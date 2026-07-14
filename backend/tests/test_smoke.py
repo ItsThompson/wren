@@ -2,6 +2,8 @@
 
 Boots both real apps in one process and asserts /healthz and /metrics respond.
 Booting both together also proves the per-app metric registries do not collide.
+Readiness is now dependency-gated (Ticket 2), so this asserts the Postgres check
+is wired into both apps; its up/down state is covered by the DB readiness tests.
 """
 
 from __future__ import annotations
@@ -22,7 +24,12 @@ def test_both_apps_serve_health_and_metrics(label: str, app: FastAPI) -> None:
     client = TestClient(app)
 
     assert client.get("/healthz").status_code == 200
-    assert client.get("/readyz").status_code == 200
+
+    readyz = client.get("/readyz")
+    # Readiness reflects live Postgres connectivity; assert the DB check is wired
+    # into both real apps rather than a specific up/down outcome (no DB here).
+    assert readyz.status_code in (200, 503)
+    assert "postgres" in readyz.json()["checks"]
 
     metrics = client.get("/metrics")
     assert metrics.status_code == 200

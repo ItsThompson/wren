@@ -6,7 +6,7 @@
 
 Readiness checks are injected, so this module stays dependency-free. Ticket 1
 mounts zero checks (``/readyz`` is a 200 placeholder); Ticket 2 injects a DB
-connectivity check without touching this module.
+connectivity check through the same seam (see ``core.db.db_readiness_check``).
 """
 
 from __future__ import annotations
@@ -31,10 +31,10 @@ class CheckResult:
     detail: str | None = None
 
 
-# Contract: a readiness check resolves to a CheckResult and must not raise. A
-# raised exception currently propagates through the gather in readyz (500)
-# rather than degrading to a clean 503; the DB-readiness slice hardens this seam
-# (gather with return_exceptions) when it adds the first real check.
+# Contract: a readiness check resolves to a CheckResult. A well-behaved check
+# reports failure as ``CheckResult(ok=False)`` rather than raising, but the
+# aggregator below is defensive: a check that raises is still degraded to a 503
+# (not a 500), so one misbehaving dependency probe cannot mask readiness.
 ReadinessCheck = Callable[[], Awaitable[CheckResult]]
 
 
@@ -48,14 +48,20 @@ def create_health_router(readiness_checks: Sequence[ReadinessCheck] = ()) -> API
 
     @router.get(READYZ_ENDPOINT, include_in_schema=False)
     async def readyz() -> JSONResponse:
-        results = await asyncio.gather(*(check() for check in readiness_checks))
-        ready = all(result.ok for result in results)
-        payload = {
-            "status": "ready" if ready else "not_ready",
-            "checks": {
-                result.name: {"ok": result.ok, "detail": result.detail} for result in results
-            },
-        }
+        results = await asyncio.gather(
+            *(check() for check in readiness_checks),
+            return_exceptions=True,
+        )
+        checks: dict[str, dict[str, object]] = {}
+        ready = True
+        for index, result in enumerate(results):
+            if isinstance(result, BaseException):
+                ready = False
+                checks[f"check_{index}"] = {"ok": False, "detail": str(result)}
+                continue
+            ready = ready and result.ok
+            checks[result.name] = {"ok": result.ok, "detail": result.detail}
+        payload = {"status": "ready" if ready else "not_ready", "checks": checks}
         return JSONResponse(payload, status_code=200 if ready else 503)
 
     return router

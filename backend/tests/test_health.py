@@ -50,3 +50,22 @@ def test_readyz_503_when_any_check_fails() -> None:
     assert body["status"] == "not_ready"
     assert body["checks"]["db"] == {"ok": False, "detail": "unreachable"}
     assert body["checks"]["cache"]["ok"] is True
+
+
+def test_readyz_503_when_a_check_raises() -> None:
+    # Seam hardening (Ticket 2): a check that raises must degrade to 503, not 500,
+    # so one misbehaving probe cannot crash readiness for the others.
+    async def cache_ok() -> CheckResult:
+        return CheckResult(name="cache", ok=True)
+
+    async def db_boom() -> CheckResult:
+        raise RuntimeError("pool exhausted")
+
+    response = _client([cache_ok, db_boom]).get("/readyz")
+    assert response.status_code == 503
+    body = response.json()
+    assert body["status"] == "not_ready"
+    assert body["checks"]["cache"]["ok"] is True
+    # The raising check is reported as failed under a positional name.
+    assert body["checks"]["check_1"]["ok"] is False
+    assert "pool exhausted" in body["checks"]["check_1"]["detail"]

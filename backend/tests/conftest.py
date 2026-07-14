@@ -22,6 +22,7 @@ def make_settings() -> MakeSettings:
             "environment": "production",
             "log_level": "info",
             "host": "127.0.0.1",
+            "database_url": "postgresql+asyncpg://wren:wren@localhost:5432/wren",
         }
         base.update(overrides)
         return AppSettings(**base)  # type: ignore[arg-type]

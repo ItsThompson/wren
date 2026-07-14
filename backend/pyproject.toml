@@ -11,6 +11,9 @@ dependencies = [
     "structlog>=24.4.0",
     "prometheus-client>=0.21.0",
     "prometheus-fastapi-instrumentator>=7.0.0",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30.0",
+    "alembic>=1.14.0",
 ]
 
 [project.scripts]
@@ -21,9 +24,11 @@ wren-api-internal = "wren.api_internal.main:main"
 dev = [
     "pytest>=8.3.0",
     "pytest-cov>=6.0.0",
+    "pytest-asyncio>=0.24.0",
     "httpx>=0.27.0",
     "ruff>=0.8.0",
     "mypy>=1.13.0",
+    "testcontainers[postgres]>=4.8.0",
 ]
 
 [build-system]
@@ -51,6 +56,10 @@ packages = ["wren"]
 pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "--cov=wren --cov-report=term-missing"
+asyncio_mode = "auto"
+markers = [
+    "integration: requires a real Postgres via testcontainers (Docker); skipped when Docker is unavailable.",
+]
 
 [tool.coverage.run]
 source = ["wren"]

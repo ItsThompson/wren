@@ -32,6 +32,10 @@ class EnvSettings(BaseSettings):
     environment: str = "development"
     log_level: str = "info"
     host: str = "0.0.0.0"  # noqa: S104 - container binds all interfaces; ingress is tunnel-only
+    # Async SQLAlchemy URL (asyncpg driver). Dev default targets the Postgres in
+    # docker-compose.dev.yml published to localhost; prod injects the in-network
+    # `@postgres:5432` form via the VPS .env (spec section 11).
+    database_url: str = "postgresql+asyncpg://wren:wren@localhost:5432/wren"
 
 
 class AppSettings(BaseModel):
@@ -42,6 +46,7 @@ class AppSettings(BaseModel):
     environment: str
     log_level: str
     host: str
+    database_url: str
 
     @property
     def is_dev(self) -> bool:
@@ -57,4 +62,5 @@ def build_app_settings(*, service: str, port: int, env: EnvSettings | None = Non
         environment=env.environment,
         log_level=env.log_level,
         host=env.host,
+        database_url=env.database_url,
     )

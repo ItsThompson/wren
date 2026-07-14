@@ -11,10 +11,17 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from wren.core.app_factory import create_app
+from wren.core.db import create_database, create_db_lifespan, db_readiness_check
 from wren.core.settings import INTERNAL_PORT, INTERNAL_SERVICE, build_app_settings
 
 settings = build_app_settings(service=INTERNAL_SERVICE, port=INTERNAL_PORT)
-app: FastAPI = create_app(settings)
+db = create_database(settings.database_url)
+app: FastAPI = create_app(
+    settings,
+    readiness_checks=[db_readiness_check(db.engine)],
+    lifespan=create_db_lifespan(db.engine),
+)
+app.state.db = db
 
 
 def main() -> None:  # pragma: no cover - process entrypoint
