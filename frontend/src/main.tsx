@@ -17,10 +17,18 @@ async function enableMocking(): Promise<void> {
   await worker.start({ onUnhandledRequest: 'bypass' })
 }
 
-void enableMocking().then(() => {
+function renderApp(): void {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App />
     </StrictMode>,
   )
-})
+}
+
+// Render regardless of mock-start outcome; a failed worker (dev-only) is logged
+// rather than left as an unhandled rejection or a blank screen.
+enableMocking()
+  .catch((error: unknown) => {
+    console.error('[MSW] Failed to start the mock worker', error)
+  })
+  .finally(renderApp)
