@@ -4,9 +4,10 @@ The migration engine reuses ``wren.core.db.create_db_engine`` and reads the URL
 from ``EnvSettings`` (``DATABASE_URL``), so migrations, the app, and tests share
 one source of truth for the connection string (spec section 11: no hardcoded URL).
 
-``target_metadata`` is ``None`` for now: Ticket 2 is DB plumbing only, with no
-domain tables yet. Ticket 6 sets it to the shared declarative ``Base.metadata``
-so ``--autogenerate`` can diff the schema.
+``target_metadata`` is an empty ``MetaData()`` for now: Ticket 2 is DB plumbing
+only, with no domain tables yet (so ``--autogenerate`` emits empty migrations).
+Ticket 6 sets it to the shared declarative ``Base.metadata`` so ``--autogenerate``
+can diff the real schema.
 """
 
 from __future__ import annotations
