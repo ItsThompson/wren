@@ -1,0 +1,23 @@
+"""Internal app entrypoint (:8001).
+
+Never tunnel-routed and never host-published: reachable only by containers on
+``compute-net`` (i.e. the MCP server). Trusts the ``X-User-ID`` header (wired in
+Ticket 3). Built from the shared factory with the internal service identity
+injected, differing from the external app only by these settings.
+"""
+
+from __future__ import annotations
+
+from fastapi import FastAPI
+
+from wren.core.app_factory import create_app
+from wren.core.settings import INTERNAL_PORT, INTERNAL_SERVICE, build_app_settings
+
+settings = build_app_settings(service=INTERNAL_SERVICE, port=INTERNAL_PORT)
+app: FastAPI = create_app(settings)
+
+
+def main() -> None:  # pragma: no cover - process entrypoint
+    import uvicorn
+
+    uvicorn.run("wren.api_internal.main:app", host=settings.host, port=settings.port)
