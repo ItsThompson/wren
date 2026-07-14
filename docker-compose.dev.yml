@@ -5,4 +5,26 @@
 # the slices that own them; keep this file appendable.
 name: wren-dev
 
-services: {}
+services:
+  # Local dev Postgres. Unlike prod (expose-only, in-network), dev publishes 5432
+  # to the host so a locally-run `just dev-api`, `just migrate`, and the test
+  # suite reach it at localhost:5432. Pinned to match prod (spec section 11).
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: wren
+      POSTGRES_PASSWORD: wren
+      POSTGRES_DB: wren
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wren -d wren"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pgdata:

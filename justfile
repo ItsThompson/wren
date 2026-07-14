@@ -32,3 +32,21 @@ lint-backend:
 # Format backend
 fmt-backend:
     cd backend && uv run ruff format . && uv run ruff check --fix .
+
+# --- Infra & migrations -----------------------------------------------------
+
+# Bring up local dev infrastructure (Postgres; observability added later)
+dev-infra:
+    docker compose -f docker-compose.dev.yml up -d postgres
+
+# Tear down local dev infrastructure (keeps the pgdata volume)
+dev-infra-down:
+    docker compose -f docker-compose.dev.yml down
+
+# Apply all migrations up to head (run pre-traffic; never at app startup)
+migrate:
+    cd backend && uv run alembic upgrade head
+
+# Autogenerate a new migration from model changes: just migrate-new "add roadmaps"
+migrate-new msg:
+    cd backend && uv run alembic revision --autogenerate -m "{{msg}}"
