@@ -1,0 +1,8 @@
+# Wren dev overrides and local infrastructure.
+#
+# Layered over docker-compose.yml in development (bind mounts, --reload, relaxed
+# cookies) and hosts local infra (Postgres, observability). Services are added by
+# the slices that own them; keep this file appendable.
+name: wren-dev
+
+services: {}

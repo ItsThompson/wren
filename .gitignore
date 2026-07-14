@@ -1,0 +1,43 @@
+# --- Python -----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# --- Node / frontend --------------------------------------------------------
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.turbo/
+
+# --- Environment (secrets; .env.example is committed) -----------------------
+.env
+.env.local
+.env.*.local
+e2e/.env.test
+
+# --- Cloudflare tunnel credentials and rendered configs ---------------------
+deployments/cloudflare/*.json
+deployments/cloudflare/*.rendered.yml
+deployments/cloudflare/cert.pem
+
+# --- IDE / OS ---------------------------------------------------------------
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# --- Playwright -------------------------------------------------------------
+e2e/test-results/
+e2e/playwright-report/
+e2e/blob-report/
