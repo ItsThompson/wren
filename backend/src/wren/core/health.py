@@ -31,6 +31,10 @@ class CheckResult:
     detail: str | None = None
 
 
+# Contract: a readiness check resolves to a CheckResult and must not raise. A
+# raised exception currently propagates through the gather in readyz (500)
+# rather than degrading to a clean 503; the DB-readiness slice hardens this seam
+# (gather with return_exceptions) when it adds the first real check.
 ReadinessCheck = Callable[[], Awaitable[CheckResult]]
 
 
