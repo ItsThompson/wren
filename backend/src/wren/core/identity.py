@@ -21,7 +21,7 @@ These are FastAPI dependencies; later route slices declare
 from __future__ import annotations
 
 import secrets
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
 from starlette.requests import Request
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -33,12 +33,13 @@ INTERNAL_TOKEN_HEADER = "X-Internal-Api-Token"
 SESSION_COOKIE_NAME = "wren_session"
 
 # A SessionVerifier turns a raw session-cookie value into a resolved user_id, or
-# None if the cookie is missing/invalid/expired. Ticket 6 supplies the real
-# signed-JWT verification through this contract; require_user does not change.
-SessionVerifier = Callable[[str], str | None]
+# None if the cookie is missing/invalid/expired. It is async so Ticket 6 can add a
+# per-request jti-blacklist lookup (an I/O call) behind this same contract without
+# reworking require_user.
+SessionVerifier = Callable[[str], Awaitable[str | None]]
 
 
-def deny_all_sessions(_cookie: str) -> str | None:
+async def deny_all_sessions(_cookie: str) -> str | None:
     """Default verifier until Ticket 6 issues sessions: every cookie fails to
     resolve, so :func:`require_user` fail-safe denies. Replaced by injecting a
     real ``SessionVerifier`` on ``app.state.session_verifier``."""
@@ -80,7 +81,7 @@ async def require_user(request: Request) -> str:
     cookie = request.cookies.get(SESSION_COOKIE_NAME)
     if cookie is None:
         raise Unauthorized("No session cookie present.")
-    user_id = verify(cookie)
+    user_id = await verify(cookie)
     if user_id is None:
         raise Unauthorized("Session is invalid or expired.")
     return user_id
@@ -95,7 +96,13 @@ async def require_internal_user(request: Request) -> str:
     """
     expected: str = getattr(request.app.state, "internal_api_token", "")
     supplied = request.headers.get(INTERNAL_TOKEN_HEADER)
-    if not expected or supplied is None or not secrets.compare_digest(supplied, expected):
+    # Compare on encoded bytes: secrets.compare_digest raises TypeError on a
+    # non-ASCII str, which would surface as a 500 instead of a clean 401.
+    if (
+        not expected
+        or supplied is None
+        or not secrets.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8"))
+    ):
         raise Unauthorized("Missing or invalid internal API token.")
     user_id = request.headers.get(USER_ID_HEADER)
     if not user_id:

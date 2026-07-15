@@ -34,10 +34,14 @@ def _cookie_verifier(cookie: str) -> str | None:
     return _COOKIE_USER if cookie == _VALID_COOKIE else None
 
 
+async def _async_cookie_verifier(cookie: str) -> str | None:
+    return _cookie_verifier(cookie)
+
+
 def _external_client(
     make_settings: MakeSettings,
     *,
-    verifier: SessionVerifier | None = _cookie_verifier,
+    verifier: SessionVerifier | None = _async_cookie_verifier,
 ) -> TestClient:
     router = APIRouter()
 
@@ -122,8 +126,8 @@ def test_external_default_verifier_denies_all_sessions(make_settings: MakeSettin
     assert response.status_code == 401
 
 
-def test_deny_all_sessions_returns_none() -> None:
-    assert deny_all_sessions("anything") is None
+async def test_deny_all_sessions_returns_none() -> None:
+    assert await deny_all_sessions("anything") is None
 
 
 async def test_strip_middleware_passes_non_http_scopes_through_untouched() -> None:
@@ -170,6 +174,17 @@ def test_internal_401_for_a_wrong_token(make_settings: MakeSettings) -> None:
     response = _internal_client(make_settings).get(
         "/whoami",
         headers={INTERNAL_TOKEN_HEADER: "wrong", USER_ID_HEADER: "agent-user"},
+    )
+    assert response.status_code == 401
+
+
+def test_internal_401_for_a_non_ascii_token(make_settings: MakeSettings) -> None:
+    # A non-ASCII token must deny cleanly (401), not crash secrets.compare_digest
+    # with a TypeError surfacing as a 500. Sent as raw latin-1 bytes so Starlette
+    # decodes it to a non-ASCII str server-side (httpx blocks non-ASCII str values).
+    response = _internal_client(make_settings).get(
+        "/whoami",
+        headers={INTERNAL_TOKEN_HEADER: b"t\xf6k\xe9n", USER_ID_HEADER: "agent-user"},
     )
     assert response.status_code == 401
 
