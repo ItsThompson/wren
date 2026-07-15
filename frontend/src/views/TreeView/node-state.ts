@@ -18,6 +18,13 @@ import { NODE_STATE, type NodeState, type Subsection } from './types'
  * `prereqs` is the list of RESOLVED prerequisite subsections; the caller drops
  * dangling prereq ids so a broken edge can never lock a node forever. State is
  * presentational only: there is no gating, so a locked node stays clickable.
+ *
+ * Divergence (intentional, bounded): dropping dangling prereqs means a node
+ * whose only prereqs are broken reads as `available` here, whereas the backend
+ * `get_next` treats an unresolved prereq as unsatisfiable. This can only differ
+ * on drafts, which are preview-only with no progress; publish-time V2 validation
+ * forbids dangling edges, so a published roadmap has none and the two agree.
+ * Mirroring the backend here is optional.
  */
 export function deriveNodeState(
   subsection: Subsection,

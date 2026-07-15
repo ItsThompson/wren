@@ -2,11 +2,8 @@ import dagre from 'dagre'
 
 import type { Edge } from '@xyflow/react'
 
+import { NODE_HEIGHT, NODE_WIDTH } from './constants'
 import type { TreeNode } from './types'
-
-/** Fixed node box dagre lays out against; must match the rendered node width. */
-const NODE_WIDTH = 208
-const NODE_HEIGHT = 60
 
 /**
  * Compute a layered top-down layout for the tree with dagre (spec section 08 /

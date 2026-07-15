@@ -1,6 +1,6 @@
 import { Background, Controls, ReactFlow } from '@xyflow/react'
 
-import type { TreeGraph } from '../types'
+import { DAG_NODE_TYPE, type TreeGraph } from '../types'
 import { DagNode } from './DagNode'
 
 import '@xyflow/react/dist/style.css'
@@ -9,7 +9,7 @@ import '@xyflow/react/dist/style.css'
  * Registered once at module scope: React Flow warns (and re-mounts nodes) if
  * `nodeTypes` is a fresh object on every render.
  */
-const nodeTypes = { dagNode: DagNode }
+const nodeTypes = { [DAG_NODE_TYPE]: DagNode }
 
 interface TreeCanvasProps {
   graph: TreeGraph

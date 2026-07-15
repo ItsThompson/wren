@@ -1,6 +1,7 @@
 import { Check, Circle, Lock, type LucideIcon } from 'lucide-react'
 import { Link } from 'react-router'
 
+import { NODE_WIDTH } from '../constants'
 import { NODE_STATE, type NodeState } from '../types'
 
 interface DagNodeCardProps {
@@ -52,7 +53,8 @@ export function DagNodeCard({ title, state, href }: DagNodeCardProps) {
       to={href}
       data-state={state}
       aria-label={`${title} (${label})`}
-      className={`flex w-52 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium text-foreground no-underline transition-colors hover:border-primary ${className}`}
+      style={{ width: NODE_WIDTH }}
+      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium text-foreground no-underline transition-colors hover:border-primary ${className}`}
     >
       <Icon aria-hidden className={`size-4 shrink-0 ${iconClassName}`} />
       <span className="truncate">{title}</span>
