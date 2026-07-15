@@ -1,0 +1,105 @@
+"""Contract tests for the internal progress surface (:8001).
+
+The internal app is the surface the MCP progress tools (Ticket 22) call: it
+resolves identity from the trusted ``X-User-ID`` header behind the shared
+``INTERNAL_API_TOKEN`` (spec section 08), not a session cookie. These assert the
+trust boundary (``require_internal_user``) and that every query stays per-user
+scoped so a tool can never reach another user's progress even though the identity
+is injected. The service is backed by in-memory repositories seeded with a
+published roadmap; no database is required.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from progress_builders import CHK_ARRAYS_READ, build_roadmap, make_record
+from progress_fakes import InMemoryProgressRepository
+from roadmaps_fakes import InMemoryRoadmapRepository
+from wren.core.app_factory import create_app
+from wren.core.errors import build_exception_handlers
+from wren.core.identity import INTERNAL_TOKEN_HEADER, USER_ID_HEADER
+from wren.core.settings import AppSettings
+from wren.progress.api_internal import create_internal_progress_router
+from wren.progress.service import ProgressService
+
+MakeSettings = Callable[..., AppSettings]
+
+_INTERNAL_TOKEN = "test-internal-token"
+_USER = "user-ada"
+_OTHER_USER = "user-grace"
+ROADMAP_ID = "grokking-dsa-7f3k"
+
+
+def _build_client(make_settings: MakeSettings) -> TestClient:
+    roadmap_repo = InMemoryRoadmapRepository()
+    roadmap = build_roadmap()
+    roadmap_repo._by_id[roadmap.id] = make_record(roadmap)
+    progress_repo = InMemoryProgressRepository()
+
+    def progress_provider() -> ProgressService:
+        return ProgressService(roadmap_repo, progress_repo)
+
+    app: FastAPI = create_app(
+        make_settings(),
+        routers=[create_internal_progress_router(progress_provider)],
+        exception_handlers=build_exception_handlers(),
+    )
+    app.state.internal_api_token = _INTERNAL_TOKEN
+    return TestClient(app)
+
+
+def _trusted(user_id: str = _USER) -> dict[str, str]:
+    return {INTERNAL_TOKEN_HEADER: _INTERNAL_TOKEN, USER_ID_HEADER: user_id}
+
+
+def test_follow_without_the_internal_token_is_401(make_settings: MakeSettings) -> None:
+    client = _build_client(make_settings)
+    response = client.post(f"/roadmaps/{ROADMAP_ID}/follow", headers={USER_ID_HEADER: _USER})
+    assert response.status_code == 401
+    assert response.json()["code"] == "UNAUTHORIZED"
+
+
+def test_follow_over_the_trusted_identity_is_201(make_settings: MakeSettings) -> None:
+    client = _build_client(make_settings)
+    response = client.post(f"/roadmaps/{ROADMAP_ID}/follow", headers=_trusted())
+    assert response.status_code == 201, response.text
+    assert response.json()["user_id"] == _USER
+
+
+def test_update_over_the_trusted_identity(make_settings: MakeSettings) -> None:
+    client = _build_client(make_settings)
+    response = client.post(
+        f"/roadmaps/{ROADMAP_ID}/progress",
+        headers=_trusted(),
+        json={"item_ids": [CHK_ARRAYS_READ], "state": "complete"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["progress"]["checked_items"] == 1
+
+
+def test_get_and_next_over_the_trusted_identity(make_settings: MakeSettings) -> None:
+    client = _build_client(make_settings)
+    assert client.get(f"/roadmaps/{ROADMAP_ID}/progress", headers=_trusted()).status_code == 200
+    assert client.get(f"/roadmaps/{ROADMAP_ID}/next", headers=_trusted()).status_code == 200
+
+
+def test_progress_is_scoped_per_trusted_user(make_settings: MakeSettings) -> None:
+    # Per-user scoping holds even though the internal app trusts X-User-ID: one
+    # user's update is invisible to another.
+    client = _build_client(make_settings)
+    client.post(
+        f"/roadmaps/{ROADMAP_ID}/progress",
+        headers=_trusted(),
+        json={"item_ids": [CHK_ARRAYS_READ], "state": "complete"},
+    )
+    snapshot = client.get(
+        f"/roadmaps/{ROADMAP_ID}/progress",
+        headers=_trusted(_OTHER_USER),
+        params={"detailed": True},
+    ).json()
+    assert snapshot["checked_items"] == 0
+    assert snapshot["checked_ids"] == []

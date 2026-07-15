@@ -34,6 +34,8 @@ from wren.oauth.wiring import (
     build_authorization_service_provider,
     build_token_service_provider,
 )
+from wren.progress.api import create_progress_router
+from wren.progress.wiring import build_progress_service_provider
 from wren.roadmaps.api import create_roadmaps_router
 from wren.roadmaps.wiring import build_roadmap_service_provider
 
@@ -55,6 +57,11 @@ accounts_router = create_accounts_router(service_provider, cookie_config=cookie_
 # layer, resolving identity via the human session cookie (require_user).
 roadmaps_router = create_roadmaps_router(build_roadmap_service_provider())
 
+# Follow + progress + server-computed next (#9): the study-time surface over the
+# progress service, resolving the human session via require_user and scoped to
+# that user (another user's progress is never returned).
+progress_router = create_progress_router(build_progress_service_provider())
+
 # Agent OAuth 2.1 Authorization Server (#18, spec section 08). All issuer/metadata/
 # endpoint URLs are built from pinned config (the Site-URL gotcha); the signing
 # key is loaded from the mounted PEM (or an ephemeral dev keypair). Fails fast
@@ -71,7 +78,7 @@ oauth_router = create_oauth_router(
 
 app: FastAPI = create_app(
     settings,
-    routers=[accounts_router, roadmaps_router, oauth_router],
+    routers=[accounts_router, roadmaps_router, progress_router, oauth_router],
     readiness_checks=[db_readiness_check(db.engine)],
     exception_handlers={**build_exception_handlers(), **build_oauth_exception_handlers()},
     lifespan=create_db_lifespan(db.engine),

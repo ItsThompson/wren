@@ -20,6 +20,8 @@ from wren.core.app_factory import create_app
 from wren.core.db import create_database, create_db_lifespan, db_readiness_check
 from wren.core.errors import build_exception_handlers
 from wren.core.settings import INTERNAL_PORT, INTERNAL_SERVICE, build_app_settings
+from wren.progress.api_internal import create_internal_progress_router
+from wren.progress.wiring import build_progress_service_provider
 from wren.roadmaps.api_internal import create_internal_roadmaps_router
 from wren.roadmaps.wiring import build_roadmap_service_provider
 
@@ -31,9 +33,14 @@ db = create_database(settings.database_url)
 # require_internal_user resolves the user from the trusted X-User-ID header.
 internal_roadmaps_router = create_internal_roadmaps_router(build_roadmap_service_provider())
 
+# Progress surface over the trusted identity (#9): follow / snapshot /
+# explicit-set / next, the endpoints the MCP progress tools (Ticket 22) call.
+# Ticket 20 mounted the internal roadmaps router and deferred these to #9.
+internal_progress_router = create_internal_progress_router(build_progress_service_provider())
+
 app: FastAPI = create_app(
     settings,
-    routers=[internal_roadmaps_router],
+    routers=[internal_roadmaps_router, internal_progress_router],
     readiness_checks=[db_readiness_check(db.engine)],
     exception_handlers=build_exception_handlers(),
     lifespan=create_db_lifespan(db.engine),

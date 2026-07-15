@@ -68,6 +68,13 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     # transition; both resolve the human session via require_user.
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:validate"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:publish"): AccessLevel.EXTERNAL_COOKIE,
+    # Follow, progress, and server-computed next (#9): the study-time surface over
+    # the progress service. All resolve the human session via require_user and are
+    # scoped to that user (another user's progress is never returned).
+    RouteKey(method="POST", path="/roadmaps/{roadmap_id}/follow"): AccessLevel.EXTERNAL_COOKIE,
+    RouteKey(method="GET", path="/roadmaps/{roadmap_id}/progress"): AccessLevel.EXTERNAL_COOKIE,
+    RouteKey(method="POST", path="/roadmaps/{roadmap_id}/progress"): AccessLevel.EXTERNAL_COOKIE,
+    RouteKey(method="GET", path="/roadmaps/{roadmap_id}/next"): AccessLevel.EXTERNAL_COOKIE,
     # OAuth 2.1 AS (#18), external-only. The AS-handshake endpoints are OAUTH
     # (unauthenticated protocol surface: discovery, DCR, authorize, token,
     # revoke); the SPA-driven consent decision and connected-clients management
@@ -94,6 +101,13 @@ INTERNAL_ROUTE_ACCESS: RouteRegistry = {
     RouteKey(method="PATCH", path="/roadmaps/{roadmap_id}"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:validate"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:publish"): AccessLevel.INTERNAL_TRUSTED,
+    # Progress surface (#9), mirrored on the internal app so the MCP progress
+    # tools (Ticket 22) call it: follow / snapshot / explicit-set / next, each
+    # resolving the trusted X-User-ID and scoped to that user.
+    RouteKey(method="POST", path="/roadmaps/{roadmap_id}/follow"): AccessLevel.INTERNAL_TRUSTED,
+    RouteKey(method="GET", path="/roadmaps/{roadmap_id}/progress"): AccessLevel.INTERNAL_TRUSTED,
+    RouteKey(method="POST", path="/roadmaps/{roadmap_id}/progress"): AccessLevel.INTERNAL_TRUSTED,
+    RouteKey(method="GET", path="/roadmaps/{roadmap_id}/next"): AccessLevel.INTERNAL_TRUSTED,
 }
 
 # OpenAPI operation keys that are HTTP methods (a path item also carries non-method
