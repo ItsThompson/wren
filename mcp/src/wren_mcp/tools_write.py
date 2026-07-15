@@ -91,7 +91,10 @@ def register_write_tools(mcp: FastMCP, client: InternalApiClient) -> None:
         for every iterative edit. Supply a proposed_id on any node you plan to
         reference later: the server preserves it, or returns a
         proposed_id -> minted_id remap where it had to de-dupe, so you never
-        address nodes by array position. Returns the minted roadmap_id."""
+        address nodes by array position. Returns the minted roadmap_id. Read the
+        authoring guidance (the shipped SKILL.md, served at GET /skill on the app)
+        first: it explains ZPD sequencing, the suggested_path, and the structural
+        validation contract you must satisfy to publish."""
         user_id = require_scope(ctx, scope=SCOPE_ROADMAPS_WRITE)
         response = await client.create_draft(user_id, roadmap.model_dump(mode="json"))
         return CreatedRoadmap.from_backend(raise_for_problem(response).json())
