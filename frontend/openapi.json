@@ -356,6 +356,274 @@
         }
       }
     },
+    "/roadmaps/{roadmap_id}/overview": {
+      "get": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Get Overview",
+        "operationId": "get_overview_roadmaps__roadmap_id__overview_get",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ResponseFormat",
+              "default": "concise"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Overview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}/nodes/{subsection_id}": {
+      "get": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Get Node",
+        "operationId": "get_node_roadmaps__roadmap_id__nodes__subsection_id__get",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          },
+          {
+            "name": "subsection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Subsection Id"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ResponseFormat",
+              "default": "concise"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}/sections/{section_id}": {
+      "get": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Get Section",
+        "operationId": "get_section_roadmaps__roadmap_id__sections__section_id__get",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          },
+          {
+            "name": "section_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Section Id"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "include",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SectionInclude",
+              "default": "both"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SectionPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}/search": {
+      "get": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Search Roadmap",
+        "operationId": "search_roadmap_roadmaps__roadmap_id__search_get",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tags"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SearchHit"
+                  },
+                  "title": "Response Search Roadmap Roadmaps  Roadmap Id  Search Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/roadmaps/{roadmap_id}:validate": {
       "post": {
         "tags": [
@@ -1902,6 +2170,30 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "ItemState": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "done": {
+            "type": "boolean",
+            "title": "Done"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "text",
+          "done"
+        ],
+        "title": "ItemState",
+        "description": "A checklist item with the caller's done state (``done`` = checked)."
+      },
       "LoginRequest": {
         "properties": {
           "email": {
@@ -2014,6 +2306,138 @@
         "type": "object",
         "title": "NextResult",
         "description": "The ``GET /next`` body: the next unchecked items in ``suggested_path``\norder whose prerequisites are all complete, plus a ``complete`` flag that is\n``True`` when nothing remains (spec section 07). ``remaining_in_path`` lands\nin Ticket 17."
+      },
+      "NodeDetail": {
+        "properties": {
+          "subsection_id": {
+            "type": "string",
+            "title": "Subsection Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "effort_estimate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort Estimate"
+          },
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            },
+            "type": "array",
+            "title": "Resources"
+          },
+          "prereqs": {
+            "items": {
+              "$ref": "#/components/schemas/PrereqRef"
+            },
+            "type": "array",
+            "title": "Prereqs"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ItemState"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subsection_id",
+          "title"
+        ],
+        "title": "NodeDetail",
+        "description": "One subsection resolved for study (spec section 04 ``NodeDetail``).\n\n``description`` is populated only in ``detailed`` mode; the concise projection\nleaves it ``None`` while still carrying every follow-up ID (the subsection id,\nthe resource links, the resolved prereq ids, and the item ids). External\nbodies are never inlined: ``resources`` are links only."
+      },
+      "OverallProgress": {
+        "properties": {
+          "total_items": {
+            "type": "integer",
+            "title": "Total Items"
+          },
+          "checked_items": {
+            "type": "integer",
+            "title": "Checked Items"
+          },
+          "percent": {
+            "type": "integer",
+            "title": "Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_items",
+          "checked_items",
+          "percent"
+        ],
+        "title": "OverallProgress",
+        "description": "Roadmap-wide completion totals (derived, never stored)."
+      },
+      "Overview": {
+        "properties": {
+          "roadmap_id": {
+            "type": "string",
+            "title": "Roadmap Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RoadmapStatus"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/SectionOverview"
+            },
+            "type": "array",
+            "title": "Sections"
+          },
+          "overall": {
+            "$ref": "#/components/schemas/OverallProgress"
+          }
+        },
+        "type": "object",
+        "required": [
+          "roadmap_id",
+          "title",
+          "status",
+          "revision",
+          "overall"
+        ],
+        "title": "Overview",
+        "description": "The ``GET /overview`` body: sections in ``section_order`` with per-section\nand overall completion, and no checklist-item bodies (spec section 04).\n\nThe orientation call; from here the agent drills into a node (``get_node``) or\na section (``get_section``). ``checked_items`` / ``percent`` reflect the\ncaller's own progress (zero when they have not started)."
       },
       "PatchRequest": {
         "properties": {
@@ -2135,6 +2559,30 @@
         ],
         "title": "PatchResult",
         "description": "The ``PATCH /roadmaps/{id}`` body: the post-batch ``revision``, the changed\nnodes, and the ``proposed_id -> minted_id`` remap for any de-duped ``add_*``\nproposal (spec section 07). ``remap`` is empty when nothing was de-duped."
+      },
+      "PrereqRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "done": {
+            "type": "boolean",
+            "title": "Done"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "done"
+        ],
+        "title": "PrereqRef",
+        "description": "A resolved prerequisite: its id, title, and the caller's done state.\n\n``done`` is ``True`` when the caller has completed every checklist item of the\nprerequisite subsection (so an agent can see at a glance whether this node is\nunlocked)."
       },
       "Progress": {
         "properties": {
@@ -2513,6 +2961,34 @@
         "title": "ResourceLink",
         "description": "A resource reference on a next item: a link, never an inlined body."
       },
+      "ResourceRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ResourceType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "url",
+          "type"
+        ],
+        "title": "ResourceRef",
+        "description": "A subsection resource as a link, never an inlined body (spec section 07)."
+      },
       "ResourceType": {
         "type": "string",
         "enum": [
@@ -2524,6 +3000,15 @@
           "other"
         ],
         "title": "ResourceType"
+      },
+      "ResponseFormat": {
+        "type": "string",
+        "enum": [
+          "concise",
+          "detailed"
+        ],
+        "title": "ResponseFormat",
+        "description": "The ``concise | detailed`` switch on the read tools (spec section 07).\n\nConcise is roughly one-third the tokens and still carries the follow-up IDs;\ndetailed adds the explanatory free-text (the node ``description``)."
       },
       "Roadmap": {
         "properties": {
@@ -2873,6 +3358,63 @@
         ],
         "title": "RoadmapStatus"
       },
+      "SearchHit": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/SearchHitKind"
+          },
+          "subsection_id": {
+            "type": "string",
+            "title": "Subsection Id"
+          },
+          "item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Id"
+          },
+          "title_or_text": {
+            "type": "string",
+            "title": "Title Or Text"
+          },
+          "matched_tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "subsection_id",
+          "title_or_text"
+        ],
+        "title": "SearchHit",
+        "description": "One search match, carrying the IDs needed to drill down (spec section 04).\n\n``item_id`` is present only when ``kind == item``; ``matched_tags`` names the\nsubsection tags that matched a tag filter (absent for a keyword-only match)."
+      },
+      "SearchHitKind": {
+        "type": "string",
+        "enum": [
+          "subsection",
+          "item"
+        ],
+        "title": "SearchHitKind",
+        "description": "Whether a search hit is a subsection (DAG node) or a checklist item."
+      },
       "Section": {
         "properties": {
           "id": {
@@ -2906,6 +3448,16 @@
         "title": "Section",
         "description": "An ordered phase grouping DAG-node subsections."
       },
+      "SectionInclude": {
+        "type": "string",
+        "enum": [
+          "subsections",
+          "items",
+          "both"
+        ],
+        "title": "SectionInclude",
+        "description": "Which parts of each node a ``SectionPage`` populates (spec section 07).\n\n``subsections`` = node metadata (tags, effort, resources, resolved prereqs);\n``items`` = the checklist items only; ``both`` = everything. Every variant\nstill carries the ``subsection_id`` so the agent can drill in further."
+      },
       "SectionInput": {
         "properties": {
           "proposed_id": {
@@ -2936,6 +3488,92 @@
           "title"
         ],
         "title": "SectionInput"
+      },
+      "SectionOverview": {
+        "properties": {
+          "section_id": {
+            "type": "string",
+            "title": "Section Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "total_items": {
+            "type": "integer",
+            "title": "Total Items"
+          },
+          "checked_items": {
+            "type": "integer",
+            "title": "Checked Items"
+          },
+          "percent": {
+            "type": "integer",
+            "title": "Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "section_id",
+          "title",
+          "total_items",
+          "checked_items",
+          "percent"
+        ],
+        "title": "SectionOverview",
+        "description": "Per-section completion counts, no checklist-item bodies (spec section 04)."
+      },
+      "SectionPage": {
+        "properties": {
+          "section_id": {
+            "type": "string",
+            "title": "Section Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "include": {
+            "$ref": "#/components/schemas/SectionInclude"
+          },
+          "subsections": {
+            "items": {
+              "$ref": "#/components/schemas/NodeDetail"
+            },
+            "type": "array",
+            "title": "Subsections"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "steering": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Steering"
+          }
+        },
+        "type": "object",
+        "required": [
+          "section_id",
+          "title",
+          "include"
+        ],
+        "title": "SectionPage",
+        "description": "The ``GET /sections/{sid}`` body: a paginated section drill-down (spec\nsections 04/07).\n\n``include`` selects which parts of each node are populated. The page holds a\nserver-set number of subsections in ``subsection_order``; ``next_cursor`` is\nan **opaque** token for the next page (absent on the last page) and\n``steering`` is present only when the response was truncated."
       },
       "SectionProgress": {
         "properties": {

@@ -109,6 +109,74 @@ export interface paths {
         patch: operations["patch_roadmap_roadmaps__roadmap_id__patch"];
         trace?: never;
     };
+    "/roadmaps/{roadmap_id}/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Overview */
+        get: operations["get_overview_roadmaps__roadmap_id__overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/roadmaps/{roadmap_id}/nodes/{subsection_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Node */
+        get: operations["get_node_roadmaps__roadmap_id__nodes__subsection_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/roadmaps/{roadmap_id}/sections/{section_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Section */
+        get: operations["get_section_roadmaps__roadmap_id__sections__section_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/roadmaps/{roadmap_id}/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search Roadmap */
+        get: operations["search_roadmap_roadmaps__roadmap_id__search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/roadmaps/{roadmap_id}:validate": {
         parameters: {
             query?: never;
@@ -696,6 +764,18 @@ export interface components {
             detail?: components["schemas"]["ValidationError"][];
         };
         /**
+         * ItemState
+         * @description A checklist item with the caller's done state (``done`` = checked).
+         */
+        ItemState: {
+            /** Id */
+            id: string;
+            /** Text */
+            text: string;
+            /** Done */
+            done: boolean;
+        };
+        /**
          * LoginRequest
          * @description Login input. ``email`` is a plain string (not ``EmailStr``) so a malformed
          *     address takes the same generic 401 path as a wrong password, never leaking
@@ -766,6 +846,66 @@ export interface components {
             complete: boolean;
         };
         /**
+         * NodeDetail
+         * @description One subsection resolved for study (spec section 04 ``NodeDetail``).
+         *
+         *     ``description`` is populated only in ``detailed`` mode; the concise projection
+         *     leaves it ``None`` while still carrying every follow-up ID (the subsection id,
+         *     the resource links, the resolved prereq ids, and the item ids). External
+         *     bodies are never inlined: ``resources`` are links only.
+         */
+        NodeDetail: {
+            /** Subsection Id */
+            subsection_id: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /** Tags */
+            tags?: string[];
+            /** Effort Estimate */
+            effort_estimate?: string | null;
+            /** Resources */
+            resources?: components["schemas"]["ResourceRef"][];
+            /** Prereqs */
+            prereqs?: components["schemas"]["PrereqRef"][];
+            /** Items */
+            items?: components["schemas"]["ItemState"][];
+        };
+        /**
+         * OverallProgress
+         * @description Roadmap-wide completion totals (derived, never stored).
+         */
+        OverallProgress: {
+            /** Total Items */
+            total_items: number;
+            /** Checked Items */
+            checked_items: number;
+            /** Percent */
+            percent: number;
+        };
+        /**
+         * Overview
+         * @description The ``GET /overview`` body: sections in ``section_order`` with per-section
+         *     and overall completion, and no checklist-item bodies (spec section 04).
+         *
+         *     The orientation call; from here the agent drills into a node (``get_node``) or
+         *     a section (``get_section``). ``checked_items`` / ``percent`` reflect the
+         *     caller's own progress (zero when they have not started).
+         */
+        Overview: {
+            /** Roadmap Id */
+            roadmap_id: string;
+            /** Title */
+            title: string;
+            status: components["schemas"]["RoadmapStatus"];
+            /** Revision */
+            revision: number;
+            /** Sections */
+            sections?: components["schemas"]["SectionOverview"][];
+            overall: components["schemas"]["OverallProgress"];
+        };
+        /**
          * PatchRequest
          * @description The ``PATCH /roadmaps/{id}`` body: the ordered op list applied atomically.
          *
@@ -794,6 +934,22 @@ export interface components {
             remap?: {
                 [key: string]: string;
             };
+        };
+        /**
+         * PrereqRef
+         * @description A resolved prerequisite: its id, title, and the caller's done state.
+         *
+         *     ``done`` is ``True`` when the caller has completed every checklist item of the
+         *     prerequisite subsection (so an agent can see at a glance whether this node is
+         *     unlocked).
+         */
+        PrereqRef: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Done */
+            done: boolean;
         };
         /**
          * Progress
@@ -978,10 +1134,32 @@ export interface components {
             type: components["schemas"]["ResourceType"];
         };
         /**
+         * ResourceRef
+         * @description A subsection resource as a link, never an inlined body (spec section 07).
+         */
+        ResourceRef: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
+            type: components["schemas"]["ResourceType"];
+        };
+        /**
          * ResourceType
          * @enum {string}
          */
         ResourceType: "article" | "video" | "book" | "course" | "docs" | "other";
+        /**
+         * ResponseFormat
+         * @description The ``concise | detailed`` switch on the read tools (spec section 07).
+         *
+         *     Concise is roughly one-third the tokens and still carries the follow-up IDs;
+         *     detailed adds the explanatory free-text (the node ``description``).
+         * @enum {string}
+         */
+        ResponseFormat: "concise" | "detailed";
         /**
          * Roadmap
          * @description A roadmap definition owned by one user. ``owner`` is resolved from the
@@ -1154,6 +1332,30 @@ export interface components {
          */
         RoadmapStatus: "draft" | "published" | "archived";
         /**
+         * SearchHit
+         * @description One search match, carrying the IDs needed to drill down (spec section 04).
+         *
+         *     ``item_id`` is present only when ``kind == item``; ``matched_tags`` names the
+         *     subsection tags that matched a tag filter (absent for a keyword-only match).
+         */
+        SearchHit: {
+            kind: components["schemas"]["SearchHitKind"];
+            /** Subsection Id */
+            subsection_id: string;
+            /** Item Id */
+            item_id?: string | null;
+            /** Title Or Text */
+            title_or_text: string;
+            /** Matched Tags */
+            matched_tags?: string[] | null;
+        };
+        /**
+         * SearchHitKind
+         * @description Whether a search hit is a subsection (DAG node) or a checklist item.
+         * @enum {string}
+         */
+        SearchHitKind: "subsection" | "item";
+        /**
          * Section
          * @description An ordered phase grouping DAG-node subsections.
          */
@@ -1169,6 +1371,16 @@ export interface components {
             /** Subsection Order */
             subsection_order?: string[];
         };
+        /**
+         * SectionInclude
+         * @description Which parts of each node a ``SectionPage`` populates (spec section 07).
+         *
+         *     ``subsections`` = node metadata (tags, effort, resources, resolved prereqs);
+         *     ``items`` = the checklist items only; ``both`` = everything. Every variant
+         *     still carries the ``subsection_id`` so the agent can drill in further.
+         * @enum {string}
+         */
+        SectionInclude: "subsections" | "items" | "both";
         /** SectionInput */
         SectionInput: {
             /** Proposed Id */
@@ -1177,6 +1389,45 @@ export interface components {
             title: string;
             /** Subsections */
             subsections?: components["schemas"]["SubsectionInput"][];
+        };
+        /**
+         * SectionOverview
+         * @description Per-section completion counts, no checklist-item bodies (spec section 04).
+         */
+        SectionOverview: {
+            /** Section Id */
+            section_id: string;
+            /** Title */
+            title: string;
+            /** Total Items */
+            total_items: number;
+            /** Checked Items */
+            checked_items: number;
+            /** Percent */
+            percent: number;
+        };
+        /**
+         * SectionPage
+         * @description The ``GET /sections/{sid}`` body: a paginated section drill-down (spec
+         *     sections 04/07).
+         *
+         *     ``include`` selects which parts of each node are populated. The page holds a
+         *     server-set number of subsections in ``subsection_order``; ``next_cursor`` is
+         *     an **opaque** token for the next page (absent on the last page) and
+         *     ``steering`` is present only when the response was truncated.
+         */
+        SectionPage: {
+            /** Section Id */
+            section_id: string;
+            /** Title */
+            title: string;
+            include: components["schemas"]["SectionInclude"];
+            /** Subsections */
+            subsections?: components["schemas"]["NodeDetail"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Steering */
+            steering?: string | null;
         };
         /**
          * SectionProgress
@@ -1653,6 +1904,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PatchResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_overview_roadmaps__roadmap_id__overview_get: {
+        parameters: {
+            query?: {
+                format?: components["schemas"]["ResponseFormat"];
+            };
+            header?: never;
+            path: {
+                roadmap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Overview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_node_roadmaps__roadmap_id__nodes__subsection_id__get: {
+        parameters: {
+            query?: {
+                format?: components["schemas"]["ResponseFormat"];
+            };
+            header?: never;
+            path: {
+                roadmap_id: string;
+                subsection_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_section_roadmaps__roadmap_id__sections__section_id__get: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                include?: components["schemas"]["SectionInclude"];
+            };
+            header?: never;
+            path: {
+                roadmap_id: string;
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SectionPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_roadmap_roadmaps__roadmap_id__search_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                tags?: string[] | null;
+            };
+            header?: never;
+            path: {
+                roadmap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchHit"][];
                 };
             };
             /** @description Validation Error */
