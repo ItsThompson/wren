@@ -95,7 +95,7 @@ function buildProgress(checkedIds: string[] = []): ProgressSnapshot {
 
 /** A progress_update result echoing the fresh checked set + a next suggestion. */
 function buildUpdateResult(checkedIds: string[]): ProgressUpdateResult {
-  return { progress: buildProgress(checkedIds), next: { items: [], complete: false } }
+  return { progress: buildProgress(checkedIds), next: { items: [], remaining_in_path: 0, complete: false } }
 }
 
 /** Renders the current pathname so navigation (e.g. after a fork) is assertable. */

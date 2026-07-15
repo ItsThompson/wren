@@ -85,23 +85,22 @@ export function useProgress(
 
   const setDeadline = useCallback(
     (next: string | null) => {
-      setDeadlineState((previous) => {
-        void (async () => {
-          try {
-            const { data } = await client.PUT('/roadmaps/{roadmap_id}/deadline', {
-              params: { path: { roadmap_id: roadmapId } },
-              body: { deadline: next },
-            })
-            if (data) setDeadlineState(data.deadline ?? null)
-          } catch {
-            // Revert the optimistic change so the UI matches the server.
-            setDeadlineState(previous)
-          }
-        })()
-        return next
-      })
+      const previous = deadline
+      setDeadlineState(next)
+      void (async () => {
+        try {
+          const { data } = await client.PUT('/roadmaps/{roadmap_id}/deadline', {
+            params: { path: { roadmap_id: roadmapId } },
+            body: { deadline: next },
+          })
+          if (data) setDeadlineState(data.deadline ?? null)
+        } catch {
+          // Revert the optimistic change so the UI matches the server.
+          setDeadlineState(previous)
+        }
+      })()
     },
-    [client, roadmapId],
+    [client, roadmapId, deadline],
   )
 
   return { checkedIds, toggle, deadline, setDeadline }
