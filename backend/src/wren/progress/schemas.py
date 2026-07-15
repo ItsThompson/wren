@@ -8,9 +8,10 @@ user.
 
 The derived read projections (``ProgressSnapshot`` / ``SectionProgress``) and the
 server-computed ``NextResult`` are never stored: they are recomputed from the
-roadmap + progress on each read (spec section 04 "Derived"). The richer
-``NextResult`` fields (``why_now`` / ``remaining_in_path`` / ``path_position``)
-and the ``deadline`` write land in Ticket 17; this slice keeps the minimal shape.
+roadmap + progress on each read (spec section 04 "Derived"). ``NextResult`` carries
+the full section-07 ``get_next`` shape (structural ``why_now``,
+``remaining_in_path``, and ``path_position`` under detailed); the per-user
+``deadline`` is set/cleared via ``PUT /roadmaps/{id}/deadline`` (:class:`DeadlineRequest`).
 
 These Pydantic models are the single source of truth for the wire contract; the
 frontend consumes them as OpenAPI-generated TypeScript (spec sections 06/10).
@@ -98,23 +99,31 @@ class ResourceLink(BaseModel):
 class NextItem(BaseModel):
     """One unchecked, prereq-satisfied checklist item to work on next.
 
-    The richer ``why_now`` / ``path_position`` fields land in Ticket 17 (spec
-    section 07); this slice returns the item, its subsection, and the resource
-    links for it."""
+    ``why_now`` is a STRUCTURAL rationale only (spec section 07): it states the
+    mechanical facts the app owns (this is the next unchecked subsection in
+    ``suggested_path`` and its named prerequisites are complete), never
+    pedagogical / ZPD judgement (that intelligence lives in the agent and was
+    baked into ``suggested_path`` at authoring time). ``path_position`` (the
+    1-based index of the item's subsection in ``suggested_path``) is populated
+    only in ``detailed`` mode."""
 
     subsection_id: str
     item_id: str
     text: str
+    why_now: str
     resources: list[ResourceLink] = Field(default_factory=list)
+    path_position: int | None = None
 
 
 class NextResult(BaseModel):
     """The ``GET /next`` body: the next unchecked items in ``suggested_path``
-    order whose prerequisites are all complete, plus a ``complete`` flag that is
-    ``True`` when nothing remains (spec section 07). ``remaining_in_path`` lands
-    in Ticket 17."""
+    order whose prerequisites are all complete (spec section 07).
+
+    ``remaining_in_path`` counts the subsections still to do along the path (any
+    with an unchecked item); ``complete`` is ``True`` when nothing remains."""
 
     items: list[NextItem] = Field(default_factory=list)
+    remaining_in_path: int = 0
     complete: bool = False
 
 
@@ -124,11 +133,20 @@ class NextResult(BaseModel):
 class ProgressUpdateRequest(BaseModel):
     """The ``POST /progress`` body: set ``item_ids`` to ``state`` (explicit set,
     not toggle; spec section 07). At least one id is required so an update is
-    never a silent no-op. The optional per-user ``deadline`` write lands in
-    Ticket 17."""
+    never a silent no-op."""
 
     item_ids: list[str] = Field(min_length=1)
     state: CompletionState
+
+
+class DeadlineRequest(BaseModel):
+    """The ``PUT /roadmaps/{id}/deadline`` body: set or clear the per-user deadline.
+
+    A ``date`` sets the deadline; ``null`` clears it. The deadline is editable and
+    clearable at any time. A date in the past is allowed (the countdown shows
+    elapsed / overdue with no pacing signal; spec sections 04/10/15)."""
+
+    deadline: date | None = None
 
 
 class ProgressUpdateResult(BaseModel):

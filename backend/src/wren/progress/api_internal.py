@@ -22,6 +22,7 @@ from fastapi import APIRouter, Depends
 
 from wren.core.identity import require_internal_user
 from wren.progress.schemas import (
+    DeadlineRequest,
     NextResult,
     Progress,
     ProgressSnapshot,
@@ -30,6 +31,7 @@ from wren.progress.schemas import (
 )
 from wren.progress.service import ProgressService
 from wren.roadmaps.config import ROADMAPS_PATH
+from wren.roadmaps.read_schemas import ResponseFormat
 
 # A FastAPI dependency that yields a ProgressService for the request.
 ProgressServiceProvider = Callable[..., object]
@@ -74,9 +76,24 @@ def create_internal_progress_router(service_provider: ProgressServiceProvider) -
     @router.get("/{roadmap_id}/next")
     async def get_next(
         roadmap_id: str,
+        format: ResponseFormat = ResponseFormat.CONCISE,
         user_id: str = Depends(require_internal_user),
         service: ProgressService = Depends(service_provider),
     ) -> NextResult:
-        return await service.get_next(user_id, roadmap_id)
+        # Mirrors the external next route for the MCP roadmap_get_next tool
+        # (Ticket 22): server-computed items + structural why_now, path_position
+        # under detailed.
+        return await service.get_next(user_id, roadmap_id, format)
+
+    @router.put("/{roadmap_id}/deadline")
+    async def set_deadline(
+        roadmap_id: str,
+        body: DeadlineRequest,
+        user_id: str = Depends(require_internal_user),
+        service: ProgressService = Depends(service_provider),
+    ) -> Progress:
+        # Set/clear the per-user deadline over the trusted identity (countdown
+        # only, no pacing); mirrors the external deadline route for Ticket 22.
+        return await service.set_deadline(user_id, roadmap_id, body.deadline)
 
     return router

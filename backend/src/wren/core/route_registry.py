@@ -108,6 +108,10 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/progress"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}/progress"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/next"): AccessLevel.EXTERNAL_COOKIE,
+    # Per-user deadline set/clear (#17): editable anytime, drives a countdown
+    # only (no pacing/forecast). Resolves the human session via require_user and
+    # is scoped to that user's progress record.
+    RouteKey(method="PUT", path="/roadmaps/{roadmap_id}/deadline"): AccessLevel.EXTERNAL_COOKIE,
     # OAuth 2.1 AS (#18), external-only. The AS-handshake endpoints are OAUTH
     # (unauthenticated protocol surface: discovery, DCR, authorize, token,
     # revoke); the SPA-driven consent decision and connected-clients management
@@ -159,6 +163,10 @@ INTERNAL_ROUTE_ACCESS: RouteRegistry = {
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/progress"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}/progress"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/next"): AccessLevel.INTERNAL_TRUSTED,
+    # Per-user deadline set/clear (#17), mirrored on the internal app so the MCP
+    # progress tools (Ticket 22) can call it: resolves the trusted X-User-ID and
+    # is scoped to that user's progress record (countdown only, no pacing).
+    RouteKey(method="PUT", path="/roadmaps/{roadmap_id}/deadline"): AccessLevel.INTERNAL_TRUSTED,
 }
 
 # OpenAPI operation keys that are HTTP methods (a path item also carries non-method

@@ -20,7 +20,7 @@ roadmap; spec section 04). An unreadable roadmap is a 404 with no existence leak
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from wren.core.errors import Conflict, NotFound, Validation
 from wren.core.logging import get_logger
@@ -36,6 +36,7 @@ from wren.progress.schemas import (
 )
 from wren.progress.summary import summarize
 from wren.progress.traversal import all_item_ids
+from wren.roadmaps.read_schemas import ResponseFormat
 from wren.roadmaps.repository import RoadmapRepository
 from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
 
@@ -132,15 +133,36 @@ class ProgressService:
             next=compute_next(roadmap, updated),
         )
 
-    async def get_next(self, user_id: str, roadmap_id: str) -> NextResult:
+    async def get_next(
+        self, user_id: str, roadmap_id: str, fmt: ResponseFormat = ResponseFormat.CONCISE
+    ) -> NextResult:
         """Return the next unchecked, prereq-satisfied items in path order.
 
         Computed server-side in :func:`progress.next.compute` (spec section 07),
-        never delegated to the agent. Scoped to the caller's progress. Trackable
-        on a published roadmap, or an archived one the caller already follows."""
+        never delegated to the agent. Each item carries a structural ``why_now``
+        and its resource links; ``detailed`` mode adds each item's
+        ``path_position``. Scoped to the caller's progress. Trackable on a
+        published roadmap, or an archived one the caller already follows."""
         roadmap = await self._require_trackable_readable(user_id, roadmap_id)
         progress = await self._load_or_empty(user_id, roadmap_id)
-        return compute_next(roadmap, progress)
+        return compute_next(roadmap, progress, fmt=fmt)
+
+    async def set_deadline(self, user_id: str, roadmap_id: str, deadline: date | None) -> Progress:
+        """Set or clear the caller's per-user deadline on the progress record.
+
+        A ``date`` sets the deadline; ``None`` clears it. Editable and clearable at
+        any time, and a past date is allowed (the countdown shows elapsed / overdue
+        with no pacing signal; spec sections 04/10/15). Upserts the caller's private
+        record like :meth:`update`, so setting a deadline on a **published** roadmap
+        also starts following; the same trackable guard refuses a non-follower on an
+        **archived** roadmap (no phantom follower). No pacing or effort forecast is
+        derived: the deadline drives a countdown only."""
+        await self._require_trackable_readable(user_id, roadmap_id)
+        progress = await self._load_or_empty(user_id, roadmap_id)
+        updated = progress.model_copy(update={"deadline": deadline, "updated_at": self._clock()})
+        await self._persist(updated)
+        _log.info("deadline_set", roadmap_id=roadmap_id, user_id=user_id, cleared=deadline is None)
+        return updated
 
     async def _load_readable(self, user_id: str, roadmap_id: str) -> Roadmap:
         """Load a roadmap the caller may read: their own (any status) or a public
