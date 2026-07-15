@@ -13,6 +13,11 @@
 #
 # Image version pinning: third-party images are pinned to exact tags. Review
 # quarterly; check release notes before bumping.
+#
+# Project name is `wren` here and `wren-dev` in the dev overlay, so the two run
+# under separate volume/network namespaces (wren_pgdata vs wren-dev_pgdata):
+# always drive them through the paired justfile recipes (`just up`/`just down`
+# vs `just up-dev`/`just dev-infra`), not a bare `docker compose` mixing the two.
 # =============================================================================
 name: wren
 
@@ -76,9 +81,11 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      # The venv interpreter probes the external app's readiness. urlopen raises
-      # on non-2xx (a 503 not-ready) and on connection refusal, both -> unhealthy.
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=3)"]
+      # The venv interpreter probes BOTH apps' readiness (external :8000 +
+      # internal :8001): the container is healthy only when both serve. urlopen
+      # raises on non-2xx (a 503 not-ready) and on connection refusal, both ->
+      # unhealthy. (serve.sh also takes the container down if either app exits.)
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/readyz', timeout=3); u.urlopen('http://127.0.0.1:8001/readyz', timeout=3)"]
       interval: 10s
       timeout: 5s
       retries: 5
