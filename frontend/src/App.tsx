@@ -5,8 +5,10 @@ import { AppShell } from '@/components/AppShell'
 import { AuthView } from '@/views/AuthView'
 import { ConnectedClientsView } from '@/views/ConnectedClientsView'
 import { ConsentView } from '@/views/ConsentView'
+import { DashboardView } from '@/views/DashboardView'
 import { LandingView } from '@/views/LandingView'
 import { NotFoundView } from '@/views/NotFoundView'
+import { ProfileView } from '@/views/ProfileView'
 import { RoadmapView } from '@/views/RoadmapView'
 
 const router = createBrowserRouter([
@@ -17,6 +19,8 @@ const router = createBrowserRouter([
       { index: true, element: <LandingView /> },
       { path: 'auth', element: <AuthView /> },
       { path: 'authorize', element: <ConsentView /> },
+      { path: 'dashboard', element: <DashboardView /> },
+      { path: 'user/:handle', element: <ProfileView /> },
       { path: 'settings/connections', element: <ConnectedClientsView /> },
       { path: 'roadmaps/:roadmapId', element: <RoadmapView /> },
       { path: '*', element: <NotFoundView /> },
