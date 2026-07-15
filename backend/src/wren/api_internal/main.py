@@ -12,6 +12,7 @@ from fastapi import FastAPI
 
 from wren.core.app_factory import create_app
 from wren.core.db import create_database, create_db_lifespan, db_readiness_check
+from wren.core.errors import build_exception_handlers
 from wren.core.settings import INTERNAL_PORT, INTERNAL_SERVICE, build_app_settings
 
 settings = build_app_settings(service=INTERNAL_SERVICE, port=INTERNAL_PORT)
@@ -19,9 +20,12 @@ db = create_database(settings.database_url)
 app: FastAPI = create_app(
     settings,
     readiness_checks=[db_readiness_check(db.engine)],
+    exception_handlers=build_exception_handlers(),
     lifespan=create_db_lifespan(db.engine),
 )
 app.state.db = db
+# The internal app trusts X-User-ID behind this shared token (require_internal_user).
+app.state.internal_api_token = settings.internal_api_token
 
 
 def main() -> None:  # pragma: no cover - process entrypoint
