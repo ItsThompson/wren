@@ -10,27 +10,17 @@ import { ProfileSkeleton } from './components/ProfileSkeleton'
 import { useProfile } from './hooks/useProfile'
 
 /**
- * Same-origin by default (dev proxy + MSW); prod points at the API subdomain via
- * `VITE_API_BASE_URL`. Read once at module load: the deployment base is fixed.
- */
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
-
-interface ProfileViewProps {
-  /** Overridable in tests; defaults to the deployment API base URL. */
-  baseUrl?: string
-}
-
-/**
  * ProfileView: a user's public
  * profile at `/user/{handle}`. It renders the display name in Fraunces, the
  * handle in mono, and a grid of the user's published-public roadmap cards. An
  * unknown handle routes to a 404 view; loading / error / empty are handled too.
  * Public and viewer-agnostic: no session is required, and drafts / private /
- * archived roadmaps and the follow graph never appear.
+ * archived roadmaps and the follow graph never appear. The public client (and
+ * its `baseUrl`) comes from `ApiClientProvider`, so the view threads no base.
  */
-export function ProfileView({ baseUrl = API_BASE_URL }: ProfileViewProps) {
+export function ProfileView() {
   const { handle } = useParams()
-  const { state, reload } = useProfile(handle ?? '', baseUrl)
+  const { state, reload } = useProfile(handle ?? '')
 
   if (state.phase === 'loading') {
     return <ProfileSkeleton />
