@@ -203,6 +203,65 @@
             }
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Patch Roadmap",
+        "operationId": "patch_roadmap_roadmaps__roadmap_id__patch",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatchResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/roadmaps/{roadmap_id}:validate": {
@@ -720,6 +779,185 @@
   },
   "components": {
     "schemas": {
+      "AddEdgeOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "add_edge",
+            "title": "Op"
+          },
+          "from_id": {
+            "type": "string",
+            "title": "From Id"
+          },
+          "to_id": {
+            "type": "string",
+            "title": "To Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "op",
+          "from_id",
+          "to_id"
+        ],
+        "title": "AddEdgeOp",
+        "description": "``to_id`` gains ``from_id`` as a prerequisite (spec section 07)."
+      },
+      "AddItemOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "add_item",
+            "title": "Op"
+          },
+          "subsection_id": {
+            "type": "string",
+            "title": "Subsection Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "proposed_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Id"
+          },
+          "before_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Id"
+          },
+          "after_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "op",
+          "subsection_id",
+          "text"
+        ],
+        "title": "AddItemOp"
+      },
+      "AddSectionOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "add_section",
+            "title": "Op"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "proposed_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Id"
+          },
+          "before_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Id"
+          },
+          "after_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "op",
+          "title"
+        ],
+        "title": "AddSectionOp"
+      },
+      "AddSubsectionOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "add_subsection",
+            "title": "Op"
+          },
+          "section_id": {
+            "type": "string",
+            "title": "Section Id"
+          },
+          "subsection": {
+            "$ref": "#/components/schemas/SubsectionInput"
+          },
+          "before_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Id"
+          },
+          "after_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "op",
+          "section_id",
+          "subsection"
+        ],
+        "title": "AddSubsectionOp"
+      },
       "AuthenticatedUser": {
         "properties": {
           "id": {
@@ -888,6 +1126,47 @@
         },
         "type": "object",
         "title": "Body_token_token_post"
+      },
+      "ChangeType": {
+        "type": "string",
+        "enum": [
+          "added",
+          "updated",
+          "removed"
+        ],
+        "title": "ChangeType"
+      },
+      "ChangedNode": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ChangedNodeKind"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "change": {
+            "$ref": "#/components/schemas/ChangeType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "change"
+        ],
+        "title": "ChangedNode",
+        "description": "One node the batch touched, echoed back so the agent knows what changed\nwithout re-reading the whole roadmap (spec section 07: summary-first). Lean\non purpose (kind + id + change), keeping a small edit's response near the\n~50-token target; the agent re-reads a specific node for its new body."
+      },
+      "ChangedNodeKind": {
+        "type": "string",
+        "enum": [
+          "roadmap",
+          "section",
+          "subsection",
+          "item"
+        ],
+        "title": "ChangedNodeKind"
       },
       "ChecklistItem": {
         "properties": {
@@ -1167,6 +1446,127 @@
         "title": "LoginRequest",
         "description": "Login input. ``email`` is a plain string (not ``EmailStr``) so a malformed\naddress takes the same generic 401 path as a wrong password, never leaking\nwhether the address is even well-formed vs. registered."
       },
+      "PatchRequest": {
+        "properties": {
+          "operations": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/AddSubsectionOp"
+                },
+                {
+                  "$ref": "#/components/schemas/UpdateSubsectionOp"
+                },
+                {
+                  "$ref": "#/components/schemas/RemoveSubsectionOp"
+                },
+                {
+                  "$ref": "#/components/schemas/AddEdgeOp"
+                },
+                {
+                  "$ref": "#/components/schemas/RemoveEdgeOp"
+                },
+                {
+                  "$ref": "#/components/schemas/SetTagsOp"
+                },
+                {
+                  "$ref": "#/components/schemas/SetResourcesOp"
+                },
+                {
+                  "$ref": "#/components/schemas/SetEffortOp"
+                },
+                {
+                  "$ref": "#/components/schemas/AddItemOp"
+                },
+                {
+                  "$ref": "#/components/schemas/UpdateItemOp"
+                },
+                {
+                  "$ref": "#/components/schemas/RemoveItemOp"
+                },
+                {
+                  "$ref": "#/components/schemas/ReorderOp"
+                },
+                {
+                  "$ref": "#/components/schemas/SetSuggestedPathOp"
+                },
+                {
+                  "$ref": "#/components/schemas/AddSectionOp"
+                },
+                {
+                  "$ref": "#/components/schemas/UpdateSectionOp"
+                },
+                {
+                  "$ref": "#/components/schemas/RemoveSectionOp"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "op",
+                "mapping": {
+                  "add_edge": "#/components/schemas/AddEdgeOp",
+                  "add_item": "#/components/schemas/AddItemOp",
+                  "add_section": "#/components/schemas/AddSectionOp",
+                  "add_subsection": "#/components/schemas/AddSubsectionOp",
+                  "remove_edge": "#/components/schemas/RemoveEdgeOp",
+                  "remove_item": "#/components/schemas/RemoveItemOp",
+                  "remove_section": "#/components/schemas/RemoveSectionOp",
+                  "remove_subsection": "#/components/schemas/RemoveSubsectionOp",
+                  "reorder": "#/components/schemas/ReorderOp",
+                  "set_effort": "#/components/schemas/SetEffortOp",
+                  "set_resources": "#/components/schemas/SetResourcesOp",
+                  "set_suggested_path": "#/components/schemas/SetSuggestedPathOp",
+                  "set_tags": "#/components/schemas/SetTagsOp",
+                  "update_item": "#/components/schemas/UpdateItemOp",
+                  "update_section": "#/components/schemas/UpdateSectionOp",
+                  "update_subsection": "#/components/schemas/UpdateSubsectionOp"
+                }
+              }
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Operations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "operations"
+        ],
+        "title": "PatchRequest",
+        "description": "The ``PATCH /roadmaps/{id}`` body: the ordered op list applied atomically.\n\nThe target ``revision`` travels in the ``If-Match`` header (spec section 06),\nnot the body. At least one op is required so a patch is never a silent no-op\nthat would still burn a revision."
+      },
+      "PatchResult": {
+        "properties": {
+          "roadmap_id": {
+            "type": "string",
+            "title": "Roadmap Id"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "changed_nodes": {
+            "items": {
+              "$ref": "#/components/schemas/ChangedNode"
+            },
+            "type": "array",
+            "title": "Changed Nodes"
+          },
+          "remap": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Remap"
+          }
+        },
+        "type": "object",
+        "required": [
+          "roadmap_id",
+          "revision"
+        ],
+        "title": "PatchResult",
+        "description": "The ``PATCH /roadmaps/{id}`` body: the post-batch ``revision``, the changed\nnodes, and the ``proposed_id -> minted_id`` remap for any de-duped ``add_*``\nproposal (spec section 07). ``remap`` is empty when nothing was de-duped."
+      },
       "RegisterRequest": {
         "properties": {
           "username": {
@@ -1191,6 +1591,129 @@
         ],
         "title": "RegisterRequest",
         "description": "Registration input. Structural typing only; domain rules (password\nstrength, handle charset) are enforced in the service for specific messages."
+      },
+      "RemoveEdgeOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "remove_edge",
+            "title": "Op"
+          },
+          "from_id": {
+            "type": "string",
+            "title": "From Id"
+          },
+          "to_id": {
+            "type": "string",
+            "title": "To Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "op",
+          "from_id",
+          "to_id"
+        ],
+        "title": "RemoveEdgeOp"
+      },
+      "RemoveItemOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "remove_item",
+            "title": "Op"
+          },
+          "item_id": {
+            "type": "string",
+            "title": "Item Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "op",
+          "item_id"
+        ],
+        "title": "RemoveItemOp"
+      },
+      "RemoveSectionOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "remove_section",
+            "title": "Op"
+          },
+          "section_id": {
+            "type": "string",
+            "title": "Section Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "op",
+          "section_id"
+        ],
+        "title": "RemoveSectionOp"
+      },
+      "RemoveSubsectionOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "remove_subsection",
+            "title": "Op"
+          },
+          "subsection_id": {
+            "type": "string",
+            "title": "Subsection Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "op",
+          "subsection_id"
+        ],
+        "title": "RemoveSubsectionOp"
+      },
+      "ReorderOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "reorder",
+            "title": "Op"
+          },
+          "target_id": {
+            "type": "string",
+            "title": "Target Id"
+          },
+          "before_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Id"
+          },
+          "after_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "op",
+          "target_id"
+        ],
+        "title": "ReorderOp",
+        "description": "Move any node (section / subsection / item) within its sibling order."
       },
       "Resource": {
         "properties": {
@@ -1582,6 +2105,109 @@
         ],
         "title": "SectionInput"
       },
+      "SetEffortOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "set_effort",
+            "title": "Op"
+          },
+          "subsection_id": {
+            "type": "string",
+            "title": "Subsection Id"
+          },
+          "effort_estimate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort Estimate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "op",
+          "subsection_id"
+        ],
+        "title": "SetEffortOp"
+      },
+      "SetResourcesOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "set_resources",
+            "title": "Op"
+          },
+          "subsection_id": {
+            "type": "string",
+            "title": "Subsection Id"
+          },
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceInput"
+            },
+            "type": "array",
+            "title": "Resources"
+          }
+        },
+        "type": "object",
+        "required": [
+          "op",
+          "subsection_id"
+        ],
+        "title": "SetResourcesOp"
+      },
+      "SetSuggestedPathOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "set_suggested_path",
+            "title": "Op"
+          },
+          "path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "op"
+        ],
+        "title": "SetSuggestedPathOp"
+      },
+      "SetTagsOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "set_tags",
+            "title": "Op"
+          },
+          "subsection_id": {
+            "type": "string",
+            "title": "Subsection Id"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "op",
+          "subsection_id"
+        ],
+        "title": "SetTagsOp"
+      },
       "Subsection": {
         "properties": {
           "id": {
@@ -1738,6 +2364,106 @@
           "title"
         ],
         "title": "SubsectionInput"
+      },
+      "UpdateItemOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "update_item",
+            "title": "Op"
+          },
+          "item_id": {
+            "type": "string",
+            "title": "Item Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "op",
+          "item_id",
+          "text"
+        ],
+        "title": "UpdateItemOp"
+      },
+      "UpdateSectionOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "update_section",
+            "title": "Op"
+          },
+          "section_id": {
+            "type": "string",
+            "title": "Section Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "op",
+          "section_id",
+          "title"
+        ],
+        "title": "UpdateSectionOp"
+      },
+      "UpdateSubsectionOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "update_subsection",
+            "title": "Op"
+          },
+          "subsection_id": {
+            "type": "string",
+            "title": "Subsection Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "effort_estimate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort Estimate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "op",
+          "subsection_id"
+        ],
+        "title": "UpdateSubsectionOp"
       },
       "ValidateResult": {
         "properties": {

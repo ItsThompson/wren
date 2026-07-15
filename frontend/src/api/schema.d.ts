@@ -103,7 +103,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Patch Roadmap */
+        patch: operations["patch_roadmap_roadmaps__roadmap_id__patch"];
         trace?: never;
     };
     "/roadmaps/{roadmap_id}:validate": {
@@ -315,6 +316,70 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * AddEdgeOp
+         * @description ``to_id`` gains ``from_id`` as a prerequisite (spec section 07).
+         */
+        AddEdgeOp: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "add_edge";
+            /** From Id */
+            from_id: string;
+            /** To Id */
+            to_id: string;
+        };
+        /** AddItemOp */
+        AddItemOp: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "add_item";
+            /** Subsection Id */
+            subsection_id: string;
+            /** Text */
+            text: string;
+            /** Proposed Id */
+            proposed_id?: string | null;
+            /** Before Id */
+            before_id?: string | null;
+            /** After Id */
+            after_id?: string | null;
+        };
+        /** AddSectionOp */
+        AddSectionOp: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "add_section";
+            /** Title */
+            title: string;
+            /** Proposed Id */
+            proposed_id?: string | null;
+            /** Before Id */
+            before_id?: string | null;
+            /** After Id */
+            after_id?: string | null;
+        };
+        /** AddSubsectionOp */
+        AddSubsectionOp: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "add_subsection";
+            /** Section Id */
+            section_id: string;
+            subsection: components["schemas"]["SubsectionInput"];
+            /** Before Id */
+            before_id?: string | null;
+            /** After Id */
+            after_id?: string | null;
+        };
+        /**
          * AuthenticatedUser
          * @description The authenticated user's own view, returned by register/login/refresh.
          *
@@ -375,6 +440,29 @@ export interface components {
             /** Resource */
             resource?: string | null;
         };
+        /**
+         * ChangeType
+         * @enum {string}
+         */
+        ChangeType: "added" | "updated" | "removed";
+        /**
+         * ChangedNode
+         * @description One node the batch touched, echoed back so the agent knows what changed
+         *     without re-reading the whole roadmap (spec section 07: summary-first). Lean
+         *     on purpose (kind + id + change), keeping a small edit's response near the
+         *     ~50-token target; the agent re-reads a specific node for its new body.
+         */
+        ChangedNode: {
+            kind: components["schemas"]["ChangedNodeKind"];
+            /** Id */
+            id: string;
+            change: components["schemas"]["ChangeType"];
+        };
+        /**
+         * ChangedNodeKind
+         * @enum {string}
+         */
+        ChangedNodeKind: "roadmap" | "section" | "subsection" | "item";
         /**
          * ChecklistItem
          * @description The only checkable unit.
@@ -489,6 +577,36 @@ export interface components {
             password: string;
         };
         /**
+         * PatchRequest
+         * @description The ``PATCH /roadmaps/{id}`` body: the ordered op list applied atomically.
+         *
+         *     The target ``revision`` travels in the ``If-Match`` header (spec section 06),
+         *     not the body. At least one op is required so a patch is never a silent no-op
+         *     that would still burn a revision.
+         */
+        PatchRequest: {
+            /** Operations */
+            operations: (components["schemas"]["AddSubsectionOp"] | components["schemas"]["UpdateSubsectionOp"] | components["schemas"]["RemoveSubsectionOp"] | components["schemas"]["AddEdgeOp"] | components["schemas"]["RemoveEdgeOp"] | components["schemas"]["SetTagsOp"] | components["schemas"]["SetResourcesOp"] | components["schemas"]["SetEffortOp"] | components["schemas"]["AddItemOp"] | components["schemas"]["UpdateItemOp"] | components["schemas"]["RemoveItemOp"] | components["schemas"]["ReorderOp"] | components["schemas"]["SetSuggestedPathOp"] | components["schemas"]["AddSectionOp"] | components["schemas"]["UpdateSectionOp"] | components["schemas"]["RemoveSectionOp"])[];
+        };
+        /**
+         * PatchResult
+         * @description The ``PATCH /roadmaps/{id}`` body: the post-batch ``revision``, the changed
+         *     nodes, and the ``proposed_id -> minted_id`` remap for any de-duped ``add_*``
+         *     proposal (spec section 07). ``remap`` is empty when nothing was de-duped.
+         */
+        PatchResult: {
+            /** Roadmap Id */
+            roadmap_id: string;
+            /** Revision */
+            revision: number;
+            /** Changed Nodes */
+            changed_nodes?: components["schemas"]["ChangedNode"][];
+            /** Remap */
+            remap?: {
+                [key: string]: string;
+            };
+        };
+        /**
          * RegisterRequest
          * @description Registration input. Structural typing only; domain rules (password
          *     strength, handle charset) are enforced in the service for specific messages.
@@ -503,6 +621,65 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /** RemoveEdgeOp */
+        RemoveEdgeOp: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "remove_edge";
+            /** From Id */
+            from_id: string;
+            /** To Id */
+            to_id: string;
+        };
+        /** RemoveItemOp */
+        RemoveItemOp: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "remove_item";
+            /** Item Id */
+            item_id: string;
+        };
+        /** RemoveSectionOp */
+        RemoveSectionOp: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "remove_section";
+            /** Section Id */
+            section_id: string;
+        };
+        /** RemoveSubsectionOp */
+        RemoveSubsectionOp: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "remove_subsection";
+            /** Subsection Id */
+            subsection_id: string;
+        };
+        /**
+         * ReorderOp
+         * @description Move any node (section / subsection / item) within its sibling order.
+         */
+        ReorderOp: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "reorder";
+            /** Target Id */
+            target_id: string;
+            /** Before Id */
+            before_id?: string | null;
+            /** After Id */
+            after_id?: string | null;
         };
         /**
          * Resource
@@ -676,6 +853,52 @@ export interface components {
             /** Subsections */
             subsections?: components["schemas"]["SubsectionInput"][];
         };
+        /** SetEffortOp */
+        SetEffortOp: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "set_effort";
+            /** Subsection Id */
+            subsection_id: string;
+            /** Effort Estimate */
+            effort_estimate?: string | null;
+        };
+        /** SetResourcesOp */
+        SetResourcesOp: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "set_resources";
+            /** Subsection Id */
+            subsection_id: string;
+            /** Resources */
+            resources?: components["schemas"]["ResourceInput"][];
+        };
+        /** SetSuggestedPathOp */
+        SetSuggestedPathOp: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "set_suggested_path";
+            /** Path */
+            path?: string[];
+        };
+        /** SetTagsOp */
+        SetTagsOp: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "set_tags";
+            /** Subsection Id */
+            subsection_id: string;
+            /** Tags */
+            tags?: string[];
+        };
         /**
          * Subsection
          * @description The DAG node: track tags, resources, checklist items, prereq edges.
@@ -724,6 +947,46 @@ export interface components {
             resources?: components["schemas"]["ResourceInput"][];
             /** Checklist Items */
             checklist_items?: components["schemas"]["ChecklistItemInput"][];
+        };
+        /** UpdateItemOp */
+        UpdateItemOp: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "update_item";
+            /** Item Id */
+            item_id: string;
+            /** Text */
+            text: string;
+        };
+        /** UpdateSectionOp */
+        UpdateSectionOp: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "update_section";
+            /** Section Id */
+            section_id: string;
+            /** Title */
+            title: string;
+        };
+        /** UpdateSubsectionOp */
+        UpdateSubsectionOp: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "update_subsection";
+            /** Subsection Id */
+            subsection_id: string;
+            /** Title */
+            title?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Effort Estimate */
+            effort_estimate?: string | null;
         };
         /**
          * ValidateResult
@@ -934,6 +1197,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Roadmap"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_roadmap_roadmaps__roadmap_id__patch: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": number;
+            };
+            path: {
+                roadmap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatchResult"];
                 };
             };
             /** @description Validation Error */
