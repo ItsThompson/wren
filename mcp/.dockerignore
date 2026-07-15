@@ -1,0 +1,16 @@
+# Build-context excludes: keep the image lean and reproducible. The venv and
+# caches are rebuilt inside the image; tests and tooling caches never ship.
+.venv/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+tests/
+.git/
+.gitignore
+*.md

@@ -1,0 +1,12 @@
+# Build-context excludes: node_modules and prior build output are rebuilt inside
+# the image; caches, tests and tooling never ship.
+node_modules/
+dist/
+coverage/
+.turbo/
+*.tsbuildinfo
+.git/
+.gitignore
+Dockerfile
+.dockerignore
+README.md
