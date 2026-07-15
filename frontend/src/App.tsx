@@ -5,6 +5,7 @@ import { AppShell } from '@/components/AppShell'
 import { AuthView } from '@/views/AuthView'
 import { LandingView } from '@/views/LandingView'
 import { NotFoundView } from '@/views/NotFoundView'
+import { RoadmapView } from '@/views/RoadmapView'
 
 const router = createBrowserRouter([
   {
@@ -13,6 +14,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <LandingView /> },
       { path: 'auth', element: <AuthView /> },
+      { path: 'roadmaps/:roadmapId', element: <RoadmapView /> },
       { path: '*', element: <NotFoundView /> },
     ],
   },
