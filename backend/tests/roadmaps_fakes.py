@@ -58,6 +58,11 @@ class InMemoryRoadmapRepository:
             return None
         return record
 
+    async def get(self, roadmap_id: str) -> RoadmapRecord | None:
+        # Unscoped read (mirrors the SQLAlchemy repository): callers apply their
+        # own readability rule before using the result.
+        return self._by_id.get(roadmap_id)
+
     async def commit(self) -> None:
         self.commits += 1
 

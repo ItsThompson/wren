@@ -35,6 +35,8 @@ class RoadmapRepository(Protocol):
 
     async def save(self, roadmap: Roadmap) -> None: ...
 
+    async def get(self, roadmap_id: str) -> RoadmapRecord | None: ...
+
     async def get_owned(self, roadmap_id: str, owner_id: str) -> RoadmapRecord | None: ...
 
     async def commit(self) -> None: ...
@@ -89,6 +91,19 @@ class SqlAlchemyRoadmapRepository:
             select(RoadmapRecord).where(
                 RoadmapRecord.id == roadmap_id, RoadmapRecord.owner == owner_id
             ),
+        )
+
+    async def get(self, roadmap_id: str) -> RoadmapRecord | None:
+        """Load a roadmap by id without owner scoping.
+
+        Unlike :meth:`get_owned`, this is not scoped to a caller: it backs the
+        cross-user reads the progress domain needs (a follower reading a
+        published roadmap they do not own; spec sections 05/06). Callers apply
+        their own readability rule (published/public vs owner) before using the
+        result, so this accessor never itself grants access.
+        """
+        return await fetch_optional(
+            self._session, select(RoadmapRecord).where(RoadmapRecord.id == roadmap_id)
         )
 
     async def commit(self) -> None:
