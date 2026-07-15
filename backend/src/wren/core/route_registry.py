@@ -43,10 +43,18 @@ class RouteKey:
 RouteRegistry = Mapping[RouteKey, AccessLevel]
 
 # Declarative per-app registries. Product routes are declared here by the slice
-# that mounts them (accounts #6, roadmaps #7+, OAuth #18); until then both apps
-# expose only infra/docs routes, so these are empty. The coverage test fails safe
-# (deny) the moment a mounted product route is missing an entry.
-EXTERNAL_ROUTE_ACCESS: RouteRegistry = {}
+# that mounts them (accounts #6, roadmaps #7+, OAuth #18). The coverage test fails
+# safe (deny) the moment a mounted product route is missing an entry.
+#
+# The /auth endpoints are PUBLIC: they establish or tear down a session rather
+# than resolving one via require_user, so they gate no caller identity. They are
+# mounted on the external app only (no internal-app auth surface).
+EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
+    RouteKey(method="POST", path="/auth/register"): AccessLevel.PUBLIC,
+    RouteKey(method="POST", path="/auth/login"): AccessLevel.PUBLIC,
+    RouteKey(method="POST", path="/auth/refresh"): AccessLevel.PUBLIC,
+    RouteKey(method="POST", path="/auth/logout"): AccessLevel.PUBLIC,
+}
 INTERNAL_ROUTE_ACCESS: RouteRegistry = {}
 
 # OpenAPI operation keys that are HTTP methods (a path item also carries non-method
