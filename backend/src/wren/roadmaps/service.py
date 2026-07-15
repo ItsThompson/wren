@@ -193,8 +193,8 @@ class RoadmapService:
         roadmap = Roadmap.model_validate(record.document)
         if roadmap.status is not RoadmapStatus.DRAFT:
             raise Conflict(
-                f"Roadmap '{roadmap_id}' is {roadmap.status.value}; only a draft can be "
-                "validated or published.",
+                f"Roadmap '{roadmap_id}' is {roadmap.status.value}; only draft roadmaps can be "
+                "edited, validated, or published.",
                 instance=f"/roadmaps/{roadmap_id}",
             )
         return roadmap
