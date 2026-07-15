@@ -1056,6 +1056,15 @@
               "type": "string",
               "title": "Roadmap Id"
             }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ResponseFormat",
+              "default": "concise"
+            }
           }
         ],
         "responses": {
@@ -1065,6 +1074,58 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NextResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}/deadline": {
+      "put": {
+        "tags": [
+          "progress"
+        ],
+        "summary": "Set Deadline",
+        "operationId": "set_deadline_roadmaps__roadmap_id__deadline_put",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeadlineRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Progress"
                 }
               }
             }
@@ -2124,6 +2185,25 @@
         "title": "ConnectedClient",
         "description": "One authorized agent in the user's connected-clients list."
       },
+      "DeadlineRequest": {
+        "properties": {
+          "deadline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline"
+          }
+        },
+        "type": "object",
+        "title": "DeadlineRequest",
+        "description": "The ``PUT /roadmaps/{id}/deadline`` body: set or clear the per-user deadline.\n\nA ``date`` sets the deadline; ``null`` clears it. The deadline is editable and\nclearable at any time. A date in the past is allowed (the countdown shows\nelapsed / overdue with no pacing signal; spec sections 04/10/15)."
+      },
       "DecisionRequest": {
         "properties": {
           "auth_request_id": {
@@ -2271,22 +2351,38 @@
             "type": "string",
             "title": "Text"
           },
+          "why_now": {
+            "type": "string",
+            "title": "Why Now"
+          },
           "resources": {
             "items": {
               "$ref": "#/components/schemas/ResourceLink"
             },
             "type": "array",
             "title": "Resources"
+          },
+          "path_position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path Position"
           }
         },
         "type": "object",
         "required": [
           "subsection_id",
           "item_id",
-          "text"
+          "text",
+          "why_now"
         ],
         "title": "NextItem",
-        "description": "One unchecked, prereq-satisfied checklist item to work on next.\n\nThe richer ``why_now`` / ``path_position`` fields land in Ticket 17 (spec\nsection 07); this slice returns the item, its subsection, and the resource\nlinks for it."
+        "description": "One unchecked, prereq-satisfied checklist item to work on next.\n\n``why_now`` is a STRUCTURAL rationale only (spec section 07): it states the\nmechanical facts the app owns (this is the next unchecked subsection in\n``suggested_path`` and its named prerequisites are complete), never\npedagogical / ZPD judgement (that intelligence lives in the agent and was\nbaked into ``suggested_path`` at authoring time). ``path_position`` (the\n1-based index of the item's subsection in ``suggested_path``) is populated\nonly in ``detailed`` mode."
       },
       "NextResult": {
         "properties": {
@@ -2297,6 +2393,11 @@
             "type": "array",
             "title": "Items"
           },
+          "remaining_in_path": {
+            "type": "integer",
+            "title": "Remaining In Path",
+            "default": 0
+          },
           "complete": {
             "type": "boolean",
             "title": "Complete",
@@ -2305,7 +2406,7 @@
         },
         "type": "object",
         "title": "NextResult",
-        "description": "The ``GET /next`` body: the next unchecked items in ``suggested_path``\norder whose prerequisites are all complete, plus a ``complete`` flag that is\n``True`` when nothing remains (spec section 07). ``remaining_in_path`` lands\nin Ticket 17."
+        "description": "The ``GET /next`` body: the next unchecked items in ``suggested_path``\norder whose prerequisites are all complete (spec section 07).\n\n``remaining_in_path`` counts the subsections still to do along the path (any\nwith an unchecked item); ``complete`` is ``True`` when nothing remains."
       },
       "NodeDetail": {
         "properties": {
@@ -2710,7 +2811,7 @@
           "state"
         ],
         "title": "ProgressUpdateRequest",
-        "description": "The ``POST /progress`` body: set ``item_ids`` to ``state`` (explicit set,\nnot toggle; spec section 07). At least one id is required so an update is\nnever a silent no-op. The optional per-user ``deadline`` write lands in\nTicket 17."
+        "description": "The ``POST /progress`` body: set ``item_ids`` to ``state`` (explicit set,\nnot toggle; spec section 07). At least one id is required so an update is\nnever a silent no-op."
       },
       "ProgressUpdateResult": {
         "properties": {

@@ -331,6 +331,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/roadmaps/{roadmap_id}/deadline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Deadline */
+        put: operations["set_deadline_roadmaps__roadmap_id__deadline_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/.well-known/oauth-authorization-server": {
         parameters: {
             query?: never;
@@ -737,6 +754,18 @@ export interface components {
             last_authorized: string;
         };
         /**
+         * DeadlineRequest
+         * @description The ``PUT /roadmaps/{id}/deadline`` body: set or clear the per-user deadline.
+         *
+         *     A ``date`` sets the deadline; ``null`` clears it. The deadline is editable and
+         *     clearable at any time. A date in the past is allowed (the countdown shows
+         *     elapsed / overdue with no pacing signal; spec sections 04/10/15).
+         */
+        DeadlineRequest: {
+            /** Deadline */
+            deadline?: string | null;
+        };
+        /**
          * DecisionRequest
          * @description The human's consent decision for a parked request.
          */
@@ -815,9 +844,13 @@ export interface components {
          * NextItem
          * @description One unchecked, prereq-satisfied checklist item to work on next.
          *
-         *     The richer ``why_now`` / ``path_position`` fields land in Ticket 17 (spec
-         *     section 07); this slice returns the item, its subsection, and the resource
-         *     links for it.
+         *     ``why_now`` is a STRUCTURAL rationale only (spec section 07): it states the
+         *     mechanical facts the app owns (this is the next unchecked subsection in
+         *     ``suggested_path`` and its named prerequisites are complete), never
+         *     pedagogical / ZPD judgement (that intelligence lives in the agent and was
+         *     baked into ``suggested_path`` at authoring time). ``path_position`` (the
+         *     1-based index of the item's subsection in ``suggested_path``) is populated
+         *     only in ``detailed`` mode.
          */
         NextItem: {
             /** Subsection Id */
@@ -826,19 +859,29 @@ export interface components {
             item_id: string;
             /** Text */
             text: string;
+            /** Why Now */
+            why_now: string;
             /** Resources */
             resources?: components["schemas"]["ResourceLink"][];
+            /** Path Position */
+            path_position?: number | null;
         };
         /**
          * NextResult
          * @description The ``GET /next`` body: the next unchecked items in ``suggested_path``
-         *     order whose prerequisites are all complete, plus a ``complete`` flag that is
-         *     ``True`` when nothing remains (spec section 07). ``remaining_in_path`` lands
-         *     in Ticket 17.
+         *     order whose prerequisites are all complete (spec section 07).
+         *
+         *     ``remaining_in_path`` counts the subsections still to do along the path (any
+         *     with an unchecked item); ``complete`` is ``True`` when nothing remains.
          */
         NextResult: {
             /** Items */
             items?: components["schemas"]["NextItem"][];
+            /**
+             * Remaining In Path
+             * @default 0
+             */
+            remaining_in_path: number;
             /**
              * Complete
              * @default false
@@ -1006,8 +1049,7 @@ export interface components {
          * ProgressUpdateRequest
          * @description The ``POST /progress`` body: set ``item_ids`` to ``state`` (explicit set,
          *     not toggle; spec section 07). At least one id is required so an update is
-         *     never a silent no-op. The optional per-user ``deadline`` write lands in
-         *     Ticket 17.
+         *     never a silent no-op.
          */
         ProgressUpdateRequest: {
             /** Item Ids */
@@ -2348,7 +2390,9 @@ export interface operations {
     };
     get_next_roadmaps__roadmap_id__next_get: {
         parameters: {
-            query?: never;
+            query?: {
+                format?: components["schemas"]["ResponseFormat"];
+            };
             header?: never;
             path: {
                 roadmap_id: string;
@@ -2364,6 +2408,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NextResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_deadline_roadmaps__roadmap_id__deadline_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                roadmap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeadlineRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Progress"];
                 };
             };
             /** @description Validation Error */
