@@ -8,14 +8,16 @@ import { createSessionClient } from '@/auth/createSessionClient'
  * client (credentials + transparent refresh), so the record resolves for the
  * signed-in user and is scoped to them server-side.
  *
- * The detailed snapshot seeds `checkedIds` and the per-user `deadline` on mount.
- * `toggle` optimistically reflects the check/uncheck locally (so the bars and
- * done-state update instantly), persists the explicit-set via `POST /progress`,
- * and reconciles to the server's returned `checked_ids`; a failed write reverts
- * the optimistic change. `setDeadline` mirrors this for the countdown: it
- * optimistically updates the local deadline, persists via `PUT /deadline`
- * (a date sets it, null clears it), and reverts on failure. `baseUrl` is injected
- * (defaulting at the view) so tests can point the client at an MSW server.
+ * The detailed snapshot seeds `checkedIds` and the per-user `deadline` on mount,
+ * and `GET /next` seeds the current "next" subsection (highlighted in the list
+ * view). `toggle` optimistically reflects the check/uncheck locally (so the bars
+ * and done-state update instantly), persists the explicit-set via `POST /progress`,
+ * and reconciles to the server's returned `checked_ids` and fresh `next`; a
+ * failed write reverts the optimistic change. `setDeadline` mirrors this for the
+ * countdown: it optimistically updates the local deadline, persists via
+ * `PUT /deadline` (a date sets it, null clears it), and reverts on failure.
+ * `baseUrl` is injected (defaulting at the view) so tests can point the client
+ * at an MSW server.
  */
 export function useProgress(
   roadmapId: string,
@@ -25,15 +27,19 @@ export function useProgress(
   toggle: (itemId: string, checked: boolean) => void
   deadline: string | null
   setDeadline: (deadline: string | null) => void
+  /** The current "next" subsection id (from `GET /next`), or null when done. */
+  nextSubsectionId: string | null
 } {
   const client = useMemo(() => createSessionClient(baseUrl), [baseUrl])
   const [checkedIds, setCheckedIds] = useState<Set<string>>(() => new Set())
   const [deadline, setDeadlineState] = useState<string | null>(null)
+  const [nextSubsectionId, setNextSubsectionId] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
     setCheckedIds(new Set())
     setDeadlineState(null)
+    setNextSubsectionId(null)
 
     void (async () => {
       try {
@@ -45,6 +51,18 @@ export function useProgress(
         setDeadlineState(data.deadline ?? null)
       } catch {
         // A read failure just leaves an unstarted checklist; not fatal.
+      }
+    })()
+
+    void (async () => {
+      try {
+        const { data } = await client.GET('/roadmaps/{roadmap_id}/next', {
+          params: { path: { roadmap_id: roadmapId } },
+        })
+        if (!active || !data) return
+        setNextSubsectionId(data.items?.[0]?.subsection_id ?? null)
+      } catch {
+        // No next suggestion available; the list view simply highlights nothing.
       }
     })()
 
@@ -69,6 +87,7 @@ export function useProgress(
           })
           const serverIds = data?.progress.checked_ids
           if (serverIds) setCheckedIds(new Set(serverIds))
+          if (data) setNextSubsectionId(data.next.items?.[0]?.subsection_id ?? null)
         } catch {
           // Revert the optimistic change so the UI matches the server.
           setCheckedIds((prev) => {
@@ -103,5 +122,5 @@ export function useProgress(
     [client, roadmapId, deadline],
   )
 
-  return { checkedIds, toggle, deadline, setDeadline }
+  return { checkedIds, toggle, deadline, setDeadline, nextSubsectionId }
 }

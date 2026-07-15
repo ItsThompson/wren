@@ -1,7 +1,11 @@
+import { useMemo, useState } from 'react'
+
 import { useProgress } from '../hooks/useProgress'
 import { overallCount } from '../progress-derive'
+import { collectTrackTags } from '../track-tags'
 import type { ProgressBinding, RoadmapActions as Actions, Roadmap } from '../types'
 import { DeadlineCountdown } from './DeadlineCountdown'
+import { FilterChips } from './FilterChips'
 import { ProgressBar } from './ProgressBar'
 import { RoadmapActions } from './RoadmapActions'
 import { SectionBlock } from './SectionBlock'
@@ -18,18 +22,29 @@ interface RoadmapListViewProps {
 
 /**
  * The published-roadmap list view with progress tracking (section 10 "List
- * view"): the header (title, subject tags, overall progress bar), then sections
- * in `section_order`, each with its own bar and interactive checklist. Checking
- * an item persists to the caller's progress record and the bars + subsection
- * done-state update from the derived checked set.
+ * view"): the header (title, subject tags, overall progress bar, deadline
+ * countdown), track-tag filter chips, then sections in `section_order`, each
+ * with its own bar and interactive checklist. Checking an item persists to the
+ * caller's progress record and the bars + subsection done-state update from the
+ * derived checked set. Selecting a filter chip narrows the visible subsections;
+ * the current-"next" subsection (from `GET /next`) is highlighted with the
+ * accent tint.
  */
 export function RoadmapListView({ roadmap, baseUrl, isOwner, actions }: RoadmapListViewProps) {
-  const { checkedIds, toggle, deadline, setDeadline } = useProgress(roadmap.id, baseUrl)
+  const { checkedIds, toggle, deadline, setDeadline, nextSubsectionId } = useProgress(
+    roadmap.id,
+    baseUrl,
+  )
+  const [activeTag, setActiveTag] = useState<string | null>(null)
   const sectionOrder = roadmap.section_order ?? []
   const sections = roadmap.sections ?? {}
   const suggestedPath = roadmap.suggested_path ?? []
+  const trackTags = useMemo(() => collectTrackTags(roadmap), [roadmap])
   const overall = overallCount(roadmap, checkedIds)
   const progress: ProgressBinding = { checkedIds, onToggle: toggle }
+
+  // Selecting the active tag again clears the filter and restores all sections.
+  const toggleTag = (tag: string) => setActiveTag((current) => (current === tag ? null : tag))
 
   return (
     <section className="reading-width py-10">
@@ -64,6 +79,8 @@ export function RoadmapListView({ roadmap, baseUrl, isOwner, actions }: RoadmapL
 
       <RoadmapActions roadmap={roadmap} isOwner={isOwner} actions={actions} />
 
+      <FilterChips tags={trackTags} activeTag={activeTag} onToggle={toggleTag} />
+
       <div className="mt-8">
         {sectionOrder.map((id) => {
           const section = sections[id]
@@ -73,6 +90,8 @@ export function RoadmapListView({ roadmap, baseUrl, isOwner, actions }: RoadmapL
               section={section}
               suggestedPath={suggestedPath}
               progress={progress}
+              activeTag={activeTag}
+              nextSubsectionId={nextSubsectionId}
             />
           ) : null
         })}
