@@ -26,6 +26,15 @@ class InMemoryProgressRepository:
     async def get(self, user_id: str, roadmap_id: str) -> ProgressRecord | None:
         return self._by_key.get((user_id, roadmap_id))
 
+    async def list_followed_roadmap_ids(self, user_id: str) -> list[str]:
+        # Mirror the real query: the caller's followed roadmap ids, newest-updated
+        # first (updated_at desc, roadmap_id asc tiebreak). Stable sort by id then
+        # by updated_at descending keeps id as the ascending tiebreak.
+        rows = [record for (uid, _rid), record in self._by_key.items() if uid == user_id]
+        by_id = sorted(rows, key=lambda record: record.roadmap_id)
+        ordered = sorted(by_id, key=lambda record: record.updated_at, reverse=True)
+        return [record.roadmap_id for record in ordered]
+
     async def count_followers(self, roadmap_id: str) -> int:
         # Mirror the real indexed count: how many progress rows reference this
         # roadmap, across all users (the roadmaps delete guard reads this).

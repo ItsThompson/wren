@@ -14,7 +14,7 @@ from collections.abc import Awaitable, Callable, Iterator, Sequence
 from sqlalchemy.exc import IntegrityError
 
 from wren.roadmaps.models import RoadmapRecord
-from wren.roadmaps.schemas import Roadmap
+from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
 
 
 class _PkViolation(Exception):
@@ -62,6 +62,35 @@ class InMemoryRoadmapRepository:
         # Unscoped read (mirrors the SQLAlchemy repository): callers apply their
         # own readability rule before using the result.
         return self._by_id.get(roadmap_id)
+
+    async def list_owned(self, owner_id: str) -> list[RoadmapRecord]:
+        # Mirror the real query: the owner's roadmaps at any status, newest-touched
+        # first (updated_at desc, id asc tiebreak).
+        return self._sorted(
+            record for record in self._by_id.values() if record.owner == owner_id
+        )
+
+    async def list_published_public(self, owner_id: str) -> list[RoadmapRecord]:
+        # Mirror the real query: only the owner's published + public roadmaps.
+        return self._sorted(
+            record
+            for record in self._by_id.values()
+            if record.owner == owner_id
+            and record.status == RoadmapStatus.PUBLISHED.value
+            and record.visibility == Visibility.PUBLIC.value
+        )
+
+    async def list_by_ids(self, roadmap_ids: Sequence[str]) -> list[RoadmapRecord]:
+        # Unscoped multi-get; the service re-orders by the follow order.
+        return [self._by_id[rid] for rid in roadmap_ids if rid in self._by_id]
+
+    @staticmethod
+    def _sorted(records: Iterator[RoadmapRecord]) -> list[RoadmapRecord]:
+        # Match the real query's ORDER BY updated_at DESC, id ASC. Python's sort is
+        # stable, so sorting by id first then by updated_at descending keeps id as
+        # the ascending tiebreak within an equal updated_at.
+        by_id = sorted(records, key=lambda record: record.id)
+        return sorted(by_id, key=lambda record: record.updated_at, reverse=True)
 
     async def delete(self, roadmap_id: str) -> None:
         # Mirror the real repository: remove the row unconditionally (the service

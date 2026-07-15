@@ -33,7 +33,8 @@ from wren.core.settings import AppSettings
 from wren.progress.api import create_progress_router
 from wren.progress.wiring import build_progress_service_provider
 from wren.roadmaps.api import create_roadmaps_router
-from wren.roadmaps.wiring import build_roadmap_service_provider
+from wren.roadmaps.listing_api import create_listing_router
+from wren.roadmaps.wiring import build_listing_service_provider, build_roadmap_service_provider
 
 pytestmark = pytest.mark.integration
 
@@ -128,9 +129,10 @@ def _external_app(database_url: str, settings: AppSettings) -> FastAPI:
     )
     roadmaps_router = create_roadmaps_router(build_roadmap_service_provider())
     progress_router = create_progress_router(build_progress_service_provider())
+    listing_router = create_listing_router(build_listing_service_provider())
     app = create_app(
         settings,
-        routers=[accounts_router, roadmaps_router, progress_router],
+        routers=[accounts_router, roadmaps_router, progress_router, listing_router],
         exception_handlers=build_exception_handlers(),
     )
     app.state.db = database
@@ -547,3 +549,66 @@ def test_delete_blocked_by_followers_then_archive_keeps_follower_end_to_end_over
         progress = client.get(f"/roadmaps/{roadmap_id}/progress?detailed=true")
         assert progress.status_code == 200, progress.text
         assert progress.json()["checked_items"] == 1
+
+
+def test_dashboard_and_profile_end_to_end_over_http(
+    migrated_url: str, make_settings: MakeSettings
+) -> None:
+    # Drives the real list queries (list_owned / list_published_public /
+    # list_by_ids / list_followed_roadmap_ids + the handle resolver) against
+    # Postgres: the owner's dashboard shows their authored roadmaps at every
+    # status plus what they follow, and the public profile shows only their
+    # published-public roadmap (Ticket 25, US-ACCT-03).
+    app = _external_app(migrated_url, make_settings(database_url=migrated_url))
+    with TestClient(app) as client:
+        assert (
+            client.post(
+                "/auth/register",
+                json={
+                    "username": "e2edash",
+                    "email": "e2e-dash@example.com",
+                    "password": _PASSWORD,
+                },
+            ).status_code
+            == 201
+        )
+        # A private draft (stays private) and a second roadmap published + public.
+        draft_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
+        public_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+        assert client.post(f"/roadmaps/{public_id}:publish").status_code == 200
+        assert (
+            client.put(
+                f"/roadmaps/{public_id}/visibility", json={"visibility": "public"}
+            ).status_code
+            == 200
+        )
+
+        # The owner's dashboard: both authored (any status), nothing followed yet.
+        dashboard = client.get("/me/dashboard").json()
+        assert {card["id"] for card in dashboard["authored"]} == {draft_id, public_id}
+        assert dashboard["followed"] == []
+
+        # The public profile lists only the published-public roadmap (the private
+        # draft never appears), and is reachable without a session.
+        client.cookies.clear()
+        profile = client.get("/users/e2edash")
+        assert profile.status_code == 200, profile.text
+        assert [card["id"] for card in profile.json()["roadmaps"]] == [public_id]
+        assert client.get("/users/nobody-here").status_code == 404
+
+        # A follower's dashboard surfaces the followed roadmap.
+        assert (
+            client.post(
+                "/auth/register",
+                json={
+                    "username": "e2edashfollower",
+                    "email": "e2e-dashfollower@example.com",
+                    "password": _PASSWORD,
+                },
+            ).status_code
+            == 201
+        )
+        assert client.post(f"/roadmaps/{public_id}/follow").status_code == 201
+        follower_dashboard = client.get("/me/dashboard").json()
+        assert follower_dashboard["authored"] == []
+        assert [card["id"] for card in follower_dashboard["followed"]] == [public_id]
