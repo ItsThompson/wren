@@ -8,9 +8,12 @@ render, and owns the transaction boundary (``get_session`` is yield-only).
 
 Every method is scoped to the resolved user: progress is loaded and written only
 for ``(user_id, roadmap_id)``, so another user's progress is never returned
-(spec sections 05/08). Progress operations require a **published** roadmap that
-the caller may read (owner, or public): an unreadable roadmap is a 404 with no
-existence leak, and a non-published one is a 409 (a draft is not startable).
+(spec sections 05/08). Starting to **follow** requires a **published** roadmap the
+caller may read (owner, or public): a draft is not startable and an archived
+roadmap is hidden from discovery (no new followers). Reading/updating progress is
+allowed on a **published or archived** roadmap, so an archived roadmap's existing
+followers keep it and their progress (spec section 04). An unreadable roadmap is a
+404 with no existence leak.
 """
 
 from __future__ import annotations
@@ -63,9 +66,10 @@ class ProgressService:
         """Start following a published roadmap: create the private progress record.
 
         Idempotent: re-following returns the existing record (spec section 06
-        follow is 201). Following a draft is a 409 (a draft is not startable);
-        an unreadable roadmap is a 404 (no existence leak). The record is private
-        to ``user_id`` and never shown publicly.
+        follow is 201). Following a draft or an archived roadmap is a 409 (a draft
+        is not startable; an archived roadmap is retired from discovery, so it
+        gains no new followers); an unreadable roadmap is a 404 (no existence
+        leak). The record is private to ``user_id`` and never shown publicly.
         """
         await self._require_published_readable(user_id, roadmap_id)
         existing = await self._progress.get(user_id, roadmap_id)
@@ -81,8 +85,10 @@ class ProgressService:
 
         Recomputed from the roadmap + the caller's record (an empty record when
         they have not started), so the counts never drift. Scoped to
-        ``user_id``; another user's progress is never returned."""
-        roadmap = await self._require_published_readable(user_id, roadmap_id)
+        ``user_id``; another user's progress is never returned. Readable on a
+        published or archived roadmap, so a follower keeps reading an archived
+        roadmap they follow."""
+        roadmap = await self._require_trackable_readable(user_id, roadmap_id)
         progress = await self._load_or_empty(user_id, roadmap_id)
         return summarize(roadmap, progress, detailed=detailed)
 
@@ -96,8 +102,10 @@ class ProgressService:
         no-op beyond the timestamp. A foreign or nonexistent item id is a 422 and
         applies nothing (all-or-nothing validation before any write). Upserts the
         caller's private record, so the first update also starts following.
+        Trackable on a published or archived roadmap (an archived roadmap's
+        followers keep updating their progress).
         """
-        roadmap = await self._require_published_readable(user_id, roadmap_id)
+        roadmap = await self._require_trackable_readable(user_id, roadmap_id)
         self._reject_foreign_items(roadmap, roadmap_id, item_ids)
         progress = await self._load_or_empty(user_id, roadmap_id)
         checked = dict(progress.checked)
@@ -126,18 +134,19 @@ class ProgressService:
         """Return the next unchecked, prereq-satisfied items in path order.
 
         Computed server-side in :func:`progress.next.compute` (spec section 07),
-        never delegated to the agent. Scoped to the caller's progress."""
-        roadmap = await self._require_published_readable(user_id, roadmap_id)
+        never delegated to the agent. Scoped to the caller's progress. Trackable
+        on a published or archived roadmap."""
+        roadmap = await self._require_trackable_readable(user_id, roadmap_id)
         progress = await self._load_or_empty(user_id, roadmap_id)
         return compute_next(roadmap, progress)
 
-    async def _require_published_readable(self, user_id: str, roadmap_id: str) -> Roadmap:
-        """Load a roadmap the caller may track: readable and published.
+    async def _load_readable(self, user_id: str, roadmap_id: str) -> Roadmap:
+        """Load a roadmap the caller may read: their own (any status) or a public
+        one (spec sections 05/06).
 
-        Readability first (owner, or public), so a private roadmap the caller
-        does not own is a 404 that leaks no existence. Then the published gate: a
-        draft/archived roadmap is a 409 (a draft is not startable). This is the
-        shared guard for follow / get / update / get_next.
+        Readability first: a private roadmap owned by someone else is a 404 that
+        leaks no existence. Callers layer their own status gate on top (follow vs
+        track), so this never itself grants a lifecycle transition.
         """
         record = await self._roadmaps.get(roadmap_id)
         if record is None:
@@ -146,10 +155,39 @@ class ProgressService:
         if roadmap.owner != user_id and roadmap.visibility is not Visibility.PUBLIC:
             # Private roadmap owned by someone else: 404, no existence leak.
             raise NotFound(f"No roadmap '{roadmap_id}'.", instance=f"/roadmaps/{roadmap_id}")
+        return roadmap
+
+    async def _require_published_readable(self, user_id: str, roadmap_id: str) -> Roadmap:
+        """Readable **and** ``published``: the guard for **starting** to follow.
+
+        A draft is not startable and an archived roadmap is hidden from discovery
+        (it gains no new followers), so both raise ``Conflict``. Existing followers
+        reach an archived roadmap's progress through
+        :meth:`_require_trackable_readable` instead.
+        """
+        roadmap = await self._load_readable(user_id, roadmap_id)
         if roadmap.status is not RoadmapStatus.PUBLISHED:
             raise Conflict(
                 f"Roadmap '{roadmap_id}' is {roadmap.status.value}; only a published roadmap can "
-                "be followed or tracked.",
+                "be followed.",
+                instance=f"/roadmaps/{roadmap_id}",
+            )
+        return roadmap
+
+    async def _require_trackable_readable(self, user_id: str, roadmap_id: str) -> Roadmap:
+        """Readable **and** trackable (``published`` *or* ``archived``): the guard
+        for reading / updating progress and computing next.
+
+        Archiving hides a roadmap from discovery but must not break its existing
+        followers, so a follower keeps reading, updating, and computing next on an
+        archived roadmap they follow (spec section 04). Only a ``draft`` is not
+        trackable (a draft is not startable) and raises ``Conflict``.
+        """
+        roadmap = await self._load_readable(user_id, roadmap_id)
+        if roadmap.status is RoadmapStatus.DRAFT:
+            raise Conflict(
+                f"Roadmap '{roadmap_id}' is a draft; only a published or archived roadmap can be "
+                "tracked.",
                 instance=f"/roadmaps/{roadmap_id}",
             )
         return roadmap

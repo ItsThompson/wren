@@ -220,3 +220,59 @@ async def test_a_persist_failure_rolls_back_and_propagates() -> None:
         await service.follow(_FOLLOWER, roadmap.id)
     assert progress_repo.rollbacks == 1
     assert progress_repo.commits == 0
+
+
+# --- archived roadmaps keep existing followers (item 2 / #9 review) ----------
+
+
+async def test_get_on_an_archived_roadmap_is_allowed_for_a_follower() -> None:
+    # Archiving hides a roadmap from discovery but must NOT break its existing
+    # followers: a follower keeps reading their progress after it is archived.
+    roadmap = build_roadmap(visibility=Visibility.PUBLIC)
+    service, roadmap_repo, _ = _service(roadmap)
+    await service.update(_FOLLOWER, roadmap.id, [CHK_ARRAYS_READ], CompletionState.COMPLETE)
+
+    # The owner archives it (simulate the persisted archived state on the record).
+    await roadmap_repo.save(roadmap.model_copy(update={"status": RoadmapStatus.ARCHIVED}))
+
+    snapshot = await service.get(_FOLLOWER, roadmap.id, detailed=True)
+    assert snapshot.checked_items == 1
+    assert snapshot.checked_ids == [CHK_ARRAYS_READ]
+
+
+async def test_update_and_next_on_an_archived_roadmap_keep_working_for_a_follower() -> None:
+    roadmap = build_roadmap(visibility=Visibility.PUBLIC)
+    service, roadmap_repo, _ = _service(roadmap)
+    await service.follow(_FOLLOWER, roadmap.id)
+    await roadmap_repo.save(roadmap.model_copy(update={"status": RoadmapStatus.ARCHIVED}))
+
+    # An existing follower can still record progress and compute their next items.
+    result = await service.update(
+        _FOLLOWER, roadmap.id, [CHK_ARRAYS_READ], CompletionState.COMPLETE
+    )
+    assert result.progress.checked_ids == [CHK_ARRAYS_READ]
+    nxt = await service.get_next(_FOLLOWER, roadmap.id)
+    assert nxt.complete is False
+    assert CHK_ARRAYS_READ not in [item.item_id for item in nxt.items]
+
+
+async def test_follow_on_an_archived_roadmap_is_a_409_no_new_followers() -> None:
+    # Archived = retired from discovery, so it gains NO new followers: a fresh
+    # follow is a 409 (existing followers keep access via get/update/get_next).
+    archived = build_roadmap(status=RoadmapStatus.ARCHIVED, visibility=Visibility.PUBLIC)
+    service, _, _ = _service(archived)
+    with pytest.raises(Conflict):
+        await service.follow(_FOLLOWER, archived.id)
+
+
+async def test_read_of_an_archived_private_roadmap_by_a_non_follower_is_a_404_no_leak() -> None:
+    # A non-owner, non-follower cannot read an archived PRIVATE roadmap: 404 with
+    # no existence leak (readability is checked before the trackable status gate).
+    archived = build_roadmap(
+        owner=_OWNER, status=RoadmapStatus.ARCHIVED, visibility=Visibility.PRIVATE
+    )
+    service, _, _ = _service(archived)
+    with pytest.raises(NotFound):
+        await service.get(_FOLLOWER, archived.id, detailed=True)
+    with pytest.raises(NotFound):
+        await service.get_next(_FOLLOWER, archived.id)

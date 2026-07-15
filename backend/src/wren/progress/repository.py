@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,6 +31,8 @@ class ProgressRepository(Protocol):
     """Data access for progress, scoped to the operations the service needs."""
 
     async def get(self, user_id: str, roadmap_id: str) -> ProgressRecord | None: ...
+
+    async def count_followers(self, roadmap_id: str) -> int: ...
 
     async def upsert(self, progress: Progress) -> None: ...
 
@@ -52,6 +54,21 @@ class SqlAlchemyProgressRepository:
                 ProgressRecord.user_id == user_id, ProgressRecord.roadmap_id == roadmap_id
             ),
         )
+
+    async def count_followers(self, roadmap_id: str) -> int:
+        """Count the progress rows referencing ``roadmap_id`` (its follower count).
+
+        Global across all users (not caller-scoped): it returns only a count, never
+        another user's data, and backs the roadmaps domain's delete guard
+        (delete-only-if-zero-followers, spec sections 05/06). The ``roadmap_id``
+        index added in migration 0005 keeps this a cheap indexed count.
+        """
+        count = await self._session.scalar(
+            select(func.count())
+            .select_from(ProgressRecord)
+            .where(ProgressRecord.roadmap_id == roadmap_id)
+        )
+        return count or 0
 
     async def upsert(self, progress: Progress) -> None:
         """Insert or update the one row for ``(user_id, roadmap_id)``.

@@ -26,6 +26,11 @@ class InMemoryProgressRepository:
     async def get(self, user_id: str, roadmap_id: str) -> ProgressRecord | None:
         return self._by_key.get((user_id, roadmap_id))
 
+    async def count_followers(self, roadmap_id: str) -> int:
+        # Mirror the real indexed count: how many progress rows reference this
+        # roadmap, across all users (the roadmaps delete guard reads this).
+        return sum(1 for (_user, rid) in self._by_key if rid == roadmap_id)
+
     async def upsert(self, progress: Progress) -> None:
         key = (progress.user_id, progress.roadmap_id)
         existing = self._by_key.get(key)
