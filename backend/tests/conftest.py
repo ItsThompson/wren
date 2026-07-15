@@ -46,6 +46,14 @@ def make_settings() -> MakeSettings:
             "internal_api_token": "test-internal-token",
             "session_jwt_secret": "test-session-secret",
             "cookie_domain": "",
+            "public_base_url": "https://api.usewren.com",
+            "app_public_url": "https://usewren.com",
+            "mcp_public_url": "https://mcp.usewren.com",
+            "oauth_private_key_path": "",
+            "oauth_key_id": "test-kid",
+            "oauth_access_ttl_seconds": 900,
+            "oauth_refresh_ttl_seconds": 2_592_000,
+            "cors_origin": "https://usewren.com",
         }
         base.update(overrides)
         return AppSettings(**base)  # type: ignore[arg-type]

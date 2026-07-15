@@ -17,6 +17,9 @@ dependencies = [
     "pyjwt>=2.9.0",
     "bcrypt>=4.2.0",
     "email-validator>=2.2.0",
+    "authlib>=1.3.0",
+    "cryptography>=43.0.0",
+    "python-multipart>=0.0.9",
 ]
 
 [project.scripts]
@@ -69,6 +72,12 @@ mypy_path = "src"
 # Type-check the package plus the Alembic env module (which imports wren and is
 # otherwise unchecked); packages= alone only covers src/wren.
 files = ["src/wren", "alembic/env.py"]
+
+[[tool.mypy.overrides]]
+# Authlib ships no type stubs; only its OAuth RFC helpers are used (PKCE), and
+# the JOSE crypto goes through the typed joserfc package.
+module = ["authlib.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
