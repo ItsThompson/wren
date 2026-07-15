@@ -114,14 +114,28 @@ def test_unauthenticated_tool_call_is_401_pointing_at_the_prm(make_settings: Mak
 
 
 def test_valid_bearer_passes_the_boundary(make_settings: MakeSettings) -> None:
-    # A valid token clears the auth boundary; there is no tool route yet
-    # (Tickets 21/22), so it 404s rather than 401s: proof the token was accepted.
+    # A valid token clears the auth boundary and reaches the now-mounted MCP tool
+    # transport (Ticket 21); tools/list returns the registered write tools.
     key = new_key()
-    client = _build(make_settings, key=key)
+    app = create_rs_app(
+        make_settings(),
+        key_provider=RemoteKeyProvider(ISSUER, make_fetch(public_jwks(key))),
+        internal_client=_internal_client(),
+    )
+    with TestClient(app, base_url=RESOURCE) as client:
+        response = client.post(
+            f"{MCP_PATH}/",
+            json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
+            headers={
+                "Authorization": f"Bearer {mint(key)}",
+                "Accept": "application/json, text/event-stream",
+                "Content-Type": "application/json",
+            },
+        )
 
-    response = client.get(MCP_PATH, headers={"Authorization": f"Bearer {mint(key)}"})
-
-    assert response.status_code == 404
+    assert response.status_code == 200
+    names = {tool["name"] for tool in response.json()["result"]["tools"]}
+    assert "create_roadmap_draft" in names
 
 
 def test_app_exposes_the_tool_layer_seams(make_settings: MakeSettings) -> None:
