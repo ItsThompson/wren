@@ -47,7 +47,9 @@ def _settings() -> RsSettings:
 class AgentHarness:
     """A TestClient over the mounted MCP transport plus captured backend calls."""
 
-    def __init__(self, backend: BackendHandler, *, sub: str = "user-ada") -> None:
+    def __init__(
+        self, backend: BackendHandler, *, sub: str = "user-ada", scope: str | None = None
+    ) -> None:
         self.captured: list[httpx.Request] = []
 
         def capture(request: httpx.Request) -> httpx.Response:
@@ -61,7 +63,11 @@ class AgentHarness:
         self.app: FastAPI = create_rs_app(
             _settings(), key_provider=provider, internal_client=self._client
         )
-        self._auth = {"Authorization": f"Bearer {mint(key, sub=sub)}"}
+        # A per-test scope override lets the scope-gate tests mint a token that is
+        # missing a required scope; the default mirrors token_factory.mint's default
+        # (roadmaps:read + roadmaps:write) so existing tool tests are unaffected.
+        token = mint(key, sub=sub) if scope is None else mint(key, sub=sub, scope=scope)
+        self._auth = {"Authorization": f"Bearer {token}"}
 
     def _rpc(self, client: TestClient, method: str, params: dict[str, Any]) -> dict[str, Any]:
         response = client.post(

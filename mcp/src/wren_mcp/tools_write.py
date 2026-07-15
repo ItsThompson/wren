@@ -16,17 +16,11 @@ visibility, archive, or delete tool: those are web-only.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
-from typing import Any, TypeVar
-
-from mcp.server.fastmcp import Context, FastMCP
-from mcp.server.fastmcp.exceptions import ToolError
-from mcp.server.session import ServerSession
+from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
-from starlette.requests import Request
 
-from wren_mcp.auth import AGENT_STATE_KEY
 from wren_mcp.client import InternalApiClient
+from wren_mcp.config import SCOPE_ROADMAPS_WRITE
 from wren_mcp.schemas import (
     CreatedRoadmap,
     ForkResult,
@@ -38,32 +32,9 @@ from wren_mcp.schemas import (
     RoadmapDraftInput,
     ValidationResult,
 )
-from wren_mcp.tokens import VerifiedAgentToken
+from wren_mcp.scopes import AgentContext, require_scope
 from wren_mcp.tool_errors import raise_for_problem
-from wren_mcp.tool_metrics import count_invocations
-
-# The Context the framework injects; RequestT is the Starlette request carrying
-# the identity the bearer boundary resolved.
-AgentContext = Context[ServerSession, object, Request]
-
-# A tool coroutine; the counted-tool registrar preserves this exact type so call
-# sites keep their real signatures.
-_ToolFn = TypeVar("_ToolFn", bound=Callable[..., Awaitable[Any]])
-
-
-def require_agent(ctx: AgentContext) -> str:
-    """Return the single ``user_id`` the request is scoped to.
-
-    The bearer boundary (:mod:`wren_mcp.auth`) validated the token and stashed the
-    resolved principal on the request before any tool runs, so a write can never
-    trust a ``user_id`` passed as a tool argument. Fails closed with a
-    :class:`ToolError` if the identity is somehow absent."""
-    request = ctx.request_context.request
-    principal = getattr(request.state, AGENT_STATE_KEY, None) if request is not None else None
-    if not isinstance(principal, VerifiedAgentToken):
-        raise ToolError("Unauthenticated: no verified agent identity on the request.")
-    return principal.user_id
-
+from wren_mcp.tool_registry import counted_tool_registrar
 
 _CREATE = ToolAnnotations(
     title="Create roadmap draft", readOnlyHint=False, destructiveHint=False, openWorldHint=False
@@ -106,20 +77,12 @@ def register_write_tools(mcp: FastMCP, client: InternalApiClient) -> None:
     """Register the seven authoring tools onto ``mcp``, each closing over the
     injected internal client (Ticket 22 registers the read tools alongside).
 
-    Each tool is wrapped by :func:`count_invocations` before registration so every
-    call is counted as ``mcp_tool_invocations_total{tool,outcome}``; the wrapper
+    Each tool is registered through :func:`counted_tool_registrar`, so every call
+    is counted as ``mcp_tool_invocations_total{tool,outcome}`` and the wrapper
     preserves the tool's name/signature so its exposed schema is unchanged.
     """
 
-    def tool(annotations: ToolAnnotations) -> Callable[[_ToolFn], _ToolFn]:
-        """Register a counted tool: wrap for the invocation metric, then hand the
-        signature-preserving wrapper to FastMCP for schema generation."""
-
-        def register(fn: _ToolFn) -> _ToolFn:
-            mcp.tool(annotations=annotations)(count_invocations(fn))
-            return fn
-
-        return register
+    tool = counted_tool_registrar(mcp)
 
     @tool(_CREATE)
     async def create_roadmap_draft(roadmap: RoadmapDraftInput, ctx: AgentContext) -> CreatedRoadmap:
@@ -129,7 +92,7 @@ def register_write_tools(mcp: FastMCP, client: InternalApiClient) -> None:
         reference later: the server preserves it, or returns a
         proposed_id -> minted_id remap where it had to de-dupe, so you never
         address nodes by array position. Returns the minted roadmap_id."""
-        user_id = require_agent(ctx)
+        user_id = require_scope(ctx, scope=SCOPE_ROADMAPS_WRITE)
         response = await client.create_draft(user_id, roadmap.model_dump(mode="json"))
         return CreatedRoadmap.from_backend(raise_for_problem(response).json())
 
@@ -147,7 +110,7 @@ def register_write_tools(mcp: FastMCP, client: InternalApiClient) -> None:
         graph is acyclic. add_* ops accept an optional proposed_id (echoed via
         remap on de-dup). Content edits are rejected on published/archived
         roadmaps (fork to change). Returns the new revision and changed nodes."""
-        user_id = require_agent(ctx)
+        user_id = require_scope(ctx, scope=SCOPE_ROADMAPS_WRITE)
         payload = [op.model_dump(mode="json") for op in operations]
         response = await client.patch_draft(user_id, roadmap_id, revision, payload)
         return PatchResult.from_backend(raise_for_problem(response).json())
@@ -162,7 +125,7 @@ def register_write_tools(mcp: FastMCP, client: InternalApiClient) -> None:
         (see remap). Reads the draft's current revision and imports under it
         (optimistic concurrency), so a concurrent edit surfaces a re-read error.
         Rejected on published/archived roadmaps."""
-        user_id = require_agent(ctx)
+        user_id = require_scope(ctx, scope=SCOPE_ROADMAPS_WRITE)
         current = raise_for_problem(await client.get_roadmap(user_id, roadmap_id)).json()
         response = await client.replace_draft(
             user_id, roadmap_id, current["revision"], full_document.model_dump(mode="json")
@@ -174,7 +137,7 @@ def register_write_tools(mcp: FastMCP, client: InternalApiClient) -> None:
         """Return every structural violation for a draft in one pass without
         mutating it. publishable is true when there are no violations. Callable
         anytime on a draft."""
-        user_id = require_agent(ctx)
+        user_id = require_scope(ctx, scope=SCOPE_ROADMAPS_WRITE)
         response = await client.validate_draft(user_id, roadmap_id)
         return ValidationResult.from_backend(raise_for_problem(response).json())
 
@@ -183,7 +146,7 @@ def register_write_tools(mcp: FastMCP, client: InternalApiClient) -> None:
         """Validate and transition a draft to published. This is one-way:
         published content is immutable (fork to change it). Refuses on any
         hard-block violation. Confirm with the user before publishing."""
-        user_id = require_agent(ctx)
+        user_id = require_scope(ctx, scope=SCOPE_ROADMAPS_WRITE)
         response = await client.publish(user_id, roadmap_id)
         return PublishResult.from_backend(raise_for_problem(response).json())
 
@@ -192,7 +155,7 @@ def register_write_tools(mcp: FastMCP, client: InternalApiClient) -> None:
         """Create a new draft seeded from any roadmap you can read, with fresh
         IDs and fresh progress. The source is untouched. Use this to change a
         published roadmap's structure."""
-        user_id = require_agent(ctx)
+        user_id = require_scope(ctx, scope=SCOPE_ROADMAPS_WRITE)
         response = await client.fork(user_id, source_roadmap_id)
         return ForkResult.from_backend(
             raise_for_problem(response).json(), source_roadmap_id=source_roadmap_id
@@ -210,7 +173,7 @@ def register_write_tools(mcp: FastMCP, client: InternalApiClient) -> None:
         allowed on published roadmaps. Omitted fields are left unchanged. Never
         touches structure or revision; a structural change requires a draft
         (fork first)."""
-        user_id = require_agent(ctx)
+        user_id = require_scope(ctx, scope=SCOPE_ROADMAPS_WRITE)
         response = await client.edit_metadata(
             user_id,
             roadmap_id,

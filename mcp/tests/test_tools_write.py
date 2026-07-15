@@ -10,18 +10,10 @@ as model-recoverable tool errors.
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 import httpx
-import pytest
-from mcp.server.fastmcp.exceptions import ToolError
-from starlette.requests import Request
 
 from mcp_harness import AgentHarness, json_error
-from wren_mcp.auth import AGENT_STATE_KEY
-from wren_mcp.tokens import VerifiedAgentToken
 from wren_mcp.tool_metrics import TOOL_METRICS_REGISTRY
-from wren_mcp.tools_write import require_agent
 
 _ROADMAP_ID = "grokking-dsa-7f3k"
 
@@ -72,11 +64,14 @@ def _roadmap(**overrides: object) -> dict[str, object]:
 # ---------- registration + annotations ----------
 
 
-def test_exactly_the_seven_write_tools_are_registered() -> None:
+def test_the_write_tools_are_registered() -> None:
+    # The read tools (Ticket 22) are registered on the same server, so assert the
+    # write surface is present as a subset; the schema snapshot enforces that the
+    # full tool set (write + read) is exactly frozen.
     harness = AgentHarness(lambda _r: httpx.Response(200, json={}))
     with harness.open() as client:
         names = {tool["name"] for tool in harness.list_tools(client)}
-    assert names == WRITE_TOOL_NAMES
+    assert names >= WRITE_TOOL_NAMES
 
 
 def test_no_visibility_archive_or_delete_tool_is_exposed() -> None:
@@ -373,33 +368,44 @@ def test_edit_metadata_sends_only_provided_fields_and_needs_no_if_match() -> Non
     assert json.loads(request.content) == {"subject_tags": ["cs"]}
 
 
+# ---------- scope gate (write surface requires roadmaps:write) ----------
+
+
+def test_write_tool_without_roadmaps_write_scope_is_insufficient_scope() -> None:
+    # A token granting only roadmaps:read cannot drive a write tool: the shared
+    # scope gate fails it as a model-recoverable insufficient_scope error, and no
+    # internal call is made.
+    harness = AgentHarness(lambda _r: httpx.Response(200, json={}), scope="roadmaps:read")
+    with harness.open() as client:
+        result = harness.call_tool(
+            client,
+            "patch_roadmap_draft",
+            {
+                "roadmap_id": _ROADMAP_ID,
+                "revision": 1,
+                "operations": [{"op": "remove_item", "item_id": "item_x"}],
+            },
+        )
+    assert result["isError"] is True
+    text = result["content"][0]["text"]
+    assert "insufficient_scope" in text
+    assert "roadmaps:write" in text
+    assert harness.captured == []
+
+
 # ---------- identity guard ----------
 
 
-def _ctx_with(request: Request | None) -> SimpleNamespace:
-    return SimpleNamespace(request_context=SimpleNamespace(request=request))
-
-
-def _request_with_agent(principal: object) -> Request:
-    request = Request({"type": "http", "headers": [], "method": "POST", "path": "/mcp"})
-    setattr(request.state, AGENT_STATE_KEY, principal)
-    return request
-
-
-def test_require_agent_returns_the_resolved_user_id() -> None:
-    principal = VerifiedAgentToken(user_id="user-ada", client_id="agent", scope="roadmaps:write")
-    assert require_agent(_ctx_with(_request_with_agent(principal))) == "user-ada"
-
-
-def test_require_agent_fails_closed_when_identity_is_absent() -> None:
-    bare = Request({"type": "http", "headers": [], "method": "POST", "path": "/mcp"})
-    with pytest.raises(ToolError):
-        require_agent(_ctx_with(bare))
-
-
-def test_require_agent_fails_closed_without_a_request() -> None:
-    with pytest.raises(ToolError):
-        require_agent(_ctx_with(None))
+def test_write_tool_with_valid_scope_reaches_the_backend() -> None:
+    # The complement of the scope-gate test: a token that DOES grant roadmaps:write
+    # reaches the internal call (guards against the gate rejecting valid tokens).
+    harness = AgentHarness(
+        lambda _r: httpx.Response(200, json={"violations": []}), scope="roadmaps:write"
+    )
+    with harness.open() as client:
+        result = harness.call_tool(client, "validate_roadmap_draft", {"roadmap_id": _ROADMAP_ID})
+    assert result["isError"] is False
+    assert harness.captured[0].url.path == f"/roadmaps/{_ROADMAP_ID}:validate"
 
 
 # ---------- invocation metric ----------
