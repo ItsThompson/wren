@@ -19,8 +19,8 @@ export function ViolationList({ violations }: ViolationListProps) {
       title={`This draft can’t be published yet. Fix ${count} issue${count === 1 ? '' : 's'}:`}
     >
       <ul className="space-y-2">
-        {violations.map((violation) => (
-          <li key={`${violation.rule}:${violation.ids.join(',')}`}>
+        {violations.map((violation, index) => (
+          <li key={`${violation.rule}:${violation.ids.join(',')}:${index}`}>
             <span className="font-mono text-xs text-foreground">{violation.rule}</span>{' '}
             <span className="text-foreground">{violation.message}</span>
             {violation.ids.length > 0 ? (

@@ -534,6 +534,43 @@ describe('RoadmapView deadline countdown', () => {
     // ... then reverts to the prior (empty) value when the write throws.
     await waitFor(() => expect(input).toHaveValue(''))
   })
+
+  it('surfaces a quiet inline notice and reverts when a deadline write fails (500)', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
+      http.get(PROGRESS_URL, () => HttpResponse.json(progressWithDeadline(null))),
+      http.put(DEADLINE_URL, () => new HttpResponse(null, { status: 500 })),
+    )
+    renderView()
+
+    const input = await screen.findByLabelText('Deadline')
+    fireEvent.change(input, { target: { value: '2026-12-01' } })
+
+    // The deadline write path now announces failures like the toggle path does ...
+    expect(await screen.findByRole('status')).toHaveTextContent(/couldn.t save that change/i)
+    // ... and the optimistic date is rolled back.
+    await waitFor(() => expect(input).toHaveValue(''))
+  })
+
+  it('surfaces the ochre re-read prompt when a deadline write is stale (409)', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
+      http.get(PROGRESS_URL, () => HttpResponse.json(progressWithDeadline(null))),
+      http.put(DEADLINE_URL, () =>
+        HttpResponse.json(
+          { type: 'x', title: 'Conflict', status: 409, code: 'STALE_REVISION', detail: 're-read' },
+          { status: 409, headers: { 'content-type': 'application/problem+json' } },
+        ),
+      ),
+    )
+    renderView()
+
+    const input = await screen.findByLabelText('Deadline')
+    fireEvent.change(input, { target: { value: '2026-12-01' } })
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/reload to continue/i)
+    await waitFor(() => expect(input).toHaveValue(''))
+  })
 })
 
 describe('RoadmapView fork', () => {

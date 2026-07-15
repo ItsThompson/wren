@@ -135,16 +135,25 @@ export function useProgress(
     (next: string | null) => {
       const previous = deadline
       setDeadlineState(next)
+      setNotice(null)
       void (async () => {
         try {
-          const { data } = await client.PUT('/roadmaps/{roadmap_id}/deadline', {
+          const { data, error, response } = await client.PUT('/roadmaps/{roadmap_id}/deadline', {
             params: { path: { roadmap_id: roadmapId } },
             body: { deadline: next },
           })
-          if (data) setDeadlineState(data.deadline ?? null)
-        } catch {
-          // Revert the optimistic change so the UI matches the server.
+          if (data) {
+            setDeadlineState(data.deadline ?? null)
+            return
+          }
+          // HTTP error response: revert and surface it, mirroring the toggle path
+          // so both write paths announce failures instead of reverting silently.
           setDeadlineState(previous)
+          setNotice(isStaleRevision(toProblem(error, response)) ? { kind: 'stale' } : { kind: 'save-failed' })
+        } catch {
+          // Network failure: revert and surface the quiet save-failed notice.
+          setDeadlineState(previous)
+          setNotice({ kind: 'save-failed' })
         }
       })()
     },
