@@ -17,7 +17,7 @@ export function uniqueUser(role = 'user'): TestUser {
   const handle = `e2e${role}${token}`.toLowerCase().replace(/[^a-z0-9]/g, '')
   return {
     username: handle,
-    email: `${handle}@example.test`,
+    email: `${handle}@example.com`,
     password: 'Str0ngPass1',
   }
 }
