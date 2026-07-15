@@ -20,6 +20,7 @@ from progress_builders import (
     CHK_ARRAYS_DRILL,
     CHK_ARRAYS_READ,
     CHK_HASH,
+    SUB_ARRAYS,
     build_roadmap,
     make_record,
 )
@@ -210,6 +211,20 @@ def test_get_next_is_server_computed(make_settings: MakeSettings) -> None:
     body = client.get(f"/roadmaps/{ROADMAP_ID}/next").json()
     assert body["complete"] is False
     assert [item["item_id"] for item in body["items"]] == [CHK_ARRAYS_READ, CHK_ARRAYS_DRILL]
+    # Full get_next shape: structural why_now + remaining_in_path; concise omits
+    # path_position.
+    assert body["remaining_in_path"] == 3
+    first = body["items"][0]
+    assert "suggested path" in first["why_now"].lower()
+    assert first["path_position"] is None
+    assert first["resources"][0]["url"] == f"https://x.test/{SUB_ARRAYS}"
+
+
+def test_get_next_detailed_includes_path_position(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings)
+    _login(client)
+    body = client.get(f"/roadmaps/{ROADMAP_ID}/next", params={"format": "detailed"}).json()
+    assert all(item["path_position"] == 1 for item in body["items"])
 
 
 def test_get_next_reports_completion(make_settings: MakeSettings) -> None:
@@ -243,3 +258,62 @@ def test_progress_is_scoped_per_user(make_settings: MakeSettings) -> None:
     snapshot = client.get(f"/roadmaps/{ROADMAP_ID}/progress", params={"detailed": True}).json()
     assert snapshot["checked_items"] == 0
     assert snapshot["checked_ids"] == []
+
+
+# --- deadline (set / clear) -------------------------------------------------
+
+
+def test_set_deadline_sets_and_echoes_it_on_the_snapshot(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings)
+    _login(client)
+    response = client.put(f"/roadmaps/{ROADMAP_ID}/deadline", json={"deadline": "2026-12-01"})
+    assert response.status_code == 200, response.text
+    assert response.json()["deadline"] == "2026-12-01"
+    # The progress snapshot carries the deadline for the countdown UI.
+    snapshot = client.get(f"/roadmaps/{ROADMAP_ID}/progress").json()
+    assert snapshot["deadline"] == "2026-12-01"
+
+
+def test_clear_deadline_with_null(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings)
+    _login(client)
+    client.put(f"/roadmaps/{ROADMAP_ID}/deadline", json={"deadline": "2026-12-01"})
+    cleared = client.put(f"/roadmaps/{ROADMAP_ID}/deadline", json={"deadline": None})
+    assert cleared.status_code == 200
+    assert cleared.json()["deadline"] is None
+    assert client.get(f"/roadmaps/{ROADMAP_ID}/progress").json()["deadline"] is None
+
+
+def test_set_deadline_in_the_past_is_allowed(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings)
+    _login(client)
+    response = client.put(f"/roadmaps/{ROADMAP_ID}/deadline", json={"deadline": "2000-01-01"})
+    assert response.status_code == 200
+    assert response.json()["deadline"] == "2000-01-01"
+
+
+def test_set_deadline_requires_authentication(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings)
+    response = client.put(f"/roadmaps/{ROADMAP_ID}/deadline", json={"deadline": "2026-12-01"})
+    assert response.status_code == 401
+    assert response.json()["code"] == "UNAUTHORIZED"
+
+
+def test_set_deadline_on_a_draft_is_a_409(make_settings: MakeSettings) -> None:
+    draft = build_roadmap(status=RoadmapStatus.DRAFT, visibility=Visibility.PUBLIC)
+    client, _ = _build_client(make_settings, draft)
+    _login(client)
+    response = client.put(f"/roadmaps/{draft.id}/deadline", json={"deadline": "2026-12-01"})
+    assert response.status_code == 409
+    assert response.json()["code"] == "CONFLICT"
+
+
+def test_deadline_is_scoped_per_user(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings)
+    _login(client, username="owner", email="owner@example.com")
+    client.put(f"/roadmaps/{ROADMAP_ID}/deadline", json={"deadline": "2026-12-01"})
+
+    client.cookies.clear()
+    _login(client, username="intruder", email="intruder@example.com")
+    snapshot = client.get(f"/roadmaps/{ROADMAP_ID}/progress").json()
+    assert snapshot["deadline"] is None

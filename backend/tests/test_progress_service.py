@@ -9,6 +9,8 @@ snapshot, the server-computed next, and per-user scoping.
 
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 
 from progress_builders import (
@@ -23,6 +25,7 @@ from roadmaps_fakes import InMemoryRoadmapRepository
 from wren.core.errors import Conflict, NotFound, Validation
 from wren.progress.schemas import CompletionState
 from wren.progress.service import ProgressService
+from wren.roadmaps.read_schemas import ResponseFormat
 from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
 
 _OWNER = "owner"
@@ -181,6 +184,108 @@ async def test_get_next_before_following_returns_the_first_items() -> None:
 
     result = await service.get_next(_FOLLOWER, roadmap.id)
     assert [item.item_id for item in result.items] == [CHK_ARRAYS_READ, CHK_ARRAYS_DRILL]
+
+
+async def test_get_next_detailed_adds_path_position_concise_omits_it() -> None:
+    roadmap = build_roadmap()
+    service, _, _ = _service(roadmap)
+
+    concise = await service.get_next(_FOLLOWER, roadmap.id, ResponseFormat.CONCISE)
+    assert all(item.path_position is None for item in concise.items)
+
+    detailed = await service.get_next(_FOLLOWER, roadmap.id, ResponseFormat.DETAILED)
+    # Arrays is first in suggested_path -> position 1; why_now stays structural.
+    assert all(item.path_position == 1 for item in detailed.items)
+    assert detailed.items[0].why_now.startswith("Next unchecked subsection in the suggested path")
+    assert detailed.remaining_in_path == 3
+
+
+# --- deadline (set / clear, per-user, countdown only) -----------------------
+
+
+async def test_set_deadline_sets_the_per_user_deadline() -> None:
+    roadmap = build_roadmap()
+    service, _, _ = _service(roadmap)
+
+    progress = await service.set_deadline(_FOLLOWER, roadmap.id, date(2026, 12, 1))
+    assert progress.deadline == date(2026, 12, 1)
+    # The snapshot echoes the deadline so the countdown can render.
+    snapshot = await service.get(_FOLLOWER, roadmap.id, detailed=False)
+    assert snapshot.deadline == date(2026, 12, 1)
+
+
+async def test_set_deadline_is_editable_and_clearable_at_any_time() -> None:
+    roadmap = build_roadmap()
+    service, _, _ = _service(roadmap)
+
+    await service.set_deadline(_FOLLOWER, roadmap.id, date(2026, 12, 1))
+    # Editable: a second set replaces the date.
+    await service.set_deadline(_FOLLOWER, roadmap.id, date(2027, 1, 15))
+    # Clearable: passing None removes it.
+    cleared = await service.set_deadline(_FOLLOWER, roadmap.id, None)
+    assert cleared.deadline is None
+    assert (await service.get(_FOLLOWER, roadmap.id, detailed=False)).deadline is None
+
+
+async def test_set_deadline_in_the_past_is_allowed() -> None:
+    # A past deadline is elapsed/overdue (no pacing signal), never rejected.
+    roadmap = build_roadmap()
+    service, _, _ = _service(roadmap)
+
+    progress = await service.set_deadline(_FOLLOWER, roadmap.id, date(2000, 1, 1))
+    assert progress.deadline == date(2000, 1, 1)
+
+
+async def test_set_deadline_preserves_existing_checked_items() -> None:
+    # Setting a deadline must not disturb progress: it only touches the date.
+    roadmap = build_roadmap()
+    service, _, _ = _service(roadmap)
+
+    await service.update(_FOLLOWER, roadmap.id, [CHK_ARRAYS_READ], CompletionState.COMPLETE)
+    await service.set_deadline(_FOLLOWER, roadmap.id, date(2026, 12, 1))
+    snapshot = await service.get(_FOLLOWER, roadmap.id, detailed=True)
+    assert snapshot.checked_ids == [CHK_ARRAYS_READ]
+    assert snapshot.deadline == date(2026, 12, 1)
+
+
+async def test_set_deadline_on_a_published_roadmap_starts_following() -> None:
+    # Mirrors update's upsert: setting a deadline on a published roadmap the
+    # caller has not explicitly followed creates their private record.
+    roadmap = build_roadmap()
+    service, _, progress_repo = _service(roadmap)
+
+    await service.set_deadline(_FOLLOWER, roadmap.id, date(2026, 12, 1))
+    assert await progress_repo.get(_FOLLOWER, roadmap.id) is not None
+
+
+async def test_set_deadline_on_a_draft_is_a_409() -> None:
+    draft = build_roadmap(status=RoadmapStatus.DRAFT)
+    service, _, _ = _service(draft)
+
+    with pytest.raises(Conflict):
+        await service.set_deadline(_FOLLOWER, draft.id, date(2026, 12, 1))
+
+
+async def test_set_deadline_is_scoped_per_user() -> None:
+    roadmap = build_roadmap()
+    service, _, _ = _service(roadmap)
+
+    await service.set_deadline(_FOLLOWER, roadmap.id, date(2026, 12, 1))
+    # Another user has no deadline of their own.
+    other = await service.get("someone-else", roadmap.id, detailed=False)
+    assert other.deadline is None
+
+
+async def test_set_deadline_on_a_public_archived_roadmap_by_a_non_follower_is_a_409() -> None:
+    # Archived gains no new followers: a non-follower's set_deadline is refused
+    # before any write, so no phantom progress row is created.
+    archived = build_roadmap(status=RoadmapStatus.ARCHIVED, visibility=Visibility.PUBLIC)
+    service, _, progress_repo = _service(archived)
+
+    with pytest.raises(Conflict):
+        await service.set_deadline(_FOLLOWER, archived.id, date(2026, 12, 1))
+    assert await progress_repo.get(_FOLLOWER, archived.id) is None
+    assert progress_repo.commits == 0
 
 
 # --- per-user scoping -------------------------------------------------------

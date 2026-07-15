@@ -84,7 +84,40 @@ def test_update_over_the_trusted_identity(make_settings: MakeSettings) -> None:
 def test_get_and_next_over_the_trusted_identity(make_settings: MakeSettings) -> None:
     client = _build_client(make_settings)
     assert client.get(f"/roadmaps/{ROADMAP_ID}/progress", headers=_trusted()).status_code == 200
-    assert client.get(f"/roadmaps/{ROADMAP_ID}/next", headers=_trusted()).status_code == 200
+    next_response = client.get(
+        f"/roadmaps/{ROADMAP_ID}/next", headers=_trusted(), params={"format": "detailed"}
+    )
+    assert next_response.status_code == 200
+    body = next_response.json()
+    # The MCP roadmap_get_next tool (Ticket 22) reads this: full shape + detailed
+    # path_position, structural why_now, remaining_in_path.
+    assert body["remaining_in_path"] == 3
+    assert all(item["path_position"] == 1 for item in body["items"])
+    assert "suggested path" in body["items"][0]["why_now"].lower()
+
+
+def test_set_and_clear_deadline_over_the_trusted_identity(make_settings: MakeSettings) -> None:
+    client = _build_client(make_settings)
+    response = client.put(
+        f"/roadmaps/{ROADMAP_ID}/deadline", headers=_trusted(), json={"deadline": "2026-12-01"}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["deadline"] == "2026-12-01"
+    cleared = client.put(
+        f"/roadmaps/{ROADMAP_ID}/deadline", headers=_trusted(), json={"deadline": None}
+    )
+    assert cleared.json()["deadline"] is None
+
+
+def test_deadline_without_the_internal_token_is_401(make_settings: MakeSettings) -> None:
+    client = _build_client(make_settings)
+    response = client.put(
+        f"/roadmaps/{ROADMAP_ID}/deadline",
+        headers={USER_ID_HEADER: _USER},
+        json={"deadline": "2026-12-01"},
+    )
+    assert response.status_code == 401
+    assert response.json()["code"] == "UNAUTHORIZED"
 
 
 def test_progress_is_scoped_per_trusted_user(make_settings: MakeSettings) -> None:

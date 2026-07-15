@@ -136,6 +136,15 @@ def test_full_study_spine_end_to_end_over_http(
         first_next = client.get(f"/roadmaps/{roadmap_id}/next").json()
         assert [item["item_id"] for item in first_next["items"]] == ["chk_read", "chk_drill"]
         assert first_next["complete"] is False
+        # full get_next shape: structural why_now + remaining_in_path (2 subsections)
+        assert first_next["remaining_in_path"] == 2
+        assert "suggested path" in first_next["items"][0]["why_now"].lower()
+        # detailed adds path_position (concise omitted it)
+        assert first_next["items"][0]["path_position"] is None
+        detailed_next = client.get(
+            f"/roadmaps/{roadmap_id}/next", params={"format": "detailed"}
+        ).json()
+        assert all(item["path_position"] == 1 for item in detailed_next["items"])
 
         # check the arrays items -> next advances to hashing
         update = client.post(
@@ -158,6 +167,21 @@ def test_full_study_spine_end_to_end_over_http(
         snapshot = client.get(f"/roadmaps/{roadmap_id}/progress", params={"detailed": True}).json()
         assert snapshot["percent"] == 100
         assert sorted(snapshot["checked_ids"]) == ["chk_drill", "chk_hash", "chk_read"]
+
+        # deadline set -> echoed on the snapshot; a past date is allowed; clear it
+        assert (
+            client.put(f"/roadmaps/{roadmap_id}/deadline", json={"deadline": "2000-01-01"}).json()[
+                "deadline"
+            ]
+            == "2000-01-01"
+        )
+        assert client.get(f"/roadmaps/{roadmap_id}/progress").json()["deadline"] == "2000-01-01"
+        assert (
+            client.put(f"/roadmaps/{roadmap_id}/deadline", json={"deadline": None}).json()[
+                "deadline"
+            ]
+            is None
+        )
 
         # a second user's progress is empty (per-user scoping), and they can read
         # the public published roadmap (a private one would 404 to a non-owner)
