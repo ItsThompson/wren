@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from wren.roadmaps.assembly import assemble_draft
+from wren.roadmaps.assembly import assemble_draft, assemble_fork
 from wren.roadmaps.schemas import (
     ChecklistItemInput,
     ResourceInput,
@@ -253,3 +253,71 @@ def test_subject_tags_and_visibility_are_carried_from_input() -> None:
     roadmap = _assemble(doc).roadmap
     assert roadmap.subject_tags == ["cs", "interview"]
     assert roadmap.visibility is Visibility.PUBLIC
+
+
+# --- assemble_fork ----------------------------------------------------------
+
+_LATER = datetime(2026, 8, 1, tzinfo=UTC)
+
+
+def _source_roadmap():
+    """A published, public source roadmap with references, for fork tests."""
+    doc = RoadmapInput(
+        title="Grokking DSA",
+        description="A prerequisite-aware path.",
+        subject_tags=["cs", "interview"],
+        visibility=Visibility.PUBLIC,
+        suggested_path=["sub_arrays", "sub_hashing"],
+        sections=[
+            SectionInput(
+                title="Foundations",
+                subsections=[
+                    _sub("Arrays", proposed_id="sub_arrays"),
+                    _sub("Hashing", proposed_id="sub_hashing", prereq_ids=["sub_arrays"]),
+                ],
+            )
+        ],
+    )
+    source = assemble_draft(doc, "grokking-dsa-7f3k", owner="author", now=_NOW).roadmap
+    # Simulate the published, public state a real fork source would be in.
+    return source.model_copy(update={"status": RoadmapStatus.PUBLISHED, "revision": 5})
+
+
+def test_fork_mints_the_new_roadmap_id_and_resets_lifecycle() -> None:
+    fork = assemble_fork(_source_roadmap(), "grokking-dsa-9x2b", owner="forker", now=_LATER)
+    # A brand-new roadmap ID (never derived from the source), owned by the forker,
+    # reset to a private draft at revision 1 with fresh timestamps.
+    assert fork.id == "grokking-dsa-9x2b"
+    assert fork.owner == "forker"
+    assert fork.status is RoadmapStatus.DRAFT
+    assert fork.visibility is Visibility.PRIVATE
+    assert fork.revision == 1
+    assert fork.created_at == _LATER == fork.updated_at
+
+
+def test_fork_copies_all_content_verbatim() -> None:
+    source = _source_roadmap()
+    fork = assemble_fork(source, "grokking-dsa-9x2b", owner="forker", now=_LATER)
+    # Presentation + structure copied: title, description, subject_tags, section
+    # and subsection maps + order, and every child ID verbatim (uniqueness scope
+    # is a single roadmap, so the IDs carry safely into the fork's namespace).
+    assert fork.title == source.title
+    assert fork.description == source.description
+    assert fork.subject_tags == source.subject_tags
+    assert fork.section_order == source.section_order
+    assert fork.suggested_path == source.suggested_path
+    fork_sub = fork.sections["sec_foundations"].subsections
+    assert set(fork_sub) == {"sub_arrays", "sub_hashing"}
+    # References carry over intact (same IDs, so no re-mint/remap needed).
+    assert fork_sub["sub_hashing"].prereq_ids == ["sub_arrays"]
+
+
+def test_fork_does_not_mutate_the_source() -> None:
+    source = _source_roadmap()
+    assemble_fork(source, "grokking-dsa-9x2b", owner="forker", now=_LATER)
+    # The deep copy leaves every field of the source untouched.
+    assert source.id == "grokking-dsa-7f3k"
+    assert source.owner == "author"
+    assert source.status is RoadmapStatus.PUBLISHED
+    assert source.visibility is Visibility.PUBLIC
+    assert source.revision == 5

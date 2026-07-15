@@ -37,6 +37,7 @@ from wren.roadmaps.schemas import (
     SectionInput,
     Subsection,
     SubsectionInput,
+    Visibility,
 )
 
 # An author's ``proposed_id`` -> the final minted ID, leaving unknown references
@@ -112,6 +113,41 @@ def assemble_draft(
         updated_at=now,
     )
     return AssembledDraft(roadmap=roadmap, remap=dict(minter.remap))
+
+
+def assemble_fork(source: Roadmap, new_roadmap_id: str, owner: str, *, now: datetime) -> Roadmap:
+    """Copy ``source`` content into a brand-new private draft (spec sections 04/05).
+
+    A fork is a faithful content copy under a freshly-minted, globally-unique
+    ``new_roadmap_id`` (never derived from the source ID), owned by the forking
+    ``owner`` and reset to a private ``draft`` at ``revision`` 1 with fresh
+    timestamps. All content is copied: sections, subsections, resources, checklist
+    items, ``prereq_ids``, ``suggested_path``, track tags, ``subject_tags``,
+    ``title``, and ``description``.
+
+    Child slug IDs are copied verbatim: their uniqueness scope is a single roadmap
+    (spec section 04), so they carry safely into the fork's own namespace and every
+    internal reference (``prereq_ids`` / ``suggested_path``) stays valid without a
+    re-mint or a remap. The only minted value is the new roadmap ID. ``visibility``
+    resets to private (a fork is the forker's own new draft, never inheriting the
+    source's sharing state), and no progress is carried over: the service creates
+    no progress record for a fork (spec section 15).
+
+    Pure: ``model_copy(deep=True)`` gives the fork independent nested maps, so the
+    persisted source is never mutated.
+    """
+    return source.model_copy(
+        deep=True,
+        update={
+            "id": new_roadmap_id,
+            "owner": owner,
+            "visibility": Visibility.PRIVATE,
+            "status": RoadmapStatus.DRAFT,
+            "revision": 1,
+            "created_at": now,
+            "updated_at": now,
+        },
+    )
 
 
 class IdMinter:

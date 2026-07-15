@@ -17,9 +17,9 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from wren.core.errors import Violation
+from wren.core.errors import Conflict, ErrorCode, Violation
 
 
 class RoadmapStatus(StrEnum):
@@ -146,6 +146,44 @@ class RoadmapInput(BaseModel):
     visibility: Visibility = Visibility.PRIVATE
     sections: list[SectionInput] = Field(default_factory=list)
     suggested_path: list[str] = Field(default_factory=list)
+
+
+class MetadataEditRequest(BaseModel):
+    """The ``PATCH /roadmaps/{id}/metadata`` body: the presentation-only fields
+    that stay mutable after publish (spec sections 04/06).
+
+    Only ``title`` / ``description`` / ``subject_tags`` are editable here; a field
+    left out (``None``) is unchanged (last-write-wins, deliberately not
+    ``If-Match``-guarded and never bumps the structural ``revision``). ``extra`` is
+    ``allow``ed so a smuggled structural, lifecycle, or identity field (e.g.
+    ``sections`` / ``visibility`` / ``status`` / ``revision``) is *captured* rather
+    than silently dropped, then rejected as immutable by
+    :meth:`reject_structural_fields`: the metadata endpoint can never touch
+    anything but presentation."""
+
+    model_config = ConfigDict(extra="allow")
+
+    title: str | None = None
+    description: str | None = None
+    subject_tags: list[str] | None = None
+
+    def reject_structural_fields(self) -> None:
+        """Raise ``Conflict`` (409 ``IMMUTABLE``) if any non-presentation field was
+        sent, naming the offending fields and pointing to the sanctioned paths.
+
+        This is what makes the endpoint presentation-only at the wire boundary: a
+        client cannot smuggle a content, visibility, status, or revision change
+        through the metadata edit. Presentation edits stay allowed post-publish;
+        structural changes require a draft (fork a published roadmap first)."""
+        smuggled = sorted(self.model_extra or {})
+        if smuggled:
+            fields = ", ".join(smuggled)
+            raise Conflict(
+                f"Fields are immutable via the metadata endpoint: {fields}. Only title, "
+                "description, and subject_tags are editable here; change structure on a draft "
+                "(fork a published roadmap to make structural changes).",
+                code=ErrorCode.IMMUTABLE,
+            )
 
 
 # ---------- Responses ----------
