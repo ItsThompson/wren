@@ -1,0 +1,61 @@
+# Authoring roadmaps
+
+How draft content is written, and why published content cannot be. Both transports
+(web and MCP) go through the same `RoadmapService` (`backend/src/wren/roadmaps/service.py`),
+so these rules hold identically for humans and agents.
+
+A roadmap is authored as a **draft**, then **published** in a one-way transition
+that freezes its structure. There are two ways to write draft content and a hard
+boundary that stops either from touching published content.
+
+## Two write paths: patch vs replace
+
+| Path | Endpoint / tool | When |
+|------|-----------------|------|
+| Iterative edit | `PATCH /roadmaps/{id}` / `patch_roadmap_draft` | **The primary path.** Typed, ID-addressed, atomic operations. A small edit costs a few tokens instead of resending the whole document. |
+| Full-document import | `PUT /roadmaps/{id}` / `replace_roadmap_draft` | **A documented escape hatch only, never the iterative path.** Replaces the entire draft in one shot: use it to import a document authored elsewhere, not to make an incremental change. |
+
+Both are draft-only content writes, both are guarded by `If-Match: <revision>`
+optimistic concurrency (a stale revision is a `409 STALE_REVISION` telling the
+caller to re-read), and both bump `revision` on success. Prefer `patch` for
+everyday editing; reach for `replace` only when you genuinely have a whole new
+document to import.
+
+### Replace: ID semantics
+
+`replace` accepts the same `RoadmapInput` full-document shape as `create`. When it
+rebuilds the draft:
+
+- The roadmap's own ID (the route param) is **unchanged**.
+- Any node that carries a `proposed_id` **keeps it** (validated, slugified, and
+  de-duped like `create`).
+- Every node **without** a `proposed_id` is **re-minted** from its title.
+- `owner` and `created_at` are preserved; `revision` is bumped.
+
+The response is the full rebuilt roadmap plus a `remap` of any `proposed_id ->
+minted_id` that had to be de-duped, so the caller can reconcile its references.
+The input shapes live in `backend/src/wren/roadmaps/schemas.py`; the mint-then-
+resolve rebuild is the shared pure module `backend/src/wren/roadmaps/assembly.py`.
+
+## The immutability boundary
+
+Publishing is where followers start tracking progress against a roadmap's
+structure, so **published (and archived) content is immutable**. Every structural
+write path is refused on a non-draft roadmap:
+
+- `create` produces a fresh draft, `patch` and `replace` both load through the
+  service's content-write guard, and all of them reject a `published`/`archived`
+  roadmap with a `409 IMMUTABLE` problem+json.
+- The error points to **fork-to-change**: forking produces a new draft (with fresh
+  IDs and no progress carry-over) that can then be edited and published on its own.
+
+The only sanctioned write on published content is a **presentation-only** metadata
+edit (`title`, `description`, `subject_tags`). That path does not go through the
+content-write guard, which is exactly why it stays allowed after publish while
+structural writes do not.
+
+| Field group | Post-publish |
+|-------------|--------------|
+| Structure and content (sections, subsections, items, prereq edges, `suggested_path`, resources, effort, track tags) | Immutable: fork to change |
+| Presentation (`title`, `description`, `subject_tags`) | Editable by the owner |
+| Lifecycle (`visibility`, archive/delete) | Web-only |
