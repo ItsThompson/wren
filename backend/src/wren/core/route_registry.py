@@ -43,7 +43,7 @@ class RouteKey:
 RouteRegistry = Mapping[RouteKey, AccessLevel]
 
 # Declarative per-app registries. Product routes are declared here by the slice
-# that mounts them (accounts #6, roadmaps #7+, OAuth #18). The coverage test fails
+# that mounts them (accounts, roadmaps, OAuth). The coverage test fails
 # safe (deny) the moment a mounted product route is missing an entry.
 #
 # The /auth endpoints are PUBLIC: they establish or tear down a session rather
@@ -73,8 +73,8 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     # transition; both resolve the human session via require_user.
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:validate"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:publish"): AccessLevel.EXTERNAL_COOKIE,
-    # Fork + presentation-only metadata edit, both agent+web callable
-    # (spec section 07). Fork seeds a new draft from any readable roadmap (own or
+    # Fork + presentation-only metadata edit, both agent+web callable.
+    # Fork seeds a new draft from any readable roadmap (own or
     # public); the metadata PATCH edits title/description/subject_tags and stays
     # allowed post-publish (not If-Match-guarded). Both resolve the human session
     # via require_user and are owner-scoped in the service (fork's source read is
@@ -95,8 +95,8 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     ): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/search"): AccessLevel.EXTERNAL_COOKIE,
     # Web-only lifecycle: visibility toggle, archive, and delete. Mounted on
-    # the external (human) app ONLY: no internal-app route and no MCP tool (spec
-    # sections 06/07/08). All resolve the human session via require_user and are
+    # the external (human) app ONLY: no internal-app route and no MCP tool.
+    # All resolve the human session via require_user and are
     # owner-scoped in the service; delete is guarded by a zero-followers check.
     RouteKey(method="PUT", path="/roadmaps/{roadmap_id}/visibility"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:archive"): AccessLevel.EXTERNAL_COOKIE,

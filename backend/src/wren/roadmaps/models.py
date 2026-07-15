@@ -1,6 +1,6 @@
-"""Roadmaps ORM: one ``roadmaps`` row per roadmap (spec sections 04, 11).
+"""Roadmaps ORM: one ``roadmaps`` row per roadmap.
 
-The authoritative roadmap is the section-04 nested document, stored whole in the
+The authoritative roadmap is the nested document, stored whole in the
 ``document`` JSONB column; the scalar columns (``owner``, ``status``,
 ``visibility``, ``revision``, ``title``) are a write-derived denormalized index
 for the owner-scoping and listing queries later slices need, never a second
@@ -29,7 +29,7 @@ ROADMAP_ID_MAX_LENGTH = 120
 
 
 class RoadmapRecord(Base):
-    """A roadmap definition. ``document`` holds the full section-04 roadmap."""
+    """A roadmap definition. ``document`` holds the full nested roadmap."""
 
     __tablename__ = "roadmaps"
 

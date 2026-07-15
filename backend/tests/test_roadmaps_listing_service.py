@@ -1,6 +1,6 @@
 """Service-level tests for the dashboard + profile listing.
 
-Sociable per spec section 13: the real :class:`ListingService` runs over the
+Sociable: the real :class:`ListingService` runs over the
 in-memory roadmap repository (the Postgres boundary substituted); the two
 cross-domain lookups (handle -> owner, caller -> followed ids) are injected as the
 same narrow callables the wiring binds, here backed by simple test doubles. These

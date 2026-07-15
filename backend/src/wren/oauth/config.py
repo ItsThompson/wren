@@ -33,7 +33,7 @@ TOKEN_PATH = "/token"
 REVOKE_PATH = "/revoke"
 CLIENTS_PATH = "/me/clients"
 
-# The SPA route that renders consent (spec section 08 sequence): the AS parks the
+# The SPA route that renders consent: the AS parks the
 # request and 302s the browser to `<app_public_url><CONSENT_ROUTE>?auth_request_id`.
 CONSENT_ROUTE = "/authorize"
 
@@ -47,7 +47,7 @@ SUPPORTED_SCOPES: tuple[str, ...] = (
     SCOPE_PROGRESS_WRITE,
 )
 
-# PKCE: only S256 is accepted (spec section 08 "PKCE S256 is required").
+# PKCE: only S256 is accepted.
 CODE_CHALLENGE_METHOD_S256 = "S256"
 
 # Grant/response types the AS supports (public clients + rotating refresh).

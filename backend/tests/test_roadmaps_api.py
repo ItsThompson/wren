@@ -538,11 +538,11 @@ def test_replace_is_404_to_a_non_owner(make_settings: MakeSettings) -> None:
     assert response.status_code == 404
 
 
-# --- immutability boundary (structural writes reject published; #13) ---------
+# --- immutability boundary (structural writes reject published) -------------
 #
 # Every content-mutating write (patch, replace) rejects a published roadmap with a
 # 409 IMMUTABLE pointing to fork-to-change. The sanctioned
-# presentation-only path (edit_metadata, Ticket 14) is NOT routed through the
+# presentation-only path (edit_metadata) is NOT routed through the
 # content-write guard, which is what keeps it allowed post-publish.
 
 
@@ -591,8 +591,8 @@ def test_replace_against_a_published_roadmap_is_a_409_immutable(
 
 
 def _make_public(repo: InMemoryRoadmapRepository, roadmap_id: str) -> None:
-    """Force a stored roadmap to published + public (no visibility endpoint yet,
-    #15), so a non-owner readability path can be exercised over HTTP."""
+    """Force a stored roadmap to published + public directly, so a non-owner
+    readability path can be exercised over HTTP."""
     record = repo._by_id[roadmap_id]
     record.status = "published"
     record.visibility = "public"
@@ -656,7 +656,7 @@ def test_fork_requires_authentication(make_settings: MakeSettings) -> None:
     assert response.status_code == 401
 
 
-# --- edit_metadata (#14, presentation-only, published-mutable) ---------------
+# --- edit_metadata (presentation-only, published-mutable) -------------------
 
 
 def test_edit_metadata_updates_presentation_fields_without_bumping_revision(
@@ -735,8 +735,8 @@ def test_edit_metadata_requires_authentication(make_settings: MakeSettings) -> N
 def test_published_rejects_structural_write_but_allows_metadata_edit(
     make_settings: MakeSettings,
 ) -> None:
-    # Closes #13 AC#4 end-to-end: on a published roadmap a structural write (PATCH)
-    # is a 409 IMMUTABLE while the presentation-only metadata edit succeeds.
+    # On a published roadmap a structural write (PATCH) is a 409 IMMUTABLE while
+    # the presentation-only metadata edit succeeds.
     client, _ = _build_client(make_settings, tokens=["7f3k"])
     _login(client)
     published_id = _publish(client)

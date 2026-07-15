@@ -6,7 +6,7 @@ short-lived RS256 access token (``aud`` = the MCP resource) plus a rotating
 refresh token; a ``refresh_token`` exchange rotates: it revokes the presented
 refresh and issues a fresh pair, and a **replay** of an already-rotated refresh
 revokes the whole grant chain. ``/revoke`` (RFC 7009) invalidates a refresh
-token. ``/me/clients`` list/revoke are the Ticket 19 connected-client seam.
+token. ``/me/clients`` list/revoke are the connected-client seam.
 
 Access tokens are stateless JWTs and cannot be individually revoked, so agent
 tokens are short-lived and revocation takes effect within the access-token TTL.
@@ -144,7 +144,7 @@ class TokenService:
         _log.info("oauth_token_revoked", client_id=existing.client_id, user_id=existing.user_id)
 
     async def list_connected_clients(self, user_id: str) -> list[ConnectedClient]:
-        """The user's authorized agents (Ticket 19 ``GET /me/clients``)."""
+        """The user's authorized agents (``GET /me/clients``)."""
         grants = await self._repo.list_active_grants(user_id)
         connected: list[ConnectedClient] = []
         for grant in grants:
@@ -160,7 +160,7 @@ class TokenService:
         return connected
 
     async def revoke_connected_client(self, user_id: str, client_id: str) -> None:
-        """Revoke a user's grant + its refresh tokens (Ticket 19 ``DELETE``)."""
+        """Revoke a user's grant + its refresh tokens (``DELETE``)."""
         grant = await self._repo.revoke_grant(user_id, client_id)
         if grant is None:
             raise NotFound("No connected client to revoke.")

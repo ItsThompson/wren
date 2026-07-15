@@ -1,9 +1,9 @@
 """Internal app entrypoint (:8001).
 
 Never tunnel-routed and never host-published: reachable only by containers on
-``compute-net`` (i.e. the MCP server). Trusts the ``X-User-ID`` header (wired in
-Ticket 3). Built from the shared factory with the internal service identity
-injected, differing from the external app only by these settings.
+``compute-net`` (i.e. the MCP server). Trusts the ``X-User-ID`` header. Built from
+the shared factory with the internal service identity injected, differing from the
+external app only by these settings.
 
 Mounts the roadmap routers as thin adapters over the same service layer the
 external app uses (:mod:`wren.roadmaps.api_internal`), resolving identity from the
@@ -35,7 +35,6 @@ internal_roadmaps_router = create_internal_roadmaps_router(build_roadmap_service
 
 # Progress surface over the trusted identity: follow / snapshot /
 # explicit-set / next, the endpoints the MCP progress tools call.
-# Ticket 20 mounted the internal roadmaps router and deferred these to #9.
 internal_progress_router = create_internal_progress_router(build_progress_service_provider())
 
 app: FastAPI = create_app(

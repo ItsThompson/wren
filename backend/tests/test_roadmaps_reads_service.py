@@ -1,8 +1,8 @@
 """Service-level tests for the read projections + readability.
 
 Sociable tests through :class:`RoadmapService`'s public read methods with the
-real projection modules behind it and only the repository substituted (spec
-section 13). These concentrate on the business rules the API tests exercise only
+real projection modules behind it and only the repository substituted. These
+concentrate on the business rules the API tests exercise only
 indirectly: the study-time readability rule (owner draft preview vs a non-owner's
 public published/archived read; private -> 404 no leak), the model-recoverable
 404 that names sibling ids, the cursor -> 422 mapping, per-user checked scoping,

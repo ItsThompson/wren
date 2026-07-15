@@ -120,7 +120,7 @@ def test_external_401_for_an_invalid_cookie(make_settings: MakeSettings) -> None
 
 def test_external_default_verifier_denies_all_sessions(make_settings: MakeSettings) -> None:
     # With no verifier injected, the app falls back to deny_all_sessions (the
-    # Ticket 3 default until Ticket 6), so even a "valid"-looking cookie is denied.
+    # default deny-all verifier), so even a "valid"-looking cookie is denied.
     client = _external_client(make_settings, verifier=None)
     response = client.get("/whoami", headers={"Cookie": f"{SESSION_COOKIE_NAME}={_VALID_COOKIE}"})
     assert response.status_code == 401

@@ -2,7 +2,7 @@
 
 Mirrors the external ``/roadmaps`` router (:mod:`wren.roadmaps.api`) op-for-op but
 resolves the caller via :func:`require_internal_user` (the trusted ``X-User-ID``
-header behind the shared ``INTERNAL_API_TOKEN``, spec section 08) instead of the
+header behind the shared ``INTERNAL_API_TOKEN``) instead of the
 human session cookie. Both are thin adapters over the same :class:`RoadmapService`:
 identical business rules, different identity resolution. The internal app is never
 tunnel-routed or host-published, so it is reachable only by the
@@ -11,8 +11,7 @@ re-validated.
 
 The MCP write/read tools are thin clients of these endpoints: one
 tool call becomes one internal HTTP call carrying the resolved ``X-User-ID``. This
-includes the fork and presentation-only metadata-edit tools, both agent-callable
-(spec section 07).
+includes the fork and presentation-only metadata-edit tools, both agent-callable.
 """
 
 from __future__ import annotations

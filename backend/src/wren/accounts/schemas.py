@@ -51,8 +51,8 @@ class AuthenticatedUser(BaseModel):
 class PublicProfile(BaseModel):
     """Public, cross-user profile projection keyed by the handle.
 
-    Stubbed here (handle + display name) and consumed by Ticket 25, which adds
-    the user's published-public roadmaps.
+    Stubbed here (handle + display name); a later slice adds the user's
+    published-public roadmaps.
     """
 
     handle: str

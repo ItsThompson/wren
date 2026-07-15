@@ -1,5 +1,5 @@
 """RoadmapService business rules, through its public methods with an in-memory
-repository and the real slugs + assembly deep modules (sociable, spec §13)."""
+repository and the real slugs + assembly deep modules (sociable)."""
 
 from __future__ import annotations
 
@@ -453,8 +453,8 @@ async def test_patch_on_a_published_roadmap_is_an_immutability_conflict() -> Non
             created.revision,
             [SetTagsOp(op="set_tags", subsection_id="sub_arrays", tags=["x"])],
         )
-    # A structural write against published content is the immutability boundary
-    # (spec section 05): a distinct 409 IMMUTABLE pointing to fork-to-change.
+    # A structural write against published content is the immutability boundary:
+    # a distinct 409 IMMUTABLE pointing to fork-to-change.
     assert excinfo.value.code is ErrorCode.IMMUTABLE
     assert "fork" in excinfo.value.detail.lower()
 
@@ -650,9 +650,9 @@ async def test_replace_rolls_back_when_persistence_fails() -> None:
 
 
 async def _publish_public(repo: InMemoryRoadmapRepository, roadmap: Roadmap) -> None:
-    """Persist ``roadmap`` as a published, public source (no visibility path yet,
-    #15), mirroring what a real published-public roadmap looks like on disk. Uses
-    the repository ``save`` seam, like the #13 archived-state simulation."""
+    """Persist ``roadmap`` as a published, public source directly, mirroring what a
+    real published-public roadmap looks like on disk. Uses the repository ``save``
+    seam, like the archived-state simulation."""
     await repo.save(
         roadmap.model_copy(
             update={"status": RoadmapStatus.PUBLISHED, "visibility": Visibility.PUBLIC}
@@ -802,8 +802,8 @@ async def test_edit_metadata_changes_only_the_three_presentation_fields() -> Non
 
 
 async def test_edit_metadata_works_on_a_published_roadmap() -> None:
-    # The positive half of #13's deferred AC#4: edit_metadata SUCCEEDS on a
-    # published roadmap while structural writes (patch/replace) are rejected 409.
+    # edit_metadata SUCCEEDS on a published roadmap while structural writes
+    # (patch/replace) are rejected 409.
     service, _ = _service()
     created = await service.create_draft("user-1", _publishable_doc())
     await service.publish("user-1", created.id)
@@ -874,13 +874,13 @@ async def test_edit_metadata_rolls_back_when_persistence_fails() -> None:
     assert repo.rollbacks == 1
 
 
-# --- replace preserves the stored visibility (#13 review item) --------------
+# --- replace preserves the stored visibility -------------------------------
 
 
 async def test_replace_preserves_the_stored_drafts_visibility() -> None:
     # A full-document import replaces content but must NOT silently flip the
     # draft's visibility: visibility is a web-only lifecycle toggle, not part of
-    # the imported document's authority (#13 review; spec sections 04/06).
+    # the imported document's authority.
     service, _ = _service()
     created = await service.create_draft("user-1", _publishable_doc())
     # Make the draft public via the sanctioned lifecycle path.

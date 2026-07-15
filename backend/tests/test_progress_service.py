@@ -327,7 +327,7 @@ async def test_a_persist_failure_rolls_back_and_propagates() -> None:
     assert progress_repo.commits == 0
 
 
-# --- archived roadmaps keep existing followers (item 2 / #9 review) ----------
+# --- archived roadmaps keep existing followers ------------------------------
 
 
 async def test_get_on_an_archived_roadmap_is_allowed_for_a_follower() -> None:

@@ -1,4 +1,4 @@
-"""Smoke test (required by Ticket 1 acceptance criteria).
+"""Smoke test.
 
 Boots both real apps in one process and asserts /healthz and /metrics respond.
 Booting both together also proves the per-app metric registries do not collide.

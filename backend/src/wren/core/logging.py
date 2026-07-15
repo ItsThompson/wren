@@ -1,7 +1,7 @@
 """structlog configuration.
 
 Configured once per process. In development, logs render as a human-readable
-console stream; everywhere else they render as JSON (spec section 11 observability).
+console stream; everywhere else they render as JSON.
 The ``service`` field is bound per app via :func:`get_logger`, so external and
 internal traffic is distinguishable without a process-global that would collide
 when both apps run in one process (e.g. the smoke test).

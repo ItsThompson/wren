@@ -6,7 +6,7 @@ Six tables back the AS:
   registration at P0, public clients (PKCE, no secret).
 - ``oauth_auth_requests``: authorize requests **parked** server-side under an
   opaque ``auth_request_id`` so the SPA only round-trips the id, not the OAuth
-  params (spec section 08 consent sequence). Short-lived.
+  params. Short-lived.
 - ``oauth_authorization_codes``: one-time codes minted at consent, PKCE-bound.
 - ``oauth_refresh_tokens``: rotating refresh tokens, stored only as a SHA-256
   hash; ``revoked`` supports rotation and replay rejection.

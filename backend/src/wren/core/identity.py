@@ -8,7 +8,7 @@ identity differently, and this module is the single place that difference lives:
   **strips any client-supplied ``X-User-ID``** (via
   :class:`StripInboundIdentityMiddleware`, wired app-wide) so a spoofed header can
   never reach a handler. Cookie verification is injected as a
-  :data:`SessionVerifier`; Ticket 6 supplies the real JWT logic through this same
+  :data:`SessionVerifier`, so the real JWT logic is supplied through this same
   contract without reworking the seam.
 - **Internal (:8001)** **trusts ``X-User-ID``** and additionally requires the
   shared ``INTERNAL_API_TOKEN`` header as defense-in-depth behind ``compute-net``
@@ -33,16 +33,16 @@ INTERNAL_TOKEN_HEADER = "X-Internal-Api-Token"
 SESSION_COOKIE_NAME = "wren_session"
 
 # A SessionVerifier turns a raw session-cookie value into a resolved user_id, or
-# None if the cookie is missing/invalid/expired. It is async so Ticket 6 can add a
-# per-request jti-blacklist lookup (an I/O call) behind this same contract without
+# None if the cookie is missing/invalid/expired. It is async so a per-request
+# jti-blacklist lookup (an I/O call) can run behind this same contract without
 # reworking require_user.
 SessionVerifier = Callable[[str], Awaitable[str | None]]
 
 
 async def deny_all_sessions(_cookie: str) -> str | None:
-    """Default verifier until Ticket 6 issues sessions: every cookie fails to
-    resolve, so :func:`require_user` fail-safe denies. Replaced by injecting a
-    real ``SessionVerifier`` on ``app.state.session_verifier``."""
+    """Default deny-all verifier: every cookie fails to resolve, so
+    :func:`require_user` fail-safe denies. Replaced by injecting a real
+    ``SessionVerifier`` on ``app.state.session_verifier``."""
     return None
 
 

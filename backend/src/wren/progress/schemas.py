@@ -1,4 +1,4 @@
-"""Progress data model + wire projections (spec sections 04, 07).
+"""Progress data model + wire projections.
 
 Progress is the second top-level entity: one mutable record per
 ``(user_id, roadmap_id)``, holding the explicit-set ``checked`` map and an
@@ -8,8 +8,8 @@ user.
 
 The derived read projections (``ProgressSnapshot`` / ``SectionProgress``) and the
 server-computed ``NextResult`` are never stored: they are recomputed from the
-roadmap + progress on each read (spec section 04 "Derived"). ``NextResult`` carries
-the full section-07 ``get_next`` shape (structural ``why_now``,
+roadmap + progress on each read. ``NextResult`` carries
+the full ``get_next`` shape (structural ``why_now``,
 ``remaining_in_path``, and ``path_position`` under detailed); the per-user
 ``deadline`` is set/cleared via ``PUT /roadmaps/{id}/deadline`` (:class:`DeadlineRequest`).
 
@@ -85,7 +85,7 @@ class ProgressSnapshot(BaseModel):
     checked_ids: list[str] | None = None
 
 
-# ---------- Server-computed next (spec section 07 get_next) ----------
+# ---------- Server-computed next (get_next) ----------
 
 
 class ResourceLink(BaseModel):
@@ -132,7 +132,7 @@ class NextResult(BaseModel):
 
 class ProgressUpdateRequest(BaseModel):
     """The ``POST /progress`` body: set ``item_ids`` to ``state`` (explicit set,
-    not toggle; spec section 07). At least one id is required so an update is
+    not toggle). At least one id is required so an update is
     never a silent no-op."""
 
     item_ids: list[str] = Field(min_length=1)
@@ -144,7 +144,7 @@ class DeadlineRequest(BaseModel):
 
     A ``date`` sets the deadline; ``null`` clears it. The deadline is editable and
     clearable at any time. A date in the past is allowed (the countdown shows
-    elapsed / overdue with no pacing signal; spec sections 04/10/15)."""
+    elapsed / overdue with no pacing signal)."""
 
     deadline: date | None = None
 

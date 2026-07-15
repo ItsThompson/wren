@@ -128,8 +128,8 @@ def test_proposed_id_dedup_is_reported_in_the_remap() -> None:
 
 def test_normalization_only_proposal_is_reported_in_the_remap() -> None:
     # A proposal that is merely normalized (no de-dup) still diverges from what
-    # the author sent, so it is remapped too (broader than section 04's "de-dup"
-    # wording, so references can be reconciled). Here a bare, un-prefixed proposal
+    # the author sent, so it is remapped too (broader than plain de-dup, so
+    # references can be reconciled). Here a bare, un-prefixed proposal
     # is normalized to the prefixed minted ID.
     doc = RoadmapInput(
         title="DSA",

@@ -10,7 +10,7 @@ round-trip; any batch with one invalid op leaves the draft unchanged).
 
 The applier is exercised through the public :func:`patch.apply`; the draft under
 test is built by the real ``assemble_draft`` so the fixtures are realistic
-(sociable, spec section 13).
+(sociable).
 """
 
 from __future__ import annotations

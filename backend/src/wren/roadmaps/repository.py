@@ -8,8 +8,8 @@ substitute an in-memory repository at this interface; production binds
 Transaction ownership: ``core.db.get_session`` is yield-only, so the service
 calls :meth:`commit`/:meth:`rollback` here. Reads are **owner-scoped** at the
 query level (``WHERE id = :id AND owner = :owner``), so a non-owner's request for
-a private draft resolves to ``None`` -> 404, leaking no existence (spec sections
-04/06). ``roadmap_id_exists`` is deliberately global (across all owners): it
+a private draft resolves to ``None`` -> 404, leaking no existence.
+``roadmap_id_exists`` is deliberately global (across all owners): it
 backs the mint-time uniqueness check for the globally-unique roadmap ID and
 returns only a boolean, never another user's data.
 """
@@ -96,7 +96,7 @@ class SqlAlchemyRoadmapRepository:
         await self._session.flush()
 
     async def delete(self, roadmap_id: str) -> None:
-        """Remove a roadmap row by id (the web-only delete, spec sections 05/06).
+        """Remove a roadmap row by id (the web-only delete).
 
         The service enforces the zero-followers guard before calling this, so the
         row is deleted unconditionally here. Progress rows are keyed separately by
@@ -119,7 +119,7 @@ class SqlAlchemyRoadmapRepository:
 
         Unlike :meth:`get_owned`, this is not scoped to a caller: it backs the
         cross-user reads the progress domain needs (a follower reading a
-        published roadmap they do not own; spec sections 05/06). Callers apply
+        published roadmap they do not own). Callers apply
         their own readability rule (published/public vs owner) before using the
         result, so this accessor never itself grants access.
         """

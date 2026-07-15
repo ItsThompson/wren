@@ -1,12 +1,12 @@
-"""Progress ORM: one ``progress`` row per ``(user_id, roadmap_id)`` (spec §04, 11).
+"""Progress ORM: one ``progress`` row per ``(user_id, roadmap_id)``.
 
 Progress is the second top-level entity, stored separately from the roadmap
 definition (one roadmap : many progress records). The composite primary key
 ``(user_id, roadmap_id)`` enforces the "one record per (user, roadmap)" rule at
 the database, so ``follow`` and every ``progress_update`` upsert into the same
 row. ``checked`` holds the explicit-set map as JSONB (only checked items are
-retained); ``deadline`` is the optional per-user date (its write lands in Ticket
-17). ``user_id`` is a ``users.id`` and ``roadmap_id`` a ``roadmaps.id`` (no hard
+retained); ``deadline`` is the optional per-user date. ``user_id`` is a
+``users.id`` and ``roadmap_id`` a ``roadmaps.id`` (no hard
 FK, keeping the domains independently migratable, as accounts/roadmaps do).
 """
 

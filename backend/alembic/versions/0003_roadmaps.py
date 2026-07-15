@@ -1,8 +1,8 @@
 """roadmaps: roadmap definitions table
 
-Adds the ``roadmaps`` table (spec sections 04, 11): scalar index columns
+Adds the ``roadmaps`` table: scalar index columns
 (owner / status / visibility / revision / title) plus the authoritative
-section-04 roadmap document as JSONB. Chained after the accounts migration to
+roadmap document as JSONB. Chained after the accounts migration to
 keep a single linear head.
 
 Revision ID: 0003_roadmaps

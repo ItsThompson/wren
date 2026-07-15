@@ -3,8 +3,7 @@
 Exercises the real :class:`AuthorizationService` + :class:`TokenService` over the
 in-memory repository with real signing keys and PKCE: DCR -> authorize-park ->
 PKCE ``/token`` -> refresh rotation -> ``/revoke`` -> audience binding, plus the
-downgrade/mismatch/replay/expiry failure paths (this is the ticket's in-process
-flow acceptance criterion).
+downgrade/mismatch/replay/expiry failure paths.
 """
 
 from __future__ import annotations

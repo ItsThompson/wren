@@ -1,4 +1,4 @@
-"""Structural validation deep-module tests (spec sections 04, 05, 13).
+"""Structural validation deep-module tests.
 
 Exercises ``validate_structure`` through its public function over hand-built
 ``Roadmap`` objects: exhaustive per-rule cases for the full contract (V1..V8),
@@ -189,14 +189,14 @@ def test_v1_flags_a_self_edge_as_a_trivial_cycle() -> None:
 
     assert len(v1) == 1
     assert v1[0].ids == ["sub_x"]
-    # The dag module's CycleReport message is carried verbatim (section 06 shape).
+    # The dag module's CycleReport message is carried verbatim.
     assert v1[0].message == "prerequisite cycle: sub_x -> sub_x"
 
 
 def test_v1_reports_a_multi_node_cycle_with_distinct_ids() -> None:
     # sub_a depends on sub_c, sub_c on sub_b, sub_b on sub_a: a 3-node cycle. The
     # V1 ids are the distinct nodes of the closed walk (the loop-closing repeat
-    # of the first node is dropped), matching the section 06 shape.
+    # of the first node is dropped).
     subs = [
         _subsection("sub_a", prereqs=["sub_c"]),
         _subsection("sub_b", prereqs=["sub_a"]),
@@ -333,7 +333,7 @@ def test_two_dag_family_rules_return_together_through_check_dag() -> None:
 
 
 def test_v7_violation_matches_the_section_06_wire_example() -> None:
-    # Mirrors the section 06 422 example entry exactly: rule + ids + message.
+    # Mirrors the 422 wire example entry exactly: rule + ids + message.
     sub = _subsection("sub_two-pointers", with_resource=False)
     roadmap = _roadmap(sections=[_section(subsections=[sub])], suggested_path=["sub_two-pointers"])
 

@@ -1,8 +1,8 @@
 """baseline (empty)
 
 Establishes the migration chain root and creates the ``alembic_version`` table on
-``upgrade head``. No schema yet: Ticket 2 is DB plumbing only. Ticket 6 adds the
-first domain tables as the next revision on top of this baseline.
+``upgrade head``. No schema yet: this baseline is DB plumbing only. Later
+revisions add the first domain tables on top of this baseline.
 
 Revision ID: 0001_baseline
 Revises:

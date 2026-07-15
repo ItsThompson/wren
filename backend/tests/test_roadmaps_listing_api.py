@@ -2,7 +2,7 @@
 
 Asserts ``GET /me/dashboard`` and ``GET /users/{handle}`` over real HTTP on an
 external-shaped app (accounts + listing + progress routers over shared in-memory
-repos). Covers US-ACCT-03: the private dashboard is auth-gated and caller-scoped
+repos). Covers the dashboard + profile: the private dashboard is auth-gated and caller-scoped
 (authored any status + followed), the public profile needs no session and exposes
 only published-public roadmaps (no draft/private/archived or social-graph leak),
 and an unknown handle is a 404. Roadmaps are seeded owned by the registered

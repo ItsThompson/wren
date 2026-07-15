@@ -1,4 +1,4 @@
-"""Password hashing and strength validation (spec section 08: bcrypt cost 12).
+"""Password hashing and strength validation (bcrypt cost 12).
 
 The hasher is a small protocol so the service depends on an interface, not on
 bcrypt directly: tests can substitute a fast fake and the production binding is
@@ -13,7 +13,6 @@ from typing import Protocol
 
 import bcrypt
 
-# Spec section 08: bcrypt cost 12.
 BCRYPT_COST = 12
 
 # bcrypt hashes at most the first 72 bytes of the password; a longer password is

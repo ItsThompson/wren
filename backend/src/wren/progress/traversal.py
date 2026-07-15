@@ -1,6 +1,6 @@
 """Pure roadmap-traversal helpers shared by the ``next`` and ``summary`` modules.
 
-These are pure functions over the section-04 ``Roadmap`` + ``Progress`` shapes
+These are pure functions over the ``Roadmap`` + ``Progress`` shapes
 (no I/O, no framework), so they are testable in isolation and are the composition
 seam both derived-read modules build on. Keeping the traversal in one place means
 "which items exist" and "which items are checked" are decided once, not
@@ -16,8 +16,8 @@ from wren.roadmaps.schemas import Roadmap, Subsection
 def index_subsections(roadmap: Roadmap) -> dict[str, Subsection]:
     """Map every subsection id to its subsection across all sections.
 
-    The DAG spans the whole roadmap (a prereq may live in another section; spec
-    section 04), so ``suggested_path`` and ``prereq_ids`` resolve against this
+    The DAG spans the whole roadmap (a prereq may live in another section), so
+    ``suggested_path`` and ``prereq_ids`` resolve against this
     roadmap-wide index rather than any single section."""
     return {
         sub_id: subsection
@@ -35,7 +35,7 @@ def all_item_ids(roadmap: Roadmap) -> set[str]:
     (assembly keeps them in sync); using the order array means an id absent from
     it is uniformly invisible to every derived read. This is the authority for
     which ids are addressable: a ``progress_update`` naming an id outside this set
-    is foreign (spec section 06 -> 422), and a stale checked id (from content
+    is foreign (a 422), and a stale checked id (from content
     edited before publish) is ignored by the derived reads."""
     return {
         item_id

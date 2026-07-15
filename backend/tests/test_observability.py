@@ -1,6 +1,6 @@
 """Domain/service/DB-pool metrics: failure counting, combined exposure, pool events.
 
-Covers the cross-cutting instrumentation added in Ticket 31: the
+Covers the cross-cutting instrumentation: the
 ``track_failures`` service decorator, the ``/metrics`` endpoint serving the shared
 custom-metrics registry alongside each app's private HTTP registry, and the
 SQLAlchemy pool events wired in :mod:`wren.core.db`.

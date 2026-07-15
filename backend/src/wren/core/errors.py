@@ -3,7 +3,7 @@
 The service layer raises :class:`WrenError` subclasses; this module maps the whole
 hierarchy to RFC 9457 ``application/problem+json`` in one exception handler, so
 every transport (external REST, internal REST, MCP over internal REST) emits one
-error contract (spec sections 05, 06). FastAPI's ``RequestValidationError`` is
+error contract. FastAPI's ``RequestValidationError`` is
 mapped into the same field-map shape so clients handle a single format.
 
 Error codes are single-sourced as :class:`ErrorCode`; the machine-readable ``code``
@@ -39,7 +39,7 @@ class ErrorCode(StrEnum):
     optimistic-concurrency mismatch (re-read), ``IMMUTABLE`` for a structural write
     against a published/archived roadmap (fork-to-change), and
     ``DELETE_HAS_FOLLOWERS`` for a delete refused because the roadmap still has
-    followers (archive instead), all defined in spec section 06.
+    followers (archive instead).
     """
 
     NOT_FOUND = "NOT_FOUND"
@@ -60,8 +60,8 @@ def _type_uri(code: ErrorCode) -> str:
 class Violation(BaseModel):
     """One structural rule failure, model-recoverable by naming the rule and IDs.
 
-    Produced by the structural validator (spec section 05 ``validation.py``, a
-    later slice) and carried in a ``Validation`` error's problem+json body. Lives
+    Produced by the structural validator (``validation.py``) and carried in a
+    ``Validation`` error's problem+json body. Lives
     in the error contract because it is part of the wire shape every client reads.
     """
 

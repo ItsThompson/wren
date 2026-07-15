@@ -52,7 +52,7 @@ class ClientRegistrationResponse(BaseModel):
     client_id_issued_at: int
 
 
-# --- SPA consent flow (Ticket 19 backend seam) ------------------------------
+# --- SPA consent flow -------------------------------------------------------
 
 
 class AuthorizationContext(BaseModel):
@@ -121,7 +121,7 @@ class TokenRequest:
     resource: str | None = None
 
 
-# --- Connected clients (Ticket 19 backend seam) -----------------------------
+# --- Connected clients ------------------------------------------------------
 
 
 class ConnectedClient(BaseModel):

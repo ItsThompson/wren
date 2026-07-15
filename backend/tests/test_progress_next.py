@@ -300,7 +300,7 @@ def test_remaining_in_path_is_zero_when_complete() -> None:
 def _roadmap_and_progress(draw: st.DrawFn) -> tuple[Roadmap, Progress]:
     """A prerequisite-chain roadmap (``sub_0 <- sub_1 <- ...``, each depending on
     the previous) with a valid ``suggested_path`` and a random subset of its items
-    marked checked. Models "any roadmap + progress" for the section-13 invariant."""
+    marked checked. Models "any roadmap + progress" for the property-based invariant."""
     length = draw(st.integers(min_value=1, max_value=5))
     subsections: dict[str, Subsection] = {}
     order: list[str] = []

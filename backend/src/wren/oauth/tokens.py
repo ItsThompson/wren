@@ -4,7 +4,7 @@ Access tokens are asymmetrically signed (RS256) and **audience-bound** to the MC
 resource, so the Resource Server verifies them via the AS JWKS
 and rejects any token whose ``aud`` is not the MCP resource. Refresh tokens are
 high-entropy opaque strings stored only as a SHA-256 hash (secrets hashed at
-rest, spec section 12); rotation is enforced by the service, which revokes the
+rest); rotation is enforced by the service, which revokes the
 presented refresh and mints a fresh one on every exchange.
 
 Signing/verification is delegated to joserfc; this module owns only the claim

@@ -1,4 +1,4 @@
-"""Roadmap list projections for the dashboard + public profile (spec sections 06, 09).
+"""Roadmap list projections for the dashboard + public profile.
 
 These are the compact card projections the two list views consume, **not** the
 full :class:`~wren.roadmaps.schemas.Roadmap`: a :class:`RoadmapCard` carries only
@@ -7,8 +7,8 @@ what a card needs (title, status/visibility badges, subject tags), the private
 public :class:`Profile` carries a handle's published-public roadmaps.
 
 Defined once here as Pydantic models (the single source of truth for the wire
-contract) and surfaced to the frontend as OpenAPI-generated TypeScript (spec
-sections 06/10). The card deliberately omits per-user progress: the dashboard
+contract) and surfaced to the frontend as OpenAPI-generated TypeScript. The card
+deliberately omits per-user progress: the dashboard
 shows status badges and the profile is a viewer-agnostic
 public page, so neither leaks who follows what.
 """
@@ -35,8 +35,7 @@ class RoadmapCard(BaseModel):
 
 
 class Dashboard(BaseModel):
-    """The ``GET /me/dashboard`` body: the caller's private home (spec section 02
-    US-ACCT-03).
+    """The ``GET /me/dashboard`` body: the caller's private home.
 
     ``authored`` is everything the caller owns at any status (draft / private /
     public), rendered in the "Yours" section; ``followed`` is every roadmap the
@@ -49,8 +48,7 @@ class Dashboard(BaseModel):
 
 
 class Profile(BaseModel):
-    """The ``GET /users/{handle}`` body: a user's public profile (spec section 02
-    US-ACCT-03).
+    """The ``GET /users/{handle}`` body: a user's public profile.
 
     ``roadmaps`` is only that user's **published, public** roadmaps; drafts,
     private, and archived roadmaps never appear, and following is never exposed

@@ -53,7 +53,7 @@ class AssembledDraft:
     author sent**, for any reason: a numeric de-dup suffix (``sub_x`` ->
     ``sub_x-2``) *or* mere normalization (a bare ``two-pointers`` ->
     ``sub_two-pointers``, a re-slugified ``Two Pointers!`` -> ``sub_two-pointers``).
-    This is intentionally broader than section 04's "de-duped" wording: the
+    This is intentionally broader than plain de-duplication: the
     author must reconcile its ``prereq_ids``/``suggested_path`` references
     whenever the final ID is not byte-for-byte what it proposed, and
     normalization changes the ID just as de-dup does. It is empty only when every
@@ -125,8 +125,8 @@ def assemble_fork(source: Roadmap, new_roadmap_id: str, owner: str, *, now: date
     items, ``prereq_ids``, ``suggested_path``, track tags, ``subject_tags``,
     ``title``, and ``description``.
 
-    Child slug IDs are copied verbatim: their uniqueness scope is a single roadmap
-    (spec section 04), so they carry safely into the fork's own namespace and every
+    Child slug IDs are copied verbatim: their uniqueness scope is a single roadmap,
+    so they carry safely into the fork's own namespace and every
     internal reference (``prereq_ids`` / ``suggested_path``) stays valid without a
     re-mint or a remap. The only minted value is the new roadmap ID. ``visibility``
     resets to private (a fork is the forker's own new draft, never inheriting the
@@ -155,8 +155,8 @@ class IdMinter:
 
     Records every proposal whose minted ID **diverges** from what the author sent
     (normalization *or* a numeric de-dup suffix) in :attr:`remap`, so references
-    can be reconciled whenever the final ID is not byte-for-byte the proposal
-    (spec section 04). ``existing`` seeds the de-dup universe: :func:`assemble_draft`
+    can be reconciled whenever the final ID is not byte-for-byte the proposal.
+    ``existing`` seeds the de-dup universe: :func:`assemble_draft`
     starts empty (a fresh roadmap) while ``patch`` seeds it with every ID already
     in the roadmap, so a minted child ID never collides with a pre-existing one.
     """

@@ -2,16 +2,15 @@
 
 Mirrors the external progress router (:mod:`wren.progress.api`) op-for-op but
 resolves the caller via :func:`require_internal_user` (the trusted ``X-User-ID``
-header behind the shared ``INTERNAL_API_TOKEN``, spec section 08) instead of the
+header behind the shared ``INTERNAL_API_TOKEN``) instead of the
 human session cookie. Both are thin adapters over the same
 :class:`ProgressService`: identical business rules, different identity
-resolution. The internal app is never tunnel-routed or host-published (spec
-section 11), so it is reachable only by the MCP server on ``compute-net``.
+resolution. The internal app is never tunnel-routed or host-published, so it is
+reachable only by the MCP server on ``compute-net``.
 
-The MCP progress tools (Ticket 22: ``progress_get`` / ``progress_update``) are
-thin clients of these endpoints: one tool call becomes one internal HTTP call
-carrying the resolved ``X-User-ID``. Ticket 20 built the internal roadmaps
-router and deferred these progress routers to this slice.
+The MCP progress tools (``progress_get`` / ``progress_update``) are thin clients
+of these endpoints: one tool call becomes one internal HTTP call carrying the
+resolved ``X-User-ID``.
 """
 
 from __future__ import annotations
@@ -80,9 +79,8 @@ def create_internal_progress_router(service_provider: ProgressServiceProvider) -
         user_id: str = Depends(require_internal_user),
         service: ProgressService = Depends(service_provider),
     ) -> NextResult:
-        # Mirrors the external next route for the MCP roadmap_get_next tool
-        # (Ticket 22): server-computed items + structural why_now, path_position
-        # under detailed.
+        # Mirrors the external next route for the MCP roadmap_get_next tool:
+        # server-computed items + structural why_now, path_position under detailed.
         return await service.get_next(user_id, roadmap_id, format)
 
     @router.put("/{roadmap_id}/deadline")
@@ -93,7 +91,7 @@ def create_internal_progress_router(service_provider: ProgressServiceProvider) -
         service: ProgressService = Depends(service_provider),
     ) -> Progress:
         # Set/clear the per-user deadline over the trusted identity (countdown
-        # only, no pacing); mirrors the external deadline route for Ticket 22.
+        # only, no pacing); mirrors the external deadline route.
         return await service.set_deadline(user_id, roadmap_id, body.deadline)
 
     return router

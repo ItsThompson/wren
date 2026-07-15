@@ -2,7 +2,7 @@
 
 ``create_app`` assembles a configured :class:`~fastapi.FastAPI` app: structured
 logging, the health router, request metrics, and mount points for the routers,
-readiness checks, exception handlers, and lifespan that later tickets supply. Both
+readiness checks, exception handlers, and lifespan that callers supply. Both
 the external (:8000) and internal (:8001) apps are built from this one factory,
 differing only by injected settings.
 

@@ -1,6 +1,6 @@
 """Exhaustive + property-based tests for the pure ``dag`` deep module.
 
-The sharpest correctness surface in the epic: a false negative lets a
+The sharpest correctness surface: a false negative lets a
 structurally broken roadmap publish. So the four structural checks
 (``check_acyclic``, ``find_dangling_prereqs``, and ``validate_suggested_path``'s
 V3 coverage + V4 topological order) are covered with exhaustive example cases and

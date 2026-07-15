@@ -4,9 +4,9 @@
 - ``GET /readyz`` is readiness: every registered dependency check passes. Returns
   503 if any fails.
 
-Readiness checks are injected, so this module stays dependency-free. Ticket 1
-mounts zero checks (``/readyz`` is a 200 placeholder); Ticket 2 injects a DB
-connectivity check through the same seam (see ``core.db.db_readiness_check``).
+Readiness checks are injected, so this module stays dependency-free. A DB
+connectivity check is injected through the same seam (see
+``core.db.db_readiness_check``).
 """
 
 from __future__ import annotations

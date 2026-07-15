@@ -1,13 +1,13 @@
 """Async persistence layer.
 
 The single async SQLAlchemy engine, session factory, and the ``get_session``
-FastAPI dependency every repository (Ticket 6+) depends on, plus the two boundary
+FastAPI dependency every repository depends on, plus the two boundary
 helpers the service layer needs: :func:`is_unique_violation` (Postgres
 unique-constraint breach -> a signal the service raises as ``Conflict``) and
 :func:`fetch_optional` (no-rows fetch -> ``None``).
 
-The pool is bounded and sized for a single backend instance (spec section 11:
-~5 concurrent users, one VPS). Connecting is lazy, so building an app that wires
+The pool is bounded and sized for a single backend instance (~5 concurrent users,
+one VPS). Connecting is lazy, so building an app that wires
 the engine does not require a reachable database; the ``/readyz`` check
 (:func:`db_readiness_check`) is what surfaces connectivity.
 """

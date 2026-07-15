@@ -27,7 +27,7 @@ def build_roadmap_service_provider() -> Callable[[AsyncSession], RoadmapService]
     def provider(session: AsyncSession = Depends(get_session)) -> RoadmapService:
         # The follower counter and the checked reader are bound to the progress
         # repository over the SAME request-scoped session (delete's zero-followers
-        # guard, spec sections 05/06; and the caller's checked set for the
+        # guard; and the caller's checked set for the
         # progress-aware read projections). The roadmaps service stays decoupled
         # from the progress domain: it only receives the narrow callables, not the
         # repository.

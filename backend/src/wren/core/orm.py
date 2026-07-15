@@ -1,8 +1,8 @@
 """The shared SQLAlchemy declarative base.
 
-Every domain's ORM models (accounts #6, roadmaps #7+) inherit from this one
+Every domain's ORM models (accounts, roadmaps) inherit from this one
 :class:`Base`, so ``Base.metadata`` is the single schema Alembic diffs for
-``--autogenerate`` (spec section 11: one source of truth for the schema). The
+``--autogenerate`` (one source of truth for the schema). The
 constraint naming convention makes constraint names deterministic and stable, so
 Alembic can emit reversible ``DROP CONSTRAINT`` operations and migrations read
 the same across environments.

@@ -1,11 +1,11 @@
-"""Typed read projections for the study-time read surface (spec sections 04, 07).
+"""Typed read projections for the study-time read surface.
 
 These are the purpose-built projections the read endpoints/tools return, **not**
 the full :class:`~wren.roadmaps.schemas.Roadmap`: an orientation ``Overview``, a
 single-node ``NodeDetail``, a paginated ``SectionPage``, and ``SearchHit``s. They
 are defined once here as Pydantic models (the single source of truth for the wire
-contract) and surfaced to the frontend as OpenAPI-generated TypeScript (spec
-sections 06/10); the MCP read tools are thin calls over the same
+contract) and surfaced to the frontend as OpenAPI-generated TypeScript; the MCP
+read tools are thin calls over the same
 shapes, one HTTP call each.
 
 Design rules they encode:
@@ -90,7 +90,7 @@ class ItemState(BaseModel):
 
 
 class NodeDetail(BaseModel):
-    """One subsection resolved for study (spec section 04 ``NodeDetail``).
+    """One subsection resolved for study.
 
     ``description`` is populated only in ``detailed`` mode; the concise projection
     leaves it ``None`` while still carrying every follow-up ID (the subsection id,
@@ -148,8 +148,7 @@ class Overview(BaseModel):
 
 
 class SectionPage(BaseModel):
-    """The ``GET /sections/{sid}`` body: a paginated section drill-down (spec
-    sections 04/07).
+    """The ``GET /sections/{sid}`` body: a paginated section drill-down.
 
     ``include`` selects which parts of each node are populated. The page holds a
     server-set number of subsections in ``subsection_order``; ``next_cursor`` is

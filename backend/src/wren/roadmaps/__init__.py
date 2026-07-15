@@ -1,4 +1,4 @@
-"""The roadmaps domain: authoring spine for learning roadmaps (spec sections 04-06).
+"""The roadmaps domain: authoring spine for learning roadmaps.
 
 Mirrors the accounts domain layout (config / models / schemas / repository /
 service / api / wiring) plus the pure deep modules the service composes

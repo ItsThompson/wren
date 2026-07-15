@@ -14,8 +14,7 @@ readable roadmap), ``edit_metadata`` (the sanctioned presentation-only edit
 that stays allowed post-publish), and the web-only lifecycle actions
 ``set_visibility`` / ``archive`` / ``delete`` (delete guarded by a zero-followers
 check; archive the safe retirement path). The read projections are later slices;
-the full structural contract composes onto ``validate`` in a later slice (spec
-section 05).
+the full structural contract composes onto ``validate`` in a later slice.
 """
 
 from __future__ import annotations
@@ -186,8 +185,7 @@ class RoadmapService:
     async def replace_draft(
         self, user_id: str, roadmap_id: str, revision: int, doc: RoadmapInput
     ) -> RoadmapReplaced:
-        """Replace the caller's entire draft from a full ``RoadmapInput`` (spec
-        sections 04/06/07).
+        """Replace the caller's entire draft from a full ``RoadmapInput``.
 
         The documented **import escape hatch**, never the iterative path: it rebuilds
         the whole document rather than editing in place. Loads through the same
@@ -197,7 +195,7 @@ class RoadmapService:
         ``revision`` (stale -> 409 "re-read"), because a full replace is a
         structure-mutating write.
 
-        ID semantics (spec section 04 v1.1): the roadmap's own ID (the route param)
+        ID semantics: the roadmap's own ID (the route param)
         is unchanged, nodes carrying a ``proposed_id`` keep it, and every other node
         is re-minted, all via the shared :func:`assemble_draft` mint-then-resolve
         pass. ``created_at``, ``owner``, and ``visibility`` are preserved; ``revision``
@@ -206,8 +204,8 @@ class RoadmapService:
 
         Visibility is deliberately taken from the **stored** draft, not the imported
         document: a full-document import replaces content, so it must not silently
-        flip a draft public/private. Visibility is a web-only lifecycle toggle (spec
-        sections 04/06), changed only through :meth:`set_visibility`.
+        flip a draft public/private. Visibility is a web-only lifecycle toggle,
+        changed only through :meth:`set_visibility`.
         """
         draft = await self._load_writable_draft(user_id, roadmap_id)
         if draft.revision != revision:
@@ -243,8 +241,8 @@ class RoadmapService:
         return RoadmapReplaced.model_validate({**replaced.model_dump(), "remap": assembled.remap})
 
     async def get(self, user_id: str, roadmap_id: str) -> Roadmap:
-        """Return the full roadmap to a caller who may read it (spec section 06:
-        "owner draft preview or readable published").
+        """Return the full roadmap to a caller who may read it (owner draft preview
+        or readable published).
 
         The owner reads their own roadmap at any status (draft preview included); a
         non-owner may read a **public** roadmap that is published or archived (by
@@ -324,8 +322,8 @@ class RoadmapService:
     async def search(
         self, user_id: str, roadmap_id: str, query: str | None, tags: list[str] | None
     ) -> list[SearchHit]:
-        """Search the roadmap's subsections + items by keyword and/or tag (spec
-        sections 04/07): search, not list-all (empty query and no tags -> ``[]``).
+        """Search the roadmap's subsections + items by keyword and/or tag: search,
+        not list-all (empty query and no tags -> ``[]``).
 
         Each hit carries the ids needed to drill down. Needs no progress, so it is
         a pure projection over the readable roadmap."""
@@ -369,8 +367,7 @@ class RoadmapService:
         return published
 
     async def fork(self, user_id: str, source_roadmap_id: str) -> Roadmap:
-        """Seed a brand-new draft from any roadmap the caller may read (spec
-        sections 04/05).
+        """Seed a brand-new draft from any roadmap the caller may read.
 
         Readable means the caller's own roadmap (any status) or a public one; a
         private roadmap owned by someone else is a 404 with no existence leak
@@ -406,15 +403,14 @@ class RoadmapService:
         description: str | None,
         subject_tags: list[str] | None,
     ) -> Roadmap:
-        """Edit the presentation-only fields on the caller's own roadmap (spec
-        sections 04/05/06).
+        """Edit the presentation-only fields on the caller's own roadmap.
 
         ``title`` / ``description`` / ``subject_tags`` stay mutable after publish
         (they touch no follower-visible structure), so this loads through the plain
         owner guard (:meth:`_load_owned`), **not** the content-write immutability
         guard: a published roadmap is edited here while structural writes on it stay
         409. It is deliberately not ``If-Match``-guarded and does not bump the
-        structural ``revision`` (last-write-wins, spec section 06). Only fields
+        structural ``revision`` (last-write-wins). Only fields
         explicitly provided (not ``None``) are changed; ``visibility``, ``status``,
         and all content are untouched (a smuggled structural field is rejected at
         the wire boundary by :meth:`MetadataEditRequest.reject_structural_fields`).
@@ -440,8 +436,7 @@ class RoadmapService:
     async def set_visibility(
         self, user_id: str, roadmap_id: str, visibility: Visibility
     ) -> Roadmap:
-        """Toggle the caller's own roadmap public/private (web-only, spec sections
-        04/06).
+        """Toggle the caller's own roadmap public/private (web-only).
 
         Loads through the plain owner guard (:meth:`_load_owned`), so it applies to
         a roadmap of any status (a draft or a published one): visibility is a
@@ -468,8 +463,7 @@ class RoadmapService:
         return updated
 
     async def archive(self, user_id: str, roadmap_id: str) -> Roadmap:
-        """Archive the caller's own published roadmap (web-only, spec sections
-        04/05/06).
+        """Archive the caller's own published roadmap (web-only).
 
         Archive is the safe retirement path (the alternative offered when a delete
         is blocked by followers): it hides the roadmap from discovery (the owner's
@@ -500,7 +494,7 @@ class RoadmapService:
 
     async def delete(self, user_id: str, roadmap_id: str) -> None:
         """Delete the caller's own roadmap, but only when it has zero followers
-        (web-only, spec sections 04/05/06).
+        (web-only).
 
         Loads through the plain owner guard (:meth:`_load_owned`: a non-owner /
         unknown ID is a 404 with no existence leak), then counts followers via the
@@ -562,8 +556,8 @@ class RoadmapService:
         return roadmap
 
     async def _load_readable_document(self, user_id: str, roadmap_id: str) -> Roadmap:
-        """Load a roadmap the caller may read as a study-time reader (spec section
-        06: "owner draft preview or readable published").
+        """Load a roadmap the caller may read as a study-time reader (owner draft
+        preview or readable published).
 
         Builds on :meth:`_load_readable` (own-or-public; a private roadmap owned by
         someone else is a 404 with no existence leak) and layers the reader status
@@ -588,7 +582,7 @@ class RoadmapService:
         raises ``Conflict`` with the ``IMMUTABLE`` code and a message pointing to
         fork-to-change. This is the guard that protects
         follower progress: the only way to change published content is to fork it
-        into a fresh draft. Presentation edits (``edit_metadata``, Ticket 14) do
+        into a fresh draft. Presentation edits (``edit_metadata``) do
         **not** load through here, which is why they stay allowed post-publish.
         """
         roadmap = await self._load_owned(user_id, roadmap_id)

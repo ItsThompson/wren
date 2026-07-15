@@ -2,7 +2,7 @@
 
 The projection builders are pure functions over a ``Roadmap`` + the caller's
 checked-item set, so they are tested in isolation without a DB, request, or
-token (the high-density layer per spec section 13): every projection shape, the
+token (the high-density layer): every projection shape, the
 ``concise|detailed`` switch, ``include`` selection, opaque+stable cursor
 pagination, and keyword/tag search.
 """

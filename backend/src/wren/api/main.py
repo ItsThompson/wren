@@ -1,7 +1,7 @@
 """External app entrypoint (:8000).
 
 Internet-reachable via the Cloudflare tunnel. Authenticates humans by session
-cookie and hosts the public REST surface + OAuth AS (later tickets). Built from
+cookie and hosts the public REST surface + OAuth AS. Built from
 the shared factory with the external service identity injected.
 """
 
@@ -105,7 +105,7 @@ app: FastAPI = create_app(
     lifespan=create_db_lifespan(db.engine),
 )
 app.state.db = db
-# Replace the Ticket 3 deny-all default with the real signed-JWT + jti-blacklist
+# Replace the deny-all default with the real signed-JWT + jti-blacklist
 # verifier. With no configured SESSION_JWT_SECRET the app fail-safe denies every
 # session rather than sign with an empty key.
 app.state.session_verifier = (
@@ -115,7 +115,7 @@ app.state.session_verifier = (
 )
 # Strip any client-supplied X-User-ID app-wide: the external app never trusts it.
 app.add_middleware(StripInboundIdentityMiddleware)
-# CORS for the SPA's credentialed consent/login XHRs (hardening §4.3): a single
+# CORS for the SPA's credentialed consent/login XHRs: a single
 # allowed origin with credentials so the cross-subdomain cookie flow works
 # (/authorize/context, /authorize/decision, /me/clients). Added last so it is the
 # outermost middleware and handles preflight before the identity strip.

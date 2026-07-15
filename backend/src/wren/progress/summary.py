@@ -1,8 +1,8 @@
 """``summary``: the pure progress-snapshot computation.
 
 Derives the ``ProgressSnapshot`` (roadmap-wide + per-section completion) from a
-roadmap definition and a progress record. This is a **derived read** (spec
-section 04 "Derived"): nothing here is stored, it is recomputed on each read, so
+roadmap definition and a progress record. This is a **derived read**: nothing here
+is stored, it is recomputed on each read, so
 the counts can never drift from the authoritative ``checked`` map. Pure and
 framework-free, sharing the traversal helpers with ``next``.
 """

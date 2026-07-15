@@ -149,8 +149,7 @@ class RoadmapInput(BaseModel):
 
 
 class VisibilityRequest(BaseModel):
-    """The ``PUT /roadmaps/{id}/visibility`` body: toggle public/private (web-only,
-    spec sections 04/06).
+    """The ``PUT /roadmaps/{id}/visibility`` body: toggle public/private (web-only).
 
     Visibility is a lifecycle/presentation field, editable by the owner on a
     roadmap of any status (draft or published): a public roadmap is reachable by
@@ -214,7 +213,7 @@ class RoadmapCreated(Roadmap):
 
 class RoadmapReplaced(Roadmap):
     """The ``PUT /roadmaps/{id}`` body: the full rebuilt draft after a full-document
-    import (the escape hatch, spec section 07) plus the ``proposed_id -> minted_id``
+    import (the escape hatch) plus the ``proposed_id -> minted_id``
     remap. Mirrors :class:`RoadmapCreated` because replace reuses the same
     mint-then-resolve assembly: ``proposed_id``s are preserved, every other node is
     re-minted, and the roadmap's own ID is unchanged. ``remap`` is
@@ -232,7 +231,7 @@ class ValidateResult(BaseModel):
     violations: list[Violation] = Field(default_factory=list)
 
 
-# ---------- Patch operations (spec section 07 grammar) ----------
+# ---------- Patch operations ----------
 #
 # The canonical single-dispatch iterative-edit surface: an ``operations[]`` array
 # applied atomically. Every op addresses nodes by slug ID (never
@@ -398,7 +397,7 @@ class ChangeType(StrEnum):
 
 class ChangedNode(BaseModel):
     """One node the batch touched, echoed back so the agent knows what changed
-    without re-reading the whole roadmap (spec section 07: summary-first). Lean
+    without re-reading the whole roadmap (summary-first). Lean
     on purpose (kind + id + change), keeping a small edit's response near the
     ~50-token target; the agent re-reads a specific node for its new body."""
 

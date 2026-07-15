@@ -1,8 +1,8 @@
 """Contract tests for the internal /roadmaps surface (:8001).
 
 The internal app is the surface the MCP server calls: it resolves identity from
-the trusted ``X-User-ID`` header behind the shared ``INTERNAL_API_TOKEN`` (spec
-section 08), not a session cookie. These assert the trust boundary
+the trusted ``X-User-ID`` header behind the shared ``INTERNAL_API_TOKEN``, not a
+session cookie. These assert the trust boundary
 (``require_internal_user``): a missing/invalid token or a missing trusted header
 is a 401, a valid pair resolves the user, and every query stays per-user scoped
 so a tool cannot reach another user's roadmap even though the identity is
@@ -261,7 +261,7 @@ def test_publish_is_404_for_a_different_trusted_user(make_settings: MakeSettings
     assert response.status_code == 404
 
 
-# --- fork + metadata edit over the trusted identity (#14, MCP-facing) --------
+# --- fork + metadata edit over the trusted identity (MCP-facing) ------------
 
 
 def test_fork_returns_201_with_a_fresh_draft(make_settings: MakeSettings) -> None:

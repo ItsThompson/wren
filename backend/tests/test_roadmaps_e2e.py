@@ -4,8 +4,8 @@ Boots an external-shaped app with the production wiring (request-scoped
 SQLAlchemy repositories via ``get_session``, the real session verifier) against a
 migrated ``postgres:17-alpine`` and drives the full HTTP cycle: register ->
 create draft -> read own draft, and a second user's read is a 404. This proves
-the create/read path works at runtime end to end, not only in unit isolation
-(spec section 13). Skipped automatically when Docker is unavailable.
+the create/read path works at runtime end to end, not only in unit isolation.
+Skipped automatically when Docker is unavailable.
 """
 
 from __future__ import annotations
@@ -471,7 +471,7 @@ def test_delete_blocked_by_followers_then_archive_keeps_follower_end_to_end_over
     # The gold web-only-lifecycle proof over real Postgres: a followed roadmap
     # cannot be deleted (real follower-count guard), archive is the retirement
     # path, and the existing follower keeps reading their progress on the archived
-    # roadmap (Ticket 15 + the #9 read-guard relaxation).
+    # roadmap.
     app = _external_app(migrated_url, make_settings(database_url=migrated_url))
     with TestClient(app) as client:
         # Owner publishes and makes the roadmap public so a follower can reach it.

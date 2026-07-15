@@ -1,6 +1,6 @@
-"""Pure builders for the study-time read projections (spec sections 04, 07).
+"""Pure builders for the study-time read projections.
 
-Framework-free functions over the section-04 :class:`~wren.roadmaps.schemas.Roadmap`
+Framework-free functions over the :class:`~wren.roadmaps.schemas.Roadmap`
 plus the caller's set of checked checklist-item ids. They build the purpose-built
 projections (:class:`Overview`, :class:`NodeDetail`, :class:`SectionPage`,
 :class:`SearchHit`) the read endpoints/tools return, keeping "how a projection is
@@ -44,8 +44,8 @@ class CursorError(ValueError):
 def build_overview(roadmap: Roadmap, checked: frozenset[str], *, fmt: ResponseFormat) -> Overview:
     """Build the orientation overview: per-section + overall completion counts.
 
-    Sections are emitted in ``section_order`` with no checklist-item bodies (spec
-    section 04). ``fmt`` is accepted for uniformity with the rest of the read
+    Sections are emitted in ``section_order`` with no checklist-item bodies.
+    ``fmt`` is accepted for uniformity with the rest of the read
     surface (and the MCP ``roadmap_get_overview(format?)`` tool), but the overview
     is already the concise orientation summary: it carries no verbose free-text
     field to trim, so both formats produce the same body."""

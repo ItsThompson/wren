@@ -128,7 +128,7 @@ class AccountService:
         _log.info("user_logged_out", user_id=claims.user_id)
 
     async def profile(self, handle: str) -> PublicProfile:
-        """Public profile by handle (stubbed; Ticket 25 adds public roadmaps)."""
+        """Public profile by handle (stubbed; a later slice adds public roadmaps)."""
         user = await self._repo.get_by_username(handle)
         if user is None:
             raise NotFound(f"No profile for handle '{handle}'.")

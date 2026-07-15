@@ -89,7 +89,7 @@ def test_each_error_maps_to_its_status_and_code(path: str, status: int, code: st
     body = response.json()
     assert body["status"] == status
     assert body["code"] == code
-    # type/title/detail/instance are always present (section 06 shape).
+    # type/title/detail/instance are always present.
     assert body["type"].endswith(f"/{code.lower().replace('_', '-')}")
     assert body["title"]
     assert body["detail"]

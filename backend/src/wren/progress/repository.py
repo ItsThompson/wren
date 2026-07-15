@@ -1,16 +1,16 @@
 """Progress persistence: the repository interface and its SQLAlchemy binding.
 
 The service depends on the :class:`ProgressRepository` interface and receives a
-resolved ``user_id`` (never trusted from args); it never builds queries itself
-(spec section 05). Tests substitute an in-memory repository at this interface;
+resolved ``user_id`` (never trusted from args); it never builds queries itself.
+Tests substitute an in-memory repository at this interface;
 production binds :class:`SqlAlchemyProgressRepository` over a request-scoped
 ``AsyncSession`` (shared with the roadmaps read repository, so both live in one
 transaction).
 
 Transaction ownership: ``core.db.get_session`` is yield-only, so the service
 calls :meth:`commit`/:meth:`rollback` here. Every read is scoped to the resolved
-``(user_id, roadmap_id)``; another user's progress is never returned (spec
-section 05 per-user scoping). :meth:`upsert` writes the one row for that pair,
+``(user_id, roadmap_id)``; another user's progress is never returned.
+:meth:`upsert` writes the one row for that pair,
 making both follow (first write) and repeated updates idempotent.
 """
 
@@ -62,8 +62,8 @@ class SqlAlchemyProgressRepository:
 
         Caller-scoped (``WHERE user_id = :user_id``): it returns only the ids of
         the caller's own progress rows, never another user's, so it can back the
-        dashboard "Following" list without leaking anyone else's follows (spec
-        sections 02/08). The composite PK keys one row per (user, roadmap), so the
+        dashboard "Following" list without leaking anyone else's follows. The
+        composite PK keys one row per (user, roadmap), so the
         ids are already distinct.
         """
         result = await self._session.scalars(
@@ -78,7 +78,7 @@ class SqlAlchemyProgressRepository:
 
         Global across all users (not caller-scoped): it returns only a count, never
         another user's data, and backs the roadmaps domain's delete guard
-        (delete-only-if-zero-followers, spec sections 05/06). The ``roadmap_id``
+        (delete-only-if-zero-followers). The ``roadmap_id``
         index added in migration 0005 keeps this a cheap indexed count.
         """
         count = await self._session.scalar(

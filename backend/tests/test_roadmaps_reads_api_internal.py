@@ -1,8 +1,8 @@
-"""Contract tests for the internal read-projection surface (:8001, Ticket 16).
+"""Contract tests for the internal read-projection surface (:8001).
 
 The internal app is the surface the MCP read tools call: it resolves
-identity from the trusted ``X-User-ID`` header behind ``INTERNAL_API_TOKEN`` (spec
-section 08), not a session cookie. These assert the four read routes resolve over
+identity from the trusted ``X-User-ID`` header behind ``INTERNAL_API_TOKEN``, not a
+session cookie. These assert the four read routes resolve over
 the trusted identity, stay per-user scoped (a tool cannot read another user's
 progress-derived counts), and honor the same readability rule as the external
 app. The roadmaps + progress services share one in-memory roadmap store and one

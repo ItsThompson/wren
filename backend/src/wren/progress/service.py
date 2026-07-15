@@ -7,14 +7,14 @@ and ``next`` deep modules, raises ``WrenError`` subclasses for the adapter to
 render, and owns the transaction boundary (``get_session`` is yield-only).
 
 Every method is scoped to the resolved user: progress is loaded and written only
-for ``(user_id, roadmap_id)``, so another user's progress is never returned
-(spec sections 05/08). Starting to **follow** requires a **published** roadmap the
+for ``(user_id, roadmap_id)``, so another user's progress is never returned.
+Starting to **follow** requires a **published** roadmap the
 caller may read (owner, or public): a draft is not startable and an archived
 roadmap is hidden from discovery (no new followers). Reading/updating progress is
 allowed on a **published** roadmap, or on an **archived** roadmap the caller
 **already follows**: an archived roadmap keeps its existing followers and their
 progress, but gains no new ones (no progress row is ever created on an archived
-roadmap; spec section 04). An unreadable roadmap is a 404 with no existence leak.
+roadmap). An unreadable roadmap is a 404 with no existence leak.
 """
 
 from __future__ import annotations
@@ -69,8 +69,8 @@ class ProgressService:
     async def follow(self, user_id: str, roadmap_id: str) -> Progress:
         """Start following a published roadmap: create the private progress record.
 
-        Idempotent: re-following returns the existing record (spec section 06
-        follow is 201). Following a draft or an archived roadmap is a 409 (a draft
+        Idempotent: re-following returns the existing record (follow is 201).
+        Following a draft or an archived roadmap is a 409 (a draft
         is not startable; an archived roadmap is retired from discovery, so it
         gains no new followers); an unreadable roadmap is a 404 (no existence
         leak). The record is private to ``user_id`` and never shown publicly.
@@ -154,7 +154,7 @@ class ProgressService:
 
         A ``date`` sets the deadline; ``None`` clears it. Editable and clearable at
         any time, and a past date is allowed (the countdown shows elapsed / overdue
-        with no pacing signal; spec sections 04/10/15). Upserts the caller's private
+        with no pacing signal). Upserts the caller's private
         record like :meth:`update`, so setting a deadline on a **published** roadmap
         also starts following; the same trackable guard refuses a non-follower on an
         **archived** roadmap (no phantom follower). No pacing or effort forecast is

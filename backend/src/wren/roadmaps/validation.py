@@ -1,9 +1,9 @@
-"""Structural validation of a draft roadmap (spec sections 04, 05).
+"""Structural validation of a draft roadmap.
 
 Pure functions over the domain :class:`Roadmap`: no I/O, no request, no database,
 so they are exhaustively and property-tested in isolation.
 
-This is the FULL structural contract (V1..V8, spec section 04). It composes the
+This is the FULL structural contract (V1..V8). It composes the
 pure :mod:`wren.roadmaps.dag` module with the local content rules:
 
 * V1: the prerequisite DAG is acyclic (``dag.check_acyclic``)
@@ -17,7 +17,7 @@ pure :mod:`wren.roadmaps.dag` module with the local content rules:
 
 :func:`validate_structure` returns ALL violations in one pass (never fail-fast),
 so an author sees the complete fix list at once; :meth:`RoadmapService.publish`
-hard-blocks on any violation and the section 06 ``422`` problem+json carries the
+hard-blocks on any violation and the ``422`` problem+json carries the
 whole ``violations`` array.
 """
 
@@ -39,7 +39,7 @@ from wren.roadmaps.schemas import Roadmap, Section, Subsection
 
 
 class StructuralRule(StrEnum):
-    """The full ``Violation.rule`` contract (V1..V8, spec sections 04/06).
+    """The full ``Violation.rule`` contract (V1..V8).
 
     Single source of truth for the wire codes. The DAG-derived codes (V1..V4) are
     sourced from :class:`DagRule` (the pure ``dag`` module owns them and emits
@@ -145,7 +145,7 @@ def _cycle_violation(report: CycleReport) -> Violation:
     """Map the V1 :class:`CycleReport` (an ordered closed walk) onto the wire.
 
     ``cycle`` repeats its first node to close the walk; ``ids`` carry the distinct
-    nodes in cycle order (spec section 06 shape) and the report's ``message`` is
+    nodes in cycle order and the report's ``message`` is
     used verbatim.
     """
     return Violation(
@@ -202,7 +202,7 @@ def _titled_entities(draft: Roadmap) -> Iterator[tuple[str, str]]:
 
 
 def _violation(rule: StructuralRule, offending_id: str, message: str) -> Violation:
-    """One violation naming a single offending entity (spec section 06 shape)."""
+    """One violation naming a single offending entity."""
     return Violation(rule=rule.value, ids=[offending_id], message=message)
 
 

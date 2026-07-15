@@ -1,7 +1,7 @@
 """Integration tests: the DB layer and migrations against a real Postgres.
 
 Uses testcontainers-python to run ``postgres:17-alpine`` (the pinned dev/prod
-image, spec section 11). Skipped automatically when Docker is unavailable, so a
+image). Skipped automatically when Docker is unavailable, so a
 Docker-less checkout still runs the unit suite; CI's ``test-backend`` job has
 Docker and runs these.
 """

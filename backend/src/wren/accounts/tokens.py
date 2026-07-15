@@ -1,7 +1,7 @@
 """Session JWTs: a short-lived access token + a rotating refresh token.
 
-Both tokens are HS256-signed with the dedicated ``SESSION_JWT_SECRET`` (spec
-section 08). An access/refresh pair shares one opaque session id (``sid``); the
+Both tokens are HS256-signed with the dedicated ``SESSION_JWT_SECRET``. An
+access/refresh pair shares one opaque session id (``sid``); the
 ``sid`` is what the blacklist revokes, so revoking a session invalidates the
 still-unexpired access token immediately (not just future refreshes). This is
 why the identity seam's :data:`SessionVerifier` is async: verifying an access

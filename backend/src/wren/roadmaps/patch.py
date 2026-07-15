@@ -1,4 +1,4 @@
-"""``patch``: the pure, atomic op-list applier (spec sections 05, 07).
+"""``patch``: the pure, atomic op-list applier.
 
 The primary iterative-edit path. :func:`apply` takes a draft and an
 ``operations[]`` list and returns the mutated roadmap plus the changed-node echo

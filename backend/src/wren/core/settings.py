@@ -36,8 +36,8 @@ class EnvSettings(BaseSettings):
     # docker-compose.dev.yml published to localhost; prod injects the in-network
     # `@postgres:5432` form via the VPS.env.
     database_url: str = "postgresql+asyncpg://wren:wren@localhost:5432/wren"
-    # Shared secret the MCP server sends to reach the internal app (spec section
-    # 08); defense-in-depth behind compute-net isolation. Empty by default so an
+    # Shared secret the MCP server sends to reach the internal app;
+    # defense-in-depth behind compute-net isolation. Empty by default so an
     # unconfigured internal app fail-safe denies (`require_internal_user`).
     internal_api_token: str = ""
     # HS256 secret for human session JWTs, separate from the
@@ -48,7 +48,7 @@ class EnvSettings(BaseSettings):
     # (usewren.com) and API (api.usewren.com) share it; empty in dev makes the
     # cookie host-only (localhost).
     cookie_domain: str = ""
-    # Pinned public URLs (the "Site-URL gotcha", spec sections 08/11): cloudflared
+    # Pinned public URLs (the "Site-URL gotcha"): cloudflared
     # reaches the origin over http://backend:8000, so ALL OAuth issuer/metadata/
     # endpoint URLs are built from these pinned values, never from the request
     # host. `public_base_url` is the AS origin (api.usewren.com); `app_public_url`
@@ -68,7 +68,7 @@ class EnvSettings(BaseSettings):
     oauth_access_ttl_seconds: int = 900
     oauth_refresh_ttl_seconds: int = 2_592_000
     # Allowed browser origin for the SPA's credentialed consent/login XHRs
-    # (CORS, hardening §4.3). Empty falls back to `app_public_url`; prod pins
+    # (CORS). Empty falls back to `app_public_url`; prod pins
     # https://usewren.com so the cross-subdomain cookie flow works.
     cors_origin: str = ""
 

@@ -82,8 +82,7 @@ class ListingService:
         Owner-scoped: ``authored`` is every roadmap the caller owns and
         ``followed`` is every roadmap they follow (resolved from their own
         progress rows), so no other user's data is exposed. A roadmap the caller
-        both authored and follows appears in both lists (spec section 02
-        US-ACCT-03)."""
+        both authored and follows appears in both lists."""
         authored = await self._repo.list_owned(user_id)
         followed = await self._load_followed(user_id)
         return Dashboard(

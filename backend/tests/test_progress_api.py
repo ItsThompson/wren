@@ -1,6 +1,6 @@
 """Contract tests for the external progress surface on an external-shaped app.
 
-Asserts the RFC 9457 problem+json shapes and the section-06 status codes over
+Asserts the RFC 9457 problem+json shapes and the status codes over
 real HTTP: follow is 201 (409 on a draft), progress update is explicit-set +
 idempotent (422 on a foreign item id, applying nothing), get returns the derived
 snapshot, next is server-computed, ``require_user`` gates the surface (401

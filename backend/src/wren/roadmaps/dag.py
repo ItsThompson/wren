@@ -1,6 +1,6 @@
 """``dag``: the pure structural validator for the prerequisite DAG.
 
-This is the highest test-density deep module in the epic: a false
+This is the highest test-density deep module: a false
 negative here lets a structurally broken roadmap publish and break followers, so
 the module is covered exhaustively *and* with ``hypothesis`` property tests.
 
@@ -9,7 +9,7 @@ primitive graph structures (``set[str]`` of subsection IDs and
 ``dict[str, list[str]]`` mapping each subsection to its ``prereq_ids``), so the
 module imports no FastAPI, DB, request, or token and is importable and testable
 in complete isolation. It returns its own small report types
-(:class:`CycleReport`, :class:`RuleViolation`); ticket #11's ``validation.py``
+(:class:`CycleReport`, :class:`RuleViolation`); ``validation.py``
 composes these into the ``validate_structure`` contract and maps them onto the
 wire ``wren.core.errors.Violation`` (which lives with the HTTP boundary and pulls
 in FastAPI, hence is kept out of this pure module).
@@ -33,9 +33,8 @@ _WHITE, _GRAY, _BLACK = 0, 1, 2
 class DagRule(StrEnum):
     """Structural-rule codes this module emits, carried in ``RuleViolation.rule``.
 
-    The values match the ``Violation.rule`` wire codes (spec §04 validation
-    contract); ticket #11 extends the enumeration with the remaining
-    non-DAG rules (V5..V8) it owns.
+    The values match the ``Violation.rule`` wire codes; the remaining non-DAG
+    rules (V5..V8) are owned by ``validation.py``.
     """
 
     ACYCLIC = "V1_ACYCLIC"  # V1: the prerequisite DAG is acyclic
@@ -65,9 +64,9 @@ class CycleReport:
 class RuleViolation:
     """One structural-rule failure naming the rule and the offending IDs.
 
-    Mirrors the field shape of the wire ``wren.core.errors.Violation`` so #11 can
-    map it across with no restructuring, while keeping this module free of the
-    FastAPI-coupled error contract.
+    Mirrors the field shape of the wire ``wren.core.errors.Violation`` so the
+    validation layer can map it across with no restructuring, while keeping this
+    module free of the FastAPI-coupled error contract.
     """
 
     rule: DagRule

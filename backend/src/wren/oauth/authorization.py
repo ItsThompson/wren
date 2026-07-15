@@ -141,7 +141,7 @@ class AuthorizationService:
     async def get_context(
         self, auth_request_id: str, *, authenticated: bool
     ) -> AuthorizationContext:
-        """Consent-screen context for a parked request (Ticket 19 SPA seam)."""
+        """Consent-screen context for a parked request (the SPA consent seam)."""
         request = await self._load_live_request(auth_request_id)
         client = await self._repo.get_client(request.client_id)
         client_name = client.client_name if client is not None else request.client_id

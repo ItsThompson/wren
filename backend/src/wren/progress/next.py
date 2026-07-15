@@ -2,8 +2,8 @@
 
 Computing next client-side would force the agent to pull the whole
 ``suggested_path`` + full checked set + every node's ``prereq_ids`` and run a
-topological filter in-context (a context blow-up), so the server owns it (spec
-section 07 "Why get_next is server-side"). This is a **pure deep module**: it
+topological filter in-context (a context blow-up), so the server owns it. This is
+a **pure deep module**: it
 takes the roadmap + progress and returns the next unchecked, prereq-satisfied
 items in ``suggested_path`` order, each with a structural ``why_now`` and its
 resource links, plus a ``remaining_in_path`` count and a ``complete`` flag.

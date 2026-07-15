@@ -1,9 +1,9 @@
 """Contract tests for the external read-projection surface.
 
-Asserts the section-04 read projections over real HTTP on an external-shaped app
+Asserts the read projections over real HTTP on an external-shaped app
 (overview / node / paginated section / search), the ``concise|detailed`` switch,
 opaque-cursor pagination, resource-links-not-bodies, the public non-owner read
-(#15 -> #25: public+published readable by anyone, private -> 404, archived rules),
+(public+published readable by anyone, private -> 404, archived rules),
 and per-user scoping of the progress-derived counts. The roadmaps + progress
 services are backed by in-memory repositories sharing one roadmap store and one
 progress store, so a POST to the progress endpoint is visible to the read
@@ -259,7 +259,7 @@ def test_search_without_query_or_tags_is_empty(make_settings: MakeSettings) -> N
     assert client.get(f"/roadmaps/{ROADMAP_ID}/search").json() == []
 
 
-# --- public non-owner read (spec §05/§06, #15 -> #25) -----------------------
+# --- public non-owner read --------------------------------------------------
 
 
 def test_non_owner_can_read_a_public_published_roadmap(make_settings: MakeSettings) -> None:

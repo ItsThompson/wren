@@ -1,7 +1,7 @@
 """The shipped ``SKILL.md`` authoring guidance served at ``GET /skill``.
 
-The canonical, human-edited copy lives at the repository root (``skill/SKILL.md``,
-spec sections 07/15). This module bundles a byte-identical copy alongside the
+The canonical, human-edited copy lives at the repository root (``skill/SKILL.md``).
+This module bundles a byte-identical copy alongside the
 backend source so it ships inside the backend image (whose build context is
 ``backend/`` and so cannot reach a repo-root file) and resolves the same way in
 dev, tests, and the container. A drift test

@@ -1,6 +1,6 @@
 """progress: per-user roadmap-progress table
 
-Adds the ``progress`` table (spec sections 04, 11): one row per
+Adds the ``progress`` table: one row per
 ``(user_id, roadmap_id)`` holding the explicit-set ``checked`` map as JSONB plus
 an optional per-user ``deadline``. The composite primary key enforces the
 one-record-per-(user, roadmap) rule, so follow and every update upsert the same
