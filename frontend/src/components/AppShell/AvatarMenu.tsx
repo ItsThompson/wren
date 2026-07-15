@@ -1,6 +1,7 @@
-import { Link } from 'react-router'
-import { LayoutDashboard, User } from 'lucide-react'
+import { Link, useNavigate } from 'react-router'
+import { LayoutDashboard, LogOut, User } from 'lucide-react'
 
+import { useAuth } from '@/auth'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,11 +12,34 @@ import {
 } from '@/components/ui/dropdown-menu'
 
 /**
- * Account menu on the top bar. The trigger is a terracotta avatar circle.
- * A neutral user icon stands in until auth (Ticket 6) supplies the real user;
- * the menu items link to the account destinations built by later tickets.
+ * Account control on the top bar. While the session resolves it renders nothing;
+ * anonymous visitors get a "Log in" link; authenticated users get the terracotta
+ * avatar menu with their handle, account destinations, and logout.
  */
 export function AvatarMenu() {
+  const { status, user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  if (status === 'loading') {
+    return null
+  }
+
+  if (status === 'anonymous' || user === null) {
+    return (
+      <Link
+        to="/auth"
+        className="rounded-md px-2.5 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
+      >
+        Log in
+      </Link>
+    )
+  }
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/')
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -25,7 +49,7 @@ export function AvatarMenu() {
         <User className="size-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-44">
-        <DropdownMenuLabel>Account</DropdownMenuLabel>
+        <DropdownMenuLabel>{user.username}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link to="/dashboard">
@@ -38,6 +62,11 @@ export function AvatarMenu() {
             <User />
             Your profile
           </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={handleLogout}>
+          <LogOut />
+          Log out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
