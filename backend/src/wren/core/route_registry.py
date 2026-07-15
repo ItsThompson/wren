@@ -81,6 +81,19 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     # readability-scoped, not owner-scoped).
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:fork"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="PATCH", path="/roadmaps/{roadmap_id}/metadata"): AccessLevel.EXTERNAL_COOKIE,
+    # Study-time read projections (#16): the purpose-built reads the web views and
+    # (mirrored on the internal app) the MCP read tools consume. All resolve the
+    # human session via require_user; readability is enforced in the service
+    # (owner draft preview, or a non-owner reading a public published/archived
+    # roadmap; private -> 404, no existence leak).
+    RouteKey(method="GET", path="/roadmaps/{roadmap_id}/overview"): AccessLevel.EXTERNAL_COOKIE,
+    RouteKey(
+        method="GET", path="/roadmaps/{roadmap_id}/nodes/{subsection_id}"
+    ): AccessLevel.EXTERNAL_COOKIE,
+    RouteKey(
+        method="GET", path="/roadmaps/{roadmap_id}/sections/{section_id}"
+    ): AccessLevel.EXTERNAL_COOKIE,
+    RouteKey(method="GET", path="/roadmaps/{roadmap_id}/search"): AccessLevel.EXTERNAL_COOKIE,
     # Web-only lifecycle (#15): visibility toggle, archive, and delete. Mounted on
     # the external (human) app ONLY: no internal-app route and no MCP tool (spec
     # sections 06/07/08). All resolve the human session via require_user and are
@@ -127,6 +140,18 @@ INTERNAL_ROUTE_ACCESS: RouteRegistry = {
     # the service the same way as the external routes.
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:fork"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="PATCH", path="/roadmaps/{roadmap_id}/metadata"): AccessLevel.INTERNAL_TRUSTED,
+    # Study-time read projections (#16) mirrored on the internal app so the MCP
+    # read tools (Ticket 22) call them: overview / node / paginated section /
+    # search, each resolving the trusted X-User-ID and readability-scoped in the
+    # service the same way as the external routes.
+    RouteKey(method="GET", path="/roadmaps/{roadmap_id}/overview"): AccessLevel.INTERNAL_TRUSTED,
+    RouteKey(
+        method="GET", path="/roadmaps/{roadmap_id}/nodes/{subsection_id}"
+    ): AccessLevel.INTERNAL_TRUSTED,
+    RouteKey(
+        method="GET", path="/roadmaps/{roadmap_id}/sections/{section_id}"
+    ): AccessLevel.INTERNAL_TRUSTED,
+    RouteKey(method="GET", path="/roadmaps/{roadmap_id}/search"): AccessLevel.INTERNAL_TRUSTED,
     # Progress surface (#9), mirrored on the internal app so the MCP progress
     # tools (Ticket 22) call it: follow / snapshot / explicit-set / next, each
     # resolving the trusted X-User-ID and scoped to that user.

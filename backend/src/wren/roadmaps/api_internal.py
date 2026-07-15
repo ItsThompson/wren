@@ -19,10 +19,18 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Query
 
 from wren.core.identity import require_internal_user
 from wren.roadmaps.config import ROADMAPS_PATH
+from wren.roadmaps.read_schemas import (
+    NodeDetail,
+    Overview,
+    ResponseFormat,
+    SearchHit,
+    SectionInclude,
+    SectionPage,
+)
 from wren.roadmaps.schemas import (
     MetadataEditRequest,
     PatchRequest,
@@ -63,7 +71,55 @@ def create_internal_roadmaps_router(service_provider: RoadmapServiceProvider) ->
         user_id: str = Depends(require_internal_user),
         service: RoadmapService = Depends(service_provider),
     ) -> Roadmap:
+        # Full document to a reader (spec section 06): the trusted user reads their
+        # own roadmap (any status) or a public published/archived one; a private
+        # roadmap owned by another, or a non-owner's public draft, is a 404.
         return await service.get(user_id, roadmap_id)
+
+    @router.get("/{roadmap_id}/overview")
+    async def get_overview(
+        roadmap_id: str,
+        format: ResponseFormat = ResponseFormat.CONCISE,
+        user_id: str = Depends(require_internal_user),
+        service: RoadmapService = Depends(service_provider),
+    ) -> Overview:
+        # Backs the roadmap_get_overview MCP tool (Ticket 22).
+        return await service.get_overview(user_id, roadmap_id, format)
+
+    @router.get("/{roadmap_id}/nodes/{subsection_id}")
+    async def get_node(
+        roadmap_id: str,
+        subsection_id: str,
+        format: ResponseFormat = ResponseFormat.CONCISE,
+        user_id: str = Depends(require_internal_user),
+        service: RoadmapService = Depends(service_provider),
+    ) -> NodeDetail:
+        # Backs the roadmap_get_node MCP tool (Ticket 22): unknown id -> 404 naming
+        # valid siblings so the agent can self-correct.
+        return await service.get_node(user_id, roadmap_id, subsection_id, format)
+
+    @router.get("/{roadmap_id}/sections/{section_id}")
+    async def get_section(
+        roadmap_id: str,
+        section_id: str,
+        cursor: str | None = None,
+        include: SectionInclude = SectionInclude.BOTH,
+        user_id: str = Depends(require_internal_user),
+        service: RoadmapService = Depends(service_provider),
+    ) -> SectionPage:
+        # Backs the roadmap_get_section MCP tool (Ticket 22): opaque cursor + include.
+        return await service.get_section(user_id, roadmap_id, section_id, cursor, include)
+
+    @router.get("/{roadmap_id}/search")
+    async def search_roadmap(
+        roadmap_id: str,
+        q: str | None = None,
+        tags: list[str] | None = Query(default=None),
+        user_id: str = Depends(require_internal_user),
+        service: RoadmapService = Depends(service_provider),
+    ) -> list[SearchHit]:
+        # Backs the roadmap_search MCP tool (Ticket 22): search, not list-all.
+        return await service.search(user_id, roadmap_id, q, tags)
 
     @router.patch("/{roadmap_id}")
     async def patch_roadmap(

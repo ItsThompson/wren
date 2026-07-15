@@ -26,10 +26,18 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Query
 
 from wren.core.identity import require_user
 from wren.roadmaps.config import ROADMAPS_PATH
+from wren.roadmaps.read_schemas import (
+    NodeDetail,
+    Overview,
+    ResponseFormat,
+    SearchHit,
+    SectionInclude,
+    SectionPage,
+)
 from wren.roadmaps.schemas import (
     MetadataEditRequest,
     PatchRequest,
@@ -65,7 +73,56 @@ def create_roadmaps_router(service_provider: RoadmapServiceProvider) -> APIRoute
         user_id: str = Depends(require_user),
         service: RoadmapService = Depends(service_provider),
     ) -> Roadmap:
+        # Full document to a reader (spec section 06): the owner (any status, draft
+        # preview) or a non-owner reading a public published/archived roadmap by
+        # link. A private roadmap or a non-owner's public draft is a 404 (no leak).
         return await service.get(user_id, roadmap_id)
+
+    @router.get("/{roadmap_id}/overview")
+    async def get_overview(
+        roadmap_id: str,
+        format: ResponseFormat = ResponseFormat.CONCISE,
+        user_id: str = Depends(require_user),
+        service: RoadmapService = Depends(service_provider),
+    ) -> Overview:
+        # Orientation projection: per-section + overall counts, no item bodies.
+        return await service.get_overview(user_id, roadmap_id, format)
+
+    @router.get("/{roadmap_id}/nodes/{subsection_id}")
+    async def get_node(
+        roadmap_id: str,
+        subsection_id: str,
+        format: ResponseFormat = ResponseFormat.CONCISE,
+        user_id: str = Depends(require_user),
+        service: RoadmapService = Depends(service_provider),
+    ) -> NodeDetail:
+        # One subsection: resource links (never inlined bodies), resolved prereqs,
+        # and items with the caller's done-state. Unknown id -> 404 naming siblings.
+        return await service.get_node(user_id, roadmap_id, subsection_id, format)
+
+    @router.get("/{roadmap_id}/sections/{section_id}")
+    async def get_section(
+        roadmap_id: str,
+        section_id: str,
+        cursor: str | None = None,
+        include: SectionInclude = SectionInclude.BOTH,
+        user_id: str = Depends(require_user),
+        service: RoadmapService = Depends(service_provider),
+    ) -> SectionPage:
+        # Paginated drill-down: server-set page size + opaque cursor; a stale or
+        # malformed cursor is a 422 via the shared exception handler.
+        return await service.get_section(user_id, roadmap_id, section_id, cursor, include)
+
+    @router.get("/{roadmap_id}/search")
+    async def search_roadmap(
+        roadmap_id: str,
+        q: str | None = None,
+        tags: list[str] | None = Query(default=None),
+        user_id: str = Depends(require_user),
+        service: RoadmapService = Depends(service_provider),
+    ) -> list[SearchHit]:
+        # Search, not list-all: an empty query with no tag filter returns [].
+        return await service.search(user_id, roadmap_id, q, tags)
 
     @router.patch("/{roadmap_id}")
     async def patch_roadmap(
