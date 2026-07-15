@@ -11,17 +11,6 @@ import { useRoadmap } from './hooks/useRoadmap'
 import type { RoadmapActions } from './types'
 
 /**
- * Same-origin by default (dev proxy + MSW); prod points at the API subdomain via
- * `VITE_API_BASE_URL`. Read once at module load: the deployment base is fixed.
- */
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
-
-interface RoadmapViewProps {
-  /** Overridable in tests; defaults to the deployment API base URL. */
-  baseUrl?: string
-}
-
-/**
  * RoadmapView: fetches a roadmap by the route `:roadmapId`
  * and routes loading / error / loaded. A draft the caller owns renders in
  * read-only preview mode with the publish action; a
@@ -31,7 +20,7 @@ interface RoadmapViewProps {
  * write conflict (stale re-read / immutable fork-to-change) surfaces as a shared
  * ochre prompt above the view.
  */
-export function RoadmapView({ baseUrl = API_BASE_URL }: RoadmapViewProps) {
+export function RoadmapView() {
   const { roadmapId } = useParams()
   const { user } = useAuth()
   const {
@@ -83,7 +72,6 @@ export function RoadmapView({ baseUrl = API_BASE_URL }: RoadmapViewProps) {
     ) : (
       <RoadmapListView
         roadmap={state.roadmap}
-        baseUrl={baseUrl}
         isOwner={isOwner}
         actions={actions}
         onReload={reload}

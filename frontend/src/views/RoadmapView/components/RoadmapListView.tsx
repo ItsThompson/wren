@@ -17,8 +17,6 @@ import { SubjectTags } from './SubjectTags'
 
 interface RoadmapListViewProps {
   roadmap: Roadmap
-  /** API base URL, injected so tests can point the progress client at MSW. */
-  baseUrl: string
   /** Whether the signed-in user owns this roadmap (owner-only metadata edit). */
   isOwner: boolean
   actions: Actions
@@ -38,9 +36,9 @@ interface RoadmapListViewProps {
  * "next" highlight. A `#{subsectionId}` hash (e.g. from the tree view) scrolls to
  * that node.
  */
-export function RoadmapListView({ roadmap, baseUrl, isOwner, actions, onReload }: RoadmapListViewProps) {
+export function RoadmapListView({ roadmap, isOwner, actions, onReload }: RoadmapListViewProps) {
   const { checkedIds, toggle, deadline, setDeadline, nextSubsectionId, nextComplete, notice, dismissNotice, reload } =
-    useProgress(roadmap.id, baseUrl)
+    useProgress(roadmap.id)
   const [activeTag, setActiveTag] = useState<string | null>(null)
   const sectionOrder = roadmap.section_order ?? []
   const sections = roadmap.sections ?? {}

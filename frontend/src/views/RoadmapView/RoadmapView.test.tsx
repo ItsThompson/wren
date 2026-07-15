@@ -136,7 +136,7 @@ function renderView(user: typeof AUTH_USER | null = AUTH_USER) {
   return renderWithProviders(
     <>
       <Routes>
-        <Route path="/roadmaps/:roadmapId" element={<RoadmapView baseUrl={BASE} />} />
+        <Route path="/roadmaps/:roadmapId" element={<RoadmapView />} />
       </Routes>
       <LocationProbe />
     </>,
@@ -150,7 +150,7 @@ function renderViewAtHash(hash: string) {
   return renderWithProviders(
     <>
       <Routes>
-        <Route path="/roadmaps/:roadmapId" element={<RoadmapView baseUrl={BASE} />} />
+        <Route path="/roadmaps/:roadmapId" element={<RoadmapView />} />
       </Routes>
       <LocationProbe />
     </>,
@@ -1255,7 +1255,7 @@ describe('RoadmapView sub-state reset on roadmapId change (R2 invariant)', () =>
     renderWithProviders(
       <>
         <Routes>
-          <Route path="/roadmaps/:roadmapId" element={<RoadmapView baseUrl={BASE} />} />
+          <Route path="/roadmaps/:roadmapId" element={<RoadmapView />} />
         </Routes>
         <NavTo to={`/roadmaps/${ROADMAP_B}`} label="Go to roadmap B" />
       </>,
