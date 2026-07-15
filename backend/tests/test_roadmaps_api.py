@@ -307,3 +307,123 @@ def test_publish_is_404_to_a_non_owner(make_settings: MakeSettings) -> None:
     _login(client, username="intruder", email="intruder@example.com")
     response = client.post(f"/roadmaps/{created_id}:publish")
     assert response.status_code == 404
+
+
+# --- patch (If-Match optimistic concurrency) --------------------------------
+
+
+def _create_publishable(client: TestClient) -> str:
+    return client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+
+
+def test_patch_applies_ops_and_returns_the_bumped_revision(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created_id = _create_publishable(client)
+
+    response = client.patch(
+        f"/roadmaps/{created_id}",
+        headers={"If-Match": "1"},
+        json={"operations": [{"op": "set_tags", "subsection_id": "sub_arrays", "tags": ["core"]}]},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["roadmap_id"] == created_id
+    assert body["revision"] == 2
+    assert body["changed_nodes"] == [
+        {"kind": "subsection", "id": "sub_arrays", "change": "updated"}
+    ]
+    # Persisted: a fresh read reflects the edit and the bumped revision.
+    fetched = client.get(f"/roadmaps/{created_id}").json()
+    assert fetched["revision"] == 2
+    assert fetched["sections"]["sec_foundations"]["subsections"]["sub_arrays"]["tags"] == ["core"]
+
+
+def test_patch_with_a_stale_if_match_is_a_409(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created_id = _create_publishable(client)
+
+    response = client.patch(
+        f"/roadmaps/{created_id}",
+        headers={"If-Match": "99"},
+        json={"operations": [{"op": "set_tags", "subsection_id": "sub_arrays", "tags": ["x"]}]},
+    )
+    assert response.status_code == 409
+    assert response.headers["content-type"] == "application/problem+json"
+    body = response.json()
+    assert body["code"] == "STALE_REVISION"
+    assert "re-read" in body["detail"].lower()
+
+
+def test_patch_with_an_invalid_op_is_a_422_naming_valid_ids(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created_id = _create_publishable(client)
+
+    response = client.patch(
+        f"/roadmaps/{created_id}",
+        headers={"If-Match": "1"},
+        json={"operations": [{"op": "set_tags", "subsection_id": "sub_ghost", "tags": ["x"]}]},
+    )
+    assert response.status_code == 422
+    body = response.json()
+    assert body["code"] == "VALIDATION"
+    field, message = next(iter(body["fields"].items()))
+    assert field == "operations[0].subsection_id"
+    assert "sub_arrays" in message
+
+
+def test_patch_cycle_creating_edge_is_a_422_explaining_the_cycle(
+    make_settings: MakeSettings,
+) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created_id = _create_publishable(client)
+
+    response = client.patch(
+        f"/roadmaps/{created_id}",
+        headers={"If-Match": "1"},
+        json={"operations": [{"op": "add_edge", "from_id": "sub_arrays", "to_id": "sub_arrays"}]},
+    )
+    assert response.status_code == 422
+    body = response.json()
+    assert "cycle" in next(iter(body["fields"].values()))
+
+
+def test_patch_missing_if_match_header_is_a_422(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created_id = _create_publishable(client)
+
+    response = client.patch(
+        f"/roadmaps/{created_id}",
+        json={"operations": [{"op": "set_tags", "subsection_id": "sub_arrays", "tags": ["x"]}]},
+    )
+    assert response.status_code == 422
+    assert response.headers["content-type"] == "application/problem+json"
+
+
+def test_patch_requires_authentication(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings)
+    response = client.patch(
+        "/roadmaps/anything-0000",
+        headers={"If-Match": "1"},
+        json={"operations": [{"op": "set_tags", "subsection_id": "sub_x", "tags": []}]},
+    )
+    assert response.status_code == 401
+
+
+def test_patch_is_404_to_a_non_owner(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client, username="owner", email="owner@example.com")
+    created_id = _create_publishable(client)
+
+    client.cookies.clear()
+    _login(client, username="intruder", email="intruder@example.com")
+    response = client.patch(
+        f"/roadmaps/{created_id}",
+        headers={"If-Match": "1"},
+        json={"operations": [{"op": "set_tags", "subsection_id": "sub_arrays", "tags": ["x"]}]},
+    )
+    assert response.status_code == 404

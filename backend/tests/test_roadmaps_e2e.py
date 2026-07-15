@@ -202,3 +202,54 @@ def test_publish_hard_block_end_to_end_over_http(
         assert [v["rule"] for v in blocked.json()["violations"]] == ["V3_PATH_COVERAGE"]
         # The draft is untouched.
         assert client.get(f"/roadmaps/{roadmap_id}").json()["status"] == "draft"
+
+
+def test_patch_draft_end_to_end_over_http(migrated_url: str, make_settings: MakeSettings) -> None:
+    app = _external_app(migrated_url, make_settings(database_url=migrated_url))
+    with TestClient(app) as client:
+        register = client.post(
+            "/auth/register",
+            json={
+                "username": "e2epatcher",
+                "email": "e2e-patcher@example.com",
+                "password": _PASSWORD,
+            },
+        )
+        assert register.status_code == 201, register.text
+
+        roadmap_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+
+        # An atomic op batch under If-Match: applies, bumps the revision, and
+        # persists to Postgres.
+        patched = client.patch(
+            f"/roadmaps/{roadmap_id}",
+            headers={"If-Match": "1"},
+            json={
+                "operations": [
+                    {"op": "set_tags", "subsection_id": "sub_arrays", "tags": ["core"]},
+                    {
+                        "op": "add_item",
+                        "subsection_id": "sub_arrays",
+                        "text": "Practice",
+                        "proposed_id": "chk_practice",
+                    },
+                ]
+            },
+        )
+        assert patched.status_code == 200, patched.text
+        assert patched.json()["revision"] == 2
+
+        fetched = client.get(f"/roadmaps/{roadmap_id}").json()
+        assert fetched["revision"] == 2
+        arrays = fetched["sections"]["sec_foundations"]["subsections"]["sub_arrays"]
+        assert arrays["tags"] == ["core"]
+        assert "chk_practice" in arrays["checklist_items"]
+
+        # Re-using the now-stale revision 1 is a 409 "re-read".
+        stale = client.patch(
+            f"/roadmaps/{roadmap_id}",
+            headers={"If-Match": "1"},
+            json={"operations": [{"op": "set_tags", "subsection_id": "sub_arrays", "tags": []}]},
+        )
+        assert stale.status_code == 409
+        assert stale.json()["code"] == "STALE_REVISION"

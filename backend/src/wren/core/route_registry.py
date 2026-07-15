@@ -58,6 +58,11 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     # resolve the human session via require_user (owner-scoped in the service).
     RouteKey(method="POST", path="/roadmaps"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}"): AccessLevel.EXTERNAL_COOKIE,
+    # Iterative edit (#12): the atomic op-list PATCH under If-Match optimistic
+    # concurrency. Owner-scoped draft-only write, resolving the human session via
+    # require_user (the service rejects a stale revision with 409 and an invalid
+    # op with 422).
+    RouteKey(method="PATCH", path="/roadmaps/{roadmap_id}"): AccessLevel.EXTERNAL_COOKIE,
     # Roadmap validate + publish lifecycle (#8): owner-scoped draft actions on
     # the :verb sub-resource. Publish is the one-way draft -> published
     # transition; both resolve the human session via require_user.

@@ -17,11 +17,18 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 
 from wren.core.identity import require_user
 from wren.roadmaps.config import ROADMAPS_PATH
-from wren.roadmaps.schemas import Roadmap, RoadmapCreated, RoadmapInput, ValidateResult
+from wren.roadmaps.schemas import (
+    PatchRequest,
+    PatchResult,
+    Roadmap,
+    RoadmapCreated,
+    RoadmapInput,
+    ValidateResult,
+)
 from wren.roadmaps.service import RoadmapService
 
 # A FastAPI dependency that yields a RoadmapService for the request.
@@ -47,6 +54,19 @@ def create_roadmaps_router(service_provider: RoadmapServiceProvider) -> APIRoute
         service: RoadmapService = Depends(service_provider),
     ) -> Roadmap:
         return await service.get(user_id, roadmap_id)
+
+    @router.patch("/{roadmap_id}")
+    async def patch_roadmap(
+        roadmap_id: str,
+        body: PatchRequest,
+        if_match: int = Header(alias="If-Match"),
+        user_id: str = Depends(require_user),
+        service: RoadmapService = Depends(service_provider),
+    ) -> PatchResult:
+        # If-Match carries the target revision (spec section 06): a mismatch is a
+        # 409 "re-read", an invalid op is a 422, both rendered by the shared
+        # exception handler. A malformed/absent header is a 422 via FastAPI.
+        return await service.patch_draft(user_id, roadmap_id, if_match, body.operations)
 
     @router.post("/{roadmap_id}:validate")
     async def validate_roadmap(
