@@ -3,24 +3,22 @@
 Pure functions over the domain :class:`Roadmap`: no I/O, no request, no database,
 so they are exhaustively and property-tested in isolation (spec section 13).
 
-This slice (ticket 8) implements the MINIMAL subset that needs no graph analysis,
-enough to gate publish for the walking skeleton:
+This is the FULL structural contract (V1..V8, spec section 04). It composes the
+pure :mod:`wren.roadmaps.dag` module with the local content rules:
 
+* V1: the prerequisite DAG is acyclic (``dag.check_acyclic``)
+* V2: no dangling ``prereq_ids`` (``dag.find_dangling_prereqs``)
+* V3: ``suggested_path`` covers every subsection exactly once (``dag``)
+* V4: ``suggested_path`` is a legal topological order (``dag``)
 * V5: every section has >= 1 subsection
 * V6: every subsection has >= 1 checklist item
 * V7: every subsection has >= 1 resource
 * V8: non-empty titles (roadmap, every section / subsection / checklist item)
-* V3 (minimal): ``suggested_path`` must be present once there is a subsection to
-  sequence
-
-The graph rules (V1 acyclic, V2 no dangling prereqs) and the FULL V3 coverage +
-V4 topological-order checks are pure-``dag`` concerns delivered separately and
-composed here later (spec section 05). :data:`_CHECKS` is that seam: additional
-rule checks are appended, and the minimal V3 gate is superseded by the full path
-validator, all without changing the ``Violation`` wire shape.
 
 :func:`validate_structure` returns ALL violations in one pass (never fail-fast),
-so an author sees the complete fix list at once.
+so an author sees the complete fix list at once; :meth:`RoadmapService.publish`
+hard-blocks on any violation and the section 06 ``422`` problem+json carries the
+whole ``violations`` array.
 """
 
 from __future__ import annotations
@@ -29,17 +27,30 @@ from collections.abc import Callable, Iterator
 from enum import StrEnum
 
 from wren.core.errors import Violation
+from wren.roadmaps.dag import (
+    CycleReport,
+    DagRule,
+    RuleViolation,
+    check_acyclic,
+    find_dangling_prereqs,
+    validate_suggested_path,
+)
 from wren.roadmaps.schemas import Roadmap, Section, Subsection
 
 
 class StructuralRule(StrEnum):
-    """Machine-readable ``Violation.rule`` codes for the structural contract.
+    """The full ``Violation.rule`` contract (V1..V8, spec sections 04/06).
 
-    Values are stable wire identifiers (spec section 06); the full contract adds
-    V1/V2/V4 and expands V3, but never restructures an existing code.
+    Single source of truth for the wire codes. The DAG-derived codes (V1..V4) are
+    sourced from :class:`DagRule` (the pure ``dag`` module owns them and emits
+    them in its report types), so each code has exactly one definition rather than
+    two parallel enums; V5..V8 are the local content rules this module owns.
     """
 
-    V3_PATH_COVERAGE = "V3_PATH_COVERAGE"
+    V1_ACYCLIC = DagRule.ACYCLIC.value
+    V2_NO_DANGLING_PREREQ = DagRule.NO_DANGLING_PREREQ.value
+    V3_PATH_COVERAGE = DagRule.PATH_COVERAGE.value
+    V4_PATH_ORDER = DagRule.PATH_ORDER.value
     V5_SUBSECTION_REQUIRED = "V5_SUBSECTION_REQUIRED"
     V6_ITEM_REQUIRED = "V6_ITEM_REQUIRED"
     V7_RESOURCE_REQUIRED = "V7_RESOURCE_REQUIRED"
@@ -49,8 +60,9 @@ class StructuralRule(StrEnum):
 def validate_structure(draft: Roadmap) -> list[Violation]:
     """Run every structural check over ``draft`` and return all violations.
 
-    An empty list means the draft satisfies the (currently minimal) structural
-    contract and may be published.
+    An empty list means the draft satisfies the structural contract and may be
+    published. Checks run in rule order (V1..V8) and never short-circuit, so an
+    author sees every problem at once.
     """
     violations: list[Violation] = []
     for check in _CHECKS:
@@ -105,22 +117,55 @@ def _check_subsections_have_resources(draft: Roadmap) -> list[Violation]:
     ]
 
 
-def _check_suggested_path_present(draft: Roadmap) -> list[Violation]:
-    """Minimal V3 gate: once there is a subsection to sequence, ``suggested_path``
-    must be present. The FULL V3 coverage + V4 topological-order checks are
-    composed here later from the pure ``dag`` module (spec section 05); this gate
-    is superseded then, keeping the ``V3_PATH_COVERAGE`` wire code stable.
+def _check_dag(draft: Roadmap) -> list[Violation]:
+    """V1..V4: compose the pure ``dag`` module over the prerequisite graph.
+
+    ``nodes`` is every subsection ID; ``edges[x]`` is ``x``'s ``prereq_ids`` (the
+    edge convention the ``dag`` module documents). V1 (cycle), V2 (dangling
+    prereqs), and V3/V4 (``suggested_path`` coverage + topological order) each run
+    independently, so a graph with several faults surfaces them all in one pass.
     """
-    subsection_ids = [subsection.id for subsection in _subsections_in_order(draft)]
-    if not subsection_ids or draft.suggested_path:
-        return []
-    return [
-        Violation(
-            rule=StructuralRule.V3_PATH_COVERAGE.value,
-            ids=subsection_ids,
-            message="suggested_path is empty; it must sequence every subsection before publish",
-        )
+    subsections = list(_subsections_in_order(draft))
+    nodes = {subsection.id for subsection in subsections}
+    edges = {subsection.id: list(subsection.prereq_ids) for subsection in subsections}
+
+    violations: list[Violation] = []
+    cycle = check_acyclic(nodes, edges)
+    if cycle is not None:
+        violations.append(_cycle_violation(cycle))
+    dag_violations = [
+        *find_dangling_prereqs(nodes, edges),
+        *validate_suggested_path(draft.suggested_path, nodes, edges),
     ]
+    violations.extend(_to_wire(rule_violation) for rule_violation in dag_violations)
+    return violations
+
+
+def _cycle_violation(report: CycleReport) -> Violation:
+    """Map the V1 :class:`CycleReport` (an ordered closed walk) onto the wire.
+
+    ``cycle`` repeats its first node to close the walk; ``ids`` carry the distinct
+    nodes in cycle order (spec section 06 shape) and the report's ``message`` is
+    used verbatim.
+    """
+    return Violation(
+        rule=StructuralRule.V1_ACYCLIC.value,
+        ids=list(dict.fromkeys(report.cycle)),
+        message=report.message,
+    )
+
+
+def _to_wire(rule_violation: RuleViolation) -> Violation:
+    """Re-wrap a pure ``dag`` :class:`RuleViolation` as the wire ``Violation``.
+
+    The rule codes are identical strings (V2..V4); this only carries the fields
+    across the framework boundary the pure module deliberately avoids.
+    """
+    return Violation(
+        rule=rule_violation.rule.value,
+        ids=rule_violation.ids,
+        message=rule_violation.message,
+    )
 
 
 def _sections_in_order(draft: Roadmap) -> Iterator[Section]:
@@ -165,13 +210,12 @@ def _is_blank(text: str) -> bool:
     return not text.strip()
 
 
-# The composition seam: ticket 11 appends the pure-``dag`` V1/V2 checks and the
-# full V3/V4 path validator here (superseding _check_suggested_path_present),
-# without touching the Violation wire shape.
+# Every structural rule as an independent check, run in rule order (V1..V8). The
+# DAG rules compose the pure ``dag`` module; the content rules (V5..V8) are local.
 _CHECKS: tuple[Callable[[Roadmap], list[Violation]], ...] = (
-    _check_titles,
+    _check_dag,
     _check_sections_have_subsections,
     _check_subsections_have_items,
     _check_subsections_have_resources,
-    _check_suggested_path_present,
+    _check_titles,
 )
