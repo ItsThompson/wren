@@ -102,9 +102,11 @@ use `patch`.
 Edges are added with `add_edge(from_id, to_id)`: this records that `from_id` is a
 prerequisite of `to_id` (learn `from_id` first).
 
-A `patch` batch is applied **atomically** (all-or-nothing) and is checked for
-acyclicity **after every operation**, not just at the end. So a batch that would
-create a cycle *midway* is rejected even when the final graph would be acyclic.
+A `patch` batch is applied **atomically** (all-or-nothing), and every operation
+that adds a prerequisite edge (`add_edge`, or an `add_subsection` carrying
+`prereq_ids`) is checked for acyclicity **after each edge-affecting operation**,
+not just at the end of the batch. So a batch that would create a cycle *midway*
+is rejected even when the final graph would be acyclic.
 **Order your `add_edge` operations so the DAG stays acyclic at each step.** Add
 edges in dependency order (prerequisites first) and never introduce an edge whose
 reverse you plan to remove later in the same batch. The error names the cycle so
@@ -176,14 +178,19 @@ create_roadmap_draft({
 })
 ```
 
-Then iterate, e.g. add a prerequisite and a resource in one atomic patch:
+Then iterate. For example, extend the roadmap with a new subsection, wire its
+prerequisite, and keep `suggested_path` in sync, in one atomic patch:
 
 ```
 patch_roadmap_draft(roadmap_id, revision, [
-  { op: "add_edge", from_id: "sub_arrays", to_id: "sub_hashing" },
-  { op: "set_resources", subsection_id: "sub_hashing",
-    resources: [{ title: "Load factors", url: "https://...", type: "docs" }] }
+  { op: "add_subsection", section_id: "sec_foundations", after_id: "sub_hashing",
+    subsection: { proposed_id: "sub_collisions", title: "Collision handling",
+      resources: [{ title: "Open addressing", url: "https://...", type: "article" }],
+      checklist_items: [{ text: "Compare chaining vs open addressing" }] } },
+  { op: "add_edge", from_id: "sub_hashing", to_id: "sub_collisions" },
+  { op: "set_suggested_path", path: ["sub_arrays", "sub_hashing", "sub_collisions"] }
 ])
 ```
 
-Validate, confirm with the user, then publish.
+The `add_edge` names `sub_hashing` before `sub_collisions`, so the DAG stays
+acyclic as the batch applies. Validate, confirm with the user, then publish.

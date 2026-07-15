@@ -60,6 +60,16 @@ lint-mcp:
 fmt-mcp:
     cd mcp && uv run ruff format . && uv run ruff check --fix .
 
+# --- Authoring guidance (SKILL.md) ------------------------------------------
+
+# Re-sync the backend-bundled SKILL.md with the canonical repo-root copy.
+# The canonical, human-edited guidance lives at skill/SKILL.md; the backend
+# serves a bundled copy (its image build context is backend/), and a drift test
+# (backend/tests/test_skill_content.py) fails if the two diverge. Run this after
+# editing skill/SKILL.md.
+sync-skill:
+    cp skill/SKILL.md backend/src/wren/skill/SKILL.md
+
 # --- Docker stack -----------------------------------------------------------
 
 # Build the three first-party images (backend, mcp, frontend)
