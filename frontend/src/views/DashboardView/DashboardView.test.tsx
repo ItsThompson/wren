@@ -5,6 +5,7 @@ import { setupServer } from 'msw/node'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
+import { ApiClientProvider } from '@/api'
 import { AuthProvider } from '@/auth'
 import type { RoadmapCardData } from './types'
 import { DashboardView } from './DashboardView'
@@ -40,13 +41,15 @@ afterAll(() => server.close())
 
 function renderView() {
   return render(
-    <AuthProvider baseUrl={BASE}>
-      <MemoryRouter initialEntries={['/dashboard']}>
-        <Routes>
-          <Route path="/dashboard" element={<DashboardView baseUrl={BASE} />} />
-        </Routes>
-      </MemoryRouter>
-    </AuthProvider>,
+    <ApiClientProvider baseUrl={BASE}>
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/dashboard']}>
+          <Routes>
+            <Route path="/dashboard" element={<DashboardView baseUrl={BASE} />} />
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>
+    </ApiClientProvider>,
   )
 }
 

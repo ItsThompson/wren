@@ -5,6 +5,7 @@ import { setupServer } from 'msw/node'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
+import { ApiClientProvider } from '@/api'
 import { AuthProvider } from '@/auth'
 import type { ConnectedClient } from './types'
 import { ConnectedClientsView } from './ConnectedClientsView'
@@ -40,13 +41,15 @@ afterAll(() => server.close())
 
 function renderView() {
   return render(
-    <AuthProvider baseUrl={BASE}>
-      <MemoryRouter initialEntries={['/settings/connections']}>
-        <Routes>
-          <Route path="/settings/connections" element={<ConnectedClientsView baseUrl={BASE} />} />
-        </Routes>
-      </MemoryRouter>
-    </AuthProvider>,
+    <ApiClientProvider baseUrl={BASE}>
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/settings/connections']}>
+          <Routes>
+            <Route path="/settings/connections" element={<ConnectedClientsView baseUrl={BASE} />} />
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>
+    </ApiClientProvider>,
   )
 }
 

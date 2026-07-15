@@ -4,6 +4,7 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll } from 'vitest'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 
+import { ApiClientProvider } from '@/api'
 import { AuthProvider } from '@/auth'
 import { colorForTag } from '@/lib/tag-color'
 import type { ProgressSnapshot, ProgressUpdateResult, Roadmap } from './types'
@@ -120,14 +121,16 @@ function renderView(user: typeof AUTH_USER | null = AUTH_USER) {
       : http.post('*/auth/refresh', () => new HttpResponse(null, { status: 401 })),
   )
   return render(
-    <AuthProvider baseUrl={BASE}>
-      <MemoryRouter initialEntries={[`/roadmaps/${ROADMAP_ID}`]}>
-        <Routes>
-          <Route path="/roadmaps/:roadmapId" element={<RoadmapView baseUrl={BASE} />} />
-        </Routes>
-        <LocationProbe />
-      </MemoryRouter>
-    </AuthProvider>,
+    <ApiClientProvider baseUrl={BASE}>
+      <AuthProvider>
+        <MemoryRouter initialEntries={[`/roadmaps/${ROADMAP_ID}`]}>
+          <Routes>
+            <Route path="/roadmaps/:roadmapId" element={<RoadmapView baseUrl={BASE} />} />
+          </Routes>
+          <LocationProbe />
+        </MemoryRouter>
+      </AuthProvider>
+    </ApiClientProvider>,
   )
 }
 
@@ -135,14 +138,16 @@ function renderView(user: typeof AUTH_USER | null = AUTH_USER) {
 function renderViewAtHash(hash: string) {
   server.use(http.post('*/auth/refresh', () => HttpResponse.json(AUTH_USER)))
   return render(
-    <AuthProvider baseUrl={BASE}>
-      <MemoryRouter initialEntries={[`/roadmaps/${ROADMAP_ID}${hash}`]}>
-        <Routes>
-          <Route path="/roadmaps/:roadmapId" element={<RoadmapView baseUrl={BASE} />} />
-        </Routes>
-        <LocationProbe />
-      </MemoryRouter>
-    </AuthProvider>,
+    <ApiClientProvider baseUrl={BASE}>
+      <AuthProvider>
+        <MemoryRouter initialEntries={[`/roadmaps/${ROADMAP_ID}${hash}`]}>
+          <Routes>
+            <Route path="/roadmaps/:roadmapId" element={<RoadmapView baseUrl={BASE} />} />
+          </Routes>
+          <LocationProbe />
+        </MemoryRouter>
+      </AuthProvider>
+    </ApiClientProvider>,
   )
 }
 

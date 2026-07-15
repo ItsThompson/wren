@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+
+import type { SessionClient } from '@/api'
 
 import { toAuthResult } from '../api-errors'
-import { createSessionClient } from '../createSessionClient'
 import type { AuthResult, AuthStatus, AuthUser, LoginInput, RegisterInput } from '../types'
 
 interface SessionState {
@@ -12,17 +13,16 @@ interface SessionState {
 const ANONYMOUS: SessionState = { status: 'anonymous', user: null }
 
 /**
- * Owns the session: builds the session client, resumes an existing
- * session once on mount via the rotating refresh token, and exposes
+ * Owns the session: resumes an existing session once on mount via the rotating
+ * refresh token against the shared session client, and exposes
  * register/login/logout. State is a single `{status, user}` so the impossible
  * "authenticated with no user" combination cannot arise.
  */
-export function useAuthSession(baseUrl: string): SessionState & {
+export function useAuthSession(client: SessionClient): SessionState & {
   register: (input: RegisterInput) => Promise<AuthResult>
   login: (input: LoginInput) => Promise<AuthResult>
   logout: () => Promise<void>
 } {
-  const client = useMemo(() => createSessionClient(baseUrl), [baseUrl])
   const [session, setSession] = useState<SessionState>({ status: 'loading', user: null })
 
   const resume = useCallback(async () => {

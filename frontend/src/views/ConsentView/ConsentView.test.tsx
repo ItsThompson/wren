@@ -5,6 +5,7 @@ import { setupServer } from 'msw/node'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
+import { ApiClientProvider } from '@/api'
 import { AuthProvider } from '@/auth'
 import { ConsentView } from './ConsentView'
 
@@ -56,16 +57,18 @@ afterAll(() => server.close())
 function renderConsent(options: { path?: string; navigateExternal?: (url: string) => void } = {}) {
   const { path = `/authorize?auth_request_id=${AUTH_REQUEST_ID}`, navigateExternal } = options
   return render(
-    <AuthProvider baseUrl={BASE}>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route
-            path="/authorize"
-            element={<ConsentView baseUrl={BASE} navigateExternal={navigateExternal} />}
-          />
-        </Routes>
-      </MemoryRouter>
-    </AuthProvider>,
+    <ApiClientProvider baseUrl={BASE}>
+      <AuthProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route
+              path="/authorize"
+              element={<ConsentView baseUrl={BASE} navigateExternal={navigateExternal} />}
+            />
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>
+    </ApiClientProvider>,
   )
 }
 
