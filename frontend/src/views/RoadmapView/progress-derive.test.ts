@@ -1,5 +1,6 @@
 import { isSubsectionDone, overallCount, sectionCount } from './progress-derive'
-import type { Roadmap, Section, Subsection } from './types'
+import { firstNextSubsectionId, patchCheckedIds, patchDeadline } from './progress-derive'
+import type { NextResult, ProgressSnapshot, Roadmap, Section, Subsection } from './types'
 
 /** A subsection with the given item ids and no resources. */
 function subsection(id: string, itemIds: string[]): Subsection {
@@ -87,6 +88,103 @@ describe('overallCount', () => {
       total: 4,
       checked: 0,
       percent: 0,
+    })
+  })
+})
+
+describe('firstNextSubsectionId', () => {
+  it('returns the first item\'s subsection id', () => {
+    const next: NextResult = {
+      items: [
+        { subsection_id: 'sub_arrays', item_id: 'chk_read', text: 'Read', why_now: 'first' },
+        { subsection_id: 'sub_hashing', item_id: 'chk_hash', text: 'Impl', why_now: 'later' },
+      ],
+      remaining_in_path: 2,
+      complete: false,
+    }
+    expect(firstNextSubsectionId(next)).toBe('sub_arrays')
+  })
+
+  it('returns null when there are no items (path complete)', () => {
+    expect(firstNextSubsectionId({ items: [], remaining_in_path: 0, complete: true })).toBeNull()
+  })
+
+  it('returns null when items is absent', () => {
+    expect(firstNextSubsectionId({ remaining_in_path: 0, complete: false })).toBeNull()
+  })
+
+  it('returns null for an undefined response (read not resolved / failed)', () => {
+    expect(firstNextSubsectionId(undefined)).toBeNull()
+  })
+})
+
+describe('patchCheckedIds', () => {
+  /** A snapshot carrying the given checked ids. */
+  function snapshot(checkedIds: string[]): ProgressSnapshot {
+    return { roadmap_id: 'r-0000', total_items: 3, checked_items: checkedIds.length, percent: 0, checked_ids: checkedIds }
+  }
+
+  it('adds an id when checking', () => {
+    expect(patchCheckedIds(snapshot(['chk_a1']), 'r-0000', 'chk_a2', true).checked_ids).toEqual([
+      'chk_a1',
+      'chk_a2',
+    ])
+  })
+
+  it('removes an id when unchecking', () => {
+    expect(patchCheckedIds(snapshot(['chk_a1', 'chk_a2']), 'r-0000', 'chk_a1', false).checked_ids).toEqual([
+      'chk_a2',
+    ])
+  })
+
+  it('is idempotent when re-checking an already-checked id', () => {
+    expect(patchCheckedIds(snapshot(['chk_a1']), 'r-0000', 'chk_a1', true).checked_ids).toEqual([
+      'chk_a1',
+    ])
+  })
+
+  it('preserves the other snapshot fields (deadline is not clobbered)', () => {
+    const withDeadline: ProgressSnapshot = { ...snapshot([]), deadline: '2026-12-01' }
+    expect(patchCheckedIds(withDeadline, 'r-0000', 'chk_a1', true).deadline).toBe('2026-12-01')
+  })
+
+  it('seeds a conforming snapshot when none has resolved yet', () => {
+    const patched = patchCheckedIds(undefined, 'r-0000', 'chk_a1', true)
+    expect(patched).toEqual({
+      roadmap_id: 'r-0000',
+      total_items: 0,
+      checked_items: 0,
+      percent: 0,
+      checked_ids: ['chk_a1'],
+    })
+  })
+})
+
+describe('patchDeadline', () => {
+  /** A snapshot carrying the given checked ids. */
+  function snapshot(checkedIds: string[]): ProgressSnapshot {
+    return { roadmap_id: 'r-0000', total_items: 3, checked_items: checkedIds.length, percent: 0, checked_ids: checkedIds }
+  }
+
+  it('sets the deadline while preserving checked_ids', () => {
+    const patched = patchDeadline(snapshot(['chk_a1']), 'r-0000', '2026-12-01')
+    expect(patched.deadline).toBe('2026-12-01')
+    expect(patched.checked_ids).toEqual(['chk_a1'])
+  })
+
+  it('clears the deadline with null', () => {
+    const patched = patchDeadline({ ...snapshot([]), deadline: '2026-12-01' }, 'r-0000', null)
+    expect(patched.deadline).toBeNull()
+  })
+
+  it('seeds a conforming snapshot when none has resolved yet', () => {
+    expect(patchDeadline(undefined, 'r-0000', '2026-12-01')).toEqual({
+      roadmap_id: 'r-0000',
+      total_items: 0,
+      checked_items: 0,
+      percent: 0,
+      checked_ids: [],
+      deadline: '2026-12-01',
     })
   })
 })
