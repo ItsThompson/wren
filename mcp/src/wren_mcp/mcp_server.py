@@ -1,10 +1,10 @@
 """MCP tool server bootstrap.
 
-Builds the ``FastMCP`` instance the write tools (this ticket) and read tools
- register onto, and that:mod:`wren_mcp.app` mounts under the
+Builds the ``FastMCP`` instance the write tools and read tools register onto,
+and that :mod:`wren_mcp.app` mounts under the
 bearer-guarded ``/mcp`` transport prefix. The server is a **thin dispatcher**:
 tool execution, schema generation, and the Streamable HTTP protocol are the MCP
-framework's job (spec section 07: validate tool shapes against MCP guidance,
+framework's job (validate tool shapes against MCP guidance,
 ``outputSchema`` + annotations); each tool body is one call to the backend
 internal API via :class:`~wren_mcp.client.InternalApiClient`.
 

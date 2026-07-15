@@ -35,7 +35,7 @@
           "type": "object"
         },
         "ResourceInput": {
-          "description": "An external link on a subsection; the body is never inlined (spec 07).",
+          "description": "An external link on a subsection; the body is never inlined.",
           "properties": {
             "proposed_id": {
               "anyOf": [
@@ -82,7 +82,7 @@
           "type": "string"
         },
         "RoadmapDraftInput": {
-          "description": "The full-document payload for ``create_roadmap_draft`` and\n``replace_roadmap_draft`` (spec section 04 ``RoadmapInput``).",
+          "description": "The full-document payload for ``create_roadmap_draft`` and\n``replace_roadmap_draft``.",
           "properties": {
             "description": {
               "anyOf": [
@@ -478,7 +478,7 @@
     "inputSchema": {
       "$defs": {
         "AddEdgeOp": {
-          "description": "``to_id`` gains ``from_id`` as a prerequisite (spec section 07).",
+          "description": "``to_id`` gains ``from_id`` as a prerequisite.",
           "properties": {
             "from_id": {
               "title": "From Id",
@@ -815,7 +815,7 @@
           "type": "object"
         },
         "ResourceInput": {
-          "description": "An external link on a subsection; the body is never inlined (spec 07).",
+          "description": "An external link on a subsection; the body is never inlined.",
           "properties": {
             "proposed_id": {
               "anyOf": [
@@ -1255,7 +1255,7 @@
           "type": "string"
         },
         "ChangedNode": {
-          "description": "One node a patch touched, echoed back so the agent knows what changed\nwithout re-reading the whole roadmap (spec section 07: summary-first).",
+          "description": "One node a patch touched, echoed back so the agent knows what changed\nwithout re-reading the whole roadmap (summary-first).",
           "properties": {
             "change": {
               "$ref": "#/$defs/ChangeType"
@@ -1454,7 +1454,7 @@
     "inputSchema": {
       "$defs": {
         "CompletionState": {
-          "description": "The explicit target state ``progress_update`` sets its items to.\n\nExplicit set, never toggle (spec section 07): the client states the desired\nend state so a retry is idempotent.",
+          "description": "The explicit target state ``progress_update`` sets its items to.\n\nExplicit set, never toggle: the client states the desired\nend state so a retry is idempotent.",
           "enum": [
             "complete",
             "incomplete"
@@ -1491,7 +1491,7 @@
     "outputSchema": {
       "$defs": {
         "NextItem": {
-          "description": "One unchecked, prereq-satisfied checklist item to work on next.\n\n``why_now`` is a STRUCTURAL rationale only (spec section 07): the mechanical\nfacts the app owns (next unchecked in ``suggested_path``; named prerequisites\ncomplete), never pedagogical / ZPD judgement. ``path_position`` (the 1-based\nindex of the item's subsection in ``suggested_path``) is present only in\n``detailed`` mode.",
+          "description": "One unchecked, prereq-satisfied checklist item to work on next.\n\n``why_now`` is a STRUCTURAL rationale only: the mechanical\nfacts the app owns (next unchecked in ``suggested_path``; named prerequisites\ncomplete), never pedagogical / ZPD judgement. ``path_position`` (the 1-based\nindex of the item's subsection in ``suggested_path``) is present only in\n``detailed`` mode.",
           "properties": {
             "item_id": {
               "title": "Item Id",
@@ -1539,7 +1539,7 @@
           "type": "object"
         },
         "NextResult": {
-          "description": "``roadmap_get_next`` result: the next unchecked items in ``suggested_path``\norder whose prerequisites are all complete (server-computed; spec section 07).\n\n``remaining_in_path`` counts the path subsections still to do; ``complete`` is\n``True`` when nothing remains.",
+          "description": "``roadmap_get_next`` result: the next unchecked items in ``suggested_path``\norder whose prerequisites are all complete (server-computed).\n\n``remaining_in_path`` counts the path subsections still to do; ``complete`` is\n``True`` when nothing remains.",
           "properties": {
             "complete": {
               "default": false,
@@ -1691,7 +1691,7 @@
           "type": "object"
         }
       },
-      "description": "``progress_update`` result: the fresh snapshot after the explicit set plus\nthe next suggestion (spec sections 04/07). The snapshot is detailed so the\nagent can reconcile its checkbox state to the server truth.",
+      "description": "``progress_update`` result: the fresh snapshot after the explicit set plus\nthe next suggestion. The snapshot is detailed so the\nagent can reconcile its checkbox state to the server truth.",
       "properties": {
         "next": {
           "$ref": "#/$defs/NextResult"
@@ -1801,7 +1801,7 @@
           "type": "object"
         },
         "ResourceInput": {
-          "description": "An external link on a subsection; the body is never inlined (spec 07).",
+          "description": "An external link on a subsection; the body is never inlined.",
           "properties": {
             "proposed_id": {
               "anyOf": [
@@ -1848,7 +1848,7 @@
           "type": "string"
         },
         "RoadmapDraftInput": {
-          "description": "The full-document payload for ``create_roadmap_draft`` and\n``replace_roadmap_draft`` (spec section 04 ``RoadmapInput``).",
+          "description": "The full-document payload for ``create_roadmap_draft`` and\n``replace_roadmap_draft``.",
           "properties": {
             "description": {
               "anyOf": [
@@ -2087,7 +2087,7 @@
     "inputSchema": {
       "$defs": {
         "ResponseFormat": {
-          "description": "The ``concise | detailed`` switch on the read tools (spec section 07).\n\nConcise (default) is roughly one-third the tokens and still carries every\nfollow-up ID; detailed adds the explanatory free-text (a node ``description``\non ``roadmap_get_node``, ``path_position`` on ``roadmap_get_next``).",
+          "description": "The ``concise | detailed`` switch on the read tools.\n\nConcise (default) is roughly one-third the tokens and still carries every\nfollow-up ID; detailed adds the explanatory free-text (a node ``description``\non ``roadmap_get_node``, ``path_position`` on ``roadmap_get_next``).",
           "enum": [
             "concise",
             "detailed"
@@ -2116,7 +2116,7 @@
     "outputSchema": {
       "$defs": {
         "NextItem": {
-          "description": "One unchecked, prereq-satisfied checklist item to work on next.\n\n``why_now`` is a STRUCTURAL rationale only (spec section 07): the mechanical\nfacts the app owns (next unchecked in ``suggested_path``; named prerequisites\ncomplete), never pedagogical / ZPD judgement. ``path_position`` (the 1-based\nindex of the item's subsection in ``suggested_path``) is present only in\n``detailed`` mode.",
+          "description": "One unchecked, prereq-satisfied checklist item to work on next.\n\n``why_now`` is a STRUCTURAL rationale only: the mechanical\nfacts the app owns (next unchecked in ``suggested_path``; named prerequisites\ncomplete), never pedagogical / ZPD judgement. ``path_position`` (the 1-based\nindex of the item's subsection in ``suggested_path``) is present only in\n``detailed`` mode.",
           "properties": {
             "item_id": {
               "title": "Item Id",
@@ -2199,7 +2199,7 @@
           "type": "string"
         }
       },
-      "description": "``roadmap_get_next`` result: the next unchecked items in ``suggested_path``\norder whose prerequisites are all complete (server-computed; spec section 07).\n\n``remaining_in_path`` counts the path subsections still to do; ``complete`` is\n``True`` when nothing remains.",
+      "description": "``roadmap_get_next`` result: the next unchecked items in ``suggested_path``\norder whose prerequisites are all complete (server-computed).\n\n``remaining_in_path`` counts the path subsections still to do; ``complete`` is\n``True`` when nothing remains.",
       "properties": {
         "complete": {
           "default": false,
@@ -2234,7 +2234,7 @@
     "inputSchema": {
       "$defs": {
         "ResponseFormat": {
-          "description": "The ``concise | detailed`` switch on the read tools (spec section 07).\n\nConcise (default) is roughly one-third the tokens and still carries every\nfollow-up ID; detailed adds the explanatory free-text (a node ``description``\non ``roadmap_get_node``, ``path_position`` on ``roadmap_get_next``).",
+          "description": "The ``concise | detailed`` switch on the read tools.\n\nConcise (default) is roughly one-third the tokens and still carries every\nfollow-up ID; detailed adds the explanatory free-text (a node ``description``\non ``roadmap_get_node``, ``path_position`` on ``roadmap_get_next``).",
           "enum": [
             "concise",
             "detailed"
@@ -2316,7 +2316,7 @@
           "type": "object"
         },
         "ResourceRef": {
-          "description": "A subsection resource as a link, never an inlined body (spec section 07).",
+          "description": "A subsection resource as a link, never an inlined body.",
           "properties": {
             "id": {
               "title": "Id",
@@ -2438,7 +2438,7 @@
     "inputSchema": {
       "$defs": {
         "ResponseFormat": {
-          "description": "The ``concise | detailed`` switch on the read tools (spec section 07).\n\nConcise (default) is roughly one-third the tokens and still carries every\nfollow-up ID; detailed adds the explanatory free-text (a node ``description``\non ``roadmap_get_node``, ``path_position`` on ``roadmap_get_next``).",
+          "description": "The ``concise | detailed`` switch on the read tools.\n\nConcise (default) is roughly one-third the tokens and still carries every\nfollow-up ID; detailed adds the explanatory free-text (a node ``description``\non ``roadmap_get_node``, ``path_position`` on ``roadmap_get_next``).",
           "enum": [
             "concise",
             "detailed"
@@ -2500,7 +2500,7 @@
           "type": "string"
         },
         "SectionOverview": {
-          "description": "Per-section completion counts, no checklist-item bodies (spec section 04).",
+          "description": "Per-section completion counts, no checklist-item bodies.",
           "properties": {
             "checked_items": {
               "title": "Checked Items",
@@ -2750,7 +2750,7 @@
           "type": "object"
         },
         "ResourceRef": {
-          "description": "A subsection resource as a link, never an inlined body (spec section 07).",
+          "description": "A subsection resource as a link, never an inlined body.",
           "properties": {
             "id": {
               "title": "Id",
@@ -2899,7 +2899,7 @@
     "outputSchema": {
       "$defs": {
         "SearchHit": {
-          "description": "One search match carrying the IDs needed to drill down (spec section 04).\n\n``item_id`` is present only when ``kind == item``; ``matched_tags`` names the\nsubsection tags that matched a tag filter (absent for a keyword-only match).",
+          "description": "One search match carrying the IDs needed to drill down.\n\n``item_id`` is present only when ``kind == item``; ``matched_tags`` names the\nsubsection tags that matched a tag filter (absent for a keyword-only match).",
           "properties": {
             "item_id": {
               "anyOf": [
@@ -3023,7 +3023,7 @@
           "type": "object"
         }
       },
-      "description": "``validate_roadmap_draft`` result: every structural violation in one pass.\n``publishable`` is true exactly when ``violations`` is empty (spec 06/07).",
+      "description": "``validate_roadmap_draft`` result: every structural violation in one pass.\n``publishable`` is true exactly when ``violations`` is empty.",
       "properties": {
         "publishable": {
           "title": "Publishable",

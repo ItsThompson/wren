@@ -6,7 +6,7 @@ field-level ``fields`` map and a structural ``violations`` list that names the
 offending IDs (a stale-revision 409 says "re-read"; a DAG-cycle 422 names the
 nodes). This module folds that body into a single :class:`ToolError` message so
 the agent sees a structured, self-correctable error rather than a raw HTTP status
-(spec section 07: "errors name valid IDs and explain violations so the agent can
+("errors name valid IDs and explain violations so the agent can
 self-correct without a human").
 
 ``ToolError`` is the FastMCP-preferred signal for an expected failure: FastMCP

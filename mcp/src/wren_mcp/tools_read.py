@@ -62,7 +62,7 @@ _PROGRESS_UPDATE = ToolAnnotations(
 
 def register_read_tools(mcp: FastMCP, client: InternalApiClient) -> None:
     """Register the seven study-time tools onto ``mcp``, each closing over the
-    injected internal client (Ticket 21 registers the write tools alongside)."""
+    injected internal client (the write tools are registered alongside)."""
 
     tool = counted_tool_registrar(mcp)
 

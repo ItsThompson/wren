@@ -1,7 +1,7 @@
 """structlog configuration for the MCP server.
 
 Mirrors the backend's logging setup (dev -> human console, everything else ->
-JSON, spec section 11) so MCP logs land in the same aggregated, queryable shape.
+JSON) so MCP logs land in the same aggregated, queryable shape.
 Configured once per process; the ``service`` field is bound via :func:`get_logger`.
 """
 

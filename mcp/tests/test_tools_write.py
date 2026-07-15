@@ -27,7 +27,7 @@ WRITE_TOOL_NAMES = {
     "edit_roadmap_metadata",
 }
 
-# readOnly / idempotent / destructive per spec section 07's write-tool table.
+# readOnly / idempotent / destructive per the write-tool table.
 EXPECTED_ANNOTATIONS = {
     "create_roadmap_draft": {"readOnlyHint": False, "destructiveHint": False},
     "patch_roadmap_draft": {

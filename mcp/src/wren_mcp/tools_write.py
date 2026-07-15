@@ -9,7 +9,7 @@ the backend internal API via :class:`~wren_mcp.client.InternalApiClient`, and
 maps the response to a lean, structured output. Backend failures surface as
 model-recoverable :class:`ToolError`\\s (:mod:`wren_mcp.tool_errors`).
 
-Annotations follow MCP guidance (spec section 07 write-tool table):
+Annotations follow MCP guidance:
 ``readOnlyHint``/``idempotentHint``/``destructiveHint`` per tool. There is no
 visibility, archive, or delete tool: those are web-only.
 """
@@ -75,7 +75,7 @@ _EDIT_METADATA = ToolAnnotations(
 
 def register_write_tools(mcp: FastMCP, client: InternalApiClient) -> None:
     """Register the seven authoring tools onto ``mcp``, each closing over the
-    injected internal client (Ticket 22 registers the read tools alongside).
+    injected internal client (the read tools are registered alongside).
 
     Each tool is registered through :func:`counted_tool_registrar`, so every call
     is counted as ``mcp_tool_invocations_total{tool,outcome}`` and the wrapper

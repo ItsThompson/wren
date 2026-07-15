@@ -4,7 +4,7 @@ Each MCP tool call becomes one HTTP call to the backend internal
 app over ``compute-net``. This client owns the one security-critical invariant of
 that hop: **every** request carries the resolved ``X-User-ID`` plus the shared
 ``INTERNAL_API_TOKEN``, and the agent's bearer token is **never** forwarded
-(confused-deputy defense, spec section 08). The trusted headers are set last so a
+(confused-deputy defense). The trusted headers are set last so a
 caller cannot override them.
 
 The named methods mirror the internal roadmap router op-for-op; the tool layer
@@ -60,7 +60,7 @@ class InternalApiClient:
     async def get_roadmap(self, user_id: str, roadmap_id: str) -> httpx.Response:
         return await self.request("GET", f"/roadmaps/{roadmap_id}", user_id=user_id)
 
-    # ---------- Read projections (spec section 07 study-time tools) ----------
+    # ---------- Read projections (study-time tools) ----------
     # Each backs one MCP read tool, one internal GET per tool. The
     # concise|detailed switch travels as ``?format=``; pagination as an opaque
     # ``?cursor=``; ``?include=`` selects the section-page shape.
@@ -145,7 +145,7 @@ class InternalApiClient:
         self, user_id: str, roadmap_id: str, revision: int, document: Any
     ) -> httpx.Response:
         # The full-document import escape hatch (PUT) shares the PATCH's If-Match
-        # optimistic-concurrency guard; the roadmap ID is unchanged (spec 07).
+        # optimistic-concurrency guard; the roadmap ID is unchanged.
         return await self.request(
             "PUT",
             f"/roadmaps/{roadmap_id}",
@@ -173,9 +173,9 @@ class InternalApiClient:
         description: str | None = None,
         subject_tags: list[str] | None = None,
     ) -> httpx.Response:
-        # Presentation-only edit, allowed post-publish and never If-Match-guarded
-        # (spec section 06). Only provided fields are sent so an omitted field is
-        # left unchanged; a structural field can never be smuggled through here.
+        # Presentation-only edit, allowed post-publish and never If-Match-guarded.
+        # Only provided fields are sent so an omitted field is left unchanged; a
+        # structural field can never be smuggled through here.
         body: dict[str, Any] = {}
         if title is not None:
             body["title"] = title

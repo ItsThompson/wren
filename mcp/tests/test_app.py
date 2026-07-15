@@ -145,7 +145,7 @@ def test_app_exposes_the_tool_layer_seams(make_settings: MakeSettings) -> None:
     internal_client = _internal_client()
     app = create_rs_app(make_settings(), key_provider=provider, internal_client=internal_client)
 
-    # The seams Tickets 21/22 build the tool dispatch on: the verified-identity
+    # The seams the tool dispatch builds on: the verified-identity
     # verifier and the internal client the tools call.
     assert app.state.internal_client is internal_client
     assert app.state.token_verifier is not None

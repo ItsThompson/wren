@@ -31,7 +31,7 @@ READ_TOOL_NAMES = {
 }
 
 # readOnly for the six reads; progress_update is an explicit-set write, so it is
-# idempotent (a retry is a no-op) and non-destructive, not readOnly (spec 07).
+# idempotent (a retry is a no-op) and non-destructive, not readOnly.
 EXPECTED_READ_ANNOTATIONS = {
     "roadmap_get_overview": {"readOnlyHint": True},
     "roadmap_get_next": {"readOnlyHint": True},

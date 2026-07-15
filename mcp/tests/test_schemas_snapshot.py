@@ -1,4 +1,4 @@
-"""Frozen MCP tool-schema snapshot (spec section 13 contract-freeze).
+"""Frozen MCP tool-schema snapshot (contract-freeze).
 
 The write- and read-tool contracts are deliberately frozen.
 This is the MCP analog of the OpenAPI drift check: it serializes each registered

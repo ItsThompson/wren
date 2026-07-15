@@ -19,8 +19,7 @@ PRM_PATH = "/.well-known/oauth-protected-resource"
 AS_METADATA_PATH = "/.well-known/oauth-authorization-server"
 
 # The MCP transport mount point. Unauthenticated calls here get 401 +
-# WWW-Authenticate; the tool dispatch that sits behind the bearer guard is
-# Tickets 21/22.
+# WWW-Authenticate; the tool dispatch sits behind the bearer guard.
 MCP_PATH = "/mcp"
 
 # OAuth scopes advertised in the PRM. Mirrors the backend AS's
@@ -35,7 +34,7 @@ SUPPORTED_SCOPES: tuple[str, ...] = (
 )
 
 # Bearer methods advertised in the PRM: agents pass the token in the
-# Authorization header only, never in the URL (RFC 9728 / spec section 08).
+# Authorization header only, never in the URL (RFC 9728).
 BEARER_METHOD_HEADER = "header"
 
 # Internal-boundary headers the RS sends downstream to the backend internal app.

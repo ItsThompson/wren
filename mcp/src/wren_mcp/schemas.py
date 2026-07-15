@@ -1,19 +1,19 @@
-"""MCP write-tool contract schemas (frozen; spec sections 04/07/13).
+"""MCP write-tool contract schemas (frozen).
 
 The MCP server is a separate image with no backend-code dependency, so the
 authoring wire shapes are re-declared here as the **frozen MCP contract** (the
 same "duplicated domain truth kept in sync by contract" pattern as
 :mod:`wren_mcp.config`'s header names). A snapshot test freezes the generated
 JSON Schemas so the deliberately-frozen tool contracts cannot drift silently:
-the MCP analog of the OpenAPI drift check (spec section 13).
+the MCP analog of the OpenAPI drift check.
 
 Inputs mirror the backend authoring types (ordered arrays + optional
 ``proposed_id``, key-addressed, never index-addressed). Outputs are **lean**
-projections (spec section 07: summary-first, within MCP token guidance): a small
+projections (summary-first, within MCP token guidance): a small
 ``patch`` returns ~50 tokens of changed-node ids, and ``create``/``replace``
 return identity + the ``proposed_id -> minted_id`` remap rather than the whole
 document. ``visibility`` is intentionally absent from the authoring inputs:
-visibility is a web-only lifecycle control with no agent tool (spec section 07).
+visibility is a web-only lifecycle control with no agent tool.
 """
 
 from __future__ import annotations
@@ -40,11 +40,11 @@ class RoadmapStatus(StrEnum):
     ARCHIVED = "archived"
 
 
-# ---------- Read/study switches (spec section 07) ----------
+# ---------- Read/study switches ----------
 
 
 class ResponseFormat(StrEnum):
-    """The ``concise | detailed`` switch on the read tools (spec section 07).
+    """The ``concise | detailed`` switch on the read tools.
 
     Concise (default) is roughly one-third the tokens and still carries every
     follow-up ID; detailed adds the explanatory free-text (a node ``description``
@@ -72,7 +72,7 @@ class SearchHitKind(StrEnum):
 class CompletionState(StrEnum):
     """The explicit target state ``progress_update`` sets its items to.
 
-    Explicit set, never toggle (spec section 07): the client states the desired
+    Explicit set, never toggle: the client states the desired
     end state so a retry is idempotent."""
 
     COMPLETE = "complete"
@@ -83,7 +83,7 @@ class CompletionState(StrEnum):
 
 
 class ResourceInput(BaseModel):
-    """An external link on a subsection; the body is never inlined (spec 07)."""
+    """An external link on a subsection; the body is never inlined."""
 
     proposed_id: str | None = None
     title: str
@@ -118,7 +118,7 @@ class SectionInput(BaseModel):
 
 class RoadmapDraftInput(BaseModel):
     """The full-document payload for ``create_roadmap_draft`` and
-    ``replace_roadmap_draft`` (spec section 04 ``RoadmapInput``)."""
+    ``replace_roadmap_draft``."""
 
     proposed_id: str | None = None
     title: str
@@ -128,7 +128,7 @@ class RoadmapDraftInput(BaseModel):
     suggested_path: list[str] = Field(default_factory=list)
 
 
-# ---------- Patch operation grammar (spec section 07, canonical dispatch) ------
+# ---------- Patch operation grammar (canonical dispatch) ----------------------
 #
 # One ``operations[]`` array applied atomically. Every op is key-addressed by
 # slug ID; ordering uses ``before_id``/``after_id`` (never an array resend). The
@@ -161,7 +161,7 @@ class RemoveSubsectionOp(BaseModel):
 
 
 class AddEdgeOp(BaseModel):
-    """``to_id`` gains ``from_id`` as a prerequisite (spec section 07)."""
+    """``to_id`` gains ``from_id`` as a prerequisite."""
 
     op: Literal["add_edge"]
     from_id: str
@@ -284,7 +284,7 @@ class ChangeType(StrEnum):
 
 class ChangedNode(BaseModel):
     """One node a patch touched, echoed back so the agent knows what changed
-    without re-reading the whole roadmap (spec section 07: summary-first)."""
+    without re-reading the whole roadmap (summary-first)."""
 
     kind: ChangedNodeKind
     id: str
@@ -363,7 +363,7 @@ class PatchResult(BaseModel):
 
 class ValidationResult(BaseModel):
     """``validate_roadmap_draft`` result: every structural violation in one pass.
-    ``publishable`` is true exactly when ``violations`` is empty (spec 06/07)."""
+    ``publishable`` is true exactly when ``violations`` is empty."""
 
     publishable: bool
     violations: list[Violation] = Field(default_factory=list)
@@ -429,7 +429,7 @@ class MetadataResult(BaseModel):
         )
 
 
-# ---------- Read projections (study-time; spec sections 04/07) -----------------
+# ---------- Read projections (study-time) ------------------------------------
 #
 # These mirror the backend read projections (``wren.roadmaps.read_schemas`` /
 # ``wren.progress.schemas``) field-for-field, so each read tool validates the
@@ -437,14 +437,14 @@ class MetadataResult(BaseModel):
 # field renaming. They are re-declared here (not imported) because the MCP server
 # is a separate image with no backend-code dependency: the same "duplicated domain
 # truth kept in sync by contract" pattern as the authoring inputs above, frozen by
-# the schema snapshot. Design rules encoded (spec section 07): summary-first (no
+# the schema snapshot. Design rules encoded: summary-first (no
 # item bodies on ``Overview``), resource links never inlined bodies, and the
 # ``concise | detailed`` switch (the verbose ``description`` / ``path_position``
 # is present only under detailed).
 
 
 class ResourceRef(BaseModel):
-    """A subsection resource as a link, never an inlined body (spec section 07)."""
+    """A subsection resource as a link, never an inlined body."""
 
     id: str
     title: str
@@ -488,7 +488,7 @@ class NodeDetail(BaseModel):
 
 
 class SectionOverview(BaseModel):
-    """Per-section completion counts, no checklist-item bodies (spec section 04)."""
+    """Per-section completion counts, no checklist-item bodies."""
 
     section_id: str
     title: str
@@ -537,7 +537,7 @@ class SectionPage(BaseModel):
 
 
 class SearchHit(BaseModel):
-    """One search match carrying the IDs needed to drill down (spec section 04).
+    """One search match carrying the IDs needed to drill down.
 
     ``item_id`` is present only when ``kind == item``; ``matched_tags`` names the
     subsection tags that matched a tag filter (absent for a keyword-only match)."""
@@ -569,7 +569,7 @@ class ResourceLink(BaseModel):
 class NextItem(BaseModel):
     """One unchecked, prereq-satisfied checklist item to work on next.
 
-    ``why_now`` is a STRUCTURAL rationale only (spec section 07): the mechanical
+    ``why_now`` is a STRUCTURAL rationale only: the mechanical
     facts the app owns (next unchecked in ``suggested_path``; named prerequisites
     complete), never pedagogical / ZPD judgement. ``path_position`` (the 1-based
     index of the item's subsection in ``suggested_path``) is present only in
@@ -585,7 +585,7 @@ class NextItem(BaseModel):
 
 class NextResult(BaseModel):
     """``roadmap_get_next`` result: the next unchecked items in ``suggested_path``
-    order whose prerequisites are all complete (server-computed; spec section 07).
+    order whose prerequisites are all complete (server-computed).
 
     ``remaining_in_path`` counts the path subsections still to do; ``complete`` is
     ``True`` when nothing remains."""
@@ -622,7 +622,7 @@ class ProgressSnapshot(BaseModel):
 
 class ProgressUpdateResult(BaseModel):
     """``progress_update`` result: the fresh snapshot after the explicit set plus
-    the next suggestion (spec sections 04/07). The snapshot is detailed so the
+    the next suggestion. The snapshot is detailed so the
     agent can reconcile its checkbox state to the server truth."""
 
     progress: ProgressSnapshot

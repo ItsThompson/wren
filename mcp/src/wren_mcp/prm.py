@@ -1,6 +1,6 @@
 """Protected Resource Metadata (RFC 9728), served by this Resource Server.
 
-The MCP server owns the PRM (spec section 08 artifact-ownership table); the
+The MCP server owns the PRM; the
 backend AS owns the AS metadata. The PRM advertises which Authorization Server
 protects this resource, so a client that hits a 401 can discover the AS and run
 the OAuth handshake. Every URL is built from **pinned** config (the ``resource``

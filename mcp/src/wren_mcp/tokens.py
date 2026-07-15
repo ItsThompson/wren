@@ -1,4 +1,4 @@
-"""Agent bearer-token verification (the RS side of spec section 08).
+"""Agent bearer-token verification.
 
 Every MCP tool call carries an ``Authorization: Bearer`` access token minted by
 the backend AS. This module verifies it end to end before any user identity is

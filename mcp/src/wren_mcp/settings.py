@@ -6,7 +6,7 @@ every externally-visible URL (the token ``iss`` the RS validates against, the
 ``aud`` it binds to, the AS discovery base) is built from **pinned** config, never
 a request host: the RS sits behind the same Cloudflare tunnel, so a
 request-derived issuer/audience would break token validation (the "Site-URL
-gotcha", spec sections 08/11).
+gotcha").
 """
 
 from __future__ import annotations
