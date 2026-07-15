@@ -46,13 +46,24 @@ write path is refused on a non-draft roadmap:
 - `create` produces a fresh draft, `patch` and `replace` both load through the
   service's content-write guard, and all of them reject a `published`/`archived`
   roadmap with a `409 IMMUTABLE` problem+json.
-- The error points to **fork-to-change**: forking produces a new draft (with fresh
-  IDs and no progress carry-over) that can then be edited and published on its own.
+- The error points to **fork-to-change**: forking produces a new draft under a
+  brand-new roadmap ID (child slug IDs are copied verbatim, since their
+  uniqueness scope is a single roadmap) with no progress carry-over, which can
+  then be edited and published on its own.
+
+Fork (`POST /roadmaps/{id}:fork` / the fork MCP tool) works from any roadmap the
+caller can **read**: their own (any status) or a public one. A private roadmap
+owned by someone else is a 404, leaking no existence. The fork is owned by the
+forking user and starts private at `revision` 1.
 
 The only sanctioned write on published content is a **presentation-only** metadata
-edit (`title`, `description`, `subject_tags`). That path does not go through the
-content-write guard, which is exactly why it stays allowed after publish while
-structural writes do not.
+edit (`title`, `description`, `subject_tags`) via `PATCH /roadmaps/{id}/metadata`
+(or the edit-metadata MCP tool). That path does not go through the content-write
+guard, which is exactly why it stays allowed after publish while structural writes
+do not. It is deliberately **not** `If-Match`-guarded and never bumps the
+structural `revision` (last-write-wins presentation edits at the ~5-user scale);
+a smuggled structural/lifecycle field (e.g. `sections`, `visibility`) is rejected
+with a `409 IMMUTABLE` rather than silently applied.
 
 | Field group | Post-publish |
 |-------------|--------------|
