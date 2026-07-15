@@ -17,11 +17,11 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     coverage: {
       provider: 'v8',
-      // Measure every file matched by `include`, not just files a test imported,
-      // so the 70% floor accounts for untested modules and cannot be gamed by
-      // omitting a file's tests (Ticket 30 / #5 review). Excludes below carve
-      // out non-source (types, entry, vendored primitives, dev-only mocks).
-      all: true,
+      // Vitest v4 measures every file matched by `include` by default (no `all`
+      // flag needed; the v3 `coverage.all` option was removed), so the 70% floor
+      // accounts for untested modules and cannot be gamed by omitting a file's
+      // tests (Ticket 30 / #5 review). Excludes below carve out non-source
+      // (types, entry, vendored primitives, dev-only mocks).
       reporter: ['text-summary', 'text'],
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
