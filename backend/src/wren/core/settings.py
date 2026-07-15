@@ -36,6 +36,10 @@ class EnvSettings(BaseSettings):
     # docker-compose.dev.yml published to localhost; prod injects the in-network
     # `@postgres:5432` form via the VPS .env (spec section 11).
     database_url: str = "postgresql+asyncpg://wren:wren@localhost:5432/wren"
+    # Shared secret the MCP server sends to reach the internal app (spec section
+    # 08); defense-in-depth behind compute-net isolation. Empty by default so an
+    # unconfigured internal app fail-safe denies (`require_internal_user`).
+    internal_api_token: str = ""
 
 
 class AppSettings(BaseModel):
@@ -47,6 +51,7 @@ class AppSettings(BaseModel):
     log_level: str
     host: str
     database_url: str
+    internal_api_token: str
 
     @property
     def is_dev(self) -> bool:
@@ -63,4 +68,5 @@ def build_app_settings(*, service: str, port: int, env: EnvSettings | None = Non
         log_level=env.log_level,
         host=env.host,
         database_url=env.database_url,
+        internal_api_token=env.internal_api_token,
     )
