@@ -1,30 +1,36 @@
-# Wren dev overrides and local infrastructure.
-#
-# Layered over docker-compose.yml in development (bind mounts, --reload, relaxed
-# cookies) and hosts local infra (Postgres, observability). Services are added by
-# the slices that own them; keep this file appendable.
+# Wren dev overrides. Layered ON TOP of docker-compose.yml (never standalone):
+# `just up-dev` runs the full stack locally with bind mounts, --reload, relaxed
+# cookies and in-network public URLs; `just dev-infra` brings up only a
+# host-published Postgres for the host-run inner loop (`just dev-api`, migrate,
+# tests). Prod values (expose-only, pinned public URLs) stay in the base file.
 name: wren-dev
 
 services:
-  # Local dev Postgres. Unlike prod (expose-only, in-network), dev publishes 5432
-  # to the host so a locally-run `just dev-api`, `just migrate`, and the test
-  # suite reach it at localhost:5432. Pinned to match prod (spec section 11).
-  postgres:
-    image: postgres:17-alpine
+  backend:
     environment:
-      POSTGRES_USER: wren
-      POSTGRES_PASSWORD: wren
-      POSTGRES_DB: wren
+      ENVIRONMENT: development          # relaxed cookies: Secure off, host-only
+      UVICORN_RELOAD: "true"            # serve.sh adds --reload to both apps
+      PUBLIC_BASE_URL: http://backend:8000    # in-network AS origin for local runs
+      APP_PUBLIC_URL: http://localhost:5173
+      MCP_PUBLIC_URL: http://localhost:9000
+    volumes:
+      # Bind source over the image's editable install so --reload picks up edits.
+      - ./backend/src:/app/src
+      - ./backend/alembic:/app/alembic
+
+  mcp:
+    # Run uvicorn with --reload directly (the prod CMD is the non-reload console
+    # script); bind-mount source so reload sees edits.
+    command: ["uvicorn", "wren_mcp.main:app", "--host", "0.0.0.0", "--port", "9000", "--reload"]
+    environment:
+      ENVIRONMENT: development
+      PUBLIC_BASE_URL: http://backend:8000    # reach the AS JWKS in-network
+      MCP_PUBLIC_URL: http://localhost:9000
+    volumes:
+      - ./mcp/src:/app/src
+
+  postgres:
+    # Publish to the host so host-run recipes (just dev-api, just migrate, the
+    # test suite) reach it at localhost:5432. Prod is expose-only (base file).
     ports:
       - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U wren -d wren"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-volumes:
-  pgdata:

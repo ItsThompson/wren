@@ -1,0 +1,15 @@
+# =============================================================================
+# Alertmanager config for the Wren stack (spec section 11).
+#
+# SEAM FOR TICKET 31. This minimal config makes the container valid and healthy
+# today by routing everything to a null receiver. Ticket 31 owns the real
+# routing: the three critical alerts (ServiceDown, HostDiskAlmostFull,
+# HighErrorRate) fanned to DISCORD_WEBHOOK_URL with `send_resolved: true`.
+# Replace the route/receivers below then.
+# =============================================================================
+
+route:
+  receiver: "null"
+
+receivers:
+  - name: "null"

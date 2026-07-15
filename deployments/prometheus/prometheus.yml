@@ -1,0 +1,41 @@
+# =============================================================================
+# Prometheus scrape config for the Wren stack (spec section 11).
+#
+# SEAM FOR TICKET 31. This minimal config makes the stack observable today by
+# scraping the first-party /metrics endpoints over monitoring-net. Ticket 31
+# owns the full observability slice and should EXTEND (not replace) this:
+#   - alert rule files (rule_files:) for ServiceDown / HostDiskAlmostFull /
+#     HighErrorRate, and the `alerting:` block wiring Alertmanager,
+#   - any relabeling / retention tuning beyond the command flags already set in
+#     docker-compose.yml (--storage.tsdb.retention.time=3d / .size=2GB).
+#
+# Prometheus runs on monitoring-net only; backend, mcp and node-exporter are all
+# reachable there by service name.
+# =============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Backend exposes /metrics on both the external (:8000) and internal (:8001)
+  # apps; both are on monitoring-net.
+  - job_name: backend
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["backend:8000", "backend:8001"]
+
+  # MCP /metrics is scraped here over monitoring-net, never via the tunnel
+  # (tracked constraint from Ticket 20 review).
+  - job_name: mcp
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["mcp:9000"]
+
+  - job_name: node
+    static_configs:
+      - targets: ["node-exporter:9100"]

@@ -1,0 +1,264 @@
+# =============================================================================
+# Wren production-shaped stack (spec sections 08 + 11).
+#
+# Every service is expose-only (NO host `ports:`): the Cloudflare tunnel is the
+# only ingress and is added in Ticket 29 (locally the stack runs without it).
+# Four segmented bridge networks (section 08) isolate the tiers; Postgres lives
+# on data-net alone and the internal app (:8001) is never on edge-net.
+#
+# Local development layers docker-compose.dev.yml on top (bind mounts, --reload,
+# relaxed cookies, in-network public URLs, host-published Postgres): see
+# `just up-dev`. This base file is the deployable artifact the ops tickets (29,
+# 31, 32) operate on.
+#
+# Image version pinning: third-party images are pinned to exact tags. Review
+# quarterly; check release notes before bumping.
+# =============================================================================
+name: wren
+
+services:
+  # ---------------------------------------------------------------------------
+  # Edge tier
+  # ---------------------------------------------------------------------------
+  frontend:
+    image: ghcr.io/${GHCR_OWNER:-wren-platform}/wren/frontend:${WREN_IMAGE_TAG:-latest}
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Baked into the SPA bundle at build time: the API origin the SPA calls
+        # cross-origin (api.usewren.com in prod). Empty means same-origin.
+        VITE_API_BASE_URL: ${PUBLIC_BASE_URL:-}
+    expose:
+      - "80"
+    networks:
+      - edge-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:80/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Compute tier
+  # ---------------------------------------------------------------------------
+  backend:
+    image: ghcr.io/${GHCR_OWNER:-wren-platform}/wren/backend:${WREN_IMAGE_TAG:-latest}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      # Secrets, TTLs, pinned public URLs, CORS. Absent locally is fine: the
+      # in-network overrides below plus dev defaults keep the app bootable.
+      - path: .env
+        required: false
+    environment:
+      # In-network endpoints override any host-oriented .env values: inside the
+      # stack the DB is reached by service name, never localhost.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-wren}:${POSTGRES_PASSWORD:-wren}@postgres:5432/${POSTGRES_DB:-wren}
+      HOST: 0.0.0.0
+    expose:
+      - "8000"  # external app (tunnel-routed as api.usewren.com)
+      - "8001"  # internal app (compute-net only; never tunnel-routed)
+    networks:
+      - edge-net
+      - compute-net
+      - data-net
+      - monitoring-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # The venv interpreter probes the external app's readiness. urlopen raises
+      # on non-2xx (a 503 not-ready) and on connection refusal, both -> unhealthy.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 768M  # Python floor is higher than gofin's Go services.
+    restart: unless-stopped
+
+  mcp:
+    image: ghcr.io/${GHCR_OWNER:-wren-platform}/wren/mcp:${WREN_IMAGE_TAG:-latest}
+    build:
+      context: ./mcp
+      dockerfile: Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Tool calls forward to the internal app over compute-net by service name.
+      # Token issuer/audience (PUBLIC_BASE_URL / MCP_PUBLIC_URL) stay the pinned
+      # public URLs from .env in production; the dev overlay points them
+      # in-network for a self-contained local stack.
+      BACKEND_INTERNAL_URL: http://backend:8001
+      HOST: 0.0.0.0
+    expose:
+      - "9000"  # PRM + /mcp transport tunnel-routed; /metrics + health are not.
+    networks:
+      - edge-net
+      - compute-net
+      - monitoring-net
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/readyz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Data tier
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-wren}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wren}
+      POSTGRES_DB: ${POSTGRES_DB:-wren}
+    expose:
+      - "5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - data-net  # data-net exclusively: never reachable from the edge.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wren} -d ${POSTGRES_DB:-wren}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1024M
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Observability tier (monitoring-net only; never edge).
+  # Containers + networks + volumes land here; the scrape/alert config is the
+  # seam Ticket 31 fills in (deployments/prometheus, deployments/alertmanager).
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=3d"
+      - "--storage.tsdb.retention.size=2GB"
+      - "--query.max-concurrency=5"
+      - "--query.timeout=30s"
+    expose:
+      - "9090"
+    volumes:
+      - ./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - promdata:/prometheus
+    networks:
+      - monitoring-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 1024M
+    restart: unless-stopped
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    expose:
+      - "9100"
+    networks:
+      - monitoring-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9100/metrics"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    expose:
+      - "9093"
+    volumes:
+      - ./deployments/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    networks:
+      - monitoring-net
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9093/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+    restart: unless-stopped
+
+# -----------------------------------------------------------------------------
+# Networks (spec section 08 segmentation)
+# -----------------------------------------------------------------------------
+networks:
+  edge-net:
+    driver: bridge
+  compute-net:
+    driver: bridge
+  data-net:
+    driver: bridge
+  monitoring-net:
+    driver: bridge
+
+# -----------------------------------------------------------------------------
+# Named volumes
+# -----------------------------------------------------------------------------
+volumes:
+  pgdata:
+  promdata:
