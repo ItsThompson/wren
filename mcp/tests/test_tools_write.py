@@ -20,6 +20,7 @@ from starlette.requests import Request
 from mcp_harness import AgentHarness, json_error
 from wren_mcp.auth import AGENT_STATE_KEY
 from wren_mcp.tokens import VerifiedAgentToken
+from wren_mcp.tool_metrics import TOOL_METRICS_REGISTRY
 from wren_mcp.tools_write import require_agent
 
 _ROADMAP_ID = "grokking-dsa-7f3k"
@@ -399,3 +400,33 @@ def test_require_agent_fails_closed_when_identity_is_absent() -> None:
 def test_require_agent_fails_closed_without_a_request() -> None:
     with pytest.raises(ToolError):
         require_agent(_ctx_with(None))
+
+
+# ---------- invocation metric ----------
+
+
+def _invocations(tool: str, outcome: str) -> float:
+    value = TOOL_METRICS_REGISTRY.get_sample_value(
+        "mcp_tool_invocations_total", {"tool": tool, "outcome": outcome}
+    )
+    return value or 0.0
+
+
+def test_successful_tool_call_increments_the_ok_invocation_counter() -> None:
+    before = _invocations("create_roadmap_draft", "ok")
+    harness = AgentHarness(lambda _r: httpx.Response(201, json=_roadmap()))
+    with harness.open() as client:
+        result = harness.call_tool(
+            client, "create_roadmap_draft", {"roadmap": {"title": "Grokking DSA"}}
+        )
+    assert result["isError"] is False
+    assert _invocations("create_roadmap_draft", "ok") == before + 1
+
+
+def test_failing_tool_call_increments_the_error_invocation_counter() -> None:
+    before = _invocations("fork_roadmap", "error")
+    harness = AgentHarness(lambda _r: json_error(404, "NOT_FOUND", "No such roadmap."))
+    with harness.open() as client:
+        result = harness.call_tool(client, "fork_roadmap", {"source_roadmap_id": "missing-1a"})
+    assert result["isError"] is True
+    assert _invocations("fork_roadmap", "error") == before + 1

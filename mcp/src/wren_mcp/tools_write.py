@@ -16,6 +16,9 @@ visibility, archive, or delete tool: those are web-only.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
+from typing import Any, TypeVar
+
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.server.session import ServerSession
@@ -37,10 +40,15 @@ from wren_mcp.schemas import (
 )
 from wren_mcp.tokens import VerifiedAgentToken
 from wren_mcp.tool_errors import raise_for_problem
+from wren_mcp.tool_metrics import count_invocations
 
 # The Context the framework injects; RequestT is the Starlette request carrying
 # the identity the bearer boundary resolved.
 AgentContext = Context[ServerSession, object, Request]
+
+# A tool coroutine; the counted-tool registrar preserves this exact type so call
+# sites keep their real signatures.
+_ToolFn = TypeVar("_ToolFn", bound=Callable[..., Awaitable[Any]])
 
 
 def require_agent(ctx: AgentContext) -> str:
@@ -96,9 +104,24 @@ _EDIT_METADATA = ToolAnnotations(
 
 def register_write_tools(mcp: FastMCP, client: InternalApiClient) -> None:
     """Register the seven authoring tools onto ``mcp``, each closing over the
-    injected internal client (Ticket 22 registers the read tools alongside)."""
+    injected internal client (Ticket 22 registers the read tools alongside).
 
-    @mcp.tool(annotations=_CREATE)
+    Each tool is wrapped by :func:`count_invocations` before registration so every
+    call is counted as ``mcp_tool_invocations_total{tool,outcome}``; the wrapper
+    preserves the tool's name/signature so its exposed schema is unchanged.
+    """
+
+    def tool(annotations: ToolAnnotations) -> Callable[[_ToolFn], _ToolFn]:
+        """Register a counted tool: wrap for the invocation metric, then hand the
+        signature-preserving wrapper to FastMCP for schema generation."""
+
+        def register(fn: _ToolFn) -> _ToolFn:
+            mcp.tool(annotations=annotations)(count_invocations(fn))
+            return fn
+
+        return register
+
+    @tool(_CREATE)
     async def create_roadmap_draft(roadmap: RoadmapDraftInput, ctx: AgentContext) -> CreatedRoadmap:
         """Create a new roadmap draft from a full document. This is the one
         full-payload write (initial creation / import); use patch_roadmap_draft
@@ -110,7 +133,7 @@ def register_write_tools(mcp: FastMCP, client: InternalApiClient) -> None:
         response = await client.create_draft(user_id, roadmap.model_dump(mode="json"))
         return CreatedRoadmap.from_backend(raise_for_problem(response).json())
 
-    @mcp.tool(annotations=_PATCH)
+    @tool(_PATCH)
     async def patch_roadmap_draft(
         roadmap_id: str, revision: int, operations: list[PatchOp], ctx: AgentContext
     ) -> PatchResult:
@@ -129,7 +152,7 @@ def register_write_tools(mcp: FastMCP, client: InternalApiClient) -> None:
         response = await client.patch_draft(user_id, roadmap_id, revision, payload)
         return PatchResult.from_backend(raise_for_problem(response).json())
 
-    @mcp.tool(annotations=_REPLACE)
+    @tool(_REPLACE)
     async def replace_roadmap_draft(
         roadmap_id: str, full_document: RoadmapDraftInput, ctx: AgentContext
     ) -> ReplacedRoadmap:
@@ -146,7 +169,7 @@ def register_write_tools(mcp: FastMCP, client: InternalApiClient) -> None:
         )
         return ReplacedRoadmap.from_backend(raise_for_problem(response).json())
 
-    @mcp.tool(annotations=_VALIDATE)
+    @tool(_VALIDATE)
     async def validate_roadmap_draft(roadmap_id: str, ctx: AgentContext) -> ValidationResult:
         """Return every structural violation for a draft in one pass without
         mutating it. publishable is true when there are no violations. Callable
@@ -155,7 +178,7 @@ def register_write_tools(mcp: FastMCP, client: InternalApiClient) -> None:
         response = await client.validate_draft(user_id, roadmap_id)
         return ValidationResult.from_backend(raise_for_problem(response).json())
 
-    @mcp.tool(annotations=_PUBLISH)
+    @tool(_PUBLISH)
     async def publish_roadmap(roadmap_id: str, ctx: AgentContext) -> PublishResult:
         """Validate and transition a draft to published. This is one-way:
         published content is immutable (fork to change it). Refuses on any
@@ -164,7 +187,7 @@ def register_write_tools(mcp: FastMCP, client: InternalApiClient) -> None:
         response = await client.publish(user_id, roadmap_id)
         return PublishResult.from_backend(raise_for_problem(response).json())
 
-    @mcp.tool(annotations=_FORK)
+    @tool(_FORK)
     async def fork_roadmap(source_roadmap_id: str, ctx: AgentContext) -> ForkResult:
         """Create a new draft seeded from any roadmap you can read, with fresh
         IDs and fresh progress. The source is untouched. Use this to change a
@@ -175,7 +198,7 @@ def register_write_tools(mcp: FastMCP, client: InternalApiClient) -> None:
             raise_for_problem(response).json(), source_roadmap_id=source_roadmap_id
         )
 
-    @mcp.tool(annotations=_EDIT_METADATA)
+    @tool(_EDIT_METADATA)
     async def edit_roadmap_metadata(
         roadmap_id: str,
         ctx: AgentContext,

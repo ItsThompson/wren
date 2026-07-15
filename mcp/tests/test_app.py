@@ -101,6 +101,8 @@ def test_metrics_are_exposed(make_settings: MakeSettings) -> None:
     assert response.status_code == 200
     assert "http_requests_total" in response.text
     assert "http_request_duration_seconds" in response.text
+    # The shared MCP domain registry is served alongside the private HTTP one.
+    assert "mcp_tool_invocations_total" in response.text
 
 
 def test_unauthenticated_tool_call_is_401_pointing_at_the_prm(make_settings: MakeSettings) -> None:
