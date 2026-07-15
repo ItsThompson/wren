@@ -16,6 +16,7 @@ returns only a boolean, never another user's data.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Protocol
 
 from sqlalchemy import delete as sa_delete
@@ -24,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from wren.core.db import fetch_optional
 from wren.roadmaps.models import RoadmapRecord
-from wren.roadmaps.schemas import Roadmap
+from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
 
 
 class RoadmapRepository(Protocol):
@@ -41,6 +42,12 @@ class RoadmapRepository(Protocol):
     async def get(self, roadmap_id: str) -> RoadmapRecord | None: ...
 
     async def get_owned(self, roadmap_id: str, owner_id: str) -> RoadmapRecord | None: ...
+
+    async def list_owned(self, owner_id: str) -> list[RoadmapRecord]: ...
+
+    async def list_published_public(self, owner_id: str) -> list[RoadmapRecord]: ...
+
+    async def list_by_ids(self, roadmap_ids: Sequence[str]) -> list[RoadmapRecord]: ...
 
     async def commit(self) -> None: ...
 
@@ -119,6 +126,55 @@ class SqlAlchemyRoadmapRepository:
         return await fetch_optional(
             self._session, select(RoadmapRecord).where(RoadmapRecord.id == roadmap_id)
         )
+
+    async def list_owned(self, owner_id: str) -> list[RoadmapRecord]:
+        """Every roadmap owned by ``owner_id`` at any status, newest-touched first.
+
+        Backs the dashboard "Yours" section (spec section 02 US-ACCT-03): the
+        owner sees their own drafts, private, and public roadmaps. Scoped to the
+        owner at the query level, so it returns only the caller's own roadmaps.
+        """
+        result = await self._session.scalars(
+            select(RoadmapRecord)
+            .where(RoadmapRecord.owner == owner_id)
+            .order_by(RoadmapRecord.updated_at.desc(), RoadmapRecord.id)
+        )
+        return list(result)
+
+    async def list_published_public(self, owner_id: str) -> list[RoadmapRecord]:
+        """``owner_id``'s **published, public** roadmaps, newest-touched first.
+
+        Backs the public profile (spec section 02 US-ACCT-03): drafts, private,
+        and archived roadmaps are excluded at the query level, so a profile can
+        never leak a non-public roadmap regardless of who is viewing.
+        """
+        result = await self._session.scalars(
+            select(RoadmapRecord)
+            .where(
+                RoadmapRecord.owner == owner_id,
+                RoadmapRecord.status == RoadmapStatus.PUBLISHED.value,
+                RoadmapRecord.visibility == Visibility.PUBLIC.value,
+            )
+            .order_by(RoadmapRecord.updated_at.desc(), RoadmapRecord.id)
+        )
+        return list(result)
+
+    async def list_by_ids(self, roadmap_ids: Sequence[str]) -> list[RoadmapRecord]:
+        """Load the given roadmaps by id (unscoped), for the dashboard "Following"
+        section.
+
+        Unscoped like :meth:`get`: the caller's authorization to see a followed
+        roadmap is their own progress row (keyed to their ``user_id``), resolved by
+        the listing service, so this never itself grants access. The caller
+        re-orders the result by the follow order; an empty input returns ``[]``
+        without a query.
+        """
+        if not roadmap_ids:
+            return []
+        result = await self._session.scalars(
+            select(RoadmapRecord).where(RoadmapRecord.id.in_(roadmap_ids))
+        )
+        return list(result)
 
     async def commit(self) -> None:
         await self._session.commit()

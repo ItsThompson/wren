@@ -32,6 +32,8 @@ class ProgressRepository(Protocol):
 
     async def get(self, user_id: str, roadmap_id: str) -> ProgressRecord | None: ...
 
+    async def list_followed_roadmap_ids(self, user_id: str) -> list[str]: ...
+
     async def count_followers(self, roadmap_id: str) -> int: ...
 
     async def upsert(self, progress: Progress) -> None: ...
@@ -54,6 +56,22 @@ class SqlAlchemyProgressRepository:
                 ProgressRecord.user_id == user_id, ProgressRecord.roadmap_id == roadmap_id
             ),
         )
+
+    async def list_followed_roadmap_ids(self, user_id: str) -> list[str]:
+        """The roadmap ids ``user_id`` follows, most-recently-updated first.
+
+        Caller-scoped (``WHERE user_id = :user_id``): it returns only the ids of
+        the caller's own progress rows, never another user's, so it can back the
+        dashboard "Following" list without leaking anyone else's follows (spec
+        sections 02/08). The composite PK keys one row per (user, roadmap), so the
+        ids are already distinct.
+        """
+        result = await self._session.scalars(
+            select(ProgressRecord.roadmap_id)
+            .where(ProgressRecord.user_id == user_id)
+            .order_by(ProgressRecord.updated_at.desc(), ProgressRecord.roadmap_id)
+        )
+        return list(result)
 
     async def count_followers(self, roadmap_id: str) -> int:
         """Count the progress rows referencing ``roadmap_id`` (its follower count).
