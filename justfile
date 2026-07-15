@@ -50,3 +50,33 @@ migrate:
 # Autogenerate a new migration from model changes: just migrate-new "add roadmaps"
 migrate-new msg:
     cd backend && uv run alembic revision --autogenerate -m "{{msg}}"
+
+# --- Frontend ---------------------------------------------------------------
+
+# Install frontend dependencies
+setup-frontend:
+    cd frontend && npm install
+
+# Boot the SPA dev server (talks to the real backend)
+dev-web:
+    cd frontend && npm run dev
+
+# Boot the SPA against the zero-backend MSW mock harness
+dev-mock:
+    cd frontend && npm run dev:mock
+
+# Run frontend tests with coverage
+test-frontend:
+    cd frontend && npm run test:coverage
+
+# Lint + typecheck the frontend
+lint-frontend:
+    cd frontend && npx tsc -b && npm run lint
+
+# Regenerate the OpenAPI -> TypeScript client from the live FastAPI schema.
+# Exports the external app's OpenAPI document, then runs openapi-typescript.
+# CI runs this and `git diff --exit-code` to fail on a stale committed client
+# (spec sections 06/13). Run after any change to the external REST surface.
+codegen:
+    cd backend && LOG_LEVEL=critical uv run python -c "import json; from wren.api.main import app; print(json.dumps(app.openapi(), indent=2))" > ../frontend/openapi.json
+    cd frontend && npm run codegen
