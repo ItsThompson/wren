@@ -1633,6 +1633,27 @@
           }
         }
       }
+    },
+    "/skill": {
+      "get": {
+        "tags": [
+          "skill"
+        ],
+        "summary": "Get Skill",
+        "operationId": "get_skill_skill_get",
+        "responses": {
+          "200": {
+            "description": "The shipped SKILL.md authoring guidance (Markdown).",
+            "content": {
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
