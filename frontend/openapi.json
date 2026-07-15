@@ -348,6 +348,192 @@
         }
       }
     },
+    "/roadmaps/{roadmap_id}/follow": {
+      "post": {
+        "tags": [
+          "progress"
+        ],
+        "summary": "Follow Roadmap",
+        "operationId": "follow_roadmap_roadmaps__roadmap_id__follow_post",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Progress"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}/progress": {
+      "get": {
+        "tags": [
+          "progress"
+        ],
+        "summary": "Get Progress",
+        "operationId": "get_progress_roadmaps__roadmap_id__progress_get",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          },
+          {
+            "name": "detailed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Detailed"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressSnapshot"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "progress"
+        ],
+        "summary": "Update Progress",
+        "operationId": "update_progress_roadmaps__roadmap_id__progress_post",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProgressUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressUpdateResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}/next": {
+      "get": {
+        "tags": [
+          "progress"
+        ],
+        "summary": "Get Next",
+        "operationId": "get_next_roadmaps__roadmap_id__next_get",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NextResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/.well-known/oauth-authorization-server": {
       "get": {
         "tags": [
@@ -1348,6 +1534,15 @@
         "title": "ClientRegistrationResponse",
         "description": "RFC 7591 registration response echoing the stored client metadata."
       },
+      "CompletionState": {
+        "type": "string",
+        "enum": [
+          "complete",
+          "incomplete"
+        ],
+        "title": "CompletionState",
+        "description": "The explicit target state a ``progress_update`` sets its items to.\n\nExplicit set, never toggle (spec section 07): the client states the desired\nstate so a retry is idempotent."
+      },
       "ConnectedClient": {
         "properties": {
           "client_id": {
@@ -1445,6 +1640,56 @@
         ],
         "title": "LoginRequest",
         "description": "Login input. ``email`` is a plain string (not ``EmailStr``) so a malformed\naddress takes the same generic 401 path as a wrong password, never leaking\nwhether the address is even well-formed vs. registered."
+      },
+      "NextItem": {
+        "properties": {
+          "subsection_id": {
+            "type": "string",
+            "title": "Subsection Id"
+          },
+          "item_id": {
+            "type": "string",
+            "title": "Item Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceLink"
+            },
+            "type": "array",
+            "title": "Resources"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subsection_id",
+          "item_id",
+          "text"
+        ],
+        "title": "NextItem",
+        "description": "One unchecked, prereq-satisfied checklist item to work on next.\n\nThe richer ``why_now`` / ``path_position`` fields land in Ticket 17 (spec\nsection 07); this slice returns the item, its subsection, and the resource\nlinks for it."
+      },
+      "NextResult": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NextItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "NextResult",
+        "description": "The ``GET /next`` body: the next unchecked items in ``suggested_path``\norder whose prerequisites are all complete, plus a ``complete`` flag that is\n``True`` when nothing remains (spec section 07). ``remaining_in_path`` lands\nin Ticket 17."
       },
       "PatchRequest": {
         "properties": {
@@ -1566,6 +1811,151 @@
         ],
         "title": "PatchResult",
         "description": "The ``PATCH /roadmaps/{id}`` body: the post-batch ``revision``, the changed\nnodes, and the ``proposed_id -> minted_id`` remap for any de-duped ``add_*``\nproposal (spec section 07). ``remap`` is empty when nothing was de-duped."
+      },
+      "Progress": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "roadmap_id": {
+            "type": "string",
+            "title": "Roadmap Id"
+          },
+          "deadline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline"
+          },
+          "checked": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "type": "object",
+            "title": "Checked"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "roadmap_id",
+          "updated_at"
+        ],
+        "title": "Progress",
+        "description": "A user's progress against one roadmap (spec section 04).\n\n``checked`` maps a checklist-item id to its checked state; only checked items\nare retained (an unchecked item is simply absent), which keeps the map lean\nand the explicit-set idempotent. ``user_id`` is resolved from the\ntoken/session and never trusted from args. This is the ``follow`` response\nbody (following creates the record)."
+      },
+      "ProgressSnapshot": {
+        "properties": {
+          "roadmap_id": {
+            "type": "string",
+            "title": "Roadmap Id"
+          },
+          "total_items": {
+            "type": "integer",
+            "title": "Total Items"
+          },
+          "checked_items": {
+            "type": "integer",
+            "title": "Checked Items"
+          },
+          "percent": {
+            "type": "integer",
+            "title": "Percent"
+          },
+          "deadline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/SectionProgress"
+            },
+            "type": "array",
+            "title": "Sections"
+          },
+          "checked_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "roadmap_id",
+          "total_items",
+          "checked_items",
+          "percent"
+        ],
+        "title": "ProgressSnapshot",
+        "description": "The ``GET /progress`` body: roadmap-wide + per-section completion.\n\n``checked_ids`` is populated only in ``detailed`` mode (spec section 04),\nkeeping the default concise response small while still letting a client\nreconcile the exact checked set when it asks for it."
+      },
+      "ProgressUpdateRequest": {
+        "properties": {
+          "item_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Item Ids"
+          },
+          "state": {
+            "$ref": "#/components/schemas/CompletionState"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_ids",
+          "state"
+        ],
+        "title": "ProgressUpdateRequest",
+        "description": "The ``POST /progress`` body: set ``item_ids`` to ``state`` (explicit set,\nnot toggle; spec section 07). At least one id is required so an update is\nnever a silent no-op. The optional per-user ``deadline`` write lands in\nTicket 17."
+      },
+      "ProgressUpdateResult": {
+        "properties": {
+          "progress": {
+            "$ref": "#/components/schemas/ProgressSnapshot"
+          },
+          "next": {
+            "$ref": "#/components/schemas/NextResult"
+          }
+        },
+        "type": "object",
+        "required": [
+          "progress",
+          "next"
+        ],
+        "title": "ProgressUpdateResult",
+        "description": "The ``POST /progress`` body: the fresh snapshot after the set plus the\nnext suggestion (spec sections 04/07). The snapshot is returned in detailed\nmode so the client can reconcile its checkbox state to the server truth."
       },
       "RegisterRequest": {
         "properties": {
@@ -1775,6 +2165,29 @@
           "type"
         ],
         "title": "ResourceInput"
+      },
+      "ResourceLink": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ResourceType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "url",
+          "type"
+        ],
+        "title": "ResourceLink",
+        "description": "A resource reference on a next item: a link, never an inlined body."
       },
       "ResourceType": {
         "type": "string",
@@ -2104,6 +2517,35 @@
           "title"
         ],
         "title": "SectionInput"
+      },
+      "SectionProgress": {
+        "properties": {
+          "section_id": {
+            "type": "string",
+            "title": "Section Id"
+          },
+          "total_items": {
+            "type": "integer",
+            "title": "Total Items"
+          },
+          "checked_items": {
+            "type": "integer",
+            "title": "Checked Items"
+          },
+          "percent": {
+            "type": "integer",
+            "title": "Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "section_id",
+          "total_items",
+          "checked_items",
+          "percent"
+        ],
+        "title": "SectionProgress",
+        "description": "Per-section completion counts, derived from progress + roadmap."
       },
       "SetEffortOp": {
         "properties": {

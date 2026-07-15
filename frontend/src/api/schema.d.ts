@@ -141,6 +141,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/roadmaps/{roadmap_id}/follow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Follow Roadmap */
+        post: operations["follow_roadmap_roadmaps__roadmap_id__follow_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/roadmaps/{roadmap_id}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Progress */
+        get: operations["get_progress_roadmaps__roadmap_id__progress_get"];
+        put?: never;
+        /** Update Progress */
+        post: operations["update_progress_roadmaps__roadmap_id__progress_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/roadmaps/{roadmap_id}/next": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Next */
+        get: operations["get_next_roadmaps__roadmap_id__next_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/.well-known/oauth-authorization-server": {
         parameters: {
             query?: never;
@@ -521,6 +573,15 @@ export interface components {
             client_id_issued_at: number;
         };
         /**
+         * CompletionState
+         * @description The explicit target state a ``progress_update`` sets its items to.
+         *
+         *     Explicit set, never toggle (spec section 07): the client states the desired
+         *     state so a retry is idempotent.
+         * @enum {string}
+         */
+        CompletionState: "complete" | "incomplete";
+        /**
          * ConnectedClient
          * @description One authorized agent in the user's connected-clients list.
          */
@@ -577,6 +638,40 @@ export interface components {
             password: string;
         };
         /**
+         * NextItem
+         * @description One unchecked, prereq-satisfied checklist item to work on next.
+         *
+         *     The richer ``why_now`` / ``path_position`` fields land in Ticket 17 (spec
+         *     section 07); this slice returns the item, its subsection, and the resource
+         *     links for it.
+         */
+        NextItem: {
+            /** Subsection Id */
+            subsection_id: string;
+            /** Item Id */
+            item_id: string;
+            /** Text */
+            text: string;
+            /** Resources */
+            resources?: components["schemas"]["ResourceLink"][];
+        };
+        /**
+         * NextResult
+         * @description The ``GET /next`` body: the next unchecked items in ``suggested_path``
+         *     order whose prerequisites are all complete, plus a ``complete`` flag that is
+         *     ``True`` when nothing remains (spec section 07). ``remaining_in_path`` lands
+         *     in Ticket 17.
+         */
+        NextResult: {
+            /** Items */
+            items?: components["schemas"]["NextItem"][];
+            /**
+             * Complete
+             * @default false
+             */
+            complete: boolean;
+        };
+        /**
          * PatchRequest
          * @description The ``PATCH /roadmaps/{id}`` body: the ordered op list applied atomically.
          *
@@ -605,6 +700,79 @@ export interface components {
             remap?: {
                 [key: string]: string;
             };
+        };
+        /**
+         * Progress
+         * @description A user's progress against one roadmap (spec section 04).
+         *
+         *     ``checked`` maps a checklist-item id to its checked state; only checked items
+         *     are retained (an unchecked item is simply absent), which keeps the map lean
+         *     and the explicit-set idempotent. ``user_id`` is resolved from the
+         *     token/session and never trusted from args. This is the ``follow`` response
+         *     body (following creates the record).
+         */
+        Progress: {
+            /** User Id */
+            user_id: string;
+            /** Roadmap Id */
+            roadmap_id: string;
+            /** Deadline */
+            deadline?: string | null;
+            /** Checked */
+            checked?: {
+                [key: string]: boolean;
+            };
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * ProgressSnapshot
+         * @description The ``GET /progress`` body: roadmap-wide + per-section completion.
+         *
+         *     ``checked_ids`` is populated only in ``detailed`` mode (spec section 04),
+         *     keeping the default concise response small while still letting a client
+         *     reconcile the exact checked set when it asks for it.
+         */
+        ProgressSnapshot: {
+            /** Roadmap Id */
+            roadmap_id: string;
+            /** Total Items */
+            total_items: number;
+            /** Checked Items */
+            checked_items: number;
+            /** Percent */
+            percent: number;
+            /** Deadline */
+            deadline?: string | null;
+            /** Sections */
+            sections?: components["schemas"]["SectionProgress"][];
+            /** Checked Ids */
+            checked_ids?: string[] | null;
+        };
+        /**
+         * ProgressUpdateRequest
+         * @description The ``POST /progress`` body: set ``item_ids`` to ``state`` (explicit set,
+         *     not toggle; spec section 07). At least one id is required so an update is
+         *     never a silent no-op. The optional per-user ``deadline`` write lands in
+         *     Ticket 17.
+         */
+        ProgressUpdateRequest: {
+            /** Item Ids */
+            item_ids: string[];
+            state: components["schemas"]["CompletionState"];
+        };
+        /**
+         * ProgressUpdateResult
+         * @description The ``POST /progress`` body: the fresh snapshot after the set plus the
+         *     next suggestion (spec sections 04/07). The snapshot is returned in detailed
+         *     mode so the client can reconcile its checkbox state to the server truth.
+         */
+        ProgressUpdateResult: {
+            progress: components["schemas"]["ProgressSnapshot"];
+            next: components["schemas"]["NextResult"];
         };
         /**
          * RegisterRequest
@@ -698,6 +866,17 @@ export interface components {
         ResourceInput: {
             /** Proposed Id */
             proposed_id?: string | null;
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
+            type: components["schemas"]["ResourceType"];
+        };
+        /**
+         * ResourceLink
+         * @description A resource reference on a next item: a link, never an inlined body.
+         */
+        ResourceLink: {
             /** Title */
             title: string;
             /** Url */
@@ -852,6 +1031,20 @@ export interface components {
             title: string;
             /** Subsections */
             subsections?: components["schemas"]["SubsectionInput"][];
+        };
+        /**
+         * SectionProgress
+         * @description Per-section completion counts, derived from progress + roadmap.
+         */
+        SectionProgress: {
+            /** Section Id */
+            section_id: string;
+            /** Total Items */
+            total_items: number;
+            /** Checked Items */
+            checked_items: number;
+            /** Percent */
+            percent: number;
         };
         /** SetEffortOp */
         SetEffortOp: {
@@ -1296,6 +1489,136 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Roadmap"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    follow_roadmap_roadmaps__roadmap_id__follow_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                roadmap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Progress"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_progress_roadmaps__roadmap_id__progress_get: {
+        parameters: {
+            query?: {
+                detailed?: boolean;
+            };
+            header?: never;
+            path: {
+                roadmap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgressSnapshot"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_progress_roadmaps__roadmap_id__progress_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                roadmap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgressUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgressUpdateResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_next_roadmaps__roadmap_id__next_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                roadmap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NextResult"];
                 };
             };
             /** @description Validation Error */
