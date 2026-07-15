@@ -1,9 +1,9 @@
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import { Route, Routes } from 'react-router'
 
-import { AuthProvider } from '@/auth'
+import { renderWithProviders } from '@/test/renderWithProviders'
 import { RoadmapView } from '@/views/RoadmapView'
 import { handlers } from './handlers'
 import { mockRoadmap } from './data'
@@ -24,14 +24,11 @@ afterAll(() => server.close())
 
 describe('dev:mock fixtures render populated views', () => {
   it('renders the published roadmap with its sections, node cards, and resources', async () => {
-    render(
-      <AuthProvider baseUrl={BASE}>
-        <MemoryRouter initialEntries={[`/roadmaps/${mockRoadmap.id}`]}>
-          <Routes>
-            <Route path="/roadmaps/:roadmapId" element={<RoadmapView baseUrl={BASE} />} />
-          </Routes>
-        </MemoryRouter>
-      </AuthProvider>,
+    renderWithProviders(
+      <Routes>
+        <Route path="/roadmaps/:roadmapId" element={<RoadmapView />} />
+      </Routes>,
+      { initialEntries: [`/roadmaps/${mockRoadmap.id}`], baseUrl: BASE, useRealAuth: true },
     )
 
     // The roadmap header, a section, a node card, a track tag, and a resource

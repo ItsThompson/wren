@@ -1,11 +1,12 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import { Route, Routes } from 'react-router'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
-import { AuthProvider } from '@/auth'
+import { renderWithProviders } from '@/test/renderWithProviders'
+
 import { ConsentView } from './ConsentView'
 
 const BASE = 'https://api.test'
@@ -55,17 +56,11 @@ afterAll(() => server.close())
 
 function renderConsent(options: { path?: string; navigateExternal?: (url: string) => void } = {}) {
   const { path = `/authorize?auth_request_id=${AUTH_REQUEST_ID}`, navigateExternal } = options
-  return render(
-    <AuthProvider baseUrl={BASE}>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route
-            path="/authorize"
-            element={<ConsentView baseUrl={BASE} navigateExternal={navigateExternal} />}
-          />
-        </Routes>
-      </MemoryRouter>
-    </AuthProvider>,
+  return renderWithProviders(
+    <Routes>
+      <Route path="/authorize" element={<ConsentView navigateExternal={navigateExternal} />} />
+    </Routes>,
+    { initialEntries: [path], baseUrl: BASE, useRealAuth: true },
   )
 }
 

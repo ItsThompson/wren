@@ -1,11 +1,10 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
-import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
-import { AuthProvider } from '@/auth'
+import { renderWithProviders } from '@/test/renderWithProviders'
 import type { ConnectedClient } from './types'
 import { ConnectedClientsView } from './ConnectedClientsView'
 
@@ -39,15 +38,11 @@ afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
 function renderView() {
-  return render(
-    <AuthProvider baseUrl={BASE}>
-      <MemoryRouter initialEntries={['/settings/connections']}>
-        <Routes>
-          <Route path="/settings/connections" element={<ConnectedClientsView baseUrl={BASE} />} />
-        </Routes>
-      </MemoryRouter>
-    </AuthProvider>,
-  )
+  return renderWithProviders(<ConnectedClientsView />, {
+    useRealAuth: true,
+    initialEntries: ['/settings/connections'],
+    baseUrl: BASE,
+  })
 }
 
 describe('ConnectedClientsView', () => {
@@ -78,9 +73,13 @@ describe('ConnectedClientsView', () => {
 
   it('revokes a client after confirmation and removes it from the list', async () => {
     let deleted: string | null = null
+    let clientsFetches = 0
     server.use(
       authedRefresh(),
-      http.get('*/me/clients', () => HttpResponse.json([buildClient()])),
+      http.get('*/me/clients', () => {
+        clientsFetches += 1
+        return HttpResponse.json([buildClient()])
+      }),
       http.delete('*/me/clients/:clientId', ({ params }) => {
         deleted = params.clientId as string
         return new HttpResponse(null, { status: 204 })
@@ -97,6 +96,9 @@ describe('ConnectedClientsView', () => {
     expect(deleted).toBe('client-abc')
     // With no clients left, the empty state shows.
     expect(screen.getByText('No connected agents yet.')).toBeInTheDocument()
+    // The revoke edits the cache in place: only the single mount read fires, no
+    // revalidating GET /me/clients follows the successful DELETE.
+    expect(clientsFetches).toBe(1)
   })
 
   it('can cancel a pending revoke without deleting the client', async () => {

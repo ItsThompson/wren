@@ -7,20 +7,12 @@ import { ConsentLogin } from './components/ConsentLogin'
 import { ConsentSpinner } from './components/ConsentSpinner'
 import { useConsent } from './hooks/useConsent'
 
-/**
- * Same-origin by default (dev proxy + MSW); prod points at the API subdomain via
- * `VITE_API_BASE_URL`. Read once at module load: the deployment base is fixed.
- */
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
-
 /** Hand the browser to an external URL (the agent's loopback listener). */
 function assignLocation(url: string): void {
   window.location.assign(url)
 }
 
 interface ConsentViewProps {
-  /** Overridable in tests; defaults to the deployment API base URL. */
-  baseUrl?: string
   /** Overridable in tests; defaults to a real browser navigation. */
   navigateExternal?: (url: string) => void
 }
@@ -36,14 +28,11 @@ interface ConsentViewProps {
  * spinner; an anonymous visitor gets the login gate; an authenticated visitor
  * gets the decision card.
  */
-export function ConsentView({
-  baseUrl = API_BASE_URL,
-  navigateExternal = assignLocation,
-}: ConsentViewProps) {
+export function ConsentView({ navigateExternal = assignLocation }: ConsentViewProps) {
   const [searchParams] = useSearchParams()
   const authRequestId = searchParams.get('auth_request_id') ?? ''
   const { status, user } = useAuth()
-  const { context, decision, decide } = useConsent(authRequestId, baseUrl, navigateExternal)
+  const { context, decision, decide } = useConsent(authRequestId, navigateExternal)
 
   if (context.phase === 'error') {
     return <ConsentError />

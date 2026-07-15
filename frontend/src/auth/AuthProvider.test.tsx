@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll } from 'vitest'
 
 import { handlers } from '@/mocks/handlers'
 import { mockAuthUser } from '@/mocks/data'
+import { ApiClientProvider } from '@/api'
 import { AuthProvider } from './AuthProvider'
 import { useAuth } from './useAuth'
 
@@ -60,9 +61,11 @@ function Probe() {
 
 function renderProbe() {
   return render(
-    <AuthProvider baseUrl={BASE}>
-      <Probe />
-    </AuthProvider>,
+    <ApiClientProvider baseUrl={BASE}>
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>
+    </ApiClientProvider>,
   )
 }
 

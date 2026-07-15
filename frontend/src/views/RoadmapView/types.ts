@@ -20,6 +20,7 @@ export type Visibility = components['schemas']['Visibility']
  */
 export type ProgressSnapshot = components['schemas']['ProgressSnapshot']
 export type ProgressUpdateResult = components['schemas']['ProgressUpdateResult']
+export type NextResult = components['schemas']['NextResult']
 
 /**
  * The progress binding threaded from the list view down to each checklist row:

@@ -1,65 +1,56 @@
-import { useEffect, useMemo, useState } from 'react'
+import { keys, useApiQuery } from '@/api'
+import type { Problem } from '@/lib/problem'
 
-import { createSessionClient } from '@/auth/createSessionClient'
+import type { ProgressSnapshot, Roadmap, TreeDataState } from '../types'
 
-import type { TreeDataState } from '../types'
+/** The subset of an SWR read result the tree mapping consumes. */
+interface ReadResult<T> {
+  data: T | undefined
+  error: Problem | undefined
+  isLoading: boolean
+}
 
 /**
- * Fetch everything the tree view needs for one roadmap: the full roadmap
- * document (subsections + `prereq_ids`, the graph)
- * and the caller's progress snapshot (for done-state). Uses the session-aware
- * client (credentials + transparent refresh), so a private draft resolves for
- * its owner and returns an error to anyone else.
- *
- * Progress is best-effort: a public reader with no progress record (or an
- * anonymous viewer) still sees the tree with every node in its base state
- * (roots available, the rest locked). Only a failed roadmap fetch is fatal.
- *
- * `baseUrl` is injected (defaulting at the view) so tests can point the client
- * at an MSW server without touching global config.
+ * Derive the tree's phase-state from the two reads with their different
+ * fatality. The roadmap read is fatal: while it loads the view shows the
+ * skeleton, and any failure (or an empty body) is the single error surface. The
+ * progress read is best-effort, so only its `data` is read here: any failure
+ * collapses to an empty checked set, letting an anonymous viewer (or a public
+ * reader with no progress record) still see the tree in its base state.
  */
-export function useTreeData(roadmapId: string, baseUrl: string): { state: TreeDataState } {
-  const client = useMemo(() => createSessionClient(baseUrl), [baseUrl])
-  const [state, setState] = useState<TreeDataState>({ phase: 'loading' })
+function toTreeDataState(
+  roadmap: ReadResult<Roadmap>,
+  progress: Pick<ReadResult<ProgressSnapshot>, 'data'>,
+): TreeDataState {
+  if (roadmap.isLoading && !roadmap.data) return { phase: 'loading' }
+  if (roadmap.error || !roadmap.data) return { phase: 'error' }
+  return {
+    phase: 'loaded',
+    roadmap: roadmap.data,
+    checkedIds: new Set(progress.data?.checked_ids ?? []),
+  }
+}
 
-  useEffect(() => {
-    let active = true
-    setState({ phase: 'loading' })
+/**
+ * Fetch everything the tree view needs for one roadmap through two SWR reads:
+ * the full roadmap document (subsections + `prereq_ids`, the DAG edges) and the
+ * caller's progress snapshot (for done-state). Both bind the shared session
+ * client from context (credentials + transparent refresh), so a private draft
+ * resolves for its owner and errors for anyone else.
+ *
+ * The reads share `keys.roadmap(id)` / `keys.progress(id)` with `useRoadmap` and
+ * `useProgress`, so views co-mounted on the same roadmap de-duplicate onto one
+ * request per key.
+ */
+export function useTreeData(roadmapId: string): { state: TreeDataState } {
+  const roadmap = useApiQuery(keys.roadmap(roadmapId), (client) =>
+    client.GET('/roadmaps/{roadmap_id}', { params: { path: { roadmap_id: roadmapId } } }),
+  )
+  const progress = useApiQuery(keys.progress(roadmapId), (client) =>
+    client.GET('/roadmaps/{roadmap_id}/progress', {
+      params: { path: { roadmap_id: roadmapId }, query: { detailed: true } },
+    }),
+  )
 
-    void (async () => {
-      try {
-        const { data: roadmap } = await client.GET('/roadmaps/{roadmap_id}', {
-          params: { path: { roadmap_id: roadmapId } },
-        })
-        if (!active) return
-        if (!roadmap) {
-          setState({ phase: 'error' })
-          return
-        }
-
-        let checkedIds = new Set<string>()
-        try {
-          const { data: progress } = await client.GET('/roadmaps/{roadmap_id}/progress', {
-            params: { path: { roadmap_id: roadmapId }, query: { detailed: true } },
-          })
-          if (progress?.checked_ids) checkedIds = new Set(progress.checked_ids)
-        } catch {
-          // No reachable progress record: leave the checked set empty.
-        }
-
-        if (!active) return
-        setState({ phase: 'loaded', roadmap, checkedIds })
-      } catch {
-        // Network failure / no reachable backend: surface an error state rather
-        // than hang on the loading skeleton.
-        if (active) setState({ phase: 'error' })
-      }
-    })()
-
-    return () => {
-      active = false
-    }
-  }, [client, roadmapId])
-
-  return { state }
+  return { state: toTreeDataState(roadmap, progress) }
 }

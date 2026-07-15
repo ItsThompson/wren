@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import { createSessionClient } from '@/auth/createSessionClient'
+import { keys, useApiQuery, useSessionClient } from '@/api'
 import { toProblem, type Problem } from '@/lib/problem'
 import { useLifecycle } from './useLifecycle'
 import type {
@@ -15,23 +15,39 @@ import type {
 } from '../types'
 
 /**
- * Fetch one roadmap by ID for the owner and drive its publish action
- * (`:publish`). Uses the
- * session-aware client (credentials + transparent refresh), so a private draft
- * resolves for its owner and returns 404/403 to anyone else.
- *
- * `state` is the fetch state; `publishState` is the publish sub-state (kept
- * separate so a blocked/failed publish never conflicts with the loaded roadmap).
- * A successful publish replaces the loaded roadmap with the returned published
- * one, so the view reflects the immutable published state without a refetch.
- *
- * `baseUrl` is injected (defaulting at the view) so tests can point the client at
- * an MSW server without touching global config.
+ * Map the SWR read result for `keys.roadmap(id)` into the view's semantic
+ * {@link RoadmapViewState}. Guard-clause form (mirrors the pilot `useProfile`):
+ * a background revalidation keeps the last-loaded roadmap on screen rather than
+ * flashing the skeleton, and a read error preserves the HTTP status (or `null`
+ * on a network failure) for `RoadmapErrorState`.
  */
-export function useRoadmap(
-  roadmapId: string,
-  baseUrl: string,
-): {
+function toRoadmapViewState(
+  roadmap: Roadmap | undefined,
+  error: Problem | undefined,
+  isLoading: boolean,
+): RoadmapViewState {
+  if (isLoading && !roadmap) return { phase: 'loading' }
+  if (error) return { phase: 'error', status: error.status }
+  if (roadmap) return { phase: 'loaded', roadmap }
+  return { phase: 'loading' }
+}
+
+/**
+ * Fetch one roadmap by ID for the owner and drive its publish action
+ * (`:publish`). The read derives from `useApiQuery(keys.roadmap(id))` on the
+ * shared session client (credentials + transparent refresh), so a private draft
+ * resolves for its owner and returns 404/403 to anyone else, and any co-mounted
+ * reader of the same key (e.g. the tree route) shares one request and one cache
+ * entry.
+ *
+ * `state` is the derived fetch state; `publishState`/`metadataState`/`forkState`/
+ * `conflict` are local action sub-states (UI state, not cached data), kept
+ * separate so a blocked/failed write never conflicts with the loaded roadmap. A
+ * successful write reconciles the SWR cache in place
+ * (`mutate(returned, { revalidate: false })`) so the view reflects the new state
+ * without a refetch and without a stale flash.
+ */
+export function useRoadmap(roadmapId: string): {
   state: RoadmapViewState
   publishState: PublishState
   publish: () => Promise<void>
@@ -45,43 +61,36 @@ export function useRoadmap(
   /** Refetch the roadmap (the re-read recovery for a stale/immutable conflict). */
   reload: () => void
 } {
-  const client = useMemo(() => createSessionClient(baseUrl), [baseUrl])
   const navigate = useNavigate()
-  const [state, setState] = useState<RoadmapViewState>({ phase: 'loading' })
+  const client = useSessionClient()
+  const {
+    data: roadmap,
+    error: readError,
+    isLoading,
+    mutate,
+  } = useApiQuery(keys.roadmap(roadmapId), (sessionClient) =>
+    sessionClient.GET('/roadmaps/{roadmap_id}', { params: { path: { roadmap_id: roadmapId } } }),
+  )
+
   const [publishState, setPublishState] = useState<PublishState>({ phase: 'idle' })
   const [metadataState, setMetadataState] = useState<MetadataEditState>({ phase: 'idle' })
   const [forkState, setForkState] = useState<ForkState>({ phase: 'idle' })
   const [conflict, setConflict] = useState<Problem | null>(null)
-  const [reloadToken, setReloadToken] = useState(0)
 
+  const state = toRoadmapViewState(roadmap, readError, isLoading)
+
+  // Sub-state reset invariant (R2). React Router keeps the same RoadmapView
+  // instance mounted across a `:roadmapId` change (fork -> navigate, or
+  // navigating between roadmaps), so these plain-`useState` sub-states would
+  // otherwise leak from roadmap A onto roadmap B. The read effect that used to
+  // reset them is gone (the read is now derived from `useApiQuery`), so the
+  // reset is re-homed here, keyed on `roadmapId`.
   useEffect(() => {
-    let active = true
-    setState({ phase: 'loading' })
     setPublishState({ phase: 'idle' })
     setMetadataState({ phase: 'idle' })
     setForkState({ phase: 'idle' })
     setConflict(null)
-
-    void (async () => {
-      try {
-        const { data, response } = await client.GET('/roadmaps/{roadmap_id}', {
-          params: { path: { roadmap_id: roadmapId } },
-        })
-        if (!active) return
-        setState(
-          data ? { phase: 'loaded', roadmap: data } : { phase: 'error', status: response.status },
-        )
-      } catch {
-        // Network failure / no reachable backend: surface an error state rather
-        // than hang on the loading skeleton.
-        if (active) setState({ phase: 'error', status: null })
-      }
-    })()
-
-    return () => {
-      active = false
-    }
-  }, [client, roadmapId, reloadToken])
+  }, [roadmapId])
 
   const publish = useCallback(async () => {
     setPublishState({ phase: 'publishing' })
@@ -90,8 +99,9 @@ export function useRoadmap(
         params: { path: { roadmap_id: roadmapId } },
       })
       if (data) {
-        // Published: reflect the immutable transition in the loaded roadmap.
-        setState({ phase: 'loaded', roadmap: data })
+        // Published: write the immutable transition into the cache in place so
+        // the view reflects it without a refetch.
+        void mutate(data, { revalidate: false })
         setPublishState({ phase: 'idle' })
         return
       }
@@ -111,15 +121,15 @@ export function useRoadmap(
     } catch {
       setPublishState({ phase: 'failed', status: null })
     }
-  }, [client, roadmapId])
+  }, [client, roadmapId, mutate])
 
   const editMetadata = useCallback(
     async (draft: MetadataDraft): Promise<boolean> => {
       // Presentation-only edit (title/description/subject_tags): not If-Match
-      // guarded and never bumps the structural revision. On success
-      // the returned roadmap replaces the loaded one so the header updates in
-      // place; a 409 (a smuggled structural field on a published roadmap) surfaces
-      // the shared conflict prompt, and any other failure a retry message.
+      // guarded and never bumps the structural revision. On success the returned
+      // roadmap is written into the cache so the header updates in place; a 409
+      // (a smuggled structural field on a published roadmap) surfaces the shared
+      // conflict prompt, and any other failure a retry message.
       setMetadataState({ phase: 'saving' })
       try {
         const { data, error, response } = await client.PATCH('/roadmaps/{roadmap_id}/metadata', {
@@ -131,7 +141,7 @@ export function useRoadmap(
           },
         })
         if (data) {
-          setState({ phase: 'loaded', roadmap: data })
+          void mutate(data, { revalidate: false })
           setMetadataState({ phase: 'idle' })
           return true
         }
@@ -147,12 +157,14 @@ export function useRoadmap(
         return false
       }
     },
-    [client, roadmapId],
+    [client, roadmapId, mutate],
   )
 
   const fork = useCallback(() => {
     // Fork any readable roadmap (own or public) into a fresh private draft, then
-    // navigate to it so the owner can edit and publish the copy.
+    // navigate to it so the owner can edit and publish the copy. The fork is a
+    // new resource, so there is no cache write here: navigating to its route
+    // reads it under its own key.
     setForkState({ phase: 'forking' })
     void (async () => {
       try {
@@ -171,12 +183,15 @@ export function useRoadmap(
     })()
   }, [client, navigate, roadmapId])
 
-  // Web-only lifecycle (visibility / archive / delete): a visibility toggle or
-  // archive replaces the loaded roadmap in place; a successful delete leaves the
-  // now-removed roadmap's route for the landing page.
+  // Web-only lifecycle (visibility / archive / delete). A visibility toggle or
+  // archive reconciles the shared roadmap cache in place (replacing the old
+  // view `setState` callback), so the tree route and the roadmap route stay
+  // coherent; a successful delete leaves the now-removed roadmap's route.
   const onLifecycleChanged = useCallback(
-    (roadmap: Roadmap) => setState({ phase: 'loaded', roadmap }),
-    [],
+    (updated: Roadmap) => {
+      void mutate(updated, { revalidate: false })
+    },
+    [mutate],
   )
   const onDeleted = useCallback(() => navigate('/'), [navigate])
   const lifecycle = useLifecycle(client, roadmapId, {
@@ -184,7 +199,9 @@ export function useRoadmap(
     onDeleted,
   })
 
-  const reload = useCallback(() => setReloadToken((token) => token + 1), [])
+  const reload = useCallback(() => {
+    void mutate()
+  }, [mutate])
 
   return {
     state,

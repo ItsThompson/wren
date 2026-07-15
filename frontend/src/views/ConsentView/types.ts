@@ -1,3 +1,5 @@
+import type { components } from '@/api'
+
 /**
  * State shapes for the OAuth consent flow (SPA-rendered consent).
  *
@@ -7,6 +9,9 @@
  * discriminated union so impossible combinations (e.g. "loaded but errored")
  * cannot arise (frontend state-structure rule).
  */
+
+/** The parked request's context body the consent screen renders. */
+export type ConsentContextData = components['schemas']['AuthorizationContext']
 
 export type ConsentContextState =
   | { phase: 'loading' }
