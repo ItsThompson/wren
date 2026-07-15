@@ -1,56 +1,51 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { keys, useApiQuery } from '@/api'
+import type { Problem } from '@/lib/problem'
 
-import { createSessionClient } from '@/auth/createSessionClient'
-import type { DashboardState } from '../types'
+import type { DashboardData, DashboardState } from '../types'
 
 /**
- * Owns the private dashboard fetch (`GET /me/dashboard`):
- * the caller's authored roadmaps (any status) plus the ones they follow. Uses the
- * session-aware client (credentials + transparent refresh), so the backend scopes
- * the response to the resolved session user; another user's dashboard is never
- * returned.
- *
- * Fetching is gated on `enabled` (the caller enables it only once the session
- * resolves to authenticated). `reload` re-runs the fetch for the inline
- * error-retry. `baseUrl` is injected (defaulted at the view) so tests can point at
- * an MSW server without touching global config.
+ * Derive the view's semantic phase-state from the SWR read result. Any failure
+ * (including a network failure, where `Problem.status` is `null`) is the generic
+ * `error`: the dashboard has no first-class per-status branch. The loading guard
+ * holds only while there is no cached `data`, so a background revalidation keeps
+ * the last-loaded dashboard on screen instead of flashing the skeleton.
  */
-export function useDashboard(
-  baseUrl: string,
-  enabled: boolean,
-): {
+function toDashboardState(
+  data: DashboardData | undefined,
+  error: Problem | undefined,
+  isLoading: boolean,
+): DashboardState {
+  if (isLoading && !data) return { phase: 'loading' }
+  if (error) return { phase: 'error' }
+  if (data) return { phase: 'loaded', authored: data.authored ?? [], followed: data.followed ?? [] }
+  return { phase: 'loading' }
+}
+
+/**
+ * Owns the private dashboard fetch (`GET /me/dashboard`): the caller's authored
+ * roadmaps (any status) plus the ones they follow. Reads through
+ * {@link useApiQuery} so it binds the shared session client (credentials +
+ * transparent refresh) from context; the backend scopes the response to the
+ * resolved session user, so another user's dashboard is never returned.
+ *
+ * Fetching is gated on `enabled` via a null key: the caller enables it only once
+ * the session resolves to authenticated, and a `null` key never fetches (no
+ * request, no loading churn), so the view's anonymous branch (driven by
+ * `useAuth().status`) is left to render the login prompt. `reload` revalidates
+ * the cache entry via `mutate()` for the inline error-retry.
+ */
+export function useDashboard(enabled: boolean): {
   state: DashboardState
   reload: () => void
 } {
-  const client = useMemo(() => createSessionClient(baseUrl), [baseUrl])
-  const [state, setState] = useState<DashboardState>({ phase: 'loading' })
-  const [reloadToken, setReloadToken] = useState(0)
+  const { data, error, isLoading, mutate } = useApiQuery(enabled ? keys.dashboard() : null, (client) =>
+    client.GET('/me/dashboard'),
+  )
 
-  useEffect(() => {
-    if (!enabled) return
-    let active = true
-    setState({ phase: 'loading' })
-
-    void (async () => {
-      try {
-        const { data } = await client.GET('/me/dashboard')
-        if (!active) return
-        setState(
-          data
-            ? { phase: 'loaded', authored: data.authored ?? [], followed: data.followed ?? [] }
-            : { phase: 'error' },
-        )
-      } catch {
-        if (active) setState({ phase: 'error' })
-      }
-    })()
-
-    return () => {
-      active = false
-    }
-  }, [client, enabled, reloadToken])
-
-  const reload = useCallback(() => setReloadToken((token) => token + 1), [])
-
-  return { state, reload }
+  return {
+    state: toDashboardState(data, error, isLoading),
+    reload: () => {
+      void mutate()
+    },
+  }
 }

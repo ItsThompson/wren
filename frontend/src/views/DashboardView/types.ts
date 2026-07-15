@@ -3,6 +3,9 @@ import type { components } from '@/api'
 /** A roadmap summarized for a card (the generated list projection). */
 export type RoadmapCardData = components['schemas']['RoadmapCard']
 
+/** The private dashboard body (`GET /me/dashboard`): authored + followed lists. */
+export type DashboardData = components['schemas']['Dashboard']
+
 /**
  * The dashboard fetch state as a single discriminated union so the impossible
  * "loaded with an error" combinations cannot arise (frontend state-structure

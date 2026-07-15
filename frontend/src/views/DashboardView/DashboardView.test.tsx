@@ -1,12 +1,11 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import { Route, Routes } from 'react-router'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
-import { ApiClientProvider } from '@/api'
-import { AuthProvider } from '@/auth'
+import { renderWithProviders } from '@/test/renderWithProviders'
 import type { RoadmapCardData } from './types'
 import { DashboardView } from './DashboardView'
 
@@ -40,16 +39,11 @@ afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
 function renderView() {
-  return render(
-    <ApiClientProvider baseUrl={BASE}>
-      <AuthProvider>
-        <MemoryRouter initialEntries={['/dashboard']}>
-          <Routes>
-            <Route path="/dashboard" element={<DashboardView baseUrl={BASE} />} />
-          </Routes>
-        </MemoryRouter>
-      </AuthProvider>
-    </ApiClientProvider>,
+  return renderWithProviders(
+    <Routes>
+      <Route path="/dashboard" element={<DashboardView />} />
+    </Routes>,
+    { useRealAuth: true, initialEntries: ['/dashboard'], baseUrl: BASE },
   )
 }
 

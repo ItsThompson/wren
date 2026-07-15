@@ -9,17 +9,6 @@ import { DashboardSkeleton } from './components/DashboardSkeleton'
 import { useDashboard } from './hooks/useDashboard'
 
 /**
- * Same-origin by default (dev proxy + MSW); prod points at the API subdomain via
- * `VITE_API_BASE_URL`. Read once at module load: the deployment base is fixed.
- */
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
-
-interface DashboardViewProps {
-  /** Overridable in tests; defaults to the deployment API base URL. */
-  baseUrl?: string
-}
-
-/**
  * DashboardView: the caller's
  * private home. It lists everything they authored (draft / private / public) in a
  * "Yours" section and everything they follow in a "Following" section, each card
@@ -27,10 +16,10 @@ interface DashboardViewProps {
  * authenticated session; the body routes loading / anonymous / error / empty /
  * loaded inside a shared page frame.
  */
-export function DashboardView({ baseUrl = API_BASE_URL }: DashboardViewProps) {
+export function DashboardView() {
   const { status } = useAuth()
   const isAuthenticated = status === 'authenticated'
-  const { state, reload } = useDashboard(baseUrl, isAuthenticated)
+  const { state, reload } = useDashboard(isAuthenticated)
 
   let body: ReactNode
   if (status === 'loading') {
