@@ -8,30 +8,41 @@ import { createSessionClient } from '@/auth/createSessionClient'
  * client (credentials + transparent refresh), so the record resolves for the
  * signed-in user and is scoped to them server-side.
  *
- * The detailed snapshot seeds `checkedIds` on mount. `toggle` optimistically
- * reflects the check/uncheck locally (so the bars and done-state update
- * instantly), persists the explicit-set via `POST /progress`, and reconciles to
- * the server's returned `checked_ids`; a failed write reverts the optimistic
- * change. `baseUrl` is injected (defaulting at the view) so tests can point the
- * client at an MSW server.
+ * The detailed snapshot seeds `checkedIds` and the per-user `deadline` on mount.
+ * `toggle` optimistically reflects the check/uncheck locally (so the bars and
+ * done-state update instantly), persists the explicit-set via `POST /progress`,
+ * and reconciles to the server's returned `checked_ids`; a failed write reverts
+ * the optimistic change. `setDeadline` mirrors this for the countdown: it
+ * optimistically updates the local deadline, persists via `PUT /deadline`
+ * (a date sets it, null clears it), and reverts on failure. `baseUrl` is injected
+ * (defaulting at the view) so tests can point the client at an MSW server.
  */
 export function useProgress(
   roadmapId: string,
   baseUrl: string,
-): { checkedIds: Set<string>; toggle: (itemId: string, checked: boolean) => void } {
+): {
+  checkedIds: Set<string>
+  toggle: (itemId: string, checked: boolean) => void
+  deadline: string | null
+  setDeadline: (deadline: string | null) => void
+} {
   const client = useMemo(() => createSessionClient(baseUrl), [baseUrl])
   const [checkedIds, setCheckedIds] = useState<Set<string>>(() => new Set())
+  const [deadline, setDeadlineState] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
     setCheckedIds(new Set())
+    setDeadlineState(null)
 
     void (async () => {
       try {
         const { data } = await client.GET('/roadmaps/{roadmap_id}/progress', {
           params: { path: { roadmap_id: roadmapId }, query: { detailed: true } },
         })
-        if (active && data?.checked_ids) setCheckedIds(new Set(data.checked_ids))
+        if (!active || !data) return
+        if (data.checked_ids) setCheckedIds(new Set(data.checked_ids))
+        setDeadlineState(data.deadline ?? null)
       } catch {
         // A read failure just leaves an unstarted checklist; not fatal.
       }
@@ -72,5 +83,26 @@ export function useProgress(
     [client, roadmapId],
   )
 
-  return { checkedIds, toggle }
+  const setDeadline = useCallback(
+    (next: string | null) => {
+      setDeadlineState((previous) => {
+        void (async () => {
+          try {
+            const { data } = await client.PUT('/roadmaps/{roadmap_id}/deadline', {
+              params: { path: { roadmap_id: roadmapId } },
+              body: { deadline: next },
+            })
+            if (data) setDeadlineState(data.deadline ?? null)
+          } catch {
+            // Revert the optimistic change so the UI matches the server.
+            setDeadlineState(previous)
+          }
+        })()
+        return next
+      })
+    },
+    [client, roadmapId],
+  )
+
+  return { checkedIds, toggle, deadline, setDeadline }
 }

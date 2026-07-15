@@ -403,6 +403,80 @@ describe('RoadmapView progress tracking', () => {
   })
 })
 
+describe('RoadmapView deadline countdown', () => {
+  const PROGRESS_URL = `${BASE}/roadmaps/${ROADMAP_ID}/progress`
+  const DEADLINE_URL = `${BASE}/roadmaps/${ROADMAP_ID}/deadline`
+
+  /** A progress snapshot carrying (or clearing) the per-user deadline. */
+  function progressWithDeadline(deadline: string | null): ProgressSnapshot {
+    return { ...buildProgress(), deadline: deadline ?? undefined }
+  }
+
+  /** The `Progress` record the PUT /deadline endpoint echoes back. */
+  function progressRecord(deadline: string | null) {
+    return {
+      user_id: 'user-1',
+      roadmap_id: ROADMAP_ID,
+      deadline,
+      checked: {},
+      updated_at: '2026-07-15T00:00:00Z',
+    }
+  }
+
+  it('shows the deadline date and a countdown when one is set', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
+      http.get(PROGRESS_URL, () => HttpResponse.json(progressWithDeadline('2099-12-31'))),
+    )
+    renderView()
+
+    const input = await screen.findByLabelText('Deadline')
+    // The detailed snapshot hydrates the deadline asynchronously on mount.
+    await waitFor(() => expect(input).toHaveValue('2099-12-31'))
+    // A countdown renders (its exact label is covered by deadline-countdown.test).
+    expect(screen.getByTestId('deadline-countdown')).toBeInTheDocument()
+  })
+
+  it('sets a deadline via PUT when the date input changes', async () => {
+    let put: unknown
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
+      http.get(PROGRESS_URL, () => HttpResponse.json(progressWithDeadline(null))),
+      http.put(DEADLINE_URL, async ({ request }) => {
+        put = await request.json()
+        return HttpResponse.json(progressRecord('2026-12-01'))
+      }),
+    )
+    renderView()
+
+    const input = await screen.findByLabelText('Deadline')
+    fireEvent.change(input, { target: { value: '2026-12-01' } })
+
+    await waitFor(() => expect(put).toEqual({ deadline: '2026-12-01' }))
+    await waitFor(() => expect(input).toHaveValue('2026-12-01'))
+  })
+
+  it('clears the deadline via PUT null when Clear is pressed', async () => {
+    let put: unknown
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
+      http.get(PROGRESS_URL, () => HttpResponse.json(progressWithDeadline('2099-12-31'))),
+      http.put(DEADLINE_URL, async ({ request }) => {
+        put = await request.json()
+        return HttpResponse.json(progressRecord(null))
+      }),
+    )
+    renderView()
+
+    // Clear only appears once a deadline has hydrated.
+    await waitFor(() => expect(screen.getByLabelText('Deadline')).toHaveValue('2099-12-31'))
+    fireEvent.click(screen.getByRole('button', { name: /clear/i }))
+
+    await waitFor(() => expect(put).toEqual({ deadline: null }))
+    await waitFor(() => expect(screen.getByLabelText('Deadline')).toHaveValue(''))
+  })
+})
+
 describe('RoadmapView fork', () => {
   const FORK_URL = `${BASE}/roadmaps/${ROADMAP_ID}:fork`
   const OTHER_USER = {

@@ -1,6 +1,7 @@
 import { useProgress } from '../hooks/useProgress'
 import { overallCount } from '../progress-derive'
 import type { ProgressBinding, RoadmapActions as Actions, Roadmap } from '../types'
+import { DeadlineCountdown } from './DeadlineCountdown'
 import { ProgressBar } from './ProgressBar'
 import { RoadmapActions } from './RoadmapActions'
 import { SectionBlock } from './SectionBlock'
@@ -23,7 +24,7 @@ interface RoadmapListViewProps {
  * done-state update from the derived checked set.
  */
 export function RoadmapListView({ roadmap, baseUrl, isOwner, actions }: RoadmapListViewProps) {
-  const { checkedIds, toggle } = useProgress(roadmap.id, baseUrl)
+  const { checkedIds, toggle, deadline, setDeadline } = useProgress(roadmap.id, baseUrl)
   const sectionOrder = roadmap.section_order ?? []
   const sections = roadmap.sections ?? {}
   const suggestedPath = roadmap.suggested_path ?? []
@@ -58,6 +59,7 @@ export function RoadmapListView({ roadmap, baseUrl, isOwner, actions }: RoadmapL
             label="Overall progress"
           />
         </div>
+        <DeadlineCountdown deadline={deadline} onSet={setDeadline} />
       </header>
 
       <RoadmapActions roadmap={roadmap} isOwner={isOwner} actions={actions} />
