@@ -27,7 +27,7 @@ scrape sees everything. `/metrics` is reachable only over `monitoring-net`
 | `oauth_tokens_issued_total` | counter | `grant_type` | OAuth token issuance (`authorization_code` = first issuance, `refresh_token` = rotation) |
 | `mcp_tool_invocations_total` | counter | `tool`, `outcome` | Every MCP tool call (`outcome` = `ok`/`error`) |
 | `db_query_duration_seconds` | histogram | `query_name` | Every SQL statement (via SQLAlchemy engine events) |
-| `active_connections` | gauge | — | Connections checked out of the SQLAlchemy pool |
+| `active_connections` | gauge | none | Connections checked out of the SQLAlchemy pool |
 
 ### Service-method failures: what counts
 

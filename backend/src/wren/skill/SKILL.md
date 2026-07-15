@@ -118,7 +118,7 @@ Content writes carry the draft's `revision`. If it is stale (someone else edited
 in between) the tool returns a re-read error: fetch the current state, rebase your
 change, and retry with the fresh `revision`. Never guess a revision number.
 
-## The structural validation contract (V1–V8)
+## The structural validation contract (V1-V8)
 
 `publish` hard-blocks on any of these; `validate` reports all of them at once.
 Author to satisfy them from the start:

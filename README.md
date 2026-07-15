@@ -22,10 +22,10 @@ differ only by injected settings.
 
 ## Layout
 
-- `backend/` — Python backend (uv-managed); `src/wren/core` shared kit,
+- `backend/`: Python backend (uv-managed); `src/wren/core` shared kit,
   `src/wren/api` external app, `src/wren/api_internal` internal app.
-- `frontend/` — React SPA.
-- `deployments/`, `scripts/` — operational assets.
+- `frontend/`: React SPA.
+- `deployments/`, `scripts/`: operational assets.
 
 ## Backend development
 
