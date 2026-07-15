@@ -1,4 +1,5 @@
-"""External REST adapter for roadmaps: create, read, validate, and publish.
+"""External REST adapter for roadmaps: create, read, iterative-edit (patch),
+full-document import (replace), validate, and publish.
 
 Thin handlers (spec sections 05/06): each resolves the caller via ``require_user``
 (the cookie session; a spoofed ``X-User-ID`` is stripped upstream), calls one
@@ -27,6 +28,7 @@ from wren.roadmaps.schemas import (
     Roadmap,
     RoadmapCreated,
     RoadmapInput,
+    RoadmapReplaced,
     ValidateResult,
 )
 from wren.roadmaps.service import RoadmapService
@@ -67,6 +69,21 @@ def create_roadmaps_router(service_provider: RoadmapServiceProvider) -> APIRoute
         # 409 "re-read", an invalid op is a 422, both rendered by the shared
         # exception handler. A malformed/absent header is a 422 via FastAPI.
         return await service.patch_draft(user_id, roadmap_id, if_match, body.operations)
+
+    @router.put("/{roadmap_id}")
+    async def replace_roadmap(
+        roadmap_id: str,
+        body: RoadmapInput,
+        if_match: int = Header(alias="If-Match"),
+        user_id: str = Depends(require_user),
+        service: RoadmapService = Depends(service_provider),
+    ) -> RoadmapReplaced:
+        # The full-document import escape hatch (spec section 07), never the
+        # iterative path: it replaces the entire draft. Guarded by the same If-Match
+        # optimistic concurrency as PATCH (stale -> 409) and the same immutability
+        # boundary (published/archived -> 409 IMMUTABLE), rendered by the shared
+        # exception handler.
+        return await service.replace_draft(user_id, roadmap_id, if_match, body)
 
     @router.post("/{roadmap_id}:validate")
     async def validate_roadmap(

@@ -27,6 +27,7 @@ from wren.roadmaps.schemas import (
     Roadmap,
     RoadmapCreated,
     RoadmapInput,
+    RoadmapReplaced,
     ValidateResult,
 )
 from wren.roadmaps.service import RoadmapService
@@ -73,6 +74,19 @@ def create_internal_roadmaps_router(service_provider: RoadmapServiceProvider) ->
         # 409 "re-read", an invalid op is a 422, both rendered by the shared
         # exception handler. A malformed/absent header is a 422 via FastAPI.
         return await service.patch_draft(user_id, roadmap_id, if_match, body.operations)
+
+    @router.put("/{roadmap_id}")
+    async def replace_roadmap(
+        roadmap_id: str,
+        body: RoadmapInput,
+        if_match: int = Header(alias="If-Match"),
+        user_id: str = Depends(require_internal_user),
+        service: RoadmapService = Depends(service_provider),
+    ) -> RoadmapReplaced:
+        # The full-document import escape hatch backing the replace_roadmap_draft MCP
+        # tool (Ticket 21): guarded by the same If-Match optimistic concurrency and
+        # immutability boundary as the external route.
+        return await service.replace_draft(user_id, roadmap_id, if_match, body)
 
     @router.post("/{roadmap_id}:validate")
     async def validate_roadmap(

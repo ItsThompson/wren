@@ -63,6 +63,11 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     # require_user (the service rejects a stale revision with 409 and an invalid
     # op with 422).
     RouteKey(method="PATCH", path="/roadmaps/{roadmap_id}"): AccessLevel.EXTERNAL_COOKIE,
+    # Full-document import (#13): the PUT escape hatch replacing the entire draft
+    # under If-Match optimistic concurrency. Owner-scoped draft-only content write
+    # (published/archived -> 409 IMMUTABLE), resolving the human session via
+    # require_user.
+    RouteKey(method="PUT", path="/roadmaps/{roadmap_id}"): AccessLevel.EXTERNAL_COOKIE,
     # Roadmap validate + publish lifecycle (#8): owner-scoped draft actions on
     # the :verb sub-resource. Publish is the one-way draft -> published
     # transition; both resolve the human session via require_user.
@@ -99,6 +104,7 @@ INTERNAL_ROUTE_ACCESS: RouteRegistry = {
     RouteKey(method="POST", path="/roadmaps"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="PATCH", path="/roadmaps/{roadmap_id}"): AccessLevel.INTERNAL_TRUSTED,
+    RouteKey(method="PUT", path="/roadmaps/{roadmap_id}"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:validate"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:publish"): AccessLevel.INTERNAL_TRUSTED,
     # Progress surface (#9), mirrored on the internal app so the MCP progress
