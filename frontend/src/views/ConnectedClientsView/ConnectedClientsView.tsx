@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 
 import { useAuth } from '@/auth'
+import { EmptyState } from '@/components/states'
 import { Button } from '@/components/ui/button'
 import { ClientList } from './components/ClientList'
 import { ConnectedClientsSkeleton } from './components/ConnectedClientsSkeleton'
@@ -57,12 +58,10 @@ export function ConnectedClientsView({ baseUrl = API_BASE_URL }: ConnectedClient
     )
   } else if (state.clients.length === 0) {
     body = (
-      <div className="py-10 text-center">
-        <p className="display-m text-foreground">No connected agents yet.</p>
-        <p className="mx-auto mt-3 max-w-[42ch] text-muted-foreground">
-          When you authorize an agent from your MCP client, it will appear here.
-        </p>
-      </div>
+      <EmptyState
+        title="No connected agents yet."
+        description="When you authorize an agent from your MCP client, it will appear here."
+      />
     )
   } else {
     body = <ClientList clients={state.clients} onRevoke={revoke} />

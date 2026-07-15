@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { useParams } from 'react-router'
 
+import { EmptyState } from '@/components/states'
 import { RoadmapCardGrid } from '@/components/RoadmapCardGrid'
 import { Button } from '@/components/ui/button'
 import { ProfileHeader } from './components/ProfileHeader'
@@ -53,11 +54,7 @@ export function ProfileView({ baseUrl = API_BASE_URL }: ProfileViewProps) {
   const roadmaps = state.profile.roadmaps ?? []
   let grid: ReactNode
   if (roadmaps.length === 0) {
-    grid = (
-      <div className="py-14 text-center">
-        <p className="display-m text-foreground">No published roadmaps yet.</p>
-      </div>
-    )
+    grid = <EmptyState title="No published roadmaps yet." />
   } else {
     grid = <RoadmapCardGrid roadmaps={roadmaps} />
   }
