@@ -46,8 +46,18 @@ _ReferenceResolver = Callable[[str], str]
 
 @dataclass(frozen=True)
 class AssembledDraft:
-    """The minted roadmap plus the ``proposed_id -> minted_id`` remap of every
-    de-duped proposal (empty when nothing was changed)."""
+    """The minted roadmap plus the ``proposed_id -> minted_id`` remap.
+
+    The remap records every proposal whose minted ID **differs from what the
+    author sent**, for any reason: a numeric de-dup suffix (``sub_x`` ->
+    ``sub_x-2``) *or* mere normalization (a bare ``two-pointers`` ->
+    ``sub_two-pointers``, a re-slugified ``Two Pointers!`` -> ``sub_two-pointers``).
+    This is intentionally broader than section 04's "de-duped" wording: the
+    author must reconcile its ``prereq_ids``/``suggested_path`` references
+    whenever the final ID is not byte-for-byte what it proposed, and
+    normalization changes the ID just as de-dup does. It is empty only when every
+    proposal was already in its exact minted form (and omitted entirely for
+    server-minted nodes that carried no ``proposed_id``)."""
 
     roadmap: Roadmap
     remap: dict[str, str]
@@ -146,6 +156,9 @@ class _Minter:
     def _mint(self, proposed_id: str | None, source_text: str, prefix: str) -> str:
         if proposed_id is not None:
             minted = slugs.mint_proposed(proposed_id, prefix, self._existing)
+            # Record any divergence from the sent proposal (normalization or
+            # de-dup), not just de-dup, so the author can reconcile references
+            # whenever the final ID is not exactly what it proposed.
             if minted != proposed_id:
                 self.remap[proposed_id] = minted
         else:

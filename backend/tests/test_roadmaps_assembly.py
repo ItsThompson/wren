@@ -126,6 +126,39 @@ def test_proposed_id_dedup_is_reported_in_the_remap() -> None:
     }
 
 
+def test_normalization_only_proposal_is_reported_in_the_remap() -> None:
+    # A proposal that is merely normalized (no de-dup) still diverges from what
+    # the author sent, so it is remapped too (broader than section 04's "de-dup"
+    # wording, so references can be reconciled). Here a bare, un-prefixed proposal
+    # is normalized to the prefixed minted ID.
+    doc = RoadmapInput(
+        title="DSA",
+        sections=[
+            SectionInput(
+                title="Basics",
+                subsections=[_sub("Two Pointers", proposed_id="two-pointers")],
+            )
+        ],
+    )
+    result = _assemble(doc)
+    assert result.remap == {"two-pointers": "sub_two-pointers"}
+    assert "sub_two-pointers" in result.roadmap.sections["sec_basics"].subsections
+
+
+def test_exact_proposal_produces_no_remap_entry() -> None:
+    # A proposal already in its exact minted form is not remapped.
+    doc = RoadmapInput(
+        title="DSA",
+        sections=[
+            SectionInput(
+                title="Basics",
+                subsections=[_sub("Arrays", proposed_id="sub_arrays")],
+            )
+        ],
+    )
+    assert _assemble(doc).remap == {}
+
+
 def test_prereq_ids_resolve_from_proposed_to_minted_ids() -> None:
     doc = RoadmapInput(
         title="DSA",
