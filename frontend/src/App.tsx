@@ -1,7 +1,7 @@
 import { createBrowserRouter, RouterProvider } from 'react-router'
 import { SWRConfig } from 'swr'
 
-import { ApiClientProvider } from '@/api'
+import { ApiClientProvider, swrRevalidationPosture } from '@/api'
 import { AuthProvider } from '@/auth'
 import { AppShell } from '@/components/AppShell'
 import { AuthView } from '@/views/AuthView'
@@ -41,15 +41,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
 export function App() {
   return (
-    <SWRConfig
-      value={{
-        revalidateOnFocus: false,
-        revalidateOnReconnect: false,
-        revalidateIfStale: false,
-        revalidateOnMount: true,
-        dedupingInterval: 2000,
-      }}
-    >
+    <SWRConfig value={swrRevalidationPosture}>
       <ApiClientProvider baseUrl={API_BASE_URL}>
         <AuthProvider>
           <RouterProvider router={router} />

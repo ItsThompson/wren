@@ -3,7 +3,7 @@ import { render, type RenderOptions, type RenderResult } from '@testing-library/
 import { MemoryRouter } from 'react-router'
 import { SWRConfig } from 'swr'
 
-import { ApiClientProvider } from '@/api'
+import { ApiClientProvider, swrRevalidationPosture } from '@/api'
 import { AuthProvider } from '@/auth'
 import { AuthContext } from '@/auth/auth-context'
 import type { AuthContextValue } from '@/auth/types'
@@ -16,18 +16,15 @@ export const TEST_API_BASE = 'https://api.test'
 /**
  * The SWR posture for tests. `provider: () => new Map()` hands each render a
  * FRESH cache so SWR's module-level cache cannot leak between tests (the top
- * false-green risk, VC2). The revalidate/dedupe fields mirror the production
- * `SWRConfig` pinned at the app root (#1 / section 07) so test behavior matches
- * production. The `provider` factory is invoked once per mounted `SWRConfig`, so
- * sharing this constant still yields a distinct `Map` per render.
+ * false-green risk, VC2). The revalidate/dedupe fields come from the SAME
+ * {@link swrRevalidationPosture} constant the production `SWRConfig` binds at the
+ * app root (section 07), so test behavior matches production and cannot drift.
+ * The `provider` factory is invoked once per mounted `SWRConfig`, so sharing this
+ * constant still yields a distinct `Map` per render.
  */
 const SWR_TEST_CONFIG = {
   provider: () => new Map(),
-  revalidateOnFocus: false,
-  revalidateOnReconnect: false,
-  revalidateIfStale: false,
-  revalidateOnMount: true,
-  dedupingInterval: 2000,
+  ...swrRevalidationPosture,
 }
 
 export interface ProviderRenderOptions extends Omit<RenderOptions, 'wrapper'> {
