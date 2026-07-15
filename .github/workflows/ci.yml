@@ -140,8 +140,8 @@ jobs:
           uv run pytest --cov-fail-under=80
 
   # ---------------------------------------------------------------------------
-  # test-frontend: vitest with the hard 70% coverage gate (thresholds + all:true
-  # in vite.config.ts fail the run below the floor). Gated by lint.
+  # test-frontend: vitest with the hard 70% coverage gate (the thresholds in
+  # vite.config.ts fail the run below the floor). Gated by lint.
   # ---------------------------------------------------------------------------
   test-frontend:
     needs: [lint]
