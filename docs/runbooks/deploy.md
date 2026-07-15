@@ -72,5 +72,6 @@ section.
 
 One-time VPS bring-up (UFW + SSH hardening, non-root deploy user, creating
 `/opt/wren/.env` and the OAuth key, creating the tunnel + routing DNS, placing
-tunnel credentials) is a separate, human-run procedure (Ticket 32). This runbook
-covers the repeatable deploy that runs afterward.
+tunnel credentials, and setting the CD repo secrets) is a separate, human-run
+procedure: see `bring-up.md`. This runbook covers the repeatable deploy that runs
+afterward.

@@ -16,7 +16,8 @@ recorded at the end of the last successful deploy) it:
    up automatically) and re-pulls each at `:sha-<prev>`.
 2. Pins the checkout: `git reset --hard <prev>` (so the compose file and tunnel
    template match the rolled-back code).
-3. Re-renders the tunnel config and brings the stack back up on `:sha-<prev>`.
+3. Re-renders the tunnel and Alertmanager configs and brings the stack back up on
+   `:sha-<prev>`.
 
 If no previous SHA is recorded (e.g. the very first deploy), automatic rollback
 cannot proceed and the deploy exits non-zero with that message.
