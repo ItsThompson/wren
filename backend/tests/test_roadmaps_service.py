@@ -7,14 +7,18 @@ from datetime import UTC, datetime
 
 import pytest
 
+from progress_fakes import InMemoryProgressRepository
 from roadmaps_fakes import InMemoryRoadmapRepository, sequence_token_factory
 from wren.core.errors import Conflict, ErrorCode, NotFound, Validation
+from wren.progress.schemas import CompletionState
+from wren.progress.service import ProgressService
 from wren.roadmaps.schemas import (
     AddItemOp,
     AddSubsectionOp,
     ChecklistItemInput,
     ResourceInput,
     ResourceType,
+    Roadmap,
     RoadmapInput,
     RoadmapStatus,
     SectionInput,
@@ -632,4 +636,231 @@ async def test_replace_rolls_back_when_persistence_fails() -> None:
     repo.save = failing_save  # type: ignore[method-assign]
     with pytest.raises(RuntimeError):
         await service.replace_draft("user-1", created.id, created.revision, _replace_doc())
+    assert repo.rollbacks == 1
+
+
+# --- fork -------------------------------------------------------------------
+
+
+async def _publish_public(repo: InMemoryRoadmapRepository, roadmap: Roadmap) -> None:
+    """Persist ``roadmap`` as a published, public source (no visibility path yet,
+    #15), mirroring what a real published-public roadmap looks like on disk. Uses
+    the repository ``save`` seam, like the #13 archived-state simulation."""
+    await repo.save(
+        roadmap.model_copy(
+            update={"status": RoadmapStatus.PUBLISHED, "visibility": Visibility.PUBLIC}
+        )
+    )
+
+
+async def test_fork_creates_a_fresh_draft_owned_by_the_forker() -> None:
+    service, _ = _service(tokens=["7f3k", "9x2b"])
+    source = await service.create_draft("owner", _publishable_doc())
+    fork = await service.fork("owner", source.id)
+    # A brand-new roadmap ID (fresh slug + fresh random), not the source's.
+    assert fork.id == "grokking-dsa-9x2b"
+    assert fork.id != source.id
+    assert fork.owner == "owner"
+    assert fork.status is RoadmapStatus.DRAFT
+    assert fork.visibility is Visibility.PRIVATE
+    assert fork.revision == 1
+
+
+async def test_fork_copies_content_and_persists_the_new_roadmap() -> None:
+    service, repo = _service(tokens=["7f3k", "9x2b"])
+    source = await service.create_draft("owner", _publishable_doc())
+    fork = await service.fork("owner", source.id)
+    # Content copied verbatim (same child IDs, uniqueness is within-roadmap).
+    assert fork.section_order == source.section_order
+    assert fork.suggested_path == source.suggested_path
+    assert set(fork.sections["sec_foundations"].subsections) == {"sub_arrays"}
+    # Persisted: a fresh read returns the fork owned by the forker.
+    fetched = await service.get("owner", fork.id)
+    assert fetched.id == fork.id
+    assert repo.commits == 2
+
+
+async def test_fork_leaves_the_source_untouched() -> None:
+    service, _ = _service(tokens=["7f3k", "9x2b"])
+    source = await service.create_draft("owner", _publishable_doc())
+    await service.fork("owner", source.id)
+    reread = await service.get("owner", source.id)
+    assert reread.id == source.id
+    assert reread.owner == "owner"
+    assert reread.status is RoadmapStatus.DRAFT
+    assert reread.revision == source.revision
+
+
+async def test_fork_of_my_own_draft_succeeds() -> None:
+    service, _ = _service(tokens=["7f3k", "9x2b"])
+    source = await service.create_draft("owner", _publishable_doc())
+    fork = await service.fork("owner", source.id)
+    assert fork.status is RoadmapStatus.DRAFT
+    assert fork.owner == "owner"
+
+
+async def test_fork_of_a_public_roadmap_by_a_non_owner_succeeds() -> None:
+    service, repo = _service(tokens=["7f3k", "9x2b"])
+    source = await service.create_draft("author", _publishable_doc())
+    await _publish_public(repo, source)
+    # A different user forks the public roadmap: they own the fresh draft.
+    fork = await service.fork("forker", source.id)
+    assert fork.owner == "forker"
+    assert fork.status is RoadmapStatus.DRAFT
+    assert fork.visibility is Visibility.PRIVATE
+
+
+async def test_fork_of_a_private_roadmap_i_do_not_own_is_404() -> None:
+    service, _ = _service(tokens=["7f3k", "9x2b"])
+    source = await service.create_draft("author", _publishable_doc())  # private draft
+    with pytest.raises(NotFound):
+        await service.fork("intruder", source.id)
+
+
+async def test_fork_of_an_unknown_id_is_404() -> None:
+    service, _ = _service()
+    with pytest.raises(NotFound):
+        await service.fork("user-1", "does-not-exist-0000")
+
+
+async def test_fork_rolls_back_when_persistence_fails() -> None:
+    service, repo = _service(tokens=["7f3k", "9x2b"])
+    source = await service.create_draft("owner", _publishable_doc())
+
+    async def failing_add(_record: object) -> None:
+        raise RuntimeError("db down")
+
+    repo.add = failing_add  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError):
+        await service.fork("owner", source.id)
+    assert repo.rollbacks == 1
+
+
+async def test_fork_starts_with_fresh_progress_no_carry_over() -> None:
+    # The gold no-carry-over proof: even though the fork copies checklist item IDs
+    # verbatim, progress is keyed by (user, roadmap_id), so the forker's progress
+    # on the source never bleeds into the fork.
+    roadmap_repo = InMemoryRoadmapRepository()
+    progress_repo = InMemoryProgressRepository()
+    roadmaps = RoadmapService(
+        roadmap_repo,
+        token_factory=sequence_token_factory(["7f3k", "9x2b"]),
+        clock=lambda: _FIXED_NOW,
+    )
+    progress = ProgressService(roadmap_repo, progress_repo, clock=lambda: _FIXED_NOW)
+
+    source = await roadmaps.create_draft("owner", _publishable_doc())
+    await roadmaps.publish("owner", source.id)
+    item_id = source.sections["sec_foundations"].subsections["sub_arrays"].item_order[0]
+    # The owner checks an item on the source.
+    await progress.update("owner", source.id, [item_id], CompletionState.COMPLETE)
+
+    fork = await roadmaps.fork("owner", source.id)
+    await roadmaps.publish("owner", fork.id)
+
+    # The fork copied the same item ID verbatim...
+    assert item_id in fork.sections["sec_foundations"].subsections["sub_arrays"].checklist_items
+    # ...yet the forker starts the fork with zero checked items (fresh progress).
+    fork_progress = await progress.get("owner", fork.id, detailed=True)
+    assert fork_progress.checked_items == 0
+    assert fork_progress.checked_ids == []
+    # ...and the source progress is untouched (the item stays checked there).
+    source_progress = await progress.get("owner", source.id, detailed=True)
+    assert source_progress.checked_items == 1
+
+
+# --- edit_metadata (presentation-only, published-mutable) --------------------
+
+
+async def test_edit_metadata_changes_only_the_three_presentation_fields() -> None:
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    edited = await service.edit_metadata(
+        "user-1",
+        created.id,
+        title="Renamed",
+        description="New blurb",
+        subject_tags=["cs", "interview"],
+    )
+    assert edited.title == "Renamed"
+    assert edited.description == "New blurb"
+    assert edited.subject_tags == ["cs", "interview"]
+    # Structure, visibility, and status are untouched.
+    assert edited.sections == created.sections
+    assert edited.section_order == created.section_order
+    assert edited.suggested_path == created.suggested_path
+    assert edited.visibility is created.visibility
+    assert edited.status is RoadmapStatus.DRAFT
+
+
+async def test_edit_metadata_works_on_a_published_roadmap() -> None:
+    # The positive half of #13's deferred AC#4: edit_metadata SUCCEEDS on a
+    # published roadmap while structural writes (patch/replace) are rejected 409.
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    await service.publish("user-1", created.id)
+    edited = await service.edit_metadata(
+        "user-1", created.id, title="Renamed live", description=None, subject_tags=None
+    )
+    assert edited.title == "Renamed live"
+    # Still published (a presentation edit is not a lifecycle change).
+    assert edited.status is RoadmapStatus.PUBLISHED
+
+
+async def test_edit_metadata_does_not_bump_the_revision() -> None:
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    edited = await service.edit_metadata(
+        "user-1", created.id, title="Renamed", description=None, subject_tags=None
+    )
+    assert edited.revision == created.revision
+    # Persisted without a revision bump (last-write-wins, no If-Match).
+    assert (await service.get("user-1", created.id)).revision == created.revision
+
+
+async def test_edit_metadata_leaves_unprovided_fields_unchanged() -> None:
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    # Only the title is provided; description/subject_tags (None) are unchanged.
+    edited = await service.edit_metadata(
+        "user-1", created.id, title="Only title", description=None, subject_tags=None
+    )
+    assert edited.title == "Only title"
+    assert edited.description == created.description
+    assert edited.subject_tags == created.subject_tags
+
+
+async def test_edit_metadata_can_edit_only_subject_tags_leaving_the_title() -> None:
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    # No title/description provided (None): only subject_tags changes.
+    edited = await service.edit_metadata(
+        "user-1", created.id, title=None, description=None, subject_tags=["cs"]
+    )
+    assert edited.title == created.title
+    assert edited.description == created.description
+    assert edited.subject_tags == ["cs"]
+
+
+async def test_edit_metadata_is_404_for_a_non_owner() -> None:
+    service, _ = _service()
+    created = await service.create_draft("owner", _publishable_doc())
+    with pytest.raises(NotFound):
+        await service.edit_metadata(
+            "intruder", created.id, title="Hijack", description=None, subject_tags=None
+        )
+
+
+async def test_edit_metadata_rolls_back_when_persistence_fails() -> None:
+    service, repo = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+
+    async def failing_save(_roadmap: object) -> None:
+        raise RuntimeError("db down")
+
+    repo.save = failing_save  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError):
+        await service.edit_metadata(
+            "user-1", created.id, title="Renamed", description=None, subject_tags=None
+        )
     assert repo.rollbacks == 1

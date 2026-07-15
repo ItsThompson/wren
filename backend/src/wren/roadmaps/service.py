@@ -7,11 +7,12 @@ adapter to render, and owns the transaction boundary (``get_session`` is
 yield-only).
 
 This slice implements ``create_draft``, the owner-scoped ``get``, the iterative
-``patch_draft``, the full-document ``replace_draft`` import escape hatch, and the
+``patch_draft``, the full-document ``replace_draft`` import escape hatch, the
 minimal ``validate`` / ``publish`` lifecycle (the draft -> published one-way
-transition that makes content immutable). Fork and the read projections are later
-slices; the full structural contract composes onto ``validate`` in a later slice
-(spec section 05).
+transition that makes content immutable), ``fork`` (a new draft seeded from any
+readable roadmap), and ``edit_metadata`` (the sanctioned presentation-only edit
+that stays allowed post-publish). The read projections are later slices; the full
+structural contract composes onto ``validate`` in a later slice (spec section 05).
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ from datetime import UTC, datetime
 from wren.core.errors import Conflict, ErrorCode, NotFound, Validation, Violation
 from wren.core.logging import get_logger
 from wren.roadmaps import patch, slugs
-from wren.roadmaps.assembly import assemble_draft
+from wren.roadmaps.assembly import assemble_draft, assemble_fork
 from wren.roadmaps.config import MAX_ID_MINT_ATTEMPTS
 from wren.roadmaps.models import RoadmapRecord
 from wren.roadmaps.repository import RoadmapRepository
@@ -34,6 +35,7 @@ from wren.roadmaps.schemas import (
     RoadmapInput,
     RoadmapReplaced,
     RoadmapStatus,
+    Visibility,
 )
 from wren.roadmaps.validation import validate_structure
 
@@ -228,6 +230,75 @@ class RoadmapService:
         _log.info("roadmap_published", roadmap_id=roadmap_id, owner=user_id)
         return published
 
+    async def fork(self, user_id: str, source_roadmap_id: str) -> Roadmap:
+        """Seed a brand-new draft from any roadmap the caller may read (spec
+        sections 04/05).
+
+        Readable means the caller's own roadmap (any status) or a public one; a
+        private roadmap owned by someone else is a 404 with no existence leak
+        (:meth:`_load_readable`). The fork is a faithful content copy under a
+        freshly-minted, globally-unique roadmap ID (never derived from the source),
+        owned by the forking user, reset to a private ``draft`` at ``revision`` 1.
+        No progress is carried over: fork creates no progress record, so the forker
+        starts the copy with a clean slate (spec section 15). The source is never
+        mutated (the copy is a fresh insert).
+        """
+        source = await self._load_readable(user_id, source_roadmap_id)
+        new_id = await self._mint_unique_roadmap_id(source.title)
+        forked = assemble_fork(source, new_id, owner=user_id, now=self._clock())
+        try:
+            await self._repo.add(_to_record(forked))
+            await self._repo.commit()
+        except Exception:
+            await self._repo.rollback()
+            raise
+        _log.info(
+            "roadmap_forked",
+            roadmap_id=new_id,
+            source_roadmap_id=source_roadmap_id,
+            owner=user_id,
+        )
+        return forked
+
+    async def edit_metadata(
+        self,
+        user_id: str,
+        roadmap_id: str,
+        title: str | None,
+        description: str | None,
+        subject_tags: list[str] | None,
+    ) -> Roadmap:
+        """Edit the presentation-only fields on the caller's own roadmap (spec
+        sections 04/05/06).
+
+        ``title`` / ``description`` / ``subject_tags`` stay mutable after publish
+        (they touch no follower-visible structure), so this loads through the plain
+        owner guard (:meth:`_load_owned`), **not** the content-write immutability
+        guard: a published roadmap is edited here while structural writes on it stay
+        409. It is deliberately not ``If-Match``-guarded and does not bump the
+        structural ``revision`` (last-write-wins, spec section 06). Only fields
+        explicitly provided (not ``None``) are changed; ``visibility``, ``status``,
+        and all content are untouched (a smuggled structural field is rejected at
+        the wire boundary by :meth:`MetadataEditRequest.reject_structural_fields`).
+        """
+        roadmap = await self._load_owned(user_id, roadmap_id)
+        updates: dict[str, object] = {"updated_at": self._clock()}
+        if title is not None:
+            updates["title"] = title
+        if description is not None:
+            updates["description"] = description
+        if subject_tags is not None:
+            updates["subject_tags"] = list(subject_tags)
+        edited = roadmap.model_copy(update=updates)
+        try:
+            await self._repo.save(edited)
+            await self._repo.commit()
+        except Exception:
+            await self._repo.rollback()
+            raise
+        _log.info("roadmap_metadata_edited", roadmap_id=roadmap_id, owner=user_id)
+        return edited
+
     async def _load_owned(self, user_id: str, roadmap_id: str) -> Roadmap:
         """Load the caller's own roadmap or raise ``NotFound``.
 
@@ -239,6 +310,26 @@ class RoadmapService:
         if record is None:
             raise NotFound(f"No roadmap '{roadmap_id}'.", instance=f"/roadmaps/{roadmap_id}")
         return Roadmap.model_validate(record.document)
+
+    async def _load_readable(self, user_id: str, roadmap_id: str) -> Roadmap:
+        """Load a roadmap the caller may **read**: their own (any status) or a
+        public one (spec sections 05/06).
+
+        Readability first: a private roadmap owned by someone else is a 404 that
+        leaks no existence, matching the progress readability convention. This is
+        the fork-source guard; unlike the progress readability check it does not
+        require ``published`` status, so a caller can fork their own draft as well
+        as any public roadmap. Uses the unscoped repository read (a fork source is
+        not owner-scoped), then applies the readability rule here.
+        """
+        record = await self._repo.get(roadmap_id)
+        if record is None:
+            raise NotFound(f"No roadmap '{roadmap_id}'.", instance=f"/roadmaps/{roadmap_id}")
+        roadmap = Roadmap.model_validate(record.document)
+        if roadmap.owner != user_id and roadmap.visibility is not Visibility.PUBLIC:
+            # Private roadmap owned by someone else: 404, no existence leak.
+            raise NotFound(f"No roadmap '{roadmap_id}'.", instance=f"/roadmaps/{roadmap_id}")
+        return roadmap
 
     async def _load_writable_draft(self, user_id: str, roadmap_id: str) -> Roadmap:
         """Load the caller's own roadmap for a **content write** (create-content /
