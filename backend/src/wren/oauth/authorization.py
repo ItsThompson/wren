@@ -211,15 +211,18 @@ class AuthorizationService:
     def _reject_invalid_redirect_uris(self, uris: list[str]) -> None:
         for uri in uris:
             # Allowlist (spec section 08): a public client may register only an
-            # https redirect (exact-matched at /authorize) or a loopback http
-            # redirect (RFC 8252, any port). Everything else -- javascript:,
-            # data:, file:, and arbitrary custom schemes -- is rejected here so a
-            # dangerous URI can never be parked or handed back to the SPA as a
-            # navigation target on consent.
-            if urlsplit(uri).scheme == "https" or is_loopback(uri):
+            # https redirect *with a host* (exact-matched at /authorize) or a
+            # loopback http redirect (RFC 8252, any port). Everything else --
+            # javascript:, data:, file:, custom schemes, non-loopback http, and a
+            # hostless "https:" URI -- is rejected here so a dangerous or
+            # degenerate URI can never be parked or handed back to the SPA as a
+            # navigation target on consent. (An empty redirect_uris list is
+            # rejected earlier by the schema's min_length=1.)
+            parts = urlsplit(uri)
+            if (parts.scheme == "https" and parts.hostname) or is_loopback(uri):
                 continue
             raise OAuthError.invalid_client_metadata(
-                f"redirect_uri scheme is not allowed (use https or loopback http): {uri}"
+                f"redirect_uri is not allowed (use https with a host or loopback http): {uri}"
             )
 
     def _resolve_registration_scope(self, requested: str | None) -> str:

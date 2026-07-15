@@ -125,13 +125,16 @@ async def test_register_rejects_non_loopback_http_redirect() -> None:
         "file:///etc/passwd",
         "com.evil.app:/callback",
         "http://evil.example.com/cb",
+        "https:",
+        "https:///onlypath",
         "/callback",
     ],
 )
 async def test_register_rejects_dangerous_or_non_allowlisted_redirects(redirect_uri: str) -> None:
-    # Allowlist: only https or loopback http may register. A dangerous scheme
-    # (javascript:/data:/file:) or arbitrary custom/non-loopback scheme is
-    # rejected at DCR so it can never become a consent navigation target.
+    # Allowlist: only https-with-a-host or loopback http may register. A dangerous
+    # scheme (javascript:/data:/file:), an arbitrary custom/non-loopback scheme,
+    # or a degenerate hostless https URI is rejected at DCR so it can never become
+    # a consent navigation target.
     h = _harness()
     with pytest.raises(OAuthError) as exc:
         await h.auth.register_client(ClientRegistrationRequest(redirect_uris=[redirect_uri]))

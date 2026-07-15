@@ -165,6 +165,15 @@ def test_register_bad_redirect_is_oauth_error_json(make_settings: MakeSettings) 
     assert response.json()["error"] == "invalid_client_metadata"
 
 
+def test_register_empty_redirect_uris_is_rejected_at_dcr(make_settings: MakeSettings) -> None:
+    # The schema's min_length=1 rejects an empty redirect_uris list at the DCR
+    # boundary (RFC 9457 problem+json) before the service validation loop.
+    fx = _build_client(make_settings)
+    response = fx.client.post("/register", json={"redirect_uris": []})
+    assert response.status_code == 422
+    assert response.headers["content-type"] == "application/problem+json"
+
+
 # --- authorize 302 + Site-URL gotcha ----------------------------------------
 
 
