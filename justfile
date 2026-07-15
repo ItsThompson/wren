@@ -154,3 +154,27 @@ render-tunnel:
     set -a; . ./.env; set +a; \
     envsubst '$CF_TUNNEL_ID $CF_APP_HOSTNAME $CF_API_HOSTNAME $CF_MCP_HOSTNAME' \
       < deployments/cloudflare/config.yml
+
+# --- E2E (Playwright, full stack) -------------------------------------------
+
+# Every e2e compose invocation layers the e2e overlay (published frontend +
+# backend ports, relaxed cookies) on the base stack. Test-only: a real deploy
+# never uses this overlay (deploy.sh composes base + docker-compose.tunnel.yml).
+e2e_compose := "-f docker-compose.yml -f e2e/docker-compose.e2e.yml"
+
+# Install the Playwright runner + the chromium browser (run once).
+setup-e2e:
+    cd e2e && npm ci && npx playwright install --with-deps chromium
+
+# Build + boot the e2e stack (published ports) and run pre-traffic migrations.
+e2e-up:
+    docker compose {{e2e_compose}} up -d --build
+    docker compose {{e2e_compose}} run --rm backend alembic upgrade head
+
+# Run the Playwright spine + smoke against the running e2e stack.
+test-e2e:
+    cd e2e && npx playwright test
+
+# Tear down the e2e stack and drop its named volumes.
+e2e-down:
+    docker compose {{e2e_compose}} down -v
