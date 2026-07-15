@@ -25,10 +25,18 @@ from datetime import UTC, datetime
 
 from wren.core.errors import Conflict, ErrorCode, NotFound, Validation, Violation
 from wren.core.logging import get_logger
-from wren.roadmaps import patch, slugs
+from wren.roadmaps import patch, projections, slugs
 from wren.roadmaps.assembly import assemble_draft, assemble_fork
-from wren.roadmaps.config import MAX_ID_MINT_ATTEMPTS
+from wren.roadmaps.config import MAX_ID_MINT_ATTEMPTS, SECTION_PAGE_SIZE
 from wren.roadmaps.models import RoadmapRecord
+from wren.roadmaps.read_schemas import (
+    NodeDetail,
+    Overview,
+    ResponseFormat,
+    SearchHit,
+    SectionInclude,
+    SectionPage,
+)
 from wren.roadmaps.repository import RoadmapRepository
 from wren.roadmaps.schemas import (
     PatchOp,
@@ -51,10 +59,24 @@ Clock = Callable[[], datetime]
 # decoupled from the progress domain: the wiring binds it to the progress
 # repository's indexed count, tests substitute a constant (spec sections 05/06).
 FollowerCounter = Callable[[str], Awaitable[int]]
+# How a read learns the caller's checked checklist-item ids for the progress-aware
+# projections (Overview counts, NodeDetail done-state). Like FollowerCounter, a
+# narrow injected callable rather than the progress repository, so the roadmaps
+# domain stays decoupled from the progress domain (the wiring binds it to the
+# progress repository; tests substitute a closure over a seeded set).
+CheckedReader = Callable[[str, str], Awaitable[frozenset[str]]]
 
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+async def _no_checked_items(_user_id: str, _roadmap_id: str) -> frozenset[str]:
+    """Default checked reader: no progress (every item un-done).
+
+    Production wiring binds the real progress-backed reader; this default keeps the
+    read projections usable in unit/contract tests that do not seed progress."""
+    return frozenset()
 
 
 class RoadmapService:
@@ -65,17 +87,26 @@ class RoadmapService:
         repo: RoadmapRepository,
         *,
         follower_counter: FollowerCounter,
+        checked_reader: CheckedReader = _no_checked_items,
         token_factory: TokenFactory = slugs.random_token,
         clock: Clock = _utcnow,
+        section_page_size: int = SECTION_PAGE_SIZE,
     ) -> None:
         self._repo = repo
         # Counts followers for the delete guard; injected so the roadmaps domain
         # never imports the progress repository (the wiring composes them).
         self._follower_counter = follower_counter
+        # Resolves the caller's checked item ids for the progress-aware read
+        # projections (Overview counts, NodeDetail done-state); injected the same
+        # way as the follower counter so roadmaps stays decoupled from progress.
+        self._checked_reader = checked_reader
         # The random-token source and clock are injected so tests can force an
         # ID collision (re-roll) and pin timestamps without patching globals.
         self._token_factory = token_factory
         self._clock = clock
+        # Server-set section page size (spec sections 06/07); injected so a test
+        # can force truncation on a small fixture.
+        self._section_page_size = section_page_size
 
     async def create_draft(self, user_id: str, doc: RoadmapInput) -> RoadmapCreated:
         """Mint slug IDs, resolve references, and persist a private draft.
@@ -210,10 +241,94 @@ class RoadmapService:
         return RoadmapReplaced.model_validate({**replaced.model_dump(), "remap": assembled.remap})
 
     async def get(self, user_id: str, roadmap_id: str) -> Roadmap:
-        """Return the caller's own roadmap, or 404 (never revealing existence to
-        a non-owner: the query is owner-scoped). Any status, since a read is not a
-        draft-only operation."""
-        return await self._load_owned(user_id, roadmap_id)
+        """Return the full roadmap to a caller who may read it (spec section 06:
+        "owner draft preview or readable published").
+
+        The owner reads their own roadmap at any status (draft preview included); a
+        non-owner may read a **public** roadmap that is published or archived (by
+        direct link). A private roadmap owned by someone else, or a non-owner's
+        request for a public *draft* (not discoverable), is a 404 with no existence
+        leak. This is the read that backs the public list view / profile (#25).
+        """
+        return await self._load_readable_document(user_id, roadmap_id)
+
+    async def get_overview(self, user_id: str, roadmap_id: str, fmt: ResponseFormat) -> Overview:
+        """Orientation overview: sections in ``section_order`` with per-section and
+        overall completion counts, no checklist-item bodies (spec sections 04/07).
+
+        Readable by the owner (any non-draft or their own draft) or a non-owner on
+        a public published/archived roadmap; the counts reflect the **caller's**
+        progress (zero when they have not started)."""
+        roadmap = await self._load_readable_document(user_id, roadmap_id)
+        checked = await self._checked_reader(user_id, roadmap_id)
+        return projections.build_overview(roadmap, checked, fmt=fmt)
+
+    async def get_node(
+        self, user_id: str, roadmap_id: str, subsection_id: str, fmt: ResponseFormat
+    ) -> NodeDetail:
+        """One subsection resolved for study: description (detailed only), tags,
+        resource links, ``prereq_ids`` resolved to ``{id,title,done}``, and items
+        ``{id,text,done}`` (spec sections 04/07).
+
+        An unknown subsection id is a 404 that names the valid sibling subsection
+        ids so the agent can self-correct. Done-state is the caller's own."""
+        roadmap = await self._load_readable_document(user_id, roadmap_id)
+        subsection = projections.find_subsection(roadmap, subsection_id)
+        if subsection is None:
+            siblings = ", ".join(projections.all_subsection_ids(roadmap)) or "none"
+            raise NotFound(
+                f"No subsection '{subsection_id}' in roadmap '{roadmap_id}'. "
+                f"Valid subsections: {siblings}.",
+                instance=f"/roadmaps/{roadmap_id}/nodes/{subsection_id}",
+            )
+        checked = await self._checked_reader(user_id, roadmap_id)
+        return projections.build_node_detail(roadmap, subsection, checked, fmt=fmt)
+
+    async def get_section(
+        self,
+        user_id: str,
+        roadmap_id: str,
+        section_id: str,
+        cursor: str | None,
+        include: SectionInclude,
+    ) -> SectionPage:
+        """Paginated section drill-down (spec sections 04/07).
+
+        Returns a ``SectionPage`` of the section's subsections in
+        ``subsection_order`` with a server-set page size, an opaque ``next_cursor``
+        (absent on the last page), and steering text when truncated. ``include``
+        selects node metadata, items, or both. An unknown section id is a 404
+        naming the valid sections; a malformed/stale cursor is a 422."""
+        roadmap = await self._load_readable_document(user_id, roadmap_id)
+        section = roadmap.sections.get(section_id)
+        if section is None:
+            siblings = ", ".join(roadmap.section_order) or "none"
+            raise NotFound(
+                f"No section '{section_id}' in roadmap '{roadmap_id}'. Valid sections: {siblings}.",
+                instance=f"/roadmaps/{roadmap_id}/sections/{section_id}",
+            )
+        checked = await self._checked_reader(user_id, roadmap_id)
+        try:
+            return projections.build_section_page(
+                roadmap, section, cursor, include, checked, page_size=self._section_page_size
+            )
+        except projections.CursorError as err:
+            raise Validation(
+                str(err),
+                fields={"cursor": str(err)},
+                instance=f"/roadmaps/{roadmap_id}/sections/{section_id}",
+            ) from err
+
+    async def search(
+        self, user_id: str, roadmap_id: str, query: str | None, tags: list[str] | None
+    ) -> list[SearchHit]:
+        """Search the roadmap's subsections + items by keyword and/or tag (spec
+        sections 04/07): search, not list-all (empty query and no tags -> ``[]``).
+
+        Each hit carries the ids needed to drill down. Needs no progress, so it is
+        a pure projection over the readable roadmap."""
+        roadmap = await self._load_readable_document(user_id, roadmap_id)
+        return projections.search(roadmap, query, tags)
 
     async def validate(self, user_id: str, roadmap_id: str) -> list[Violation]:
         """Run the structural checks on the caller's own draft and return every
@@ -441,6 +556,25 @@ class RoadmapService:
         roadmap = Roadmap.model_validate(record.document)
         if roadmap.owner != user_id and roadmap.visibility is not Visibility.PUBLIC:
             # Private roadmap owned by someone else: 404, no existence leak.
+            raise NotFound(f"No roadmap '{roadmap_id}'.", instance=f"/roadmaps/{roadmap_id}")
+        return roadmap
+
+    async def _load_readable_document(self, user_id: str, roadmap_id: str) -> Roadmap:
+        """Load a roadmap the caller may read as a study-time reader (spec section
+        06: "owner draft preview or readable published").
+
+        Builds on :meth:`_load_readable` (own-or-public; a private roadmap owned by
+        someone else is a 404 with no existence leak) and layers the reader status
+        gate on top: a non-owner may read a **public** roadmap only when it is
+        published or archived (readable by direct link), never a public *draft*
+        (drafts are not discoverable), which is a 404 with no existence leak. The
+        owner still reads their own roadmap at any status (draft preview). This is
+        the shared load under ``get`` and every read projection.
+        """
+        roadmap = await self._load_readable(user_id, roadmap_id)
+        if roadmap.owner != user_id and roadmap.status is RoadmapStatus.DRAFT:
+            # A non-owner cannot read another user's draft even if it is public
+            # (drafts are not discoverable): 404, no existence leak.
             raise NotFound(f"No roadmap '{roadmap_id}'.", instance=f"/roadmaps/{roadmap_id}")
         return roadmap
 
