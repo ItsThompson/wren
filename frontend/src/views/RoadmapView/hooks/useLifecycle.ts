@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react'
-import type { Client } from 'openapi-fetch'
 
-import type { paths } from '@/api'
+import type { SessionClient } from '@/api'
 import type {
   ArchiveState,
   DeleteState,
@@ -12,7 +11,7 @@ import type {
 } from '../types'
 
 interface LifecycleCallbacks {
-  /** Replace the loaded roadmap after a visibility toggle or archive (in place). */
+  /** Reconcile the shared roadmap cache after a visibility toggle or archive. */
   onChanged: (roadmap: Roadmap) => void
   /** Called after a successful delete: the roadmap is gone, so navigate away. */
   onDeleted: () => void
@@ -23,15 +22,18 @@ interface LifecycleCallbacks {
  * visibility toggle, archive, and delete. Web-only by design: there is no agent
  * (MCP) surface for any of them.
  *
- * Visibility and archive replace the loaded roadmap in place via `onChanged` (so
- * the badge / discovery state updates without a refetch). Delete is guarded by a
+ * Visibility and archive reconcile the loaded roadmap in place via `onChanged`
+ * (which writes the returned roadmap into the shared `keys.roadmap(id)` cache in
+ * `useRoadmap`, so the badge / discovery state updates without a refetch and any
+ * co-mounted reader stays coherent). Delete is guarded by a
  * zero-followers check server-side: a 409 `DELETE_HAS_FOLLOWERS` surfaces as the
  * `blocked` state so the UI can steer the owner to archive instead; a successful
  * delete (204) calls `onDeleted` to leave the now-removed roadmap's route. The
- * `client` and callbacks are injected so the hook is context-free and testable.
+ * shared session `client` and the callbacks are injected so the hook is
+ * context-free and testable.
  */
 export function useLifecycle(
-  client: Client<paths>,
+  client: SessionClient,
   roadmapId: string,
   { onChanged, onDeleted }: LifecycleCallbacks,
 ): RoadmapLifecycle {

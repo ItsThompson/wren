@@ -1,11 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll } from 'vitest'
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
+import { Route, Routes, useLocation, useNavigate } from 'react-router'
 
-import { ApiClientProvider } from '@/api'
-import { AuthProvider } from '@/auth'
+import { renderWithProviders } from '@/test/renderWithProviders'
 import { colorForTag } from '@/lib/tag-color'
 import type { ProgressSnapshot, ProgressUpdateResult, Roadmap } from './types'
 import { RoadmapView } from './RoadmapView'
@@ -114,40 +113,48 @@ function LocationProbe() {
   return <div data-testid="location">{location.pathname}</div>
 }
 
+/**
+ * A test-only control that navigates to another route without unmounting the
+ * view under test, so a `:roadmapId` change on the SAME RoadmapView instance is
+ * exercisable (the fork -> navigate / roadmap-to-roadmap case behind R2).
+ */
+function NavTo({ to, label }: { to: string; label: string }) {
+  const navigate = useNavigate()
+  return (
+    <button type="button" onClick={() => navigate(to)}>
+      {label}
+    </button>
+  )
+}
+
 function renderView(user: typeof AUTH_USER | null = AUTH_USER) {
   server.use(
     user
       ? http.post('*/auth/refresh', () => HttpResponse.json(user))
       : http.post('*/auth/refresh', () => new HttpResponse(null, { status: 401 })),
   )
-  return render(
-    <ApiClientProvider baseUrl={BASE}>
-      <AuthProvider>
-        <MemoryRouter initialEntries={[`/roadmaps/${ROADMAP_ID}`]}>
-          <Routes>
-            <Route path="/roadmaps/:roadmapId" element={<RoadmapView baseUrl={BASE} />} />
-          </Routes>
-          <LocationProbe />
-        </MemoryRouter>
-      </AuthProvider>
-    </ApiClientProvider>,
+  return renderWithProviders(
+    <>
+      <Routes>
+        <Route path="/roadmaps/:roadmapId" element={<RoadmapView baseUrl={BASE} />} />
+      </Routes>
+      <LocationProbe />
+    </>,
+    { initialEntries: [`/roadmaps/${ROADMAP_ID}`], baseUrl: BASE, useRealAuth: true },
   )
 }
 
 /** Renders the view with a starting URL hash so anchor-scroll can be exercised. */
 function renderViewAtHash(hash: string) {
   server.use(http.post('*/auth/refresh', () => HttpResponse.json(AUTH_USER)))
-  return render(
-    <ApiClientProvider baseUrl={BASE}>
-      <AuthProvider>
-        <MemoryRouter initialEntries={[`/roadmaps/${ROADMAP_ID}${hash}`]}>
-          <Routes>
-            <Route path="/roadmaps/:roadmapId" element={<RoadmapView baseUrl={BASE} />} />
-          </Routes>
-          <LocationProbe />
-        </MemoryRouter>
-      </AuthProvider>
-    </ApiClientProvider>,
+  return renderWithProviders(
+    <>
+      <Routes>
+        <Route path="/roadmaps/:roadmapId" element={<RoadmapView baseUrl={BASE} />} />
+      </Routes>
+      <LocationProbe />
+    </>,
+    { initialEntries: [`/roadmaps/${ROADMAP_ID}${hash}`], baseUrl: BASE, useRealAuth: true },
   )
 }
 
@@ -1207,6 +1214,75 @@ describe('RoadmapView states (loading/empty/error, 409/422, tabs, anchor)', () =
     // ... and the hash scrolls that node into view.
     await waitFor(() => expect(scrollSpy).toHaveBeenCalled())
     scrollSpy.mockRestore()
+  })
+})
+
+describe('RoadmapView sub-state reset on roadmapId change (R2 invariant)', () => {
+  const ROADMAP_B = 'algorithms-ii-9x2b'
+  const PUBLISH_URL = `${BASE}/roadmaps/${ROADMAP_ID}:publish`
+
+  /** A 422 hard-block carrying one structural violation, to drive the publish
+   *  sub-state into `blocked` (the state that must not leak across roadmaps). */
+  function blockedPublish() {
+    return HttpResponse.json(
+      {
+        type: 'x',
+        title: 'Draft cannot be published',
+        status: 422,
+        code: 'VALIDATION',
+        violations: [
+          {
+            rule: 'V7_RESOURCE_REQUIRED',
+            ids: ['sub_hashing'],
+            message: 'subsection sub_hashing has no resources',
+          },
+        ],
+      },
+      { status: 422, headers: { 'content-type': 'application/problem+json' } },
+    )
+  }
+
+  it('clears a blocked publish sub-state when the route changes on the same instance', async () => {
+    server.use(
+      http.post('*/auth/refresh', () => HttpResponse.json(AUTH_USER)),
+      // Both roadmap A and roadmap B resolve to an owned draft (echo the id), so
+      // the only thing that could differ between them is a leaked sub-state.
+      http.get('*/roadmaps/:id', ({ params }) =>
+        HttpResponse.json(buildDraft({ id: String(params.id) })),
+      ),
+      http.post(PUBLISH_URL, () => blockedPublish()),
+    )
+    renderWithProviders(
+      <>
+        <Routes>
+          <Route path="/roadmaps/:roadmapId" element={<RoadmapView baseUrl={BASE} />} />
+        </Routes>
+        <NavTo to={`/roadmaps/${ROADMAP_B}`} label="Go to roadmap B" />
+      </>,
+      { initialEntries: [`/roadmaps/${ROADMAP_ID}`], baseUrl: BASE, useRealAuth: true },
+    )
+
+    await screen.findByText('Grokking DSA')
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }))
+    // Roadmap A's publish is hard-blocked: the violation is shown inline.
+    expect(
+      await screen.findByText('subsection sub_hashing has no resources'),
+    ).toBeInTheDocument()
+
+    // Navigate to roadmap B WITHOUT unmounting RoadmapView: React Router keeps the
+    // same instance across a `:roadmapId` change, so the plain-useState publish
+    // sub-state would leak onto B unless it is reset (the R2 invariant).
+    fireEvent.click(screen.getByRole('button', { name: /go to roadmap b/i }))
+
+    // Once roadmap B is loaded (its Publish action is back), the blocked violation
+    // from roadmap A is gone: the sub-state reset fired on the route change.
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^publish$/i })).toBeInTheDocument()
+      expect(
+        screen.queryByText('subsection sub_hashing has no resources'),
+      ).not.toBeInTheDocument()
+    })
+    expect(screen.getByText(/draft · preview/i)).toBeInTheDocument()
   })
 })
 

@@ -45,7 +45,7 @@ export function RoadmapView({ baseUrl = API_BASE_URL }: RoadmapViewProps) {
     lifecycle,
     conflict,
     reload,
-  } = useRoadmap(roadmapId ?? '', baseUrl)
+  } = useRoadmap(roadmapId ?? '')
 
   if (state.phase === 'loading') {
     return <RoadmapSkeleton />
