@@ -13,19 +13,19 @@ describe('tagPillStyle', () => {
     expect(styleOf('arrays')['--tag-hue']).toBe(colorForTag('arrays'))
   })
 
-  it('mixes the hue into card for background and into foreground for text', () => {
+  it('drives the color from --tag-hue via color-mix (the var is load-bearing)', () => {
     const style = styleOf('graphs')
-    const hue = colorForTag('graphs') // #B8862F
-    expect(style.backgroundColor).toBe(`color-mix(in oklab, ${hue} 16%, var(--card))`)
-    expect(style.color).toBe(`color-mix(in oklab, ${hue} 72%, var(--foreground))`)
+    expect(style['--tag-hue']).toBe(colorForTag('graphs')) // #B8862F
+    expect(style.backgroundColor).toBe('color-mix(in oklab, var(--tag-hue) 16%, var(--card))')
+    expect(style.color).toBe('color-mix(in oklab, var(--tag-hue) 72%, var(--foreground))')
   })
 
   it('is stable: the same tag always yields the same style', () => {
     expect(tagPillStyle('recursion')).toEqual(tagPillStyle('recursion'))
   })
 
-  it('gives different tags whose hues differ a different background', () => {
+  it('gives different tags whose hues differ a different --tag-hue', () => {
     // 'recursion' -> #B06A43 (index 0), 'arrays' -> #B05A72 (index 8).
-    expect(styleOf('recursion').backgroundColor).not.toBe(styleOf('arrays').backgroundColor)
+    expect(styleOf('recursion')['--tag-hue']).not.toBe(styleOf('arrays')['--tag-hue'])
   })
 })

@@ -16,7 +16,7 @@ interface NodeCardProps {
   /**
    * The current "next" node (from `GET /next`, section 07/Ticket 17). The one
    * next subsection gets the accent-tinted highlight (§7.2): an accent-tint
-   * surface, a loud terracotta left border, and the reserved faint shadow.
+   * surface, an accent-tint left border, and the reserved faint shadow.
    */
   isNext?: boolean
 }
@@ -37,11 +37,12 @@ export function NodeCard({ subsection, progress, isNext = false }: NodeCardProps
   const tags = subsection.tags ?? []
   const done = progress ? isSubsectionDone(subsection, progress.checkedIds) : false
   const borderClass = done ? 'border-success/50' : 'border-border'
-  // §7.2 "next" card: accent-tint surface + loud terracotta left border + the
-  // reserved faint shadow. `aria-current="step"` announces it as the current
-  // step (meaning is never carried by color alone).
+  // §7.2 "next" card: accent-tint surface + accent-tint left border + the
+  // reserved faint shadow (the specific component spec, not the general §9
+  // loud-map, governs the border color; the surface tint carries the emphasis).
+  // `aria-current="step"` announces it as the current step (never color alone).
   const nextClass = isNext
-    ? 'border-l-4 border-l-primary bg-accent shadow-[0_1px_2px_rgba(33,26,21,0.06),0_4px_16px_rgba(33,26,21,0.04)]'
+    ? 'border-l-4 border-l-accent bg-accent shadow-[0_1px_2px_rgba(33,26,21,0.06),0_4px_16px_rgba(33,26,21,0.04)]'
     : 'bg-card'
 
   return (
@@ -54,7 +55,7 @@ export function NodeCard({ subsection, progress, isNext = false }: NodeCardProps
           {done ? (
             <Check aria-hidden className="size-4 shrink-0 self-center text-success" />
           ) : null}
-          <h3 className="font-serif text-lg font-medium text-foreground">{subsection.title}</h3>
+          <h3 className="text-lg font-semibold text-foreground">{subsection.title}</h3>
           {done ? (
             <span className="font-mono text-[11px] uppercase tracking-wide text-success">done</span>
           ) : null}

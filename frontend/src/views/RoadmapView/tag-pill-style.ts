@@ -9,17 +9,17 @@ import { colorForTag } from '@/lib/tag-color'
  * `colorForTag` util (never re-derived here), so a given tag always renders in
  * the same hue across every view.
  *
- * The raw hue is also exposed as the `--tag-hue` custom property. It is the
- * stable, inspectable signal of which palette hue a tag resolved to (the
- * color-mix expressions above only reference it indirectly), which keeps the
- * hash → color contract assertable without depending on how a given engine
- * resolves `color-mix`.
+ * The hue is set once as the `--tag-hue` custom property and the color-mix
+ * expressions read `var(--tag-hue)`, so the exposed variable is load-bearing
+ * (the single source of the pill's color) rather than a duplicate copy. It is
+ * also the stable, inspectable signal of which palette hue a tag resolved to,
+ * which keeps the hash → color contract assertable without depending on how a
+ * given engine resolves `color-mix`.
  */
 export function tagPillStyle(tag: string): CSSProperties {
-  const hue = colorForTag(tag)
   return {
-    '--tag-hue': hue,
-    backgroundColor: `color-mix(in oklab, ${hue} 16%, var(--card))`,
-    color: `color-mix(in oklab, ${hue} 72%, var(--foreground))`,
+    '--tag-hue': colorForTag(tag),
+    backgroundColor: 'color-mix(in oklab, var(--tag-hue) 16%, var(--card))',
+    color: 'color-mix(in oklab, var(--tag-hue) 72%, var(--foreground))',
   } as CSSProperties
 }
