@@ -9,27 +9,16 @@ import { ConnectedClientsSkeleton } from './components/ConnectedClientsSkeleton'
 import { useConnectedClients } from './hooks/useConnectedClients'
 
 /**
- * Same-origin by default (dev proxy + MSW); prod points at the API subdomain via
- * `VITE_API_BASE_URL`. Read once at module load: the deployment base is fixed.
- */
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
-
-interface ConnectedClientsViewProps {
-  /** Overridable in tests; defaults to the deployment API base URL. */
-  baseUrl?: string
-}
-
-/**
  * ConnectedClientsView (`/me/clients`): the connected-agents
  * management surface. It lists the agents the signed-in user has authorized and
  * lets them revoke access. Fetching is gated on an authenticated session; the
  * body routes loading / anonymous / error / empty / loaded states inside a
  * shared page frame.
  */
-export function ConnectedClientsView({ baseUrl = API_BASE_URL }: ConnectedClientsViewProps) {
+export function ConnectedClientsView() {
   const { status } = useAuth()
   const isAuthenticated = status === 'authenticated'
-  const { state, revoke, reload } = useConnectedClients(baseUrl, isAuthenticated)
+  const { state, revoke, reload } = useConnectedClients(isAuthenticated)
 
   let body: ReactNode
   if (status === 'loading') {
