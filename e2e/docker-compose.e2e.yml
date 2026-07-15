@@ -1,0 +1,43 @@
+# =============================================================================
+# E2E overlay (Ticket 30) — layered ON TOP of docker-compose.yml for the CI
+# `e2e` job and local `just e2e-up` / `just test-e2e`.
+#
+# The base stack is expose-only (the tunnel is the only ingress in prod), so a
+# host-run Playwright cannot reach it. This overlay publishes the frontend and
+# external backend ports to the host, and relaxes cookies + wires in-network
+# URLs so the containerized stack boots healthy and self-contained for tests.
+#
+# Test-only: a real deploy never uses this file (deploy.sh composes the base
+# file plus docker-compose.tunnel.yml). The distinct project name keeps its
+# volumes/networks separate from `just up` (wren) and `just up-dev` (wren-dev).
+# =============================================================================
+name: wren-e2e
+
+services:
+  frontend:
+    build:
+      args:
+        # The browser reaches the API at the published HOST port, so bake the
+        # host origin (not the in-network `backend` service name) into the SPA.
+        VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - "5173:80"
+
+  backend:
+    environment:
+      ENVIRONMENT: development            # relaxed cookies: Secure off, host-only
+      SESSION_JWT_SECRET: e2e-session-secret-not-for-production
+      INTERNAL_API_TOKEN: e2e-internal-token
+      CORS_ORIGIN: http://localhost:5173  # allow the SPA origin's credentialed XHRs
+      PUBLIC_BASE_URL: http://backend:8000  # in-network AS origin (OAuth/JWKS)
+      APP_PUBLIC_URL: http://localhost:5173
+      MCP_PUBLIC_URL: http://localhost:9000
+    ports:
+      - "8000:8000"
+
+  mcp:
+    environment:
+      ENVIRONMENT: development
+      INTERNAL_API_TOKEN: e2e-internal-token
+      PUBLIC_BASE_URL: http://backend:8000  # reach the AS JWKS in-network
+      MCP_PUBLIC_URL: http://localhost:9000
