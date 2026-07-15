@@ -58,6 +58,20 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     # resolve the human session via require_user (owner-scoped in the service).
     RouteKey(method="POST", path="/roadmaps"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}"): AccessLevel.EXTERNAL_COOKIE,
+    # OAuth 2.1 AS (#18), external-only. The AS-handshake endpoints are OAUTH
+    # (unauthenticated protocol surface: discovery, DCR, authorize, token,
+    # revoke); the SPA-driven consent decision and connected-clients management
+    # resolve the human session via require_user (EXTERNAL_COOKIE).
+    RouteKey(method="GET", path="/.well-known/oauth-authorization-server"): AccessLevel.OAUTH,
+    RouteKey(method="GET", path="/jwks"): AccessLevel.OAUTH,
+    RouteKey(method="POST", path="/register"): AccessLevel.OAUTH,
+    RouteKey(method="GET", path="/authorize"): AccessLevel.OAUTH,
+    RouteKey(method="GET", path="/authorize/context"): AccessLevel.OAUTH,
+    RouteKey(method="POST", path="/authorize/decision"): AccessLevel.EXTERNAL_COOKIE,
+    RouteKey(method="POST", path="/token"): AccessLevel.OAUTH,
+    RouteKey(method="POST", path="/revoke"): AccessLevel.OAUTH,
+    RouteKey(method="GET", path="/me/clients"): AccessLevel.EXTERNAL_COOKIE,
+    RouteKey(method="DELETE", path="/me/clients/{client_id}"): AccessLevel.EXTERNAL_COOKIE,
 }
 INTERNAL_ROUTE_ACCESS: RouteRegistry = {}
 
