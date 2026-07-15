@@ -69,25 +69,47 @@ test_filter_first_party_images() {
   equals "$(printf '%s\n' "${out}" | wc -l | tr -d ' ')" "3" || return 1
 }
 
-test_unhealthy_services_jsonl() {
+test_gate_unhealthy_jsonl() {
   source "${DEPLOY}"
   local out
   out="$(printf '%s\n' \
-    '{"Service":"backend","Health":"healthy"}' \
-    '{"Service":"mcp","Health":"starting"}' \
-    '{"Service":"postgres","Health":""}' \
-    '{"Service":"frontend","Health":"unhealthy"}' | unhealthy_services)"
+    '{"Service":"backend","State":"running","Health":"healthy"}' \
+    '{"Service":"mcp","State":"running","Health":"starting"}' \
+    '{"Service":"postgres","State":"running","Health":""}' \
+    '{"Service":"frontend","State":"running","Health":"unhealthy"}' | gate_unhealthy)"
   contains "${out}" "mcp" || return 1
   contains "${out}" "frontend" || return 1
   not_contains "${out}" "backend" || return 1
   not_contains "${out}" "postgres" || return 1
 }
 
-test_unhealthy_services_array_and_all_healthy() {
+test_gate_unhealthy_flags_exited_container_with_empty_health() {
   source "${DEPLOY}"
   local out
-  out="$(printf '%s' '[{"Service":"backend","Health":"healthy"},{"Service":"mcp","Health":"healthy"}]' | unhealthy_services)"
+  # An exited container reports empty Health; keying on State alone must catch it.
+  out="$(printf '%s\n' \
+    '{"Service":"backend","State":"running","Health":"healthy"}' \
+    '{"Service":"mcp","State":"exited","Health":""}' | gate_unhealthy)"
+  contains "${out}" "mcp" || return 1
+  not_contains "${out}" "backend" || return 1
+}
+
+test_gate_unhealthy_array_and_all_healthy() {
+  source "${DEPLOY}"
+  local out
+  out="$(printf '%s' '[{"Service":"backend","State":"running","Health":"healthy"},{"Service":"mcp","State":"running","Health":"healthy"}]' | gate_unhealthy)"
   equals "${out}" "" || return 1
+}
+
+test_gate_unhealthy_empty_or_unparseable_is_not_healthy() {
+  source "${DEPLOY}"
+  # A transient SSH blip (empty output) must NOT read as healthy, or the gate
+  # would falsely pass and suppress the rollback that is its whole purpose.
+  local empty_out garbage_out
+  empty_out="$(printf '' | gate_unhealthy)"
+  garbage_out="$(printf 'not json at all' | gate_unhealthy)"
+  [[ -n "${empty_out}" ]] || { echo "empty input read as healthy"; return 1; }
+  [[ -n "${garbage_out}" ]] || { echo "unparseable input read as healthy"; return 1; }
 }
 
 # --- dry-run phase plan & ordering ------------------------------------------
@@ -208,8 +230,10 @@ test_failed_health_gate_triggers_rollback_and_nonzero_exit() {
 
 main_tests() {
   run_test test_filter_first_party_images
-  run_test test_unhealthy_services_jsonl
-  run_test test_unhealthy_services_array_and_all_healthy
+  run_test test_gate_unhealthy_jsonl
+  run_test test_gate_unhealthy_flags_exited_container_with_empty_health
+  run_test test_gate_unhealthy_array_and_all_healthy
+  run_test test_gate_unhealthy_empty_or_unparseable_is_not_healthy
   run_test test_dry_run_full_phase_sequence
   run_test test_dry_run_migrations_before_start
   run_test test_dry_run_pull_and_start_use_overlay_and_profile

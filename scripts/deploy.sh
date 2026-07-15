@@ -110,11 +110,28 @@ filter_first_party_images() {
   { grep -E '^ghcr\.io/[^/]+/wren/' || true; } | sed -E 's/:[^:/]*$//' | sort -u
 }
 
-# Read `docker compose ps --format json` output on stdin (JSONL or a JSON
-# array; `flatten` normalizes both); emit the names of services whose health is
-# defined but not "healthy". Services without a healthcheck ("") are ignored.
-unhealthy_services() {
-  jq -rs 'flatten | .[] | select((.Health // "") != "" and (.Health // "") != "healthy") | .Service' 2>/dev/null || true
+# Read raw `docker compose ps --format json` on stdin (JSONL or a JSON array;
+# `flatten` normalizes both). Print a token for every reason the stack is NOT
+# fully healthy, so an EMPTY stdout is the only signal that all is well:
+#   - empty / unparseable output, or zero services -> "<no-status>" / "<parse-error>"
+#     (a transient SSH blip must never read as healthy: that would suppress the
+#     rollback the gate exists to trigger)
+#   - any service not in State=running                        -> its .Service
+#     (an exited container with empty Health is caught here, not ignored)
+#   - any service whose Health is defined and not "healthy"   -> its .Service
+gate_unhealthy() {
+  jq -rs '
+    (flatten) as $svcs
+    | if ($svcs | length) == 0 then "<no-status>"
+      else
+        $svcs[]
+        | select(
+            (.State // "") != "running"
+            or ((.Health // "") != "" and (.Health // "") != "healthy")
+          )
+        | .Service
+      end
+  ' 2>/dev/null || echo "<parse-error>"
 }
 
 # --- Phase 1: preflight ------------------------------------------------------
@@ -311,7 +328,7 @@ wait_service_healthy() {
   fi
   local i status raw
   for ((i = 1; i <= attempts; i++)); do
-    raw="$(remote "cd ${REMOTE_DIR} && ${COMPOSE} ps --format json ${svc}")"
+    raw="$(remote "cd ${REMOTE_DIR} && ${COMPOSE} ps --format json ${svc}" 2>/dev/null || true)"
     status="$(printf '%s' "${raw}" | jq -rs 'flatten | .[0].Health // ""' 2>/dev/null || true)"
     if [[ "${status}" == "healthy" ]]; then
       log "    ${svc} healthy"
@@ -350,8 +367,10 @@ health_gate() {
   fi
   local i raw unhealthy=""
   for ((i = 1; i <= 12; i++)); do
-    raw="$(remote "cd ${REMOTE_DIR} && ${COMPOSE} ps --format json")"
-    unhealthy="$(printf '%s' "${raw}" | unhealthy_services)"
+    # `|| true`: a failed/transient SSH call yields empty output, which
+    # gate_unhealthy reports as not-healthy (retry) rather than aborting.
+    raw="$(remote "cd ${REMOTE_DIR} && ${COMPOSE} ps --format json" 2>/dev/null || true)"
+    unhealthy="$(printf '%s' "${raw}" | gate_unhealthy)"
     if [[ -z "${unhealthy}" ]]; then
       log "    all services healthy"
       return 0
