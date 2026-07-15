@@ -14,7 +14,7 @@ to the final minted IDs.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -114,17 +114,46 @@ def assemble_draft(
     return AssembledDraft(roadmap=roadmap, remap=dict(minter.remap))
 
 
+class IdMinter:
+    """Mints prefixed, de-duped child IDs against a seeded existing-ID set.
+
+    Records every proposal whose minted ID **diverges** from what the author sent
+    (normalization *or* a numeric de-dup suffix) in :attr:`remap`, so references
+    can be reconciled whenever the final ID is not byte-for-byte the proposal
+    (spec section 04). ``existing`` seeds the de-dup universe: :func:`assemble_draft`
+    starts empty (a fresh roadmap) while ``patch`` seeds it with every ID already
+    in the roadmap, so a minted child ID never collides with a pre-existing one.
+    """
+
+    def __init__(self, existing: Iterable[str] = ()) -> None:
+        self._existing: set[str] = set(existing)
+        self.remap: dict[str, str] = {}
+
+    def mint(self, proposed_id: str | None, source_text: str, prefix: str) -> str:
+        if proposed_id is not None:
+            minted = slugs.mint_proposed(proposed_id, prefix, self._existing)
+            if minted != proposed_id:
+                self.remap[proposed_id] = minted
+        else:
+            minted = slugs.mint(source_text, prefix, self._existing)
+        self._existing.add(minted)
+        return minted
+
+
 class _Minter:
-    """Accumulates minted IDs across one roadmap so collisions de-dupe within it,
-    and records the remap plus the subsection reference map for edge resolution."""
+    """Assembles a whole roadmap: an :class:`IdMinter` plus the subsection
+    reference map so ``prereq_ids``/``suggested_path`` resolve to minted IDs."""
 
     def __init__(self) -> None:
-        self._existing: set[str] = set()
-        self.remap: dict[str, str] = {}
+        self._ids = IdMinter()
         self._subsection_refs: dict[str, str] = {}
 
+    @property
+    def remap(self) -> dict[str, str]:
+        return self._ids.remap
+
     def section(self, section: SectionInput) -> _MintedSection:
-        section_id = self._mint(section.proposed_id, section.title, SECTION_PREFIX)
+        section_id = self._ids.mint(section.proposed_id, section.title, SECTION_PREFIX)
         return _MintedSection(
             id=section_id,
             source=section,
@@ -132,17 +161,18 @@ class _Minter:
         )
 
     def _subsection(self, sub: SubsectionInput) -> _MintedSub:
-        sub_id = self._mint(sub.proposed_id, sub.title, SUBSECTION_PREFIX)
+        sub_id = self._ids.mint(sub.proposed_id, sub.title, SUBSECTION_PREFIX)
         if sub.proposed_id is not None:
             # First occurrence of a proposed_id wins the reference mapping: a
             # duplicate proposal is de-duped to a suffixed ID and cannot be the
             # target of references to the bare handle.
             self._subsection_refs.setdefault(sub.proposed_id, sub_id)
         resources = [
-            (self._mint(res.proposed_id, res.title, RESOURCE_PREFIX), res) for res in sub.resources
+            (self._ids.mint(res.proposed_id, res.title, RESOURCE_PREFIX), res)
+            for res in sub.resources
         ]
         items = [
-            (self._mint(item.proposed_id, item.text, CHECKLIST_PREFIX), item)
+            (self._ids.mint(item.proposed_id, item.text, CHECKLIST_PREFIX), item)
             for item in sub.checklist_items
         ]
         return _MintedSub(id=sub_id, source=sub, resources=resources, items=items)
@@ -152,19 +182,6 @@ class _Minter:
         unknown references (e.g. a typo, caught later at publish) unchanged."""
         refs = dict(self._subsection_refs)
         return lambda ref: refs.get(ref, ref)
-
-    def _mint(self, proposed_id: str | None, source_text: str, prefix: str) -> str:
-        if proposed_id is not None:
-            minted = slugs.mint_proposed(proposed_id, prefix, self._existing)
-            # Record any divergence from the sent proposal (normalization or
-            # de-dup), not just de-dup, so the author can reconcile references
-            # whenever the final ID is not exactly what it proposed.
-            if minted != proposed_id:
-                self.remap[proposed_id] = minted
-        else:
-            minted = slugs.mint(source_text, prefix, self._existing)
-        self._existing.add(minted)
-        return minted
 
 
 def _build_section(minted: _MintedSection, resolve: _ReferenceResolver) -> Section:
