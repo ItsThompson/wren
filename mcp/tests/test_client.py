@@ -82,6 +82,55 @@ async def test_validate_and_publish_hit_the_action_sub_resources() -> None:
         assert request.headers[INTERNAL_TOKEN_HEADER] == _API_TOKEN
 
 
+async def test_replace_draft_carries_the_revision_in_if_match() -> None:
+    client, captured = _client_with_capture()
+    document = {"title": "Grokking DSA v2"}
+
+    await client.replace_draft("user-ada", "grokking-dsa-7f3k", 5, document)
+
+    request = captured[0]
+    assert request.method == "PUT"
+    assert request.url.path == "/roadmaps/grokking-dsa-7f3k"
+    assert request.headers["If-Match"] == "5"
+    assert request.headers[USER_ID_HEADER] == "user-ada"
+    assert json.loads(request.content) == document
+
+
+async def test_fork_hits_the_fork_action_with_trusted_identity() -> None:
+    client, captured = _client_with_capture()
+
+    await client.fork("user-ada", "grokking-dsa-7f3k")
+
+    request = captured[0]
+    assert request.method == "POST"
+    assert request.url.path == "/roadmaps/grokking-dsa-7f3k:fork"
+    assert request.headers[USER_ID_HEADER] == "user-ada"
+    assert request.headers[INTERNAL_TOKEN_HEADER] == _API_TOKEN
+
+
+async def test_edit_metadata_sends_only_provided_fields_and_no_if_match() -> None:
+    client, captured = _client_with_capture()
+
+    await client.edit_metadata(
+        "user-ada",
+        "grokking-dsa-7f3k",
+        title="New Title",
+        description="A new blurb",
+        subject_tags=["cs"],
+    )
+
+    request = captured[0]
+    assert request.method == "PATCH"
+    assert request.url.path == "/roadmaps/grokking-dsa-7f3k/metadata"
+    assert "If-Match" not in request.headers
+    # Only provided fields are sent; an omitted field is left unchanged server-side.
+    assert json.loads(request.content) == {
+        "title": "New Title",
+        "description": "A new blurb",
+        "subject_tags": ["cs"],
+    }
+
+
 async def test_extra_headers_cannot_override_the_trusted_identity() -> None:
     # A caller-supplied header must never be able to spoof the resolved user or
     # the shared secret: the trusted pair is applied last.

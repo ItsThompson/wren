@@ -73,11 +73,51 @@ class InternalApiClient:
             extra_headers={"If-Match": str(revision)},
         )
 
+    async def replace_draft(
+        self, user_id: str, roadmap_id: str, revision: int, document: Any
+    ) -> httpx.Response:
+        # The full-document import escape hatch (PUT) shares the PATCH's If-Match
+        # optimistic-concurrency guard; the roadmap ID is unchanged (spec 07).
+        return await self.request(
+            "PUT",
+            f"/roadmaps/{roadmap_id}",
+            user_id=user_id,
+            json=document,
+            extra_headers={"If-Match": str(revision)},
+        )
+
     async def validate_draft(self, user_id: str, roadmap_id: str) -> httpx.Response:
         return await self.request("POST", f"/roadmaps/{roadmap_id}:validate", user_id=user_id)
 
     async def publish(self, user_id: str, roadmap_id: str) -> httpx.Response:
         return await self.request("POST", f"/roadmaps/{roadmap_id}:publish", user_id=user_id)
+
+    async def fork(self, user_id: str, roadmap_id: str) -> httpx.Response:
+        # Forks any roadmap the user can read into a fresh draft (spec section 07).
+        return await self.request("POST", f"/roadmaps/{roadmap_id}:fork", user_id=user_id)
+
+    async def edit_metadata(
+        self,
+        user_id: str,
+        roadmap_id: str,
+        *,
+        title: str | None = None,
+        description: str | None = None,
+        subject_tags: list[str] | None = None,
+    ) -> httpx.Response:
+        # Presentation-only edit, allowed post-publish and never If-Match-guarded
+        # (spec section 06). Only provided fields are sent so an omitted field is
+        # left unchanged; a structural field can never be smuggled through here.
+        body: dict[str, Any] = {}
+        if title is not None:
+            body["title"] = title
+        if description is not None:
+            body["description"] = description
+        if subject_tags is not None:
+            body["subject_tags"] = subject_tags
+        return await self.request(
+            "PATCH", f"/roadmaps/{roadmap_id}/metadata", user_id=user_id, json=body
+        )
 
 
 def create_internal_http_client(settings: RsSettings) -> httpx.AsyncClient:
