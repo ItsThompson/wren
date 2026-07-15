@@ -98,7 +98,8 @@ export interface paths {
         };
         /** Get Roadmap */
         get: operations["get_roadmap_roadmaps__roadmap_id__get"];
-        put?: never;
+        /** Replace Roadmap */
+        put: operations["replace_roadmap_roadmaps__roadmap_id__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1003,6 +1004,58 @@ export interface components {
             suggested_path?: string[];
         };
         /**
+         * RoadmapReplaced
+         * @description The ``PUT /roadmaps/{id}`` body: the full rebuilt draft after a full-document
+         *     import (the escape hatch, spec section 07) plus the ``proposed_id -> minted_id``
+         *     remap. Mirrors :class:`RoadmapCreated` because replace reuses the same
+         *     mint-then-resolve assembly: ``proposed_id``s are preserved, every other node is
+         *     re-minted, and the roadmap's own ID is unchanged (spec section 04). ``remap`` is
+         *     empty when no proposed ID had to be de-duped.
+         */
+        RoadmapReplaced: {
+            /** Id */
+            id: string;
+            /** Owner */
+            owner: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /** Subject Tags */
+            subject_tags?: string[];
+            /** @default private */
+            visibility: components["schemas"]["Visibility"];
+            /** @default draft */
+            status: components["schemas"]["RoadmapStatus"];
+            /**
+             * Revision
+             * @default 1
+             */
+            revision: number;
+            /** Sections */
+            sections?: {
+                [key: string]: components["schemas"]["Section"];
+            };
+            /** Section Order */
+            section_order?: string[];
+            /** Suggested Path */
+            suggested_path?: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Remap */
+            remap?: {
+                [key: string]: string;
+            };
+        };
+        /**
          * RoadmapStatus
          * @enum {string}
          */
@@ -1390,6 +1443,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Roadmap"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_roadmap_roadmaps__roadmap_id__put: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": number;
+            };
+            path: {
+                roadmap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoadmapInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoadmapReplaced"];
                 };
             };
             /** @description Validation Error */

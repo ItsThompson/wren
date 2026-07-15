@@ -262,6 +262,65 @@
             }
           }
         }
+      },
+      "put": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Replace Roadmap",
+        "operationId": "replace_roadmap_roadmaps__roadmap_id__put",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoadmapInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoadmapReplaced"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/roadmaps/{roadmap_id}:validate": {
@@ -2444,6 +2503,101 @@
         ],
         "title": "RoadmapInput",
         "description": "The ``create_roadmap_draft`` / ``replace_roadmap_draft`` payload."
+      },
+      "RoadmapReplaced": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "owner": {
+            "type": "string",
+            "title": "Owner"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "subject_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subject Tags"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility",
+            "default": "private"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RoadmapStatus",
+            "default": "draft"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "default": 1
+          },
+          "sections": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Section"
+            },
+            "type": "object",
+            "title": "Sections"
+          },
+          "section_order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Section Order"
+          },
+          "suggested_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggested Path"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "remap": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Remap"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "owner",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "RoadmapReplaced",
+        "description": "The ``PUT /roadmaps/{id}`` body: the full rebuilt draft after a full-document\nimport (the escape hatch, spec section 07) plus the ``proposed_id -> minted_id``\nremap. Mirrors :class:`RoadmapCreated` because replace reuses the same\nmint-then-resolve assembly: ``proposed_id``s are preserved, every other node is\nre-minted, and the roadmap's own ID is unchanged (spec section 04). ``remap`` is\nempty when no proposed ID had to be de-duped."
       },
       "RoadmapStatus": {
         "type": "string",
