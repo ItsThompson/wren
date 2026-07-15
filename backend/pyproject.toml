@@ -50,7 +50,9 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
 python_version = "3.12"
 strict = true
 mypy_path = "src"
-packages = ["wren"]
+# Type-check the package plus the Alembic env module (which imports wren and is
+# otherwise unchecked); packages= alone only covers src/wren.
+files = ["src/wren", "alembic/env.py"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
