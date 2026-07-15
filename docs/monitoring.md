@@ -1,0 +1,89 @@
+# Monitoring
+
+Wren's P0 observability: what is measured, what alerts, and how long data is kept.
+There is **no Grafana at P0** (Prometheus retains the data regardless); the only
+alert sink is Discord. Metric names and labels mirror gofin so its rules and
+dashboards can be dropped in later.
+
+Canonical sources:
+
+- Instrumentation: `backend/src/wren/core/metrics.py` (HTTP), `backend/src/wren/core/observability.py` (domain/service/pool families), `backend/src/wren/core/db.py` (pool events), `mcp/src/wren_mcp/metrics.py` + `mcp/src/wren_mcp/tool_metrics.py` (MCP).
+- Scrape + alert rules: `deployments/prometheus/prometheus.yml`, `deployments/prometheus/alerts.yml`.
+- Alert routing: `deployments/alertmanager/alertmanager.yml`.
+- Container topology, retention flags, and network placement: `docker-compose.yml`.
+
+## Metrics
+
+Both the backend and MCP expose `GET /metrics`. Each app serves its private HTTP
+registry concatenated with a shared registry of the custom families below, so one
+scrape sees everything. `/metrics` is reachable only over `monitoring-net`
+(never the Cloudflare tunnel).
+
+| Metric | Type | Labels | Emitted by |
+|--------|------|--------|-----------|
+| `http_requests_total` | counter | `method`, `path`, `status` | Every HTTP request (`path` = matched route template, e.g. `/roadmaps/{id}`, to bound cardinality) |
+| `http_request_duration_seconds` | histogram | `method`, `path` | Every HTTP request |
+| `service_method_failures_total` | counter | `service`, `method` | A public service method exiting with an **unexpected** error (see below) |
+| `oauth_tokens_issued_total` | counter | `grant_type` | OAuth token issuance (`authorization_code` = first issuance, `refresh_token` = rotation) |
+| `mcp_tool_invocations_total` | counter | `tool`, `outcome` | Every MCP tool call (`outcome` = `ok`/`error`) |
+| `db_query_duration_seconds` | histogram | `query_name` | Every SQL statement (via SQLAlchemy engine events) |
+| `active_connections` | gauge | — | Connections checked out of the SQLAlchemy pool |
+
+### Service-method failures: what counts
+
+`service_method_failures_total` counts only faults that would surface as **5xx**.
+A `WrenError` (the model-recoverable 4xx domain outcomes: `NotFound`, `Conflict`,
+`Validation`, `Unauthorized`) is an expected result, not a failure, and is
+deliberately **not** counted, so this metric correlates with the `HighErrorRate`
+alert instead of being diluted by normal 404s/409s. Instrumentation is a
+cross-cutting class decorator (`track_failures`); each public service method is
+counted once (private helpers are not wrapped, and the service layer has no
+public-to-public calls, so there is no double-counting). Thin delegating methods
+add no timer of their own.
+
+### DB `query_name`
+
+To keep label cardinality bounded, `query_name` collapses to the SQL verb
+(`select`/`insert`/`update`/`delete`, else `other`). A repository may override it
+for a specific statement via SQLAlchemy `execution_options(query_name=...)`.
+
+## Alerts
+
+Prometheus evaluates three critical rules (`deployments/prometheus/alerts.yml`)
+and routes them through Alertmanager to a single Discord webhook with
+`send_resolved: true`, so both firing and recovery are posted.
+
+| Alert | Condition | For |
+|-------|-----------|-----|
+| `ServiceDown` | `up == 0` (any scrape target) | 1m |
+| `HostDiskAlmostFull` | filesystem available < 10% (non-tmpfs/overlay) | 2m |
+| `HighErrorRate` | 5xx ratio of `http_requests_total` > 5% over 5m | 5m |
+
+`node-exporter` provides the host disk/memory series `HostDiskAlmostFull` reads.
+
+### Discord webhook templating
+
+`deployments/alertmanager/alertmanager.yml` keeps a `${DISCORD_WEBHOOK_URL}`
+placeholder in the committed file. Alertmanager does not expand environment
+variables, so `scripts/deploy.sh` substitutes **only** that token via `sed` on the
+VPS at deploy time (then `chmod 600`); the Go templating (`{{ ... }}`) in the
+title/message is left untouched and renders at alert time. Set
+`DISCORD_WEBHOOK_URL` in the VPS `.env` (see `.env.example`). Never commit a real
+webhook.
+
+## Retention and query guards
+
+Configured as Prometheus command flags in `docker-compose.yml`:
+
+- Retention: `--storage.tsdb.retention.time=3d` and `--storage.tsdb.retention.size=2GB` (whichever hits first).
+- Query guards: `--query.max-concurrency=5` and `--query.timeout=30s`, sized for the single-VPS scale envelope.
+
+TSDB persists to the `promdata` named volume.
+
+## Topology
+
+Prometheus, node-exporter, and Alertmanager run on `monitoring-net` **only**,
+never on `edge-net`, so none is reachable through the tunnel. The backend is
+scraped on both its external (`:8000`) and internal (`:8001`) apps; MCP is scraped
+on `:9000` over `monitoring-net`, never via `mcp.usewren.com` (which path-exposes
+only the PRM document and the `/mcp` transport at ingress).

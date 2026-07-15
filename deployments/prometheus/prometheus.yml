@@ -1,21 +1,28 @@
 # =============================================================================
-# Prometheus scrape config for the Wren stack (spec section 11).
-#
-# SEAM FOR TICKET 31. This minimal config makes the stack observable today by
-# scraping the first-party /metrics endpoints over monitoring-net. Ticket 31
-# owns the full observability slice and should EXTEND (not replace) this:
-#   - alert rule files (rule_files:) for ServiceDown / HostDiskAlmostFull /
-#     HighErrorRate, and the `alerting:` block wiring Alertmanager,
-#   - any relabeling / retention tuning beyond the command flags already set in
-#     docker-compose.yml (--storage.tsdb.retention.time=3d / .size=2GB).
+# Prometheus scrape + alerting config for the Wren stack (spec section 11).
 #
 # Prometheus runs on monitoring-net only; backend, mcp and node-exporter are all
-# reachable there by service name.
+# reachable there by service name. Retention (3d / 2GB) and the query
+# concurrency/timeout guards are set as command flags in docker-compose.yml
+# (--storage.tsdb.retention.time/.size, --query.max-concurrency, --query.timeout);
+# this file owns the scrape targets, the alert rule files, and the Alertmanager
+# wiring.
+#
+# The three P0 alert rules live in alerts.yml (mounted alongside this file). Metric
+# names/labels mirror gofin so its rules/dashboards drop in later.
 # =============================================================================
 
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+
+rule_files:
+  - alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
 
 scrape_configs:
   - job_name: prometheus
@@ -30,7 +37,8 @@ scrape_configs:
       - targets: ["backend:8000", "backend:8001"]
 
   # MCP /metrics is scraped here over monitoring-net, never via the tunnel
-  # (tracked constraint from Ticket 20 review).
+  # (tracked constraint from Ticket 20 review): mcp.usewren.com only path-exposes
+  # the PRM doc + /mcp transport at ingress, so /metrics is unreachable publicly.
   - job_name: mcp
     metrics_path: /metrics
     static_configs:

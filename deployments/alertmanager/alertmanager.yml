@@ -1,15 +1,33 @@
 # =============================================================================
 # Alertmanager config for the Wren stack (spec section 11).
 #
-# SEAM FOR TICKET 31. This minimal config makes the container valid and healthy
-# today by routing everything to a null receiver. Ticket 31 owns the real
-# routing: the three critical alerts (ServiceDown, HostDiskAlmostFull,
-# HighErrorRate) fanned to DISCORD_WEBHOOK_URL with `send_resolved: true`.
-# Replace the route/receivers below then.
+# The three critical alerts (ServiceDown, HostDiskAlmostFull, HighErrorRate) all
+# fan to one Discord receiver with send_resolved, so an operator sees both the
+# firing and the recovery. There is no Grafana at P0; Discord is the only sink.
+#
+# TEMPLATING: `${DISCORD_WEBHOOK_URL}` is a deploy-time placeholder. Alertmanager
+# does not expand environment variables, so scripts/deploy.sh substitutes ONLY
+# that token via sed on the VPS (the file is then chmod 600). sed leaves the Go
+# templating (`{{ ... }}`) in title/message untouched, so those render at alert
+# time. Keep the placeholder in the committed file; never commit a real webhook.
 # =============================================================================
 
+global:
+  resolve_timeout: 5m
+
 route:
-  receiver: "null"
+  receiver: discord
+  # Group by the alert and its job so one Discord message covers a burst.
+  group_by: ["alertname", "job"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 1h
 
 receivers:
-  - name: "null"
+  - name: discord
+    discord_configs:
+      - webhook_url: "${DISCORD_WEBHOOK_URL}"
+        send_resolved: true
+        title: '{{ if eq .Status "firing" }}🚨 FIRING{{ else }}✅ RESOLVED{{ end }}: {{ .GroupLabels.alertname }}'
+        message: '{{ range .Alerts }}{{ .Annotations.summary }}{{ if .Annotations.description }} — {{ .Annotations.description }}{{ end }}
+{{ end }}'
