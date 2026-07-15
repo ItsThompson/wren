@@ -39,6 +39,7 @@ from wren.progress.wiring import build_progress_service_provider
 from wren.roadmaps.api import create_roadmaps_router
 from wren.roadmaps.listing_api import create_listing_router
 from wren.roadmaps.wiring import build_listing_service_provider, build_roadmap_service_provider
+from wren.skill.api import create_skill_router
 
 settings = build_app_settings(service=EXTERNAL_SERVICE, port=EXTERNAL_PORT)
 db = create_database(settings.database_url)
@@ -69,6 +70,12 @@ listing_router = create_listing_router(build_listing_service_provider())
 # that user (another user's progress is never returned).
 progress_router = create_progress_router(build_progress_service_provider())
 
+# Shipped SKILL.md authoring guidance (#27, spec sections 07/14): the public,
+# unauthenticated GET /skill an agent fetches (referenced from the MCP tool
+# descriptions) to learn how to author a ZPD-ordered roadmap. Guidance, not user
+# data, so no session is required or consulted.
+skill_router = create_skill_router()
+
 # Agent OAuth 2.1 Authorization Server (#18, spec section 08). All issuer/metadata/
 # endpoint URLs are built from pinned config (the Site-URL gotcha); the signing
 # key is loaded from the mounted PEM (or an ephemeral dev keypair). Fails fast
@@ -85,7 +92,14 @@ oauth_router = create_oauth_router(
 
 app: FastAPI = create_app(
     settings,
-    routers=[accounts_router, roadmaps_router, listing_router, progress_router, oauth_router],
+    routers=[
+        accounts_router,
+        roadmaps_router,
+        listing_router,
+        progress_router,
+        oauth_router,
+        skill_router,
+    ],
     readiness_checks=[db_readiness_check(db.engine)],
     exception_handlers={**build_exception_handlers(), **build_oauth_exception_handlers()},
     lifespan=create_db_lifespan(db.engine),

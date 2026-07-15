@@ -134,6 +134,11 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     # on the external app only.
     RouteKey(method="GET", path="/me/dashboard"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="GET", path="/users/{handle}"): AccessLevel.PUBLIC,
+    # Shipped SKILL.md authoring guidance (#27, spec sections 07/14). PUBLIC:
+    # generic agent guidance served for download/copy, not user data, so it
+    # resolves no identity. Referenced from the MCP tool descriptions so an agent
+    # can discover it. Mounted on the external app only.
+    RouteKey(method="GET", path="/skill"): AccessLevel.PUBLIC,
 }
 # Internal app routes (:8001), reachable only by the MCP server on compute-net.
 # Every route resolves identity via require_internal_user (the trusted X-User-ID
