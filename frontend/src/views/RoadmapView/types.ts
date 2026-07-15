@@ -33,6 +33,14 @@ export interface ProgressBinding {
 }
 
 /**
+ * A surfaced progress-write failure (section 10 "Any write"; ticket 26 / #9). A
+ * failed persist is optimistically reverted and then announced instead of failing
+ * silently: `stale` is a 409 re-read (US-ERR-01, shown as the ochre reload
+ * prompt); `save-failed` is any other failure (shown as a quiet inline notice).
+ */
+export type ProgressNotice = { kind: 'stale' } | { kind: 'save-failed' }
+
+/**
  * The roadmap-view fetch state as a single discriminated union so the impossible
  * "loaded with an error" combinations cannot arise (frontend state-structure
  * rule). `error.status` is the HTTP status (404/403 = unreachable) or null when

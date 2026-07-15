@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { createSessionClient } from '@/auth/createSessionClient'
+import { toProblem, type Problem } from '@/lib/problem'
 import { useLifecycle } from './useLifecycle'
 import type {
   ForkState,
@@ -11,17 +12,7 @@ import type {
   Roadmap,
   RoadmapLifecycle,
   RoadmapViewState,
-  Violation,
 } from '../types'
-
-/**
- * The 422 publish hard-block body is RFC 9457 problem+json carrying `violations`
- * (section 06), which the generated client types only as the default validation
- * error. This narrow shape is the boundary type used to read the violations back.
- */
-interface PublishProblem {
-  violations?: Violation[]
-}
 
 /**
  * Fetch one roadmap by ID for the owner and drive its publish action (section 10
@@ -49,6 +40,10 @@ export function useRoadmap(
   forkState: ForkState
   fork: () => void
   lifecycle: RoadmapLifecycle
+  /** A 409 write conflict (stale/immutable) surfaced above the view, or null. */
+  conflict: Problem | null
+  /** Refetch the roadmap (the re-read recovery for a stale/immutable conflict). */
+  reload: () => void
 } {
   const client = useMemo(() => createSessionClient(baseUrl), [baseUrl])
   const navigate = useNavigate()
@@ -56,6 +51,8 @@ export function useRoadmap(
   const [publishState, setPublishState] = useState<PublishState>({ phase: 'idle' })
   const [metadataState, setMetadataState] = useState<MetadataEditState>({ phase: 'idle' })
   const [forkState, setForkState] = useState<ForkState>({ phase: 'idle' })
+  const [conflict, setConflict] = useState<Problem | null>(null)
+  const [reloadToken, setReloadToken] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -63,6 +60,7 @@ export function useRoadmap(
     setPublishState({ phase: 'idle' })
     setMetadataState({ phase: 'idle' })
     setForkState({ phase: 'idle' })
+    setConflict(null)
 
     void (async () => {
       try {
@@ -83,7 +81,7 @@ export function useRoadmap(
     return () => {
       active = false
     }
-  }, [client, roadmapId])
+  }, [client, roadmapId, reloadToken])
 
   const publish = useCallback(async () => {
     setPublishState({ phase: 'publishing' })
@@ -97,9 +95,16 @@ export function useRoadmap(
         setPublishState({ phase: 'idle' })
         return
       }
+      const problem = toProblem(error, response)
       if (response.status === 422) {
-        const violations = (error as PublishProblem | undefined)?.violations ?? []
-        setPublishState({ phase: 'blocked', violations })
+        setPublishState({ phase: 'blocked', violations: problem.violations ?? [] })
+        return
+      }
+      if (response.status === 409) {
+        // Already published/archived (immutable) or the draft changed under us
+        // (stale): surface the shared 409 re-read / fork-to-change prompt.
+        setConflict(problem)
+        setPublishState({ phase: 'idle' })
         return
       }
       setPublishState({ phase: 'failed', status: response.status })
@@ -113,10 +118,11 @@ export function useRoadmap(
       // Presentation-only edit (title/description/subject_tags): not If-Match
       // guarded and never bumps the structural revision (section 06). On success
       // the returned roadmap replaces the loaded one so the header updates in
-      // place; a failure surfaces a retry message without touching the roadmap.
+      // place; a 409 (a smuggled structural field on a published roadmap) surfaces
+      // the shared conflict prompt, and any other failure a retry message.
       setMetadataState({ phase: 'saving' })
       try {
-        const { data, response } = await client.PATCH('/roadmaps/{roadmap_id}/metadata', {
+        const { data, error, response } = await client.PATCH('/roadmaps/{roadmap_id}/metadata', {
           params: { path: { roadmap_id: roadmapId } },
           body: {
             title: draft.title,
@@ -128,6 +134,11 @@ export function useRoadmap(
           setState({ phase: 'loaded', roadmap: data })
           setMetadataState({ phase: 'idle' })
           return true
+        }
+        if (response.status === 409) {
+          setConflict(toProblem(error, response))
+          setMetadataState({ phase: 'idle' })
+          return false
         }
         setMetadataState({ phase: 'failed', status: response.status })
         return false
@@ -173,6 +184,8 @@ export function useRoadmap(
     onDeleted,
   })
 
+  const reload = useCallback(() => setReloadToken((token) => token + 1), [])
+
   return {
     state,
     publishState,
@@ -182,5 +195,7 @@ export function useRoadmap(
     forkState,
     fork,
     lifecycle,
+    conflict,
+    reload,
   }
 }

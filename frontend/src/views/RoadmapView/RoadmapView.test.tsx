@@ -81,8 +81,9 @@ const server = setupServer(
   // Default "nothing next" so published-view tests that don't exercise the next
   // highlight don't trip `onUnhandledRequest: 'error'`; specific tests override
   // this via `server.use` (runtime handlers take precedence over initial ones).
+  // `complete: false` keeps the calm all-caught-up banner off by default.
   http.get('*/roadmaps/:id/next', () =>
-    HttpResponse.json({ items: [], remaining_in_path: 0, complete: true }),
+    HttpResponse.json({ items: [], remaining_in_path: 0, complete: false }),
   ),
 )
 
@@ -121,6 +122,21 @@ function renderView(user: typeof AUTH_USER | null = AUTH_USER) {
   return render(
     <AuthProvider baseUrl={BASE}>
       <MemoryRouter initialEntries={[`/roadmaps/${ROADMAP_ID}`]}>
+        <Routes>
+          <Route path="/roadmaps/:roadmapId" element={<RoadmapView baseUrl={BASE} />} />
+        </Routes>
+        <LocationProbe />
+      </MemoryRouter>
+    </AuthProvider>,
+  )
+}
+
+/** Renders the view with a starting URL hash so anchor-scroll can be exercised. */
+function renderViewAtHash(hash: string) {
+  server.use(http.post('*/auth/refresh', () => HttpResponse.json(AUTH_USER)))
+  return render(
+    <AuthProvider baseUrl={BASE}>
+      <MemoryRouter initialEntries={[`/roadmaps/${ROADMAP_ID}${hash}`]}>
         <Routes>
           <Route path="/roadmaps/:roadmapId" element={<RoadmapView baseUrl={BASE} />} />
         </Routes>
@@ -181,6 +197,25 @@ describe('RoadmapView', () => {
     )
     renderView()
 
+    expect(await screen.findByText('Roadmap not found')).toBeInTheDocument()
+    expect(
+      screen.getByText(/does not exist or is not shared with you/i),
+    ).toBeInTheDocument()
+  })
+
+  it('renders the same dedicated view for a 403 as a 404 (no existence leak)', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () =>
+        HttpResponse.json(
+          { type: 'x', title: 'Access forbidden', status: 403, code: 'FORBIDDEN' },
+          { status: 403, headers: { 'content-type': 'application/problem+json' } },
+        ),
+      ),
+    )
+    renderView()
+
+    // A 403 (someone else's private roadmap) must not read differently from a
+    // 404, so the roadmap's existence never leaks (US-ERR-04).
     expect(await screen.findByText('Roadmap not found')).toBeInTheDocument()
     expect(
       screen.getByText(/does not exist or is not shared with you/i),
@@ -1013,6 +1048,123 @@ describe('RoadmapView list view (tags, filter chips, next highlight)', () => {
     expect(
       screen.getByRole('heading', { level: 3, name: 'Hashing' }).closest('article'),
     ).not.toHaveAttribute('aria-current')
+  })
+})
+
+describe('RoadmapView states (loading/empty/error, 409/422, tabs, anchor)', () => {
+  const PROGRESS_URL = `${BASE}/roadmaps/${ROADMAP_ID}/progress`
+  const NEXT_URL = `${BASE}/roadmaps/${ROADMAP_ID}/next`
+  const PUBLISH_URL = `${BASE}/roadmaps/${ROADMAP_ID}:publish`
+
+  /** A 409 problem+json body with the given machine code (spec section 06). */
+  function conflict(code: string, detail: string) {
+    return HttpResponse.json(
+      { type: 'x', title: 'Conflict with the current state', status: 409, code, detail },
+      { status: 409, headers: { 'content-type': 'application/problem+json' } },
+    )
+  }
+
+  it('surfaces an ochre re-read prompt (color AND text) when a progress write is stale (409)', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
+      http.get(PROGRESS_URL, () => HttpResponse.json(buildProgress())),
+      http.post(PROGRESS_URL, () =>
+        conflict('STALE_REVISION', 'This roadmap changed; re-read and retry.'),
+      ),
+    )
+    renderView()
+
+    const checkbox = await screen.findByRole('checkbox', { name: 'Read the walkthrough' })
+    fireEvent.click(checkbox)
+
+    // The stale write becomes the first-class ochre re-read prompt, not a toast.
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/reload to continue/i)
+    // Meaning is reinforced by ochre, but never carried by color alone (text + icon).
+    expect(alert.className).toMatch(/warning/)
+    // The optimistic check was rolled back to match the server.
+    await waitFor(() => expect(checkbox).not.toBeChecked())
+
+    // Reloading clears the prompt and refetches fresh state.
+    fireEvent.click(within(alert).getByRole('button', { name: 'Reload' }))
+    await waitFor(() => expect(screen.queryByText(/reload to continue/i)).not.toBeInTheDocument())
+  })
+
+  it('surfaces a quiet inline notice (not silent) and reverts when a progress write fails (500)', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
+      http.get(PROGRESS_URL, () => HttpResponse.json(buildProgress())),
+      http.post(PROGRESS_URL, () => new HttpResponse(null, { status: 500 })),
+    )
+    renderView()
+
+    const checkbox = await screen.findByRole('checkbox', { name: 'Read the walkthrough' })
+    fireEvent.click(checkbox)
+
+    // A failed persist is announced (US-ERR: never a silent revert) ...
+    expect(await screen.findByRole('status')).toHaveTextContent(/couldn.t save that change/i)
+    // ... and the optimistic check is rolled back.
+    await waitFor(() => expect(checkbox).not.toBeChecked())
+  })
+
+  it('steers a 409 immutable publish to fork-to-change', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
+      http.post(PUBLISH_URL, () =>
+        conflict('IMMUTABLE', 'Already published; fork to change.'),
+      ),
+    )
+    renderView()
+    await screen.findByText('Grokking DSA')
+
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/fork it to make changes/i)
+    expect(within(alert).getByRole('button', { name: 'Fork to change' })).toBeInTheDocument()
+  })
+
+  it('renders a calm completion state when the suggested path is complete', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
+      http.get(PROGRESS_URL, () => HttpResponse.json(buildProgress(['chk_read', 'chk_hash']))),
+      http.get(NEXT_URL, () => HttpResponse.json({ items: [], remaining_in_path: 0, complete: true })),
+    )
+    renderView()
+
+    expect(await screen.findByText(/all caught up/i)).toBeInTheDocument()
+  })
+
+  it('offers a List->Tree entry point in the published list header', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
+      http.get(PROGRESS_URL, () => HttpResponse.json(buildProgress())),
+    )
+    renderView()
+    await screen.findByRole('progressbar', { name: /overall progress/i })
+
+    const tabs = screen.getByRole('navigation', { name: 'Roadmap views' })
+    expect(within(tabs).getByRole('link', { name: 'Tree' })).toHaveAttribute(
+      'href',
+      `/roadmaps/${ROADMAP_ID}/tree`,
+    )
+  })
+
+  it('renders per-subsection anchor targets and scrolls to the URL hash', async () => {
+    const scrollSpy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {})
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
+      http.get(PROGRESS_URL, () => HttpResponse.json(buildProgress())),
+    )
+    renderViewAtHash('#sub_arrays')
+
+    await screen.findByRole('heading', { level: 3, name: 'Arrays & two pointers' })
+    // The list-view anchor target the tree links to is present ...
+    const anchor = document.getElementById('sub_arrays')
+    expect(anchor).not.toBeNull()
+    // ... and the hash scrolls that node into view.
+    await waitFor(() => expect(scrollSpy).toHaveBeenCalled())
+    scrollSpy.mockRestore()
   })
 })
 

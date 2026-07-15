@@ -47,8 +47,9 @@ export function NodeCard({ subsection, progress, isNext = false }: NodeCardProps
 
   return (
     <article
+      id={subsection.id}
       aria-current={isNext ? 'step' : undefined}
-      className={`rounded-lg border p-5 ${borderClass} ${nextClass}`}
+      className={`scroll-mt-6 rounded-lg border p-5 ${borderClass} ${nextClass}`}
     >
       <div className="flex items-baseline justify-between gap-3">
         <div className="flex items-baseline gap-2">

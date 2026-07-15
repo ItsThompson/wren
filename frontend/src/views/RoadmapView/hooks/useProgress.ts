@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { createSessionClient } from '@/auth/createSessionClient'
+import { isStaleRevision, toProblem } from '@/lib/problem'
+import type { ProgressNotice } from '../types'
 
 /**
  * Fetch and mutate the caller's progress for one published roadmap (section 10
@@ -10,14 +12,15 @@ import { createSessionClient } from '@/auth/createSessionClient'
  *
  * The detailed snapshot seeds `checkedIds` and the per-user `deadline` on mount,
  * and `GET /next` seeds the current "next" subsection (highlighted in the list
- * view). `toggle` optimistically reflects the check/uncheck locally (so the bars
- * and done-state update instantly), persists the explicit-set via `POST /progress`,
- * and reconciles to the server's returned `checked_ids` and fresh `next`; a
- * failed write reverts the optimistic change. `setDeadline` mirrors this for the
- * countdown: it optimistically updates the local deadline, persists via
- * `PUT /deadline` (a date sets it, null clears it), and reverts on failure.
- * `baseUrl` is injected (defaulting at the view) so tests can point the client
- * at an MSW server.
+ * view) plus the `complete` flag (the calm all-caught-up state). `toggle`
+ * optimistically reflects the check/uncheck locally (so the bars and done-state
+ * update instantly), persists the explicit-set via `POST /progress`, and
+ * reconciles to the server's returned `checked_ids` and fresh `next`. A failed
+ * write reverts the optimistic change and surfaces a `notice` (a 409 becomes the
+ * stale re-read prompt; anything else a quiet inline notice) instead of failing
+ * silently (ticket 26 / #9). `setDeadline` mirrors this for the countdown, and
+ * `reload` refetches everything for the re-read recovery. `baseUrl` is injected
+ * (defaulting at the view) so tests can point the client at an MSW server.
  */
 export function useProgress(
   roadmapId: string,
@@ -29,17 +32,29 @@ export function useProgress(
   setDeadline: (deadline: string | null) => void
   /** The current "next" subsection id (from `GET /next`), or null when done. */
   nextSubsectionId: string | null
+  /** True once the caller has completed every item in the suggested path. */
+  nextComplete: boolean
+  /** A surfaced write failure, or null; cleared by `dismissNotice` / `reload`. */
+  notice: ProgressNotice | null
+  dismissNotice: () => void
+  /** Refetch progress + next (the re-read recovery for a stale write). */
+  reload: () => void
 } {
   const client = useMemo(() => createSessionClient(baseUrl), [baseUrl])
   const [checkedIds, setCheckedIds] = useState<Set<string>>(() => new Set())
   const [deadline, setDeadlineState] = useState<string | null>(null)
   const [nextSubsectionId, setNextSubsectionId] = useState<string | null>(null)
+  const [nextComplete, setNextComplete] = useState(false)
+  const [notice, setNotice] = useState<ProgressNotice | null>(null)
+  const [reloadToken, setReloadToken] = useState(0)
 
   useEffect(() => {
     let active = true
     setCheckedIds(new Set())
     setDeadlineState(null)
     setNextSubsectionId(null)
+    setNextComplete(false)
+    setNotice(null)
 
     void (async () => {
       try {
@@ -61,6 +76,7 @@ export function useProgress(
         })
         if (!active || !data) return
         setNextSubsectionId(data.items?.[0]?.subsection_id ?? null)
+        setNextComplete(data.complete)
       } catch {
         // No next suggestion available; the list view simply highlights nothing.
       }
@@ -69,33 +85,46 @@ export function useProgress(
     return () => {
       active = false
     }
-  }, [client, roadmapId])
+  }, [client, roadmapId, reloadToken])
 
   const toggle = useCallback(
     (itemId: string, checked: boolean) => {
+      const revert = () =>
+        setCheckedIds((prev) => {
+          const reverted = new Set(prev)
+          if (checked) reverted.delete(itemId)
+          else reverted.add(itemId)
+          return reverted
+        })
+
       setCheckedIds((prev) => {
         const next = new Set(prev)
         if (checked) next.add(itemId)
         else next.delete(itemId)
         return next
       })
+      setNotice(null)
+
       void (async () => {
         try {
-          const { data } = await client.POST('/roadmaps/{roadmap_id}/progress', {
+          const { data, error, response } = await client.POST('/roadmaps/{roadmap_id}/progress', {
             params: { path: { roadmap_id: roadmapId } },
             body: { item_ids: [itemId], state: checked ? 'complete' : 'incomplete' },
           })
-          const serverIds = data?.progress.checked_ids
-          if (serverIds) setCheckedIds(new Set(serverIds))
-          if (data) setNextSubsectionId(data.next.items?.[0]?.subsection_id ?? null)
+          if (data) {
+            if (data.progress.checked_ids) setCheckedIds(new Set(data.progress.checked_ids))
+            setNextSubsectionId(data.next.items?.[0]?.subsection_id ?? null)
+            setNextComplete(data.next.complete)
+            return
+          }
+          // An HTTP error response (409/422/5xx): revert and surface it. A stale
+          // revision is the re-read prompt; anything else a quiet inline notice.
+          revert()
+          setNotice(isStaleRevision(toProblem(error, response)) ? { kind: 'stale' } : { kind: 'save-failed' })
         } catch {
-          // Revert the optimistic change so the UI matches the server.
-          setCheckedIds((prev) => {
-            const reverted = new Set(prev)
-            if (checked) reverted.delete(itemId)
-            else reverted.add(itemId)
-            return reverted
-          })
+          // Network failure: revert and surface the quiet save-failed notice.
+          revert()
+          setNotice({ kind: 'save-failed' })
         }
       })()
     },
@@ -122,5 +151,21 @@ export function useProgress(
     [client, roadmapId, deadline],
   )
 
-  return { checkedIds, toggle, deadline, setDeadline, nextSubsectionId }
+  const dismissNotice = useCallback(() => setNotice(null), [])
+  const reload = useCallback(() => {
+    setNotice(null)
+    setReloadToken((token) => token + 1)
+  }, [])
+
+  return {
+    checkedIds,
+    toggle,
+    deadline,
+    setDeadline,
+    nextSubsectionId,
+    nextComplete,
+    notice,
+    dismissNotice,
+    reload,
+  }
 }
