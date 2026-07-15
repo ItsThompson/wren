@@ -6,11 +6,12 @@ and the resolved ``user_id`` (never trusted from payload), composes the pure
 adapter to render, and owns the transaction boundary (``get_session`` is
 yield-only).
 
-This slice implements ``create_draft``, the owner-scoped ``get``, and the minimal
-``validate`` / ``publish`` lifecycle (the draft -> published one-way transition
-that makes content immutable). Patch, replace, fork, and the read projections are
-later slices; the full structural contract composes onto ``validate`` in a later
-slice (spec section 05).
+This slice implements ``create_draft``, the owner-scoped ``get``, the iterative
+``patch_draft``, the full-document ``replace_draft`` import escape hatch, and the
+minimal ``validate`` / ``publish`` lifecycle (the draft -> published one-way
+transition that makes content immutable). Fork and the read projections are later
+slices; the full structural contract composes onto ``validate`` in a later slice
+(spec section 05).
 """
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ from wren.roadmaps.schemas import (
     Roadmap,
     RoadmapCreated,
     RoadmapInput,
+    RoadmapReplaced,
     RoadmapStatus,
 )
 from wren.roadmaps.validation import validate_structure
@@ -86,14 +88,14 @@ class RoadmapService:
         """Apply an atomic op batch to the caller's draft under optimistic
         concurrency (spec sections 05/07).
 
-        Loads through the shared draft-only guard (:meth:`_load_owned_draft`: 404
-        for a non-owner / unknown ID, 409 immutability on a published or archived
-        roadmap), then rejects a stale ``If-Match`` ``revision`` with a 409
+        Loads through the shared content-write guard (:meth:`_load_writable_draft`:
+        404 for a non-owner / unknown ID, 409 ``IMMUTABLE`` on a published or
+        archived roadmap), then rejects a stale ``If-Match`` ``revision`` with a 409
         "re-read". :func:`patch.apply` is all-or-nothing: an invalid op raises and
         nothing is persisted; on success the ``revision`` bumps by one and only the
         changed nodes (plus any de-dup remap) are echoed.
         """
-        draft = await self._load_owned_draft(user_id, roadmap_id)
+        draft = await self._load_writable_draft(user_id, roadmap_id)
         if draft.revision != revision:
             raise Conflict(
                 f"Your edit targeted revision {revision} but the current revision is "
@@ -134,13 +136,61 @@ class RoadmapService:
             remap=outcome.remap,
         )
 
+    async def replace_draft(
+        self, user_id: str, roadmap_id: str, revision: int, doc: RoadmapInput
+    ) -> RoadmapReplaced:
+        """Replace the caller's entire draft from a full ``RoadmapInput`` (spec
+        sections 04/06/07).
+
+        The documented **import escape hatch**, never the iterative path: it rebuilds
+        the whole document rather than editing in place. Loads through the same
+        content-write guard as :meth:`patch_draft` (:meth:`_load_writable_draft`: 404
+        for a non-owner / unknown ID, 409 ``IMMUTABLE`` on a published/archived
+        roadmap) and is guarded by the same optimistic-concurrency ``If-Match``
+        ``revision`` (stale -> 409 "re-read"), because a full replace is a
+        structure-mutating write (spec section 06).
+
+        ID semantics (spec section 04 v1.1): the roadmap's own ID (the route param)
+        is unchanged, nodes carrying a ``proposed_id`` keep it, and every other node
+        is re-minted, all via the shared :func:`assemble_draft` mint-then-resolve
+        pass. ``created_at`` and ``owner`` are preserved; ``revision`` bumps by one
+        and the ``proposed_id -> minted_id`` remap is returned so the author can
+        reconcile any de-duped reference.
+        """
+        draft = await self._load_writable_draft(user_id, roadmap_id)
+        if draft.revision != revision:
+            raise Conflict(
+                f"Your import targeted revision {revision} but the current revision is "
+                f"{draft.revision}. Re-read and retry.",
+                code=ErrorCode.STALE_REVISION,
+                instance=f"/roadmaps/{roadmap_id}",
+            )
+        # Rebuild from the full document using the same pure assembly as create: the
+        # roadmap ID is the (unchanged) route param, so no re-mint/collision check is
+        # needed. Preserve created_at + bump the revision (assemble_draft resets both).
+        assembled = assemble_draft(doc, roadmap_id, owner=user_id, now=self._clock())
+        replaced = assembled.roadmap.model_copy(
+            update={"revision": draft.revision + 1, "created_at": draft.created_at}
+        )
+        try:
+            await self._repo.save(replaced)
+            await self._repo.commit()
+        except Exception:
+            await self._repo.rollback()
+            raise
+        _log.info(
+            "roadmap_replaced",
+            roadmap_id=roadmap_id,
+            owner=user_id,
+            revision=replaced.revision,
+        )
+        return RoadmapReplaced.model_validate({**replaced.model_dump(), "remap": assembled.remap})
+
     async def get(self, user_id: str, roadmap_id: str) -> Roadmap:
         """Return the caller's own roadmap, or 404 (never revealing existence to
-        a non-owner: the query is owner-scoped)."""
-        record = await self._repo.get_owned(roadmap_id, user_id)
-        if record is None:
-            raise NotFound(f"No roadmap '{roadmap_id}'.", instance=f"/roadmaps/{roadmap_id}")
-        return Roadmap.model_validate(record.document)
+        a non-owner: the query is owner-scoped). Any status, since a read is not a
+        draft-only operation."""
+        return await self._load_owned(user_id, roadmap_id)
 
     async def validate(self, user_id: str, roadmap_id: str) -> list[Violation]:
         """Run the structural checks on the caller's own draft and return every
@@ -178,23 +228,53 @@ class RoadmapService:
         _log.info("roadmap_published", roadmap_id=roadmap_id, owner=user_id)
         return published
 
-    async def _load_owned_draft(self, user_id: str, roadmap_id: str) -> Roadmap:
-        """Load the caller's own roadmap and assert it is a mutable draft.
+    async def _load_owned(self, user_id: str, roadmap_id: str) -> Roadmap:
+        """Load the caller's own roadmap or raise ``NotFound``.
 
-        The single guard for draft-only operations: a non-owner (or unknown ID)
-        gets ``NotFound`` (owner-scoped, no existence leak); a published/archived
-        roadmap gets ``Conflict`` (the immutability boundary). Structural writes
-        (patch / replace, later slices) load through here so a published roadmap's
-        content stays immutable.
+        Owner-scoped (the repository query filters by ``owner``), so a non-owner or
+        unknown ID is a 404 that never reveals another user's roadmap's existence.
+        The shared load underneath every owner-scoped operation.
         """
         record = await self._repo.get_owned(roadmap_id, user_id)
         if record is None:
             raise NotFound(f"No roadmap '{roadmap_id}'.", instance=f"/roadmaps/{roadmap_id}")
-        roadmap = Roadmap.model_validate(record.document)
+        return Roadmap.model_validate(record.document)
+
+    async def _load_writable_draft(self, user_id: str, roadmap_id: str) -> Roadmap:
+        """Load the caller's own roadmap for a **content write** (create-content /
+        patch / replace) and enforce the immutability boundary.
+
+        A published or archived roadmap is content-immutable: any structural write
+        raises ``Conflict`` with the ``IMMUTABLE`` code and a message pointing to
+        fork-to-change (spec sections 04/05/07). This is the guard that protects
+        follower progress: the only way to change published content is to fork it
+        into a fresh draft. Presentation edits (``edit_metadata``, Ticket 14) do
+        **not** load through here, which is why they stay allowed post-publish.
+        """
+        roadmap = await self._load_owned(user_id, roadmap_id)
+        if roadmap.status is not RoadmapStatus.DRAFT:
+            raise Conflict(
+                f"Roadmap '{roadmap_id}' is {roadmap.status.value}; published content is "
+                "immutable. Fork it into a new draft to make structural changes "
+                "(fork-to-change).",
+                code=ErrorCode.IMMUTABLE,
+                instance=f"/roadmaps/{roadmap_id}",
+            )
+        return roadmap
+
+    async def _load_owned_draft(self, user_id: str, roadmap_id: str) -> Roadmap:
+        """Load the caller's own roadmap for a draft-only **lifecycle** action
+        (validate / publish).
+
+        A non-owner / unknown ID is a 404 (no existence leak); a published or
+        archived roadmap is a lifecycle ``Conflict`` (these actions apply only to a
+        draft and change no content, so they are not the immutability/fork path).
+        """
+        roadmap = await self._load_owned(user_id, roadmap_id)
         if roadmap.status is not RoadmapStatus.DRAFT:
             raise Conflict(
                 f"Roadmap '{roadmap_id}' is {roadmap.status.value}; only draft roadmaps can be "
-                "edited, validated, or published.",
+                "validated or published.",
                 instance=f"/roadmaps/{roadmap_id}",
             )
         return roadmap
