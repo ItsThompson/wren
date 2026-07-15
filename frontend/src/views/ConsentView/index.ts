@@ -1,0 +1,1 @@
+export { ConsentView } from './ConsentView'
