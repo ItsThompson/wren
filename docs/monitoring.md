@@ -41,6 +41,14 @@ counted once (private helpers are not wrapped, and the service layer has no
 public-to-public calls, so there is no double-counting). Thin delegating methods
 add no timer of their own.
 
+**Asymmetry with the MCP counter.** `mcp_tool_invocations_total{outcome}` counts a
+model-recoverable 4xx (a backend error surfaced to the agent as a `ToolError`) as
+`outcome="error"`, whereas the backend `service_method_failures_total`
+deliberately **excludes** `WrenError` 4xx. This is intentional: the MCP counter
+reports per-tool call outcomes (an agent's request failed), while the backend
+counter reports operational faults (5xx-class). Do not compare their error counts
+directly on a dashboard.
+
 ### DB `query_name`
 
 To keep label cardinality bounded, `query_name` collapses to the SQL verb
@@ -61,7 +69,7 @@ and routes them through Alertmanager to a single Discord webhook with
 
 `node-exporter` provides the host disk/memory series `HostDiskAlmostFull` reads.
 
-### Discord webhook templating
+### Discord webhook templating (required for Alertmanager to start)
 
 `deployments/alertmanager/alertmanager.yml` keeps a `${DISCORD_WEBHOOK_URL}`
 placeholder in the committed file. Alertmanager does not expand environment
@@ -70,6 +78,17 @@ VPS at deploy time (then `chmod 600`); the Go templating (`{{ ... }}`) in the
 title/message is left untouched and renders at alert time. Set
 `DISCORD_WEBHOOK_URL` in the VPS `.env` (see `.env.example`). Never commit a real
 webhook.
+
+**This render is release-gating, not merely "needed for live firing."**
+Alertmanager v0.27 **exits on config load** if `webhook_url` is not a valid URL
+(an unrendered/blank placeholder → `unsupported scheme ""`). Because the deploy
+health gate (spec §11) polls *every* service's healthcheck, a deploy that starts
+Alertmanager without a rendered webhook will fail the gate and roll back. To avoid
+crash-looping local dev, the `alertmanager` service is gated behind the `tunnels`
+compose profile (the only profile the deploy activates), so `just up`/`up-dev` do
+not start it; Prometheus and node-exporter still run locally. Wiring the sed-render
+and provisioning a real `DISCORD_WEBHOOK_URL` is a prerequisite of the #32 live
+bring-up.
 
 ## Retention and query guards
 
@@ -86,4 +105,6 @@ Prometheus, node-exporter, and Alertmanager run on `monitoring-net` **only**,
 never on `edge-net`, so none is reachable through the tunnel. The backend is
 scraped on both its external (`:8000`) and internal (`:8001`) apps; MCP is scraped
 on `:9000` over `monitoring-net`, never via `mcp.usewren.com` (which path-exposes
-only the PRM document and the `/mcp` transport at ingress).
+only the PRM document and the `/mcp` transport at ingress). Alertmanager is
+additionally gated behind the `tunnels` compose profile (see the webhook note
+above); Prometheus and node-exporter are ungated and run in local dev.
