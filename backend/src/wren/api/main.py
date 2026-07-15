@@ -24,6 +24,8 @@ from wren.core.db import create_database, create_db_lifespan, db_readiness_check
 from wren.core.errors import build_exception_handlers
 from wren.core.identity import StripInboundIdentityMiddleware, deny_all_sessions
 from wren.core.settings import EXTERNAL_PORT, EXTERNAL_SERVICE, build_app_settings
+from wren.roadmaps.api import create_roadmaps_router
+from wren.roadmaps.wiring import build_roadmap_service_provider
 
 settings = build_app_settings(service=EXTERNAL_SERVICE, port=EXTERNAL_PORT)
 db = create_database(settings.database_url)
@@ -39,9 +41,13 @@ codec = SessionTokenCodec(session_config)
 service_provider = build_account_service_provider(BcryptPasswordHasher(), codec)
 accounts_router = create_accounts_router(service_provider, cookie_config=cookie_config)
 
+# Roadmap authoring (#7): create-draft + owner-scoped read over the same service
+# layer, resolving identity via the human session cookie (require_user).
+roadmaps_router = create_roadmaps_router(build_roadmap_service_provider())
+
 app: FastAPI = create_app(
     settings,
-    routers=[accounts_router],
+    routers=[accounts_router, roadmaps_router],
     readiness_checks=[db_readiness_check(db.engine)],
     exception_handlers=build_exception_handlers(),
     lifespan=create_db_lifespan(db.engine),

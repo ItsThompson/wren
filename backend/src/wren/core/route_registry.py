@@ -54,6 +54,10 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     RouteKey(method="POST", path="/auth/login"): AccessLevel.PUBLIC,
     RouteKey(method="POST", path="/auth/refresh"): AccessLevel.PUBLIC,
     RouteKey(method="POST", path="/auth/logout"): AccessLevel.PUBLIC,
+    # Roadmap authoring (#7): create a draft and read an owned roadmap. Both
+    # resolve the human session via require_user (owner-scoped in the service).
+    RouteKey(method="POST", path="/roadmaps"): AccessLevel.EXTERNAL_COOKIE,
+    RouteKey(method="GET", path="/roadmaps/{roadmap_id}"): AccessLevel.EXTERNAL_COOKIE,
 }
 INTERNAL_ROUTE_ACCESS: RouteRegistry = {}
 
