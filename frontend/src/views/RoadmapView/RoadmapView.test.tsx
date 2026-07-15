@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll } from 'vitest'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 
 import { AuthProvider } from '@/auth'
+import { colorForTag } from '@/lib/tag-color'
 import type { ProgressSnapshot, ProgressUpdateResult, Roadmap } from './types'
 import { RoadmapView } from './RoadmapView'
 
@@ -76,7 +77,14 @@ function buildDraft(overrides: Partial<Roadmap> = {}): Roadmap {
   }
 }
 
-const server = setupServer()
+const server = setupServer(
+  // Default "nothing next" so published-view tests that don't exercise the next
+  // highlight don't trip `onUnhandledRequest: 'error'`; specific tests override
+  // this via `server.use` (runtime handlers take precedence over initial ones).
+  http.get('*/roadmaps/:id/next', () =>
+    HttpResponse.json({ items: [], remaining_in_path: 0, complete: true }),
+  ),
+)
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
@@ -830,6 +838,181 @@ describe('RoadmapView web-only lifecycle', () => {
     expect(await screen.findByText(/couldn.t archive this roadmap/i)).toBeInTheDocument()
     // Not archived: the Archive action remains available to retry.
     expect(screen.getByRole('button', { name: /^archive$/i })).toBeInTheDocument()
+  })
+})
+
+describe('RoadmapView list view (tags, filter chips, next highlight)', () => {
+  const PROGRESS_URL = `${BASE}/roadmaps/${ROADMAP_ID}/progress`
+  const NEXT_URL = `${BASE}/roadmaps/${ROADMAP_ID}/next`
+
+  /**
+   * A published roadmap with two subsections carrying distinct track tags, so
+   * the filter chips and per-subsection filtering are exercisable end-to-end.
+   */
+  function filterableRoadmap(): Roadmap {
+    return buildDraft({
+      status: 'published',
+      section_order: ['sec_foundations'],
+      suggested_path: ['sub_arrays', 'sub_hashing'],
+      sections: {
+        sec_foundations: {
+          id: 'sec_foundations',
+          title: 'Foundations',
+          subsection_order: ['sub_arrays', 'sub_hashing'],
+          subsections: {
+            sub_arrays: {
+              id: 'sub_arrays',
+              title: 'Arrays & two pointers',
+              tags: ['arrays'],
+              prereq_ids: [],
+              resource_order: [],
+              resources: {},
+              item_order: ['chk_read'],
+              checklist_items: { chk_read: { id: 'chk_read', text: 'Read the walkthrough' } },
+            },
+            sub_hashing: {
+              id: 'sub_hashing',
+              title: 'Hashing',
+              tags: ['hashing'],
+              prereq_ids: [],
+              resource_order: [],
+              resources: {},
+              item_order: ['chk_hash'],
+              checklist_items: { chk_hash: { id: 'chk_hash', text: 'Implement a counter' } },
+            },
+          },
+        },
+      },
+    })
+  }
+
+  it('renders one filter chip per distinct track tag', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(filterableRoadmap())),
+      http.get(PROGRESS_URL, () => HttpResponse.json(buildProgress())),
+    )
+    renderView()
+
+    const group = await screen.findByRole('group', { name: /filter by tag/i })
+    // One chip per track tag, in first-appearance order; subject tags excluded.
+    expect(within(group).getAllByRole('button').map((chip) => chip.textContent)).toEqual([
+      'arrays',
+      'hashing',
+    ])
+  })
+
+  it('filters subsections to the selected tag and clears on re-select', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(filterableRoadmap())),
+      http.get(PROGRESS_URL, () => HttpResponse.json(buildProgress())),
+    )
+    renderView()
+
+    const group = await screen.findByRole('group', { name: /filter by tag/i })
+    const arraysChip = within(group).getByRole('button', { name: 'arrays' })
+    // Both subsections visible before any filter.
+    expect(screen.getByRole('heading', { level: 3, name: 'Arrays & two pointers' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 3, name: 'Hashing' })).toBeInTheDocument()
+
+    fireEvent.click(arraysChip)
+
+    // Active chip is styled/announced active; only the matching subsection shows.
+    expect(arraysChip).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('heading', { level: 3, name: 'Arrays & two pointers' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 3, name: 'Hashing' })).not.toBeInTheDocument()
+
+    // Re-selecting the active chip clears the filter and restores all subsections.
+    fireEvent.click(arraysChip)
+    expect(arraysChip).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('heading', { level: 3, name: 'Hashing' })).toBeInTheDocument()
+  })
+
+  it('renders no filter chips when the roadmap has no track tags', async () => {
+    const untagged = buildDraft({
+      status: 'published',
+      section_order: ['sec_only'],
+      suggested_path: [],
+      sections: {
+        sec_only: {
+          id: 'sec_only',
+          title: 'Only section',
+          subsection_order: ['sub_bare'],
+          subsections: {
+            sub_bare: {
+              id: 'sub_bare',
+              title: 'Bare node',
+              tags: [],
+              prereq_ids: [],
+              resource_order: [],
+              resources: {},
+              item_order: ['chk_x'],
+              checklist_items: { chk_x: { id: 'chk_x', text: 'Only item' } },
+            },
+          },
+        },
+      },
+    })
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(untagged)),
+      http.get(PROGRESS_URL, () => HttpResponse.json(buildProgress())),
+    )
+    renderView()
+
+    await screen.findByRole('heading', { level: 3, name: 'Bare node' })
+    expect(screen.queryByRole('group', { name: /filter by tag/i })).not.toBeInTheDocument()
+  })
+
+  it('hash-colors track-tag pills via the shared util and leaves subject tags neutral', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(filterableRoadmap())),
+      http.get(PROGRESS_URL, () => HttpResponse.json(buildProgress())),
+    )
+    renderView()
+
+    // The track-tag pill inside the node card carries the stable hash hue.
+    const card = (
+      await screen.findByRole('heading', { level: 3, name: 'Arrays & two pointers' })
+    ).closest('article') as HTMLElement
+    const pill = within(card).getByText('arrays')
+    expect(pill.style.getPropertyValue('--tag-hue')).toBe(colorForTag('arrays'))
+
+    // The roadmap-level subject tag is a neutral chip: never hash-colored.
+    const subjectTag = screen.getByText('computer-science')
+    expect(subjectTag.style.getPropertyValue('--tag-hue')).toBe('')
+  })
+
+  it('highlights the current "next" subsection (from GET /next) with aria-current', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(filterableRoadmap())),
+      http.get(PROGRESS_URL, () => HttpResponse.json(buildProgress())),
+      http.get(NEXT_URL, () =>
+        HttpResponse.json({
+          items: [
+            {
+              subsection_id: 'sub_arrays',
+              item_id: 'chk_read',
+              text: 'Read the walkthrough',
+              why_now:
+                'Next unchecked subsection in the suggested path; it has no prerequisites.',
+            },
+          ],
+          remaining_in_path: 2,
+          complete: false,
+        }),
+      ),
+    )
+    renderView()
+
+    await screen.findByRole('progressbar', { name: /overall progress/i })
+    // The "next" node is highlighted; the highlight lands only on that card.
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', { level: 3, name: 'Arrays & two pointers' }).closest('article'),
+      ).toHaveAttribute('aria-current', 'step'),
+    )
+    expect(
+      screen.getByRole('heading', { level: 3, name: 'Hashing' }).closest('article'),
+    ).not.toHaveAttribute('aria-current')
   })
 })
 
