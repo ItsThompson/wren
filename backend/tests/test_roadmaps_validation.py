@@ -316,6 +316,22 @@ def test_dag_and_content_violations_return_together_in_one_pass() -> None:
     }
 
 
+def test_two_dag_family_rules_return_together_through_check_dag() -> None:
+    # V2 (dangling prereq) and V3 (missing coverage) both flow through the single
+    # _check_dag composition seam and must surface together in one pass.
+    subs = [_subsection("sub_a", prereqs=["sub_ghost"]), _subsection("sub_b")]
+    roadmap = _roadmap(sections=[_section(subsections=subs)], suggested_path=["sub_a"])
+
+    violations = validate_structure(roadmap)
+    rules = {v.rule for v in violations}
+
+    assert rules == {StructuralRule.V2_NO_DANGLING_PREREQ, StructuralRule.V3_PATH_COVERAGE}
+    v2 = next(v for v in violations if v.rule == StructuralRule.V2_NO_DANGLING_PREREQ)
+    v3 = next(v for v in violations if v.rule == StructuralRule.V3_PATH_COVERAGE)
+    assert v2.ids == ["sub_a", "sub_ghost"]
+    assert v3.ids == ["sub_b"]
+
+
 def test_v7_violation_matches_the_section_06_wire_example() -> None:
     # Mirrors the section 06 422 example entry exactly: rule + ids + message.
     sub = _subsection("sub_two-pointers", with_resource=False)
