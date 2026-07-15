@@ -1,0 +1,158 @@
+name: CD
+
+# Spec section 11 §CD (cd.yml). Two triggers:
+#   - workflow_run: fires after CI completes on main; the build/deploy jobs are
+#     gated on CI having concluded successfully.
+#   - workflow_dispatch: manual re-deploy of the current main.
+#
+# The single static concurrency group serializes deploys so an auto push-deploy
+# and a manual dispatch can never race onto the box (section 11). In-progress
+# deploys are never cancelled mid-flight; a second run queues behind the first.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cd-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+# The SHA being released: the exact commit CI validated on the auto path, or the
+# dispatched HEAD manually. Used for BOTH the image tag and deploy.sh's
+# DEPLOY_SHA so the pushed :sha-<...> tag and the recorded rollback SHA always
+# match within a run.
+env:
+  DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # discover: parse the deployable Compose file with the official parser and emit
+  # a build matrix of the first-party images (ghcr.io/<org>/wren/*), auto-derived
+  # so a new first-party service is picked up without editing this workflow (the
+  # same derivation deploy.sh's rollback uses).
+  # ---------------------------------------------------------------------------
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+
+      - name: Discover first-party build services
+        id: set-matrix
+        run: |
+          # Filter docker-compose.yml to images under ghcr.io/<org>/wren/ that
+          # declare a build. service = last path segment (owner-agnostic); the
+          # build context/dockerfile are converted from absolute to repo-relative.
+          matrix=$(docker compose -f docker-compose.yml config --format json | jq -c --arg pwd "$PWD" '
+            [ .services | to_entries[]
+              | select((.value.image // "") | test("ghcr\\.io/.+/wren/"))
+              | select(.value.build != null)
+              | {
+                  service: (.value.image | split("/") | last | split(":") | first),
+                  context: ("." + (.value.build.context | ltrimstr($pwd))),
+                  file: ("." + ((.value.build.context + "/" + .value.build.dockerfile) | ltrimstr($pwd)))
+                } ]')
+          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
+          echo "Discovered first-party services:"
+          echo "${matrix}" | jq -r '.[].service'
+
+  # ---------------------------------------------------------------------------
+  # build-and-push: build each first-party image with Buildx and push two tags to
+  # GHCR: :latest (what deploy.sh pulls) and :sha-<DEPLOY_SHA> (immutable, what a
+  # rollback re-pulls). GHA layer cache keeps rebuilds cheap.
+  # ---------------------------------------------------------------------------
+  build-and-push:
+    needs: [discover]
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.discover.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+
+      - name: Resolve GHCR owner (lowercase)
+        id: owner
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.service }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: true
+          tags: |
+            ghcr.io/${{ steps.owner.outputs.owner }}/wren/${{ matrix.service }}:latest
+            ghcr.io/${{ steps.owner.outputs.owner }}/wren/${{ matrix.service }}:sha-${{ env.DEPLOY_SHA }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
+  # deploy: decode the Cloudflare tunnel secrets to the paths deploy.sh asserts,
+  # set up SSH to the VPS, then hand off to scripts/deploy.sh (owned by Ticket
+  # 29) with DEPLOY_SHA so it deploys/records the just-built images.
+  # ---------------------------------------------------------------------------
+  deploy:
+    needs: [build-and-push]
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+
+      - name: Decode Cloudflare tunnel credentials
+        run: |
+          mkdir -p deployments/cloudflare
+          echo "${{ secrets.CF_TUNNEL_CREDENTIALS }}" | base64 -d > deployments/cloudflare/credentials.json
+          echo "${{ secrets.CF_CERT_PEM }}" | base64 -d > deployments/cloudflare/cert.pem
+
+      - name: Validate credential files are non-empty
+        run: |
+          for f in deployments/cloudflare/credentials.json deployments/cloudflare/cert.pem; do
+            if [ ! -s "$f" ]; then
+              echo "ERROR: $f is empty or missing. Check the CF_TUNNEL_CREDENTIALS / CF_CERT_PEM repo secrets."
+              exit 1
+            fi
+          done
+          echo "Cloudflare credential files decoded."
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.DEPLOY_SERVER_IP }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy to the VPS
+        run: ./scripts/deploy.sh "${{ secrets.DEPLOY_SERVER_IP }}"
+        env:
+          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
