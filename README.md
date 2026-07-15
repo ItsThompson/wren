@@ -1,29 +1,38 @@
-# Wren
+<div align="center">
+<pre>
+ __      ___ __ ___ _ __  
+ \ \ /\ / / '__/ _ \ '_ \ 
+  \ V  V /| | |  __/ | | |
+   \_/\_/ |_|  \___|_| |_|
+                          
+-----------------------------------------------------------------------------------------
+Learning-roadmap platform for humans and AI agents, built with a modular-monolith backend,
+react frontend, and an MCP server for AI agents. 
 
-A multi-user learning-roadmap platform. Humans use it through a web app; AI
-agents use it through an MCP server. Both go through the same backend, so the
-rules for creating, publishing, and tracking roadmaps are defined in exactly one
-place.
+</pre>
+
+![GitHub top language](https://img.shields.io/github/languages/top/ItsThompson/wren)
+![GitHub last commit (branch)](https://img.shields.io/github/last-commit/ItsThompson/wren/main)
+![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/ItsThompson/wren)
+
+</div>
+
+## Introduction
+
+A multi-user learning-roadmap platform. Humans use it through a web app; AI agents use it through an MCP server. Both go through the same backend, so the rules for creating, publishing, and tracking roadmaps are defined in exactly one place.
 
 ## Architecture
 
-Wren is a monorepo with a Python modular-monolith backend, a separate MCP server,
-a React frontend, and the deployment assets. The backend is one codebase that
-serves two apps over a shared service layer:
+Wren is a monorepo with a Python modular-monolith backend, a separate MCP server, a React frontend, and the deployment assets. The backend is one codebase that serves two apps over a shared service layer:
 
-- **External app (`:8000`)** is internet-facing: it authenticates humans by
-  session cookie and hosts the public REST API and OAuth authorization server.
-- **Internal app (`:8001`)** trusts an injected identity header and is reachable
-  only from inside the compute network (the MCP server calls it). It is never
-  exposed to the internet.
+- **External app (`:8000`)** is internet-facing: it authenticates humans by session cookie and hosts the public REST API and OAuth authorization server.
+- **Internal app (`:8001`)** trusts an injected identity header and is reachable only from inside the compute network (the MCP server calls it). It is never exposed to the internet.
 
-Both apps are assembled from one factory (`wren.core.app_factory.create_app`) and
-differ only by injected settings.
+Both apps are assembled from one factory (`wren.core.app_factory.create_app`) and differ only by injected settings.
 
 ## Layout
 
-- `backend/`: Python backend (uv-managed); `src/wren/core` shared kit,
-  `src/wren/api` external app, `src/wren/api_internal` internal app.
+- `backend/`: Python backend (uv-managed); `src/wren/core` shared kit, `src/wren/api` external app, `src/wren/api_internal` internal app.
 - `frontend/`: React SPA.
 - `deployments/`, `scripts/`: operational assets.
 
@@ -39,8 +48,6 @@ just test-backend      # run tests with coverage
 just lint-backend      # ruff + mypy
 ```
 
-Health and metrics are available on both apps: `GET /healthz` (liveness),
-`GET /readyz` (readiness), and `GET /metrics` (Prometheus).
+Health and metrics are available on both apps: `GET /healthz` (liveness), `GET /readyz` (readiness), and `GET /metrics` (Prometheus).
 
-Configuration comes from environment variables; see `.env.example` for the
-canonical list.
+Configuration comes from environment variables; see `.env.example` for the canonical list.
