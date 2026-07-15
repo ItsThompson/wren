@@ -29,15 +29,19 @@ def index_subsections(roadmap: Roadmap) -> dict[str, Subsection]:
 def all_item_ids(roadmap: Roadmap) -> set[str]:
     """Every checklist-item id defined anywhere in the roadmap.
 
-    This is the authority for which ids are addressable: a ``progress_update``
-    naming an id outside this set is foreign (spec section 06 -> 422), and a
-    stale checked id (from content edited before publish) is ignored by the
-    derived reads."""
+    Iterates ``item_order`` (the canonical addressable order array), matching the
+    counting/done/next helpers so "which items exist" is decided from one source.
+    For a published roadmap ``item_order`` and the ``checklist_items`` map agree
+    (assembly keeps them in sync); using the order array means an id absent from
+    it is uniformly invisible to every derived read. This is the authority for
+    which ids are addressable: a ``progress_update`` naming an id outside this set
+    is foreign (spec section 06 -> 422), and a stale checked id (from content
+    edited before publish) is ignored by the derived reads."""
     return {
         item_id
         for section in roadmap.sections.values()
         for subsection in section.subsections.values()
-        for item_id in subsection.checklist_items
+        for item_id in subsection.item_order
     }
 
 

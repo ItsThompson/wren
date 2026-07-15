@@ -156,7 +156,8 @@ class ProgressService:
 
     def _reject_foreign_items(self, roadmap: Roadmap, roadmap_id: str, item_ids: list[str]) -> None:
         """Reject any item id not defined in this roadmap (422, applies nothing)."""
-        foreign = sorted({item_id for item_id in item_ids if item_id not in all_item_ids(roadmap)})
+        valid = all_item_ids(roadmap)
+        foreign = sorted({item_id for item_id in item_ids if item_id not in valid})
         if foreign:
             plural = "id" if len(foreign) == 1 else "ids"
             raise Validation(
