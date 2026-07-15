@@ -30,10 +30,8 @@ interface RoadmapViewProps {
 export function RoadmapView({ baseUrl = API_BASE_URL }: RoadmapViewProps) {
   const { roadmapId } = useParams()
   const { user } = useAuth()
-  const { state, publishState, publish, metadataState, editMetadata, forkState, fork } = useRoadmap(
-    roadmapId ?? '',
-    baseUrl,
-  )
+  const { state, publishState, publish, metadataState, editMetadata, forkState, fork, lifecycle } =
+    useRoadmap(roadmapId ?? '', baseUrl)
 
   if (state.phase === 'loading') {
     return <RoadmapSkeleton />
@@ -43,7 +41,7 @@ export function RoadmapView({ baseUrl = API_BASE_URL }: RoadmapViewProps) {
   }
 
   const isOwner = user?.id != null && user.id === state.roadmap.owner
-  const actions: RoadmapActions = { metadataState, editMetadata, forkState, fork }
+  const actions: RoadmapActions = { metadataState, editMetadata, forkState, fork, lifecycle }
 
   if (state.roadmap.status === 'draft') {
     return (

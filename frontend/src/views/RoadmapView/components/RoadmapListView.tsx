@@ -33,7 +33,19 @@ export function RoadmapListView({ roadmap, baseUrl, isOwner, actions }: RoadmapL
   return (
     <section className="reading-width py-10">
       <header className="border-b border-border pb-6">
-        <h1 className="display-l text-foreground">{roadmap.title}</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="display-l text-foreground">{roadmap.title}</h1>
+          {roadmap.status === 'archived' ? (
+            <span className="rounded-full border border-muted-foreground/50 px-3 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Archived
+            </span>
+          ) : null}
+        </div>
+        {roadmap.status === 'archived' ? (
+          <p className="mt-2 text-sm text-muted-foreground">
+            This roadmap is archived: hidden from discovery, but you keep it and your progress.
+          </p>
+        ) : null}
         {roadmap.description ? (
           <p className="mt-3 max-w-[52ch] text-muted-foreground">{roadmap.description}</p>
         ) : null}

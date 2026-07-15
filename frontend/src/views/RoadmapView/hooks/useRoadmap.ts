@@ -2,11 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { createSessionClient } from '@/auth/createSessionClient'
+import { useLifecycle } from './useLifecycle'
 import type {
   ForkState,
   MetadataDraft,
   MetadataEditState,
   PublishState,
+  Roadmap,
+  RoadmapLifecycle,
   RoadmapViewState,
   Violation,
 } from '../types'
@@ -45,6 +48,7 @@ export function useRoadmap(
   editMetadata: (draft: MetadataDraft) => Promise<boolean>
   forkState: ForkState
   fork: () => void
+  lifecycle: RoadmapLifecycle
 } {
   const client = useMemo(() => createSessionClient(baseUrl), [baseUrl])
   const navigate = useNavigate()
@@ -156,5 +160,27 @@ export function useRoadmap(
     })()
   }, [client, navigate, roadmapId])
 
-  return { state, publishState, publish, metadataState, editMetadata, forkState, fork }
+  // Web-only lifecycle (visibility / archive / delete): a visibility toggle or
+  // archive replaces the loaded roadmap in place; a successful delete leaves the
+  // now-removed roadmap's route for the landing page (section 06).
+  const onLifecycleChanged = useCallback(
+    (roadmap: Roadmap) => setState({ phase: 'loaded', roadmap }),
+    [],
+  )
+  const onDeleted = useCallback(() => navigate('/'), [navigate])
+  const lifecycle = useLifecycle(client, roadmapId, {
+    onChanged: onLifecycleChanged,
+    onDeleted,
+  })
+
+  return {
+    state,
+    publishState,
+    publish,
+    metadataState,
+    editMetadata,
+    forkState,
+    fork,
+    lifecycle,
+  }
 }

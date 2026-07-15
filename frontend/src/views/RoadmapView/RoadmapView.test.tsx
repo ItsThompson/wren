@@ -563,3 +563,183 @@ describe('RoadmapView metadata edit', () => {
   })
 })
 
+describe('RoadmapView web-only lifecycle', () => {
+  const VISIBILITY_URL = `${BASE}/roadmaps/${ROADMAP_ID}/visibility`
+  const ARCHIVE_URL = `${BASE}/roadmaps/${ROADMAP_ID}:archive`
+  const DELETE_URL = `${BASE}/roadmaps/${ROADMAP_ID}`
+  const OTHER_USER = {
+    id: 'user-2',
+    username: 'grace',
+    email: 'grace@example.com',
+    created_at: '2026-07-15T00:00:00Z',
+  }
+
+  it('lets the owner toggle a draft public and flips the control', async () => {
+    let put: unknown
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
+      http.put(VISIBILITY_URL, async ({ request }) => {
+        put = await request.json()
+        const body = put as { visibility: 'public' | 'private' }
+        return HttpResponse.json(buildDraft({ visibility: body.visibility }))
+      }),
+    )
+    renderView()
+    await screen.findByText('Grokking DSA')
+
+    // Private draft: the toggle offers "Make public".
+    fireEvent.click(screen.getByRole('button', { name: /make public/i }))
+
+    await waitFor(() => expect(put).toEqual({ visibility: 'public' }))
+    // The returned roadmap replaces the loaded one, so the control flips.
+    expect(await screen.findByRole('button', { name: /make private/i })).toBeInTheDocument()
+  })
+
+  it('does not offer Archive on a draft, but does offer Delete', async () => {
+    server.use(http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())))
+    renderView()
+    await screen.findByText('Grokking DSA')
+
+    // Archive applies only to a published roadmap (linear lifecycle).
+    expect(screen.queryByRole('button', { name: /^archive$/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^delete$/i })).toBeInTheDocument()
+  })
+
+  it('archives a published roadmap after confirmation and shows the archived badge', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
+      http.get('*/roadmaps/:id/progress', () => HttpResponse.json(buildProgress())),
+      http.post(ARCHIVE_URL, () => HttpResponse.json(buildDraft({ status: 'archived' }))),
+    )
+    renderView()
+    await screen.findByRole('progressbar', { name: /overall progress/i })
+
+    // Confirm-gated: the first click reveals a confirmation step.
+    fireEvent.click(screen.getByRole('button', { name: /^archive$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /confirm archive/i }))
+
+    // The archived badge appears and the Archive action is gone (already archived).
+    expect(await screen.findByText('Archived')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^archive$/i })).not.toBeInTheDocument()
+  })
+
+  it('deletes a follower-free roadmap after confirmation and navigates away', async () => {
+    let deleted = false
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
+      http.delete(DELETE_URL, () => {
+        deleted = true
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    renderView()
+    await screen.findByText('Grokking DSA')
+
+    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /confirm delete/i }))
+
+    await waitFor(() => expect(deleted).toBe(true))
+    // A successful delete leaves the now-removed roadmap's route.
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/))
+  })
+
+  it('blocks delete when the roadmap has followers and steers to archive', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
+      http.get('*/roadmaps/:id/progress', () => HttpResponse.json(buildProgress())),
+      http.delete(DELETE_URL, () =>
+        HttpResponse.json(
+          {
+            type: 'x',
+            title: 'Conflict with the current state',
+            status: 409,
+            code: 'DELETE_HAS_FOLLOWERS',
+            detail: 'Roadmap has 2 followers; archive it instead.',
+          },
+          { status: 409, headers: { 'content-type': 'application/problem+json' } },
+        ),
+      ),
+    )
+    renderView()
+    await screen.findByRole('progressbar', { name: /overall progress/i })
+
+    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /confirm delete/i }))
+
+    // The 409 steers the owner to archive instead; the roadmap is not removed.
+    expect(await screen.findByText(/archive it instead/i)).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent(`/roadmaps/${ROADMAP_ID}`)
+    // Archive remains available as the safe retirement path.
+    expect(screen.getByRole('button', { name: /^archive$/i })).toBeInTheDocument()
+  })
+
+  it('cancels a destructive action without firing a request', async () => {
+    let deleteCalled = false
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
+      http.delete(DELETE_URL, () => {
+        deleteCalled = true
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    renderView()
+    await screen.findByText('Grokking DSA')
+
+    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
+    expect(screen.getByRole('button', { name: /confirm delete/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+
+    // The confirmation collapses and nothing was deleted.
+    expect(screen.queryByRole('button', { name: /confirm delete/i })).not.toBeInTheDocument()
+    expect(deleteCalled).toBe(false)
+    expect(screen.getByRole('button', { name: /^delete$/i })).toBeInTheDocument()
+  })
+
+  it('hides all lifecycle actions from a non-owner', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () =>
+        HttpResponse.json(buildDraft({ status: 'published', owner: 'user-1' })),
+      ),
+      http.get('*/roadmaps/:id/progress', () => HttpResponse.json(buildProgress())),
+    )
+    renderView(OTHER_USER)
+    await screen.findByRole('progressbar', { name: /overall progress/i })
+
+    // A reader who is not the owner sees Fork but none of the lifecycle actions.
+    expect(screen.getByRole('button', { name: /^fork$/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^delete$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^archive$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /make public|make private/i })).not.toBeInTheDocument()
+  })
+
+  it('surfaces a retry message when a visibility toggle fails (500)', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
+      http.put(VISIBILITY_URL, () => new HttpResponse(null, { status: 500 })),
+    )
+    renderView()
+    await screen.findByText('Grokking DSA')
+
+    fireEvent.click(screen.getByRole('button', { name: /make public/i }))
+    expect(await screen.findByText(/couldn.t update visibility/i)).toBeInTheDocument()
+    // Unchanged: still offers "Make public" (the toggle did not take effect).
+    expect(screen.getByRole('button', { name: /make public/i })).toBeInTheDocument()
+  })
+
+  it('surfaces a retry message when archive fails (500)', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
+      http.get('*/roadmaps/:id/progress', () => HttpResponse.json(buildProgress())),
+      http.post(ARCHIVE_URL, () => new HttpResponse(null, { status: 500 })),
+    )
+    renderView()
+    await screen.findByRole('progressbar', { name: /overall progress/i })
+
+    fireEvent.click(screen.getByRole('button', { name: /^archive$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /confirm archive/i }))
+    expect(await screen.findByText(/couldn.t archive this roadmap/i)).toBeInTheDocument()
+    // Not archived: the Archive action remains available to retry.
+    expect(screen.getByRole('button', { name: /^archive$/i })).toBeInTheDocument()
+  })
+})
+

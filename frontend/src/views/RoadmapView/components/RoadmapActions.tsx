@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import type { MetadataDraft, RoadmapActions as Actions, Roadmap } from '../types'
+import { LifecycleActions } from './LifecycleActions'
 import { MetadataEditor } from './MetadataEditor'
 
 interface RoadmapActionsProps {
@@ -18,7 +19,9 @@ interface RoadmapActionsProps {
  * producing a fresh draft the view then navigates to. The presentation-only
  * "Edit details" affordance is owner-only and opens the {@link MetadataEditor}
  * inline; it stays available even on a published roadmap because editing
- * title/description/subject_tags is the sanctioned post-publish edit.
+ * title/description/subject_tags is the sanctioned post-publish edit. The
+ * owner-only web-only lifecycle bar ({@link LifecycleActions}: visibility toggle
+ * + confirm-gated archive/delete) renders below, for the roadmap's owner.
  */
 export function RoadmapActions({ roadmap, isOwner, actions }: RoadmapActionsProps) {
   const [editing, setEditing] = useState(false)
@@ -66,6 +69,8 @@ export function RoadmapActions({ roadmap, isOwner, actions }: RoadmapActionsProp
           We couldn&rsquo;t fork this roadmap. Please try again.
         </p>
       ) : null}
+
+      {isOwner ? <LifecycleActions roadmap={roadmap} lifecycle={actions.lifecycle} /> : null}
     </section>
   )
 }

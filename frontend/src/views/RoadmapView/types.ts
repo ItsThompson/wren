@@ -11,6 +11,7 @@ export type Subsection = components['schemas']['Subsection']
 export type Resource = components['schemas']['Resource']
 export type ChecklistItem = components['schemas']['ChecklistItem']
 export type Violation = components['schemas']['Violation']
+export type Visibility = components['schemas']['Visibility']
 
 /**
  * Progress read types, also from the generated client. The published list view
@@ -82,13 +83,62 @@ export type MetadataEditState =
 export type ForkState = { phase: 'idle' } | { phase: 'forking' } | { phase: 'failed'; status: number | null }
 
 /**
+ * The web-only visibility toggle sub-state (`PUT /roadmaps/{id}/visibility`,
+ * section 06). Last-write-wins: on success the returned roadmap replaces the
+ * loaded one so the badge updates in place; `failed` carries the status.
+ */
+export type VisibilityState =
+  | { phase: 'idle' }
+  | { phase: 'saving' }
+  | { phase: 'failed'; status: number | null }
+
+/**
+ * The web-only archive sub-state (`POST /roadmaps/{id}:archive`, section 06). On
+ * success the returned archived roadmap replaces the loaded one; `failed` carries
+ * the status for a retry message.
+ */
+export type ArchiveState =
+  | { phase: 'idle' }
+  | { phase: 'archiving' }
+  | { phase: 'failed'; status: number | null }
+
+/**
+ * The web-only delete sub-state (`DELETE /roadmaps/{id}`, section 06). `blocked`
+ * is the 409 `DELETE_HAS_FOLLOWERS` hard-stop: the roadmap has followers, so the
+ * UI offers archive instead. A successful delete navigates away (no loaded
+ * state); `failed` carries the status for a retry message.
+ */
+export type DeleteState =
+  | { phase: 'idle' }
+  | { phase: 'deleting' }
+  | { phase: 'blocked' }
+  | { phase: 'failed'; status: number | null }
+
+/**
+ * The owner-only web-only lifecycle bundle (visibility / archive / delete,
+ * section 06). No agent surface: these are human-web actions only. Threaded into
+ * the {@link RoadmapActions} bundle and rendered by `LifecycleActions` when the
+ * signed-in user owns the roadmap.
+ */
+export interface RoadmapLifecycle {
+  visibilityState: VisibilityState
+  setVisibility: (visibility: Visibility) => void
+  archiveState: ArchiveState
+  archive: () => void
+  deleteState: DeleteState
+  deleteRoadmap: () => void
+}
+
+/**
  * The owner/reader action bundle threaded from RoadmapView into whichever view
  * renders (draft preview or published list). Fork is available to any reader;
- * the metadata edit is owner-only and gated by `isOwner` at the render site.
+ * the metadata edit and the web-only lifecycle actions are owner-only and gated
+ * by `isOwner` at the render site.
  */
 export interface RoadmapActions {
   metadataState: MetadataEditState
   editMetadata: (draft: MetadataDraft) => Promise<boolean>
   forkState: ForkState
   fork: () => void
+  lifecycle: RoadmapLifecycle
 }
