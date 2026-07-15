@@ -37,7 +37,8 @@ from wren.oauth.wiring import (
 from wren.progress.api import create_progress_router
 from wren.progress.wiring import build_progress_service_provider
 from wren.roadmaps.api import create_roadmaps_router
-from wren.roadmaps.wiring import build_roadmap_service_provider
+from wren.roadmaps.listing_api import create_listing_router
+from wren.roadmaps.wiring import build_listing_service_provider, build_roadmap_service_provider
 
 settings = build_app_settings(service=EXTERNAL_SERVICE, port=EXTERNAL_PORT)
 db = create_database(settings.database_url)
@@ -56,6 +57,12 @@ accounts_router = create_accounts_router(service_provider, cookie_config=cookie_
 # Roadmap authoring (#7): create-draft + owner-scoped read over the same service
 # layer, resolving identity via the human session cookie (require_user).
 roadmaps_router = create_roadmaps_router(build_roadmap_service_provider())
+
+# Dashboard + public profile (#25, spec section 02 US-ACCT-03): the private
+# dashboard (authored + followed, require_user) and the public profile
+# (published-public only, no session). The listing service composes the roadmaps,
+# accounts, and progress repositories over one request-scoped session.
+listing_router = create_listing_router(build_listing_service_provider())
 
 # Follow + progress + server-computed next (#9): the study-time surface over the
 # progress service, resolving the human session via require_user and scoped to
@@ -78,7 +85,7 @@ oauth_router = create_oauth_router(
 
 app: FastAPI = create_app(
     settings,
-    routers=[accounts_router, roadmaps_router, progress_router, oauth_router],
+    routers=[accounts_router, roadmaps_router, listing_router, progress_router, oauth_router],
     readiness_checks=[db_readiness_check(db.engine)],
     exception_handlers={**build_exception_handlers(), **build_oauth_exception_handlers()},
     lifespan=create_db_lifespan(db.engine),

@@ -126,6 +126,14 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     RouteKey(method="POST", path="/revoke"): AccessLevel.OAUTH,
     RouteKey(method="GET", path="/me/clients"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="DELETE", path="/me/clients/{client_id}"): AccessLevel.EXTERNAL_COOKIE,
+    # Dashboard + public profile (#25, spec section 02 US-ACCT-03). The private
+    # dashboard resolves the human session via require_user (EXTERNAL_COOKIE) and
+    # is caller-scoped (authored + followed). The public profile is PUBLIC: it
+    # resolves no identity and returns only the handle owner's published-public
+    # roadmaps (no draft/private/archived or social-graph leak). Both are mounted
+    # on the external app only.
+    RouteKey(method="GET", path="/me/dashboard"): AccessLevel.EXTERNAL_COOKIE,
+    RouteKey(method="GET", path="/users/{handle}"): AccessLevel.PUBLIC,
 }
 # Internal app routes (:8001), reachable only by the MCP server on compute-net.
 # Every route resolves identity via require_internal_user (the trusted X-User-ID
