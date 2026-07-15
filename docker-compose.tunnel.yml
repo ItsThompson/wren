@@ -1,0 +1,46 @@
+# =============================================================================
+# Cloudflare Tunnel overlay (spec section 11 §4.1, §7.2 phase 11).
+#
+# Layered ON TOP of docker-compose.yml at DEPLOY TIME ONLY:
+#   docker compose -f docker-compose.yml -f docker-compose.tunnel.yml \
+#     --profile tunnels up -d
+# scripts/deploy.sh drives this. The tunnel is the ONLY ingress on the VPS;
+# locally the stack runs without it (the base file defines no cloudflared), and
+# the `tunnels` profile keeps cloudflared from ever starting outside a deploy.
+#
+# Kept separate from docker-compose.yml (Ticket 28) so the base stack stays a
+# self-contained, tunnel-free local artifact and the ingress lives with the
+# rest of the Ticket-29 deploy machinery.
+# =============================================================================
+name: wren
+
+services:
+  cloudflared:
+    # Pinned (spec: pin third-party images; review quarterly, check release notes).
+    image: cloudflare/cloudflared:2026.7.1
+    profiles: [tunnels]
+    command: tunnel --config /etc/cloudflared/config.yml run
+    # Rendered ingress config + named-tunnel credentials, both read-only.
+    # deploy.sh renders config.rendered.yml (envsubst) and copies
+    # credentials.json (chmod 600); both are gitignored.
+    volumes:
+      - ./deployments/cloudflare/config.rendered.yml:/etc/cloudflared/config.yml:ro
+      - ./deployments/cloudflare/credentials.json:/etc/cloudflared/credentials.json:ro
+    networks:
+      - edge-net
+    depends_on:
+      - frontend
+      - backend
+      - mcp
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+    restart: unless-stopped
+
+# edge-net is defined in the base file; redeclared here (identical) so the
+# overlay is self-consistent when merged.
+networks:
+  edge-net:
+    driver: bridge
