@@ -20,6 +20,7 @@ from sqlalchemy.engine import Connection
 # Import every domain's models for their side effect of registering tables on
 # Base.metadata. Add new domain model modules here as slices land (roadmaps #7+).
 import wren.accounts.models  # noqa: F401  (registers the accounts tables)
+import wren.oauth.models  # noqa: F401  (registers the OAuth AS tables)
 import wren.roadmaps.models  # noqa: F401  (registers the roadmaps table)
 from wren.core.db import create_db_engine
 from wren.core.orm import Base
