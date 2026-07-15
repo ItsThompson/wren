@@ -70,6 +70,10 @@ class TokenService:
         grant = await self._repo.get_grant(code.user_id, code.client_id)
         if grant is None:  # pragma: no cover - decision always upserts the grant
             raise OAuthError.invalid_grant("No active grant for this authorization.")
+        if grant.revoked_at is not None:
+            # The user revoked the client after this code was minted (within the
+            # code TTL): honor the revocation rather than re-establish access.
+            raise OAuthError.invalid_grant("The authorization grant has been revoked.")
         tokens = await self._issue_pair(
             grant_id=grant.id,
             user_id=code.user_id,

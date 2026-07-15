@@ -117,6 +117,37 @@ async def test_register_rejects_non_loopback_http_redirect() -> None:
     assert exc.value.error == OAuthErrorCode.INVALID_CLIENT_METADATA
 
 
+@pytest.mark.parametrize(
+    "redirect_uri",
+    [
+        "javascript:alert(document.cookie)",
+        "data:text/html,<script>alert(1)</script>",
+        "file:///etc/passwd",
+        "com.evil.app:/callback",
+        "http://evil.example.com/cb",
+        "/callback",
+    ],
+)
+async def test_register_rejects_dangerous_or_non_allowlisted_redirects(redirect_uri: str) -> None:
+    # Allowlist: only https or loopback http may register. A dangerous scheme
+    # (javascript:/data:/file:) or arbitrary custom/non-loopback scheme is
+    # rejected at DCR so it can never become a consent navigation target.
+    h = _harness()
+    with pytest.raises(OAuthError) as exc:
+        await h.auth.register_client(ClientRegistrationRequest(redirect_uris=[redirect_uri]))
+    assert exc.value.error == OAuthErrorCode.INVALID_CLIENT_METADATA
+
+
+async def test_register_accepts_https_and_loopback_http_redirects() -> None:
+    h = _harness()
+    response = await h.auth.register_client(
+        ClientRegistrationRequest(
+            redirect_uris=["https://app.example.com/callback", "http://127.0.0.1:9000/cb"]
+        )
+    )
+    assert response.client_id
+
+
 async def test_register_rejects_relative_redirect() -> None:
     h = _harness()
     with pytest.raises(OAuthError):
@@ -332,6 +363,28 @@ async def test_code_exchange_rejects_wrong_pkce_verifier() -> None:
                 client_id=client_id,
                 code=code,
                 code_verifier="wrong-verifier",
+                redirect_uri=_REDIRECT,
+            )
+        )
+    assert exc.value.error == OAuthErrorCode.INVALID_GRANT
+
+
+async def test_code_exchange_rejects_a_revoked_grant() -> None:
+    # Revocation must win a race with an outstanding code: a code minted before
+    # the user revoked the client cannot mint a fresh, un-revoked refresh token
+    # within the code TTL.
+    h = _harness()
+    client_id = await _register(h.auth)
+    verifier, challenge = make_pkce_pair()
+    code = await _authorize_to_code(h, client_id, challenge)
+    await h.tokens.revoke_connected_client(_USER, client_id)
+    with pytest.raises(OAuthError) as exc:
+        await h.tokens.exchange(
+            TokenRequest(
+                grant_type="authorization_code",
+                client_id=client_id,
+                code=code,
+                code_verifier=verifier,
                 redirect_uri=_REDIRECT,
             )
         )
