@@ -106,6 +106,176 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/.well-known/oauth-authorization-server": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** As Metadata */
+        get: operations["as_metadata__well_known_oauth_authorization_server_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jwks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Jwks Document */
+        get: operations["jwks_document_jwks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register Client */
+        post: operations["register_client_register_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/authorize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Authorize */
+        get: operations["authorize_authorize_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/authorize/context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Authorize Context */
+        get: operations["authorize_context_authorize_context_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/authorize/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Authorize Decision */
+        post: operations["authorize_decision_authorize_decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Token */
+        post: operations["token_token_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke */
+        post: operations["revoke_revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/clients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Clients */
+        get: operations["list_clients_me_clients_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/clients/{client_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Client */
+        delete: operations["revoke_client_me_clients__client_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -131,6 +301,47 @@ export interface components {
             created_at: string;
         };
         /**
+         * AuthorizationContext
+         * @description What the SPA consent screen renders for a parked ``auth_request_id``.
+         */
+        AuthorizationContext: {
+            /** Client Name */
+            client_name: string;
+            /** Scopes */
+            scopes: string[];
+            /** Authenticated */
+            authenticated: boolean;
+        };
+        /** Body_revoke_revoke_post */
+        Body_revoke_revoke_post: {
+            /** Token */
+            token: string;
+            /** Token Type Hint */
+            token_type_hint?: string | null;
+            /** Client Id */
+            client_id?: string | null;
+        };
+        /** Body_token_token_post */
+        Body_token_token_post: {
+            /**
+             * Grant Type
+             * @default
+             */
+            grant_type: string;
+            /** Client Id */
+            client_id?: string | null;
+            /** Code */
+            code?: string | null;
+            /** Code Verifier */
+            code_verifier?: string | null;
+            /** Redirect Uri */
+            redirect_uri?: string | null;
+            /** Refresh Token */
+            refresh_token?: string | null;
+            /** Resource */
+            resource?: string | null;
+        };
+        /**
          * ChecklistItem
          * @description The only checkable unit.
          */
@@ -146,6 +357,85 @@ export interface components {
             proposed_id?: string | null;
             /** Text */
             text: string;
+        };
+        /**
+         * ClientRegistrationRequest
+         * @description RFC 7591 registration input. Only ``redirect_uris`` is required at P0.
+         */
+        ClientRegistrationRequest: {
+            /** Redirect Uris */
+            redirect_uris: string[];
+            /** Client Name */
+            client_name?: string | null;
+            /** Grant Types */
+            grant_types?: string[] | null;
+            /** Response Types */
+            response_types?: string[] | null;
+            /** Scope */
+            scope?: string | null;
+            /** Token Endpoint Auth Method */
+            token_endpoint_auth_method?: string | null;
+        };
+        /**
+         * ClientRegistrationResponse
+         * @description RFC 7591 registration response echoing the stored client metadata.
+         */
+        ClientRegistrationResponse: {
+            /** Client Id */
+            client_id: string;
+            /** Client Name */
+            client_name: string;
+            /** Redirect Uris */
+            redirect_uris: string[];
+            /** Grant Types */
+            grant_types: string[];
+            /** Response Types */
+            response_types: string[];
+            /** Scope */
+            scope: string;
+            /** Token Endpoint Auth Method */
+            token_endpoint_auth_method: string;
+            /** Client Id Issued At */
+            client_id_issued_at: number;
+        };
+        /**
+         * ConnectedClient
+         * @description One authorized agent in the user's connected-clients list.
+         */
+        ConnectedClient: {
+            /** Client Id */
+            client_id: string;
+            /** Client Name */
+            client_name: string;
+            /** Scopes */
+            scopes: string[];
+            /**
+             * Last Authorized
+             * Format: date-time
+             */
+            last_authorized: string;
+        };
+        /**
+         * DecisionRequest
+         * @description The human's consent decision for a parked request.
+         */
+        DecisionRequest: {
+            /** Auth Request Id */
+            auth_request_id: string;
+            /** Approve */
+            approve: boolean;
+        };
+        /**
+         * DecisionResult
+         * @description The loopback URL the SPA redirects the browser to (approve or deny).
+         *
+         *     Returned as JSON (not a 302) because the SPA calls the decision endpoint via a
+         *     credentialed XHR; the SPA performs the browser navigation to the loopback
+         *     listener itself.
+         */
+        DecisionResult: {
+            /** Redirect Uri */
+            redirect_uri: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -584,6 +874,296 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Roadmap"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    as_metadata__well_known_oauth_authorization_server_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    jwks_document_jwks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    register_client_register_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClientRegistrationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientRegistrationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    authorize_authorize_get: {
+        parameters: {
+            query?: {
+                client_id?: string;
+                redirect_uri?: string;
+                response_type?: string;
+                code_challenge?: string;
+                code_challenge_method?: string;
+                scope?: string | null;
+                state?: string | null;
+                resource?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    authorize_context_authorize_context_get: {
+        parameters: {
+            query: {
+                auth_request_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorizationContext"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    authorize_decision_authorize_decision_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    token_token_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/x-www-form-urlencoded": components["schemas"]["Body_token_token_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_revoke_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": components["schemas"]["Body_revoke_revoke_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_clients_me_clients_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectedClient"][];
+                };
+            };
+        };
+    };
+    revoke_client_me_clients__client_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                client_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
