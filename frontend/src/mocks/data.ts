@@ -211,3 +211,11 @@ export const mockProfile: MockProfile = {
     },
   ],
 }
+
+/** The authenticated-user shape returned by /auth/register|login|refresh. */
+export const mockAuthUser = {
+  id: 'usr_ada',
+  username: OWNER_HANDLE,
+  email: 'ada@example.com',
+  created_at: '2026-07-15T00:00:00Z',
+}

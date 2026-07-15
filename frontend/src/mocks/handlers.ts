@@ -1,6 +1,7 @@
 import { http, HttpResponse, delay } from 'msw'
 
 import {
+  mockAuthUser,
   mockDashboard,
   mockNext,
   mockOverview,
@@ -38,6 +39,23 @@ function notFound(instance: string) {
 }
 
 export const handlers = [
+  // --- auth (section 06 external-only) ---
+  // The mock harness starts anonymous: refresh has no session to resume. Login
+  // and register return the demo user so the authed shell can be exercised.
+  http.post('*/auth/refresh', () => new HttpResponse(null, { status: 401 })),
+
+  http.post('*/auth/register', async () => {
+    await delay(LATENCY_MS)
+    return HttpResponse.json(mockAuthUser, { status: 201 })
+  }),
+
+  http.post('*/auth/login', async () => {
+    await delay(LATENCY_MS)
+    return HttpResponse.json(mockAuthUser)
+  }),
+
+  http.post('*/auth/logout', () => new HttpResponse(null, { status: 204 })),
+
   http.get('*/me/dashboard', async () => {
     await delay(LATENCY_MS)
     return HttpResponse.json(mockDashboard)
