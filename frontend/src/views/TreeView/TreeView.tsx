@@ -10,17 +10,6 @@ import { layoutTree } from './layout'
 import { buildTreeGraph } from './tree-graph'
 
 /**
- * Same-origin by default (dev proxy + MSW); prod points at the API subdomain via
- * `VITE_API_BASE_URL`. Read once at module load: the deployment base is fixed.
- */
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
-
-interface TreeViewProps {
-  /** Overridable in tests; defaults to the deployment API base URL. */
-  baseUrl?: string
-}
-
-/**
  * The Tree/DAG view: the roadmap's subsections
  * as a layered top-down DAG over their prerequisite edges (React Flow + dagre).
  * Node soft-state (done / available / locked) is derived from progress + prereqs
@@ -29,10 +18,10 @@ interface TreeViewProps {
  * `/roadmaps/{id}/tree` (a sibling route to the list view). Loading / empty /
  * error use the shared state surfaces so the tree reads like the rest of the app.
  */
-export function TreeView({ baseUrl = API_BASE_URL }: TreeViewProps) {
+export function TreeView() {
   const { roadmapId } = useParams()
   const id = roadmapId ?? ''
-  const { state } = useTreeData(id, baseUrl)
+  const { state } = useTreeData(id)
 
   const graph = useMemo(() => {
     if (state.phase !== 'loaded') return null
