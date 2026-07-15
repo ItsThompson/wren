@@ -1,7 +1,7 @@
 """OAuth AS persistence: the repository interface and its SQLAlchemy binding.
 
 The service depends on this interface and receives resolved identities, never
-building queries itself (spec section 05). Tests substitute an in-memory
+building queries itself. Tests substitute an in-memory
 repository; production binds :class:`SqlAlchemyOAuthRepository` over a
 request-scoped ``AsyncSession``. As with accounts, ``get_session`` is yield-only,
 so the transaction boundary lives here: the service calls :meth:`commit` after a

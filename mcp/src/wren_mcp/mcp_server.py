@@ -1,7 +1,7 @@
-"""MCP tool server bootstrap (spec sections 07/03).
+"""MCP tool server bootstrap.
 
 Builds the ``FastMCP`` instance the write tools (this ticket) and read tools
-(Ticket 22) register onto, and that :mod:`wren_mcp.app` mounts under the
+ register onto, and that:mod:`wren_mcp.app` mounts under the
 bearer-guarded ``/mcp`` transport prefix. The server is a **thin dispatcher**:
 tool execution, schema generation, and the Streamable HTTP protocol are the MCP
 framework's job (spec section 07: validate tool shapes against MCP guidance,

@@ -44,7 +44,7 @@ from wren.skill.api import create_skill_router
 settings = build_app_settings(service=EXTERNAL_SERVICE, port=EXTERNAL_PORT)
 db = create_database(settings.database_url)
 
-# Human session cookies (spec section 08): HS256 codec + bcrypt hasher wired into
+# Human session cookies: HS256 codec + bcrypt hasher wired into
 # the /auth router and the real cookie verifier behind require_user.
 session_config = build_session_config(settings)
 # Fail fast on a missing/weak secret outside development (dev stays lenient and
@@ -55,28 +55,28 @@ codec = SessionTokenCodec(session_config)
 service_provider = build_account_service_provider(BcryptPasswordHasher(), codec)
 accounts_router = create_accounts_router(service_provider, cookie_config=cookie_config)
 
-# Roadmap authoring (#7): create-draft + owner-scoped read over the same service
+# Roadmap authoring: create-draft + owner-scoped read over the same service
 # layer, resolving identity via the human session cookie (require_user).
 roadmaps_router = create_roadmaps_router(build_roadmap_service_provider())
 
-# Dashboard + public profile (#25, spec section 02 US-ACCT-03): the private
+# Dashboard + public profile: the private
 # dashboard (authored + followed, require_user) and the public profile
 # (published-public only, no session). The listing service composes the roadmaps,
 # accounts, and progress repositories over one request-scoped session.
 listing_router = create_listing_router(build_listing_service_provider())
 
-# Follow + progress + server-computed next (#9): the study-time surface over the
+# Follow + progress + server-computed next: the study-time surface over the
 # progress service, resolving the human session via require_user and scoped to
 # that user (another user's progress is never returned).
 progress_router = create_progress_router(build_progress_service_provider())
 
-# Shipped SKILL.md authoring guidance (#27, spec sections 07/14): the public,
+# Shipped SKILL.md authoring guidance: the public,
 # unauthenticated GET /skill an agent fetches (referenced from the MCP tool
 # descriptions) to learn how to author a ZPD-ordered roadmap. Guidance, not user
 # data, so no session is required or consulted.
 skill_router = create_skill_router()
 
-# Agent OAuth 2.1 Authorization Server (#18, spec section 08). All issuer/metadata/
+# Agent OAuth 2.1 Authorization Server. All issuer/metadata/
 # endpoint URLs are built from pinned config (the Site-URL gotcha); the signing
 # key is loaded from the mounted PEM (or an ephemeral dev keypair). Fails fast
 # outside development when no key is configured, like the session secret.

@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 type RoadmapStatus = components['schemas']['RoadmapStatus']
 
 /**
- * Lifecycle-status badge (design language §7.9): Draft is a neutral muted pill,
+ * Lifecycle-status badge: Draft is a neutral muted pill,
  * Published an olive tint, Archived a muted outline. The text label always
  * carries the meaning, so status is never encoded by color alone (accessibility).
  */

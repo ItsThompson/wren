@@ -5,7 +5,7 @@ import type { Roadmap } from './types'
  * order (section_order → subsection_order → tag order). These are the tags that
  * become filter chips above the list view (section 10 "List view"). Subject
  * tags are roadmap-level categorization and are never included: only subsection
- * track tags are hash-colored and filterable (section 09 §3.5).
+ * track tags are hash-colored and filterable.
  */
 export function collectTrackTags(roadmap: Roadmap): string[] {
   const seen = new Set<string>()

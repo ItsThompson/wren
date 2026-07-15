@@ -1,6 +1,6 @@
 """Frozen MCP tool-schema snapshot (spec section 13 contract-freeze).
 
-The write- and read-tool contracts are deliberately frozen (spec section 07).
+The write- and read-tool contracts are deliberately frozen.
 This is the MCP analog of the OpenAPI drift check: it serializes each registered
 tool's machine contract (name + annotations + input/output JSON Schema) and
 compares it against a committed snapshot, so any accidental shape change fails the

@@ -1,8 +1,8 @@
 """Contract tests for the internal progress surface (:8001).
 
-The internal app is the surface the MCP progress tools (Ticket 22) call: it
+The internal app is the surface the MCP progress tools call: it
 resolves identity from the trusted ``X-User-ID`` header behind the shared
-``INTERNAL_API_TOKEN`` (spec section 08), not a session cookie. These assert the
+``INTERNAL_API_TOKEN``, not a session cookie. These assert the
 trust boundary (``require_internal_user``) and that every query stays per-user
 scoped so a tool can never reach another user's progress even though the identity
 is injected. The service is backed by in-memory repositories seeded with a
@@ -89,7 +89,7 @@ def test_get_and_next_over_the_trusted_identity(make_settings: MakeSettings) -> 
     )
     assert next_response.status_code == 200
     body = next_response.json()
-    # The MCP roadmap_get_next tool (Ticket 22) reads this: full shape + detailed
+    # The MCP roadmap_get_next tool reads this: full shape + detailed
     # path_position, structural why_now, remaining_in_path.
     assert body["remaining_in_path"] == 3
     assert all(item["path_position"] == 1 for item in body["items"])

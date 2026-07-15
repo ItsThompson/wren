@@ -1,4 +1,4 @@
-"""OAuth 2.1 Authorization Server configuration (spec section 08).
+"""OAuth 2.1 Authorization Server configuration.
 
 Every issuer, metadata, and endpoint URL the AS publishes is built from pinned
 deployment config (``PUBLIC_BASE_URL`` / ``APP_PUBLIC_URL`` / ``MCP_PUBLIC_URL``),
@@ -7,7 +7,7 @@ never from the request host. This is the single highest-risk auth item, the
 any request-derived URL would break client issuer/audience validation. All URL
 construction therefore lives here and reads only :class:`OAuthConfig`.
 
-Signing is asymmetric (spec section 08): the AS holds a private key; the MCP
+Signing is asymmetric: the AS holds a private key; the MCP
 Resource Server verifies via the published JWKS. Access tokens are audience-bound
 to the MCP resource. The human HS256 session secret (accounts domain) is kept
 separate from this keypair for separate blast radii.
@@ -37,7 +37,7 @@ CLIENTS_PATH = "/me/clients"
 # request and 302s the browser to `<app_public_url><CONSENT_ROUTE>?auth_request_id`.
 CONSENT_ROUTE = "/authorize"
 
-# --- Scopes (spec section 08) -----------------------------------------------
+# --- Scopes -----------------------------------------------
 SCOPE_ROADMAPS_READ = "roadmaps:read"
 SCOPE_ROADMAPS_WRITE = "roadmaps:write"
 SCOPE_PROGRESS_WRITE = "progress:write"

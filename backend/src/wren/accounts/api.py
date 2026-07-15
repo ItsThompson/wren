@@ -1,6 +1,6 @@
 """External REST adapter for accounts: /auth/register, /login, /refresh, /logout.
 
-Thin handlers (spec section 05/06): each maps one request to one
+Thin handlers: each maps one request to one
 :class:`AccountService` call, writes or clears the session cookies, and returns
 the authenticated user (never the password hash). The ``WrenError`` the service
 raises is rendered as RFC 9457 problem+json by the shared exception handler.

@@ -1,4 +1,4 @@
-"""Identity resolution at the two trust boundaries (spec section 08).
+"""Identity resolution at the two trust boundaries.
 
 Every request resolves to exactly one ``user_id``; the server never trusts a
 ``user_id`` from request/tool args for authorization. The two apps resolve that

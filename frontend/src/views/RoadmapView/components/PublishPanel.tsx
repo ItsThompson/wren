@@ -11,7 +11,7 @@ interface PublishPanelProps {
  * The draft publish affordance (section 06 `:publish` action). Offers a Publish
  * action and, when a publish is hard-blocked (422), renders the returned
  * structural violations via the shared ochre `ViolationList` so the author sees
- * the full fix list (rule + message + offending ids) in one pass (US-ERR-02).
+ * the full fix list (rule + message + offending ids) in one pass.
  * Rendered only in draft preview mode: on a successful publish the RoadmapView
  * routes to the published list view, so there is no published state here.
  */

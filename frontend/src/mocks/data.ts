@@ -10,7 +10,7 @@ import type {
 
 /**
  * Coherent dev fixtures for the MSW harness, in the OpenAPI-generated schema
- * shape (section 06). One published roadmap plus the dashboard/profile/progress
+ * shape. One published roadmap plus the dashboard/profile/progress
  * projections built from it, so the SPA renders populated views with zero backend
  * (`npm run dev:mock`). The roadmap uses the section-04 ID-keyed maps
  * (`sections` / `subsections` / `resources` / `checklist_items`) with explicit

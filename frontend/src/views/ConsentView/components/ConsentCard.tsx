@@ -3,7 +3,7 @@ import { ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 /**
- * Plain-language labels for the scopes the AS grants (section 08). The raw scope
+ * Plain-language labels for the scopes the AS grants. The raw scope
  * token is shown alongside so the grant is legible and honest; an unknown scope
  * falls back to its token.
  */

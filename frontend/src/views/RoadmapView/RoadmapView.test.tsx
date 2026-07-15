@@ -215,7 +215,7 @@ describe('RoadmapView', () => {
     renderView()
 
     // A 403 (someone else's private roadmap) must not read differently from a
-    // 404, so the roadmap's existence never leaks (US-ERR-04).
+    // 404, so the roadmap's existence never leaks.
     expect(await screen.findByText('Roadmap not found')).toBeInTheDocument()
     expect(
       screen.getByText(/does not exist or is not shared with you/i),
@@ -1093,7 +1093,7 @@ describe('RoadmapView states (loading/empty/error, 409/422, tabs, anchor)', () =
   const NEXT_URL = `${BASE}/roadmaps/${ROADMAP_ID}/next`
   const PUBLISH_URL = `${BASE}/roadmaps/${ROADMAP_ID}:publish`
 
-  /** A 409 problem+json body with the given machine code (spec section 06). */
+  /** A 409 problem+json body with the given machine code. */
   function conflict(code: string, detail: string) {
     return HttpResponse.json(
       { type: 'x', title: 'Conflict with the current state', status: 409, code, detail },

@@ -1681,7 +1681,7 @@
           "to_id"
         ],
         "title": "AddEdgeOp",
-        "description": "``to_id`` gains ``from_id`` as a prerequisite (spec section 07)."
+        "description": "``to_id`` gains ``from_id`` as a prerequisite."
       },
       "AddItemOp": {
         "properties": {
@@ -2234,7 +2234,7 @@
           "incomplete"
         ],
         "title": "CompletionState",
-        "description": "The explicit target state a ``progress_update`` sets its items to.\n\nExplicit set, never toggle (spec section 07): the client states the desired\nstate so a retry is idempotent."
+        "description": "The explicit target state a ``progress_update`` sets its items to.\n\nExplicit set, never toggle: the client states the desired\nstate so a retry is idempotent."
       },
       "ConnectedClient": {
         "properties": {
@@ -2288,7 +2288,7 @@
         },
         "type": "object",
         "title": "Dashboard",
-        "description": "The ``GET /me/dashboard`` body: the caller's private home (spec section 02\nUS-ACCT-03).\n\n``authored`` is everything the caller owns at any status (draft / private /\npublic), rendered in the \"Yours\" section; ``followed`` is every roadmap the\ncaller follows, rendered in the \"Following\" section (spec section 09 \u00a77.9). A\nroadmap the caller both authored and follows appears in both lists. Scoped to\nthe caller: another user's dashboard is never returned."
+        "description": "The ``GET /me/dashboard`` body: the caller's private home (spec section 02\nUS-ACCT-03).\n\n``authored`` is everything the caller owns at any status (draft / private /\npublic), rendered in the \"Yours\" section; ``followed`` is every roadmap the\ncaller follows, rendered in the \"Following\" section. A\nroadmap the caller both authored and follows appears in both lists. Scoped to\nthe caller: another user's dashboard is never returned."
       },
       "DeadlineRequest": {
         "properties": {
@@ -2440,7 +2440,7 @@
         "additionalProperties": true,
         "type": "object",
         "title": "MetadataEditRequest",
-        "description": "The ``PATCH /roadmaps/{id}/metadata`` body: the presentation-only fields\nthat stay mutable after publish (spec sections 04/06).\n\nOnly ``title`` / ``description`` / ``subject_tags`` are editable here; a field\nleft out (``None``) is unchanged (last-write-wins, deliberately not\n``If-Match``-guarded and never bumps the structural ``revision``). ``extra`` is\n``allow``ed so a smuggled structural, lifecycle, or identity field (e.g.\n``sections`` / ``visibility`` / ``status`` / ``revision``) is *captured* rather\nthan silently dropped, then rejected as immutable by\n:meth:`reject_structural_fields`: the metadata endpoint can never touch\nanything but presentation."
+        "description": "The ``PATCH /roadmaps/{id}/metadata`` body: the presentation-only fields\nthat stay mutable after publish.\n\nOnly ``title`` / ``description`` / ``subject_tags`` are editable here; a field\nleft out (``None``) is unchanged (last-write-wins, deliberately not\n``If-Match``-guarded and never bumps the structural ``revision``). ``extra`` is\n``allow``ed so a smuggled structural, lifecycle, or identity field (e.g.\n``sections`` / ``visibility`` / ``status`` / ``revision``) is *captured* rather\nthan silently dropped, then rejected as immutable by\n:meth:`reject_structural_fields`: the metadata endpoint can never touch\nanything but presentation."
       },
       "NextItem": {
         "properties": {
@@ -2487,7 +2487,7 @@
           "why_now"
         ],
         "title": "NextItem",
-        "description": "One unchecked, prereq-satisfied checklist item to work on next.\n\n``why_now`` is a STRUCTURAL rationale only (spec section 07): it states the\nmechanical facts the app owns (this is the next unchecked subsection in\n``suggested_path`` and its named prerequisites are complete), never\npedagogical / ZPD judgement (that intelligence lives in the agent and was\nbaked into ``suggested_path`` at authoring time). ``path_position`` (the\n1-based index of the item's subsection in ``suggested_path``) is populated\nonly in ``detailed`` mode."
+        "description": "One unchecked, prereq-satisfied checklist item to work on next.\n\n``why_now`` is a STRUCTURAL rationale only: it states the\nmechanical facts the app owns (this is the next unchecked subsection in\n``suggested_path`` and its named prerequisites are complete), never\npedagogical / ZPD judgement (that intelligence lives in the agent and was\nbaked into ``suggested_path`` at authoring time). ``path_position`` (the\n1-based index of the item's subsection in ``suggested_path``) is populated\nonly in ``detailed`` mode."
       },
       "NextResult": {
         "properties": {
@@ -2511,7 +2511,7 @@
         },
         "type": "object",
         "title": "NextResult",
-        "description": "The ``GET /next`` body: the next unchecked items in ``suggested_path``\norder whose prerequisites are all complete (spec section 07).\n\n``remaining_in_path`` counts the subsections still to do along the path (any\nwith an unchecked item); ``complete`` is ``True`` when nothing remains."
+        "description": "The ``GET /next`` body: the next unchecked items in ``suggested_path``\norder whose prerequisites are all complete.\n\n``remaining_in_path`` counts the subsections still to do along the path (any\nwith an unchecked item); ``complete`` is ``True`` when nothing remains."
       },
       "NodeDetail": {
         "properties": {
@@ -2643,7 +2643,7 @@
           "overall"
         ],
         "title": "Overview",
-        "description": "The ``GET /overview`` body: sections in ``section_order`` with per-section\nand overall completion, and no checklist-item bodies (spec section 04).\n\nThe orientation call; from here the agent drills into a node (``get_node``) or\na section (``get_section``). ``checked_items`` / ``percent`` reflect the\ncaller's own progress (zero when they have not started)."
+        "description": "The ``GET /overview`` body: sections in ``section_order`` with per-section\nand overall completion, and no checklist-item bodies.\n\nThe orientation call; from here the agent drills into a node (``get_node``) or\na section (``get_section``). ``checked_items`` / ``percent`` reflect the\ncaller's own progress (zero when they have not started)."
       },
       "PatchRequest": {
         "properties": {
@@ -2731,7 +2731,7 @@
           "operations"
         ],
         "title": "PatchRequest",
-        "description": "The ``PATCH /roadmaps/{id}`` body: the ordered op list applied atomically.\n\nThe target ``revision`` travels in the ``If-Match`` header (spec section 06),\nnot the body. At least one op is required so a patch is never a silent no-op\nthat would still burn a revision."
+        "description": "The ``PATCH /roadmaps/{id}`` body: the ordered op list applied atomically.\n\nThe target ``revision`` travels in the ``If-Match`` header,\nnot the body. At least one op is required so a patch is never a silent no-op\nthat would still burn a revision."
       },
       "PatchResult": {
         "properties": {
@@ -2764,7 +2764,7 @@
           "revision"
         ],
         "title": "PatchResult",
-        "description": "The ``PATCH /roadmaps/{id}`` body: the post-batch ``revision``, the changed\nnodes, and the ``proposed_id -> minted_id`` remap for any de-duped ``add_*``\nproposal (spec section 07). ``remap`` is empty when nothing was de-duped."
+        "description": "The ``PATCH /roadmaps/{id}`` body: the post-batch ``revision``, the changed\nnodes, and the ``proposed_id -> minted_id`` remap for any de-duped ``add_*``\nproposal. ``remap`` is empty when nothing was de-duped."
       },
       "PrereqRef": {
         "properties": {
@@ -2858,7 +2858,7 @@
           "updated_at"
         ],
         "title": "Progress",
-        "description": "A user's progress against one roadmap (spec section 04).\n\n``checked`` maps a checklist-item id to its checked state; only checked items\nare retained (an unchecked item is simply absent), which keeps the map lean\nand the explicit-set idempotent. ``user_id`` is resolved from the\ntoken/session and never trusted from args. This is the ``follow`` response\nbody (following creates the record)."
+        "description": "A user's progress against one roadmap.\n\n``checked`` maps a checklist-item id to its checked state; only checked items\nare retained (an unchecked item is simply absent), which keeps the map lean\nand the explicit-set idempotent. ``user_id`` is resolved from the\ntoken/session and never trusted from args. This is the ``follow`` response\nbody (following creates the record)."
       },
       "ProgressSnapshot": {
         "properties": {
@@ -2920,7 +2920,7 @@
           "percent"
         ],
         "title": "ProgressSnapshot",
-        "description": "The ``GET /progress`` body: roadmap-wide + per-section completion.\n\n``checked_ids`` is populated only in ``detailed`` mode (spec section 04),\nkeeping the default concise response small while still letting a client\nreconcile the exact checked set when it asks for it."
+        "description": "The ``GET /progress`` body: roadmap-wide + per-section completion.\n\n``checked_ids`` is populated only in ``detailed`` mode,\nkeeping the default concise response small while still letting a client\nreconcile the exact checked set when it asks for it."
       },
       "ProgressUpdateRequest": {
         "properties": {
@@ -2959,7 +2959,7 @@
           "next"
         ],
         "title": "ProgressUpdateResult",
-        "description": "The ``POST /progress`` body: the fresh snapshot after the set plus the\nnext suggestion (spec sections 04/07). The snapshot is returned in detailed\nmode so the client can reconcile its checkbox state to the server truth."
+        "description": "The ``POST /progress`` body: the fresh snapshot after the set plus the\nnext suggestion. The snapshot is returned in detailed\nmode so the client can reconcile its checkbox state to the server truth."
       },
       "RegisterRequest": {
         "properties": {
@@ -3219,7 +3219,7 @@
           "type"
         ],
         "title": "ResourceRef",
-        "description": "A subsection resource as a link, never an inlined body (spec section 07)."
+        "description": "A subsection resource as a link, never an inlined body."
       },
       "ResourceType": {
         "type": "string",
@@ -3240,7 +3240,7 @@
           "detailed"
         ],
         "title": "ResponseFormat",
-        "description": "The ``concise | detailed`` switch on the read tools (spec section 07).\n\nConcise is roughly one-third the tokens and still carries the follow-up IDs;\ndetailed adds the explanatory free-text (the node ``description``)."
+        "description": "The ``concise | detailed`` switch on the read tools.\n\nConcise is roughly one-third the tokens and still carries the follow-up IDs;\ndetailed adds the explanatory free-text (the node ``description``)."
       },
       "Roadmap": {
         "properties": {
@@ -3362,7 +3362,7 @@
           "visibility"
         ],
         "title": "RoadmapCard",
-        "description": "A roadmap summarized for a list/grid card (spec sections 06/09).\n\n``status`` drives the Draft/Published/Archived badge and ``visibility`` the\nlock/globe badge (spec section 09 \u00a77.9). Content (sections, items, progress)\nis never inlined: a card links to the full roadmap view for that."
+        "description": "A roadmap summarized for a list/grid card.\n\n``status`` drives the Draft/Published/Archived badge and ``visibility`` the\nlock/globe badge. Content (sections, items, progress)\nis never inlined: a card links to the full roadmap view for that."
       },
       "RoadmapCreated": {
         "properties": {
@@ -3457,7 +3457,7 @@
           "updated_at"
         ],
         "title": "RoadmapCreated",
-        "description": "The ``POST /roadmaps`` body: the full minted roadmap plus a ``remap`` of\nevery de-duped ``proposed_id -> minted_id`` so the author can reconcile the\nreferences it sent (spec section 04). ``remap`` is empty when no proposed ID\nhad to be changed."
+        "description": "The ``POST /roadmaps`` body: the full minted roadmap plus a ``remap`` of\nevery de-duped ``proposed_id -> minted_id`` so the author can reconcile the\nreferences it sent. ``remap`` is empty when no proposed ID\nhad to be changed."
       },
       "RoadmapInput": {
         "properties": {
@@ -3613,7 +3613,7 @@
           "updated_at"
         ],
         "title": "RoadmapReplaced",
-        "description": "The ``PUT /roadmaps/{id}`` body: the full rebuilt draft after a full-document\nimport (the escape hatch, spec section 07) plus the ``proposed_id -> minted_id``\nremap. Mirrors :class:`RoadmapCreated` because replace reuses the same\nmint-then-resolve assembly: ``proposed_id``s are preserved, every other node is\nre-minted, and the roadmap's own ID is unchanged (spec section 04). ``remap`` is\nempty when no proposed ID had to be de-duped."
+        "description": "The ``PUT /roadmaps/{id}`` body: the full rebuilt draft after a full-document\nimport (the escape hatch, spec section 07) plus the ``proposed_id -> minted_id``\nremap. Mirrors :class:`RoadmapCreated` because replace reuses the same\nmint-then-resolve assembly: ``proposed_id``s are preserved, every other node is\nre-minted, and the roadmap's own ID is unchanged. ``remap`` is\nempty when no proposed ID had to be de-duped."
       },
       "RoadmapStatus": {
         "type": "string",
@@ -3670,7 +3670,7 @@
           "title_or_text"
         ],
         "title": "SearchHit",
-        "description": "One search match, carrying the IDs needed to drill down (spec section 04).\n\n``item_id`` is present only when ``kind == item``; ``matched_tags`` names the\nsubsection tags that matched a tag filter (absent for a keyword-only match)."
+        "description": "One search match, carrying the IDs needed to drill down.\n\n``item_id`` is present only when ``kind == item``; ``matched_tags`` names the\nsubsection tags that matched a tag filter (absent for a keyword-only match)."
       },
       "SearchHitKind": {
         "type": "string",
@@ -3722,7 +3722,7 @@
           "both"
         ],
         "title": "SectionInclude",
-        "description": "Which parts of each node a ``SectionPage`` populates (spec section 07).\n\n``subsections`` = node metadata (tags, effort, resources, resolved prereqs);\n``items`` = the checklist items only; ``both`` = everything. Every variant\nstill carries the ``subsection_id`` so the agent can drill in further."
+        "description": "Which parts of each node a ``SectionPage`` populates.\n\n``subsections`` = node metadata (tags, effort, resources, resolved prereqs);\n``items`` = the checklist items only; ``both`` = everything. Every variant\nstill carries the ``subsection_id`` so the agent can drill in further."
       },
       "SectionInput": {
         "properties": {
@@ -3787,7 +3787,7 @@
           "percent"
         ],
         "title": "SectionOverview",
-        "description": "Per-section completion counts, no checklist-item bodies (spec section 04)."
+        "description": "Per-section completion counts, no checklist-item bodies."
       },
       "SectionPage": {
         "properties": {
@@ -4242,7 +4242,7 @@
         },
         "type": "object",
         "title": "ValidateResult",
-        "description": "The ``POST /roadmaps/{id}:validate`` body: all structural violations in one\npass (empty when the draft is publishable). The ``violations`` shape is\nidentical to the 422 publish hard-block body (spec section 06), so a client\nhandles one violation contract for both validate and publish."
+        "description": "The ``POST /roadmaps/{id}:validate`` body: all structural violations in one\npass (empty when the draft is publishable). The ``violations`` shape is\nidentical to the 422 publish hard-block body, so a client\nhandles one violation contract for both validate and publish."
       },
       "ValidationError": {
         "properties": {

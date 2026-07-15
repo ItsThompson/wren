@@ -1,4 +1,4 @@
-"""Domain, service, and DB-pool metric families (spec section 11).
+"""Domain, service, and DB-pool metric families.
 
 Complements the HTTP request metrics in :mod:`wren.core.metrics`. Where those
 count traffic at the edge, these count the things the three P0 alerts and future
@@ -8,7 +8,7 @@ registered on the dedicated :data:`WREN_REGISTRY`, which
 :func:`wren.core.metrics.instrument` exposes on ``/metrics`` alongside each app's
 private HTTP registry.
 
-Metric names and labels follow a stable convention (spec section 11) so alert
+Metric names and labels follow a stable convention so alert
 rules and dashboards can be dropped in later:
 
 - ``service_method_failures_total{service,method}`` (counter): one increment when

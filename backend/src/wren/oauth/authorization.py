@@ -1,6 +1,6 @@
 """AuthorizationService: DCR, the authorize/park flow, and the consent decision.
 
-The authorization-grant lifecycle up to code minting (spec section 08): a client
+The authorization-grant lifecycle up to code minting: a client
 registers (RFC 7591), an ``/authorize`` request is validated and **parked**
 server-side under an opaque ``auth_request_id`` (so the SPA only round-trips the
 id), the SPA reads the consent context, and the human's decision either mints a
@@ -212,7 +212,7 @@ class AuthorizationService:
 
     def _reject_invalid_redirect_uris(self, uris: list[str]) -> None:
         for uri in uris:
-            # Allowlist (spec section 08): a public client may register only an
+            # Allowlist: a public client may register only an
             # https redirect *with a host* (exact-matched at /authorize) or a
             # loopback http redirect (RFC 8252, any port). Everything else --
             # javascript:, data:, file:, custom schemes, non-loopback http, and a

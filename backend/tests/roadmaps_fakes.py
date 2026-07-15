@@ -1,6 +1,6 @@
 """In-memory test double for the roadmaps domain.
 
-The service is tested sociably (spec section 13): the real ``slugs`` and
+The service is tested sociably: the real ``slugs`` and
 ``assembly`` deep modules run behind ``RoadmapService``; only the repository (the
 Postgres boundary) is substituted here. The fake enforces the same PK uniqueness
 and owner-scoping as the ``roadmaps`` table so the create/get paths are exercised

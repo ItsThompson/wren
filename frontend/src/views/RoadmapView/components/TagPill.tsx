@@ -5,7 +5,7 @@ interface TagPillProps {
 }
 
 /**
- * A subsection track-tag pill (section 09 §3.5 / §7.4): a small, borderless
+ * A subsection track-tag pill: a small, borderless
  * mono pill whose hue is hash-assigned from the shared palette via
  * {@link tagPillStyle} (background = hue ~16% into `card`, text = hue ~72% into
  * `foreground`). The tag text always shows, so color is redundant reinforcement,

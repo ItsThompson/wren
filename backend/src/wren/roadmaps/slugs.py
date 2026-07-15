@@ -1,7 +1,7 @@
-"""``slugs``: the pure, deterministic slug-minting deep module (spec section 05).
+"""``slugs``: the pure, deterministic slug-minting deep module.
 
 No I/O, no request, no token: just functions over strings and sets, so they are
-the highest-density test target (spec section 13). Two concerns:
+the highest-density test target. Two concerns:
 
 - **Child-entity IDs** (``sec_``/``sub_``/``chk_``/``res_``) are minted from a
   title (or a caller-proposed ID), prefixed by entity, and de-duped *within one
@@ -27,7 +27,7 @@ SLUG_FALLBACK = "untitled"
 
 # Crockford base32 (lowercased), minus the ambiguous i/l/o/u. A 4-char token over
 # this 32-symbol alphabet gives ~1M combinations: ample for the single-VPS,
-# few-users deployment (spec section 11) while keeping IDs short and readable.
+# few-users deployment while keeping IDs short and readable.
 TOKEN_ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz"
 TOKEN_LENGTH = 4
 
@@ -58,7 +58,7 @@ def mint(title: str, prefix: str, existing_ids: set[str]) -> str:
 
 
 def mint_proposed(proposed_id: str, prefix: str, existing_ids: set[str]) -> str:
-    """Validate/slugify/de-dupe a caller-proposed child ID (spec section 04).
+    """Validate/slugify/de-dupe a caller-proposed child ID.
 
     A proposed ID may arrive already prefixed (``"sub_two-pointers"``) or bare
     (``"two-pointers"``); either way the prefix is normalized exactly once, the
@@ -70,7 +70,7 @@ def mint_proposed(proposed_id: str, prefix: str, existing_ids: set[str]) -> str:
 
 
 def compose_roadmap_id(base: str, token: str) -> str:
-    """Compose a roadmap ID as ``{slug-of-base}-{token}`` (spec section 04).
+    """Compose a roadmap ID as ``{slug-of-base}-{token}``.
 
     ``base`` is the title (or a caller-proposed base); the random ``token`` is
     what guarantees global uniqueness, so the caller never emits a sequential

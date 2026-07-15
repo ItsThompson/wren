@@ -30,7 +30,7 @@ all gitignored. `.env.example` is the canonical description of every variable.
 
 ---
 
-## Phase A: provision and harden the VPS (§4.4)
+## Phase A: provision and harden the VPS
 
 Run as root (or a sudo admin) on the box.
 
@@ -90,7 +90,7 @@ session.
 
 ---
 
-## Phase B: create the Cloudflare tunnel and route DNS (§4.1)
+## Phase B: create the Cloudflare tunnel and route DNS
 
 Run locally where `cloudflared` is installed and logged into the Cloudflare
 account that owns `usewren.com`.
@@ -114,7 +114,7 @@ The tunnel dials out only; no inbound port is opened.
 All files below live under `/opt/wren` and are `chmod 600`. `scripts/deploy.sh`
 **asserts they exist and never creates them.**
 
-### C1. `/opt/wren/.env` (§8.3)
+### C1. `/opt/wren/.env`
 
 Start from the canonical example and fill in production values:
 
@@ -161,7 +161,7 @@ too short or the OAuth key is missing, and makes cookies `Secure`. All OAuth
 issuer/metadata/redirect URLs are built from the pinned `*_PUBLIC_URL` values, not
 the request host (the "Site-URL gotcha", section 08).
 
-### C2. OAuth AS private key (§8.3, section 08)
+### C2. OAuth AS private key
 
 ```sh
 sudo openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /opt/wren/secrets/oauth_private.pem
@@ -254,7 +254,7 @@ curl -sI https://api.usewren.com/.well-known/oauth-authorization-server   # AS m
 curl -sI https://mcp.usewren.com/.well-known/oauth-protected-resource     # PRM (mcp :9000)
 ```
 
-Confirm the **internal `:8001` boundary holds** (section 08): the internal app is
+Confirm the **internal `:8001` boundary holds**: the internal app is
 never tunnel-routed, and `mcp.usewren.com` serves **only** the PRM document and
 the `/mcp` transport (any other path → 404 at ingress):
 

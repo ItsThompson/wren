@@ -1,6 +1,6 @@
 """TokenService: token exchange, rotating refresh, revocation, and grants.
 
-The token endpoint (spec section 08): an ``authorization_code`` exchange verifies
+The token endpoint: an ``authorization_code`` exchange verifies
 the PKCE ``code_verifier`` against the code's stored S256 challenge and mints a
 short-lived RS256 access token (``aud`` = the MCP resource) plus a rotating
 refresh token; a ``refresh_token`` exchange rotates: it revokes the presented

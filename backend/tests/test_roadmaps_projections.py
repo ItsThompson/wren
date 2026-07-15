@@ -1,4 +1,4 @@
-"""Pure-module tests for the read projections (spec sections 04/07, Ticket 16).
+"""Pure-module tests for the read projections.
 
 The projection builders are pure functions over a ``Roadmap`` + the caller's
 checked-item set, so they are tested in isolation without a DB, request, or

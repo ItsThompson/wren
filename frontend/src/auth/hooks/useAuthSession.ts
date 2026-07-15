@@ -12,7 +12,7 @@ interface SessionState {
 const ANONYMOUS: SessionState = { status: 'anonymous', user: null }
 
 /**
- * Owns the session (section 10): builds the session client, resumes an existing
+ * Owns the session: builds the session client, resumes an existing
  * session once on mount via the rotating refresh token, and exposes
  * register/login/logout. State is a single `{status, user}` so the impossible
  * "authenticated with no user" combination cannot arise.

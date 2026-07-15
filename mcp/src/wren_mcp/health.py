@@ -2,7 +2,7 @@
 
 - ``GET /healthz`` is liveness: the process is up. Always 200.
 - ``GET /readyz`` is readiness: every registered dependency check passes. Returns
-  503 if any fails. The deploy health gate (spec section 11) polls ``/readyz``.
+  503 if any fails. The deploy health gate polls ``/readyz``.
 
 Readiness checks are injected, so this module stays dependency-free. The RS wires
 a JWKS check (:func:`jwks_readiness_check`): the RS cannot validate any token

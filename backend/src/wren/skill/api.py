@@ -1,6 +1,6 @@
 """External REST adapter serving the shipped ``SKILL.md`` at ``GET /skill``.
 
-The authoring guidance (spec sections 07/14, US-SKILL-01) is public: it is
+The authoring guidance is public: it is
 generic agent guidance, not user data, and an agent must be able to fetch it
 without a session or bearer (its access level is declared ``PUBLIC`` in
 ``wren.core.route_registry``). The MCP tool descriptions point agents here.

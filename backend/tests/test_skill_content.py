@@ -1,4 +1,4 @@
-"""Tests for the bundled SKILL.md content and the canonical-copy drift guard (#27).
+"""Tests for the bundled SKILL.md content and the canonical-copy drift guard.
 
 The human-edited canonical guidance lives at the repo root (``skill/SKILL.md``);
 ``wren.skill.content`` bundles a byte-identical copy beside the backend source so

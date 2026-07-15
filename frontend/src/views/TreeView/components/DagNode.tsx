@@ -4,7 +4,7 @@ import type { TreeNode } from '../types'
 import { DagNodeCard } from './DagNodeCard'
 
 /**
- * React Flow custom node (spec section 08). Prerequisite edges connect into the
+ * React Flow custom node. Prerequisite edges connect into the
  * top handle and out of the bottom handle, giving the layered top-down layout.
  * The visible node is the presentational {@link DagNodeCard}; the handles are
  * the only React-Flow-specific wiring here.

@@ -5,10 +5,10 @@ the full :class:`~wren.roadmaps.schemas.Roadmap`: an orientation ``Overview``, a
 single-node ``NodeDetail``, a paginated ``SectionPage``, and ``SearchHit``s. They
 are defined once here as Pydantic models (the single source of truth for the wire
 contract) and surfaced to the frontend as OpenAPI-generated TypeScript (spec
-sections 06/10); the MCP read tools (Ticket 22) are thin calls over the same
+sections 06/10); the MCP read tools are thin calls over the same
 shapes, one HTTP call each.
 
-Design rules they encode (spec section 07):
+Design rules they encode:
 
 - **Summary-first, then drill-down.** ``Overview`` carries per-section counts and
   no checklist-item bodies; ``NodeDetail`` is the drill-down.
@@ -29,7 +29,7 @@ from wren.roadmaps.schemas import ResourceType, RoadmapStatus
 
 
 class ResponseFormat(StrEnum):
-    """The ``concise | detailed`` switch on the read tools (spec section 07).
+    """The ``concise | detailed`` switch on the read tools.
 
     Concise is roughly one-third the tokens and still carries the follow-up IDs;
     detailed adds the explanatory free-text (the node ``description``)."""
@@ -39,7 +39,7 @@ class ResponseFormat(StrEnum):
 
 
 class SectionInclude(StrEnum):
-    """Which parts of each node a ``SectionPage`` populates (spec section 07).
+    """Which parts of each node a ``SectionPage`` populates.
 
     ``subsections`` = node metadata (tags, effort, resources, resolved prereqs);
     ``items`` = the checklist items only; ``both`` = everything. Every variant
@@ -61,7 +61,7 @@ class SearchHitKind(StrEnum):
 
 
 class ResourceRef(BaseModel):
-    """A subsection resource as a link, never an inlined body (spec section 07)."""
+    """A subsection resource as a link, never an inlined body."""
 
     id: str
     title: str
@@ -111,7 +111,7 @@ class NodeDetail(BaseModel):
 
 
 class SectionOverview(BaseModel):
-    """Per-section completion counts, no checklist-item bodies (spec section 04)."""
+    """Per-section completion counts, no checklist-item bodies."""
 
     section_id: str
     title: str
@@ -130,7 +130,7 @@ class OverallProgress(BaseModel):
 
 class Overview(BaseModel):
     """The ``GET /overview`` body: sections in ``section_order`` with per-section
-    and overall completion, and no checklist-item bodies (spec section 04).
+    and overall completion, and no checklist-item bodies.
 
     The orientation call; from here the agent drills into a node (``get_node``) or
     a section (``get_section``). ``checked_items`` / ``percent`` reflect the
@@ -168,7 +168,7 @@ class SectionPage(BaseModel):
 
 
 class SearchHit(BaseModel):
-    """One search match, carrying the IDs needed to drill down (spec section 04).
+    """One search match, carrying the IDs needed to drill down.
 
     ``item_id`` is present only when ``kind == item``; ``matched_tags`` names the
     subsection tags that matched a tag filter (absent for a keyword-only match)."""

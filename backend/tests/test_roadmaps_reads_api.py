@@ -1,4 +1,4 @@
-"""Contract tests for the external read-projection surface (Ticket 16).
+"""Contract tests for the external read-projection surface.
 
 Asserts the section-04 read projections over real HTTP on an external-shaped app
 (overview / node / paginated section / search), the ``concise|detailed`` switch,
@@ -287,7 +287,7 @@ def test_non_owner_gets_404_on_a_public_draft(make_settings: MakeSettings) -> No
 
 
 def test_non_owner_can_read_a_public_archived_roadmap_by_link(make_settings: MakeSettings) -> None:
-    # Archived is hidden from discovery but still readable by direct link (§05/§06).
+    # Archived is hidden from discovery but still readable by direct link.
     archived = build_read_roadmap(status=RoadmapStatus.ARCHIVED, visibility=Visibility.PUBLIC)
     client, _ = _build_client(make_settings, archived)
     _login(client, username="reader", email="reader@example.com")

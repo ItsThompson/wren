@@ -10,7 +10,7 @@ interface InlineNoticeProps {
 
 /**
  * A quiet, non-intrusive inline notice for transient, self-recovered states,
- * such as a progress write that failed and was rolled back (ticket 26 / #9). Kept
+ * such as a progress write that failed and was rolled back. Kept
  * neutral (ink on a muted surface, not ochre/brick) per the accent map: ochre is
  * reserved for the write-contract attention states, and informational emphasis
  * uses ink/neutral. `role="status"` announces it politely without stealing focus.

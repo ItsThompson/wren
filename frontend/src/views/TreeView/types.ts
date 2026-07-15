@@ -13,7 +13,7 @@ export type Subsection = components['schemas']['Subsection']
 export type ProgressSnapshot = components['schemas']['ProgressSnapshot']
 
 /**
- * The soft visual state of a tree node (spec section 08/09). This is a const
+ * The soft visual state of a tree node. This is a const
  * map + derived union rather than a TS `enum`: the app tsconfig sets
  * `erasableSyntaxOnly`, which forbids enums.
  */

@@ -1,6 +1,6 @@
 /**
  * The profile loading state: a name/handle header placeholder over a skeleton
- * card grid, matching the loaded layout so the swap is calm (section 10).
+ * card grid, matching the loaded layout so the swap is calm.
  */
 export function ProfileSkeleton() {
   return (

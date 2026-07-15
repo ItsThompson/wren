@@ -1,5 +1,5 @@
 # =============================================================================
-# The three critical P0 alert rules (spec section 11). All route to Discord via
+# The three critical P0 alert rules. All route to Discord via
 # Alertmanager with send_resolved (see deployments/alertmanager/alertmanager.yml).
 # No Grafana at P0; these are the only alerts. Expressions follow a stable
 # convention so rules/dashboards drop in later.

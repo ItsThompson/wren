@@ -2,7 +2,7 @@
 
 Turns a :class:`RoadmapInput` (ordered arrays, optional ``proposed_id``s) into a
 :class:`Roadmap` (ID-keyed maps + ``*_order`` arrays) with every node's slug ID
-minted (spec section 04). No I/O: the globally-unique roadmap ID is passed in
+minted. No I/O: the globally-unique roadmap ID is passed in
 already resolved by the service (its collision check needs the database), so this
 module stays a pure, exhaustively-testable deep function.
 
@@ -116,7 +116,7 @@ def assemble_draft(
 
 
 def assemble_fork(source: Roadmap, new_roadmap_id: str, owner: str, *, now: datetime) -> Roadmap:
-    """Copy ``source`` content into a brand-new private draft (spec sections 04/05).
+    """Copy ``source`` content into a brand-new private draft.
 
     A fork is a faithful content copy under a freshly-minted, globally-unique
     ``new_roadmap_id`` (never derived from the source ID), owned by the forking
@@ -131,7 +131,7 @@ def assemble_fork(source: Roadmap, new_roadmap_id: str, owner: str, *, now: date
     re-mint or a remap. The only minted value is the new roadmap ID. ``visibility``
     resets to private (a fork is the forker's own new draft, never inheriting the
     source's sharing state), and no progress is carried over: the service creates
-    no progress record for a fork (spec section 15).
+    no progress record for a fork.
 
     Pure: ``model_copy(deep=True)`` gives the fork independent nested maps, so the
     persisted source is never mutated.

@@ -1,4 +1,4 @@
-"""Contract tests for the dashboard + profile surface (Ticket 25).
+"""Contract tests for the dashboard + profile surface.
 
 Asserts ``GET /me/dashboard`` and ``GET /users/{handle}`` over real HTTP on an
 external-shaped app (accounts + listing + progress routers over shared in-memory

@@ -1,4 +1,4 @@
-"""MCP write tools: the agent authoring surface (spec section 07).
+"""MCP write tools: the agent authoring surface.
 
 Seven workflow-shaped write tools, registered on the shared FastMCP server
 (:mod:`wren_mcp.mcp_server`) that :mod:`wren_mcp.app` mounts under the

@@ -1,7 +1,7 @@
-"""Model-recoverable tool errors (spec sections 06/07).
+"""Model-recoverable tool errors.
 
 The backend renders every failure as one RFC 9457 ``application/problem+json``
-body (spec section 06): a machine ``code`` plus a human ``detail``, optionally a
+body: a machine ``code`` plus a human ``detail``, optionally a
 field-level ``fields`` map and a structural ``violations`` list that names the
 offending IDs (a stale-revision 409 says "re-read"; a DAG-cycle 422 names the
 nodes). This module folds that body into a single :class:`ToolError` message so

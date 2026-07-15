@@ -541,7 +541,7 @@ def test_replace_is_404_to_a_non_owner(make_settings: MakeSettings) -> None:
 # --- immutability boundary (structural writes reject published; #13) ---------
 #
 # Every content-mutating write (patch, replace) rejects a published roadmap with a
-# 409 IMMUTABLE pointing to fork-to-change (spec sections 05/07). The sanctioned
+# 409 IMMUTABLE pointing to fork-to-change. The sanctioned
 # presentation-only path (edit_metadata, Ticket 14) is NOT routed through the
 # content-write guard, which is what keeps it allowed post-publish.
 
@@ -587,7 +587,7 @@ def test_replace_against_a_published_roadmap_is_a_409_immutable(
     assert "fork" in body["detail"].lower()
 
 
-# --- fork (#14) --------------------------------------------------------------
+# --- fork --------------------------------------------------------------
 
 
 def _make_public(repo: InMemoryRoadmapRepository, roadmap_id: str) -> None:

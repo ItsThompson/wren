@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test'
 import { FRONTEND_BASE_URL } from './helpers/config'
 
 /**
- * Playwright config for the Wren spine E2E (spec section 13). Serial by design:
+ * Playwright config for the Wren spine E2E. Serial by design:
  * `workers: 1` + `fullyParallel: false` so all tests share one live stack
  * deterministically. `globalSetup` pre-flights stack health
  * before any test runs.

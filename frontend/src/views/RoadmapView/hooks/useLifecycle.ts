@@ -19,7 +19,7 @@ interface LifecycleCallbacks {
 }
 
 /**
- * The owner-only web-only lifecycle actions for a roadmap (section 06/08):
+ * The owner-only web-only lifecycle actions for a roadmap:
  * visibility toggle, archive, and delete. Web-only by design: there is no agent
  * (MCP) surface for any of them.
  *

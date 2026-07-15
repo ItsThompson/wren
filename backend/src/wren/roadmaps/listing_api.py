@@ -1,6 +1,6 @@
-"""External REST adapter for the dashboard and public profile (spec section 06).
+"""External REST adapter for the dashboard and public profile.
 
-Thin handlers (spec sections 05/06) over :class:`ListingService`:
+Thin handlers over:class:`ListingService`:
 
 - ``GET /me/dashboard`` resolves the caller via ``require_user`` (the cookie
   session; a spoofed ``X-User-ID`` is stripped upstream) and returns their private
@@ -39,7 +39,7 @@ def create_listing_router(service_provider: ListingServiceProvider) -> APIRouter
         service: ListingService = Depends(service_provider),
     ) -> Dashboard:
         # Private, caller-scoped: everything the caller authored (any status) plus
-        # everything they follow (spec section 02 US-ACCT-03).
+        # everything they follow.
         return await service.dashboard(user_id)
 
     @router.get("/users/{handle}")

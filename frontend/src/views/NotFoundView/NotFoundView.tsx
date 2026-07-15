@@ -3,7 +3,7 @@ import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 
 /**
- * Generic catch-all for unmatched routes. Uses the empty-state pattern (§7.8):
+ * Generic catch-all for unmatched routes. Uses the empty-state pattern:
  * a Fraunces line, a muted sub-line, and one primary action back home.
  */
 export function NotFoundView() {

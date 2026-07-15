@@ -2,14 +2,14 @@ name: CI
 
 # Spec section 11 §CI (ci.yml). Runs on every push and on PRs into main. The
 # lint job runs first and gates the three test jobs; codegen-drift is
-# independent. Coverage gates are hard (section 13): backend 80%, frontend 70%.
+# independent. Coverage gates are hard: backend 80%, frontend 70%.
 on:
   push:
     branches: ["**"]
   pull_request:
     branches: [main]
 
-# One in-flight run per ref; a new push cancels the previous run (section 11).
+# One in-flight run per ref; a new push cancels the previous run.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true

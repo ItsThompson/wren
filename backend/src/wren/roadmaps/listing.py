@@ -1,16 +1,16 @@
-"""ListingService: the private dashboard and the public profile (spec section 05).
+"""ListingService: the private dashboard and the public profile.
 
 The read-only listing surface behind ``GET /me/dashboard`` and
-``GET /users/{handle}`` (spec sections 02/06 US-ACCT-03). It is a separate service
+``GET /users/{handle}``. It is a separate service
 from :class:`~wren.roadmaps.service.RoadmapService` (authoring/lifecycle) because
 it is a distinct read concern and needs cross-domain lookups the authoring service
 does not: a **handle resolver** (accounts) and a **followed-roadmaps reader**
 (progress). Both are injected as narrow callables (never the foreign repository),
 so the roadmaps domain stays decoupled from accounts and progress exactly as
 :class:`RoadmapService` does with its follower counter and checked reader; the
-wiring composes them (spec section 05).
+wiring composes them.
 
-Scoping (spec sections 02/08):
+Scoping:
 
 - **Dashboard** is private and caller-scoped: everything the caller **authored**
   (any status) plus everything they **follow**. Another user's dashboard is never
@@ -48,12 +48,12 @@ class ProfileOwner:
 # How the profile learns the public identity behind a handle. A narrow injected
 # callable (not the accounts repository) resolving a handle to its owner, or
 # ``None`` when no such user exists (-> 404). The wiring binds it to the accounts
-# repository; tests substitute a dict lookup (spec section 05).
+# repository; tests substitute a dict lookup.
 HandleResolver = Callable[[str], Awaitable[ProfileOwner | None]]
 # How the dashboard learns which roadmaps the caller follows. A narrow injected
 # callable (not the progress repository) returning the followed roadmap ids in
 # display order. The wiring binds it to the progress repository; tests substitute
-# a closure over a seeded set (spec section 05).
+# a closure over a seeded set.
 FollowedReader = Callable[[str], Awaitable[list[str]]]
 
 
@@ -94,7 +94,7 @@ class ListingService:
     async def profile(self, handle: str) -> Profile:
         """The public profile for ``handle``: published-public roadmaps only.
 
-        An unknown handle is a 404 (spec section 02 US-ACCT-03). The listing is
+        An unknown handle is a 404. The listing is
         viewer-agnostic and excludes every non-published-public roadmap at the
         query level, so a profile never leaks a draft, private, or archived
         roadmap, nor who follows what."""

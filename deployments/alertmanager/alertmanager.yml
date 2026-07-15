@@ -1,5 +1,5 @@
 # =============================================================================
-# Alertmanager config for the Wren stack (spec section 11).
+# Alertmanager config for the Wren stack.
 #
 # The three critical alerts (ServiceDown, HostDiskAlmostFull, HighErrorRate) all
 # fan to one Discord receiver with send_resolved, so an operator sees both the

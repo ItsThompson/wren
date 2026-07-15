@@ -3,7 +3,7 @@
 Deployment-wide configuration is sourced from the environment once (``EnvSettings``)
 and is identical for both apps. Per-app identity (``service`` name and ``port``) is
 injected at construction time so the external and internal apps differ *only* by
-their injected settings, per the two-app split (spec section 08).
+their injected settings, per the two-app split.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ INTERNAL_PORT = 8001
 class EnvSettings(BaseSettings):
     """Deployment-wide config shared by both apps, sourced from the environment.
 
-    Field names mirror the shared ``.env`` keys (spec section 11): ``ENVIRONMENT``,
+    Field names mirror the shared ``.env`` keys: ``ENVIRONMENT``,
     ``LOG_LEVEL``. Unknown keys are ignored so the single sectioned root ``.env``
     can carry vars for other consumers.
     """
@@ -34,13 +34,13 @@ class EnvSettings(BaseSettings):
     host: str = "0.0.0.0"  # noqa: S104 - container binds all interfaces; ingress is tunnel-only
     # Async SQLAlchemy URL (asyncpg driver). Dev default targets the Postgres in
     # docker-compose.dev.yml published to localhost; prod injects the in-network
-    # `@postgres:5432` form via the VPS .env (spec section 11).
+    # `@postgres:5432` form via the VPS.env.
     database_url: str = "postgresql+asyncpg://wren:wren@localhost:5432/wren"
     # Shared secret the MCP server sends to reach the internal app (spec section
     # 08); defense-in-depth behind compute-net isolation. Empty by default so an
     # unconfigured internal app fail-safe denies (`require_internal_user`).
     internal_api_token: str = ""
-    # HS256 secret for human session JWTs (spec section 08), separate from the
+    # HS256 secret for human session JWTs, separate from the
     # agent OAuth keypair. Empty by default so an unconfigured external app
     # fail-safe denies every session (no cookie resolves).
     session_jwt_secret: str = ""
@@ -57,7 +57,7 @@ class EnvSettings(BaseSettings):
     public_base_url: str = "http://localhost:8000"
     app_public_url: str = "http://localhost:5173"
     mcp_public_url: str = "http://localhost:9000"
-    # Agent OAuth 2.1 AS signing key (spec section 08): the AS holds a private PEM
+    # Agent OAuth 2.1 AS signing key: the AS holds a private PEM
     # and publishes the public key via JWKS; `oauth_key_id` is the active `kid`
     # (kid rotation publishes a new key, signs with it, retires the old). Empty
     # path lets development generate an ephemeral in-memory keypair so the app

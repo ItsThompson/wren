@@ -3,7 +3,7 @@
 Verifies the ordered-array -> ID-keyed-map + ``*_order`` transformation, slug
 minting per entity, ``proposed_id`` de-dup + remap, and reference resolution
 (``prereq_ids`` / ``suggested_path`` from proposed IDs to minted IDs), all without
-a database (spec sections 04/13).
+a database.
 """
 
 from __future__ import annotations

@@ -9,7 +9,7 @@ import {
   type Problem,
 } from './problem'
 
-/** The 409 stale-revision problem+json body the backend emits (spec section 06). */
+/** The 409 stale-revision problem+json body the backend emits. */
 function staleBody() {
   return {
     type: 'https://usewren.com/errors/stale-revision',

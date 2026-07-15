@@ -34,7 +34,7 @@ from starlette.types import Lifespan
 from wren.core.health import CheckResult, ReadinessCheck
 from wren.core.observability import ACTIVE_CONNECTIONS, DB_QUERY_DURATION
 
-# Pool sized for one backend instance (spec section 11). `pool_pre_ping` discards
+# Pool sized for one backend instance. `pool_pre_ping` discards
 # connections severed by a Postgres restart or idle timeout before they are handed
 # to a request.
 POOL_SIZE = 5
@@ -108,7 +108,7 @@ def instrument_pool(engine: AsyncEngine) -> None:
     Emits ``db_query_duration_seconds{query_name}`` around every statement and
     tracks ``active_connections`` as connections are checked out of and back into
     the pool. Attached to the async engine's underlying sync engine, which is
-    where the pool and cursor events fire (spec section 11).
+    where the pool and cursor events fire.
     """
     sync_engine = engine.sync_engine
 
@@ -195,7 +195,7 @@ def is_unique_violation(exc: BaseException) -> bool:
 
     SQLAlchemy raises ``IntegrityError`` wrapping the driver error on ``.orig``;
     the driver error carries the SQLSTATE. The service layer catches the
-    ``IntegrityError`` and raises ``Conflict`` (Ticket 3) when this returns True.
+    ``IntegrityError`` and raises ``Conflict`` when this returns True.
     """
     driver_error = getattr(exc, "orig", exc)
     sqlstate = getattr(driver_error, "sqlstate", None) or getattr(driver_error, "pgcode", None)

@@ -1,6 +1,6 @@
 """Exhaustive + property-based tests for the pure ``slugs`` deep module.
 
-The highest-density target (spec section 13): slugify rules, prefixing, numeric
+The highest-density target: slugify rules, prefixing, numeric
 collision suffixing, ASCII folding, and the roadmap-ID composition, plus
 ``hypothesis`` invariants (any title always yields a valid, unique, prefixed slug
 within a growing ``existing`` set).

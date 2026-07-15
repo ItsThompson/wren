@@ -1,4 +1,4 @@
-"""Unit tests for the pure ``progress.summary`` deep module (spec section 04).
+"""Unit tests for the pure ``progress.summary`` deep module.
 
 ``summarize`` is pure over the roadmap + progress, so it is tested in isolation.
 Covers per-section + overall counts/percents, the detailed ``checked_ids``

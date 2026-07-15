@@ -1,8 +1,8 @@
-"""MCP read tools: the agent study-time surface (spec section 07).
+"""MCP read tools: the agent study-time surface.
 
 The six workflow-shaped read tools plus ``progress_update``, registered on the
 shared FastMCP server (:mod:`wren_mcp.mcp_server`) that :mod:`wren_mcp.app` mounts
-under the bearer-guarded ``/mcp`` prefix, alongside the write tools (Ticket 21).
+under the bearer-guarded ``/mcp`` prefix, alongside the write tools.
 Each tool is a **thin adapter**: it enforces the required OAuth scope and resolves
 the single ``user_id`` the request is scoped to (:func:`require_scope`, never a
 tool argument), makes **one** call to a backend internal read route via
@@ -10,14 +10,14 @@ tool argument), makes **one** call to a backend internal read route via
 frozen read projection. Backend failures surface as model-recoverable
 :class:`ToolError`\\s (:mod:`wren_mcp.tool_errors`).
 
-Design rules (spec section 07): summary-first then drill-down; the
+Design rules: summary-first then drill-down; the
 ``concise | detailed`` switch; resource links never inlined bodies; the one
 many-item tool (``roadmap_get_section``) paginates via an opaque cursor and
 carries steering text on truncation. Annotations: the six reads are
 ``readOnlyHint``; ``progress_update`` is an explicit-set write, so it is
 ``idempotentHint`` (a retry is a no-op), ``destructiveHint: false``, not readOnly.
 
-``roadmap_get_next`` maps to the server-side ``next.compute`` (Ticket 17): the
+``roadmap_get_next`` maps to the server-side ``next.compute``: the
 agent never receives the full checked set or every ``prereq_ids`` (a context
 blow-up), only the next prereq-satisfied items with a STRUCTURAL ``why_now``.
 """

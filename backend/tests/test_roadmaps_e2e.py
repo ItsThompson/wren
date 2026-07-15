@@ -558,7 +558,7 @@ def test_dashboard_and_profile_end_to_end_over_http(
     # list_by_ids / list_followed_roadmap_ids + the handle resolver) against
     # Postgres: the owner's dashboard shows their authored roadmaps at every
     # status plus what they follow, and the public profile shows only their
-    # published-public roadmap (Ticket 25, US-ACCT-03).
+    # published-public roadmap.
     app = _external_app(migrated_url, make_settings(database_url=migrated_url))
     with TestClient(app) as client:
         assert (

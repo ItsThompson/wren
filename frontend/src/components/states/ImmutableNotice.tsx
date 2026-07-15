@@ -11,7 +11,7 @@ interface ImmutableNoticeProps {
 }
 
 /**
- * The 409 `IMMUTABLE` prompt (spec section 12, US-ERR-03): a structural write
+ * The 409 `IMMUTABLE` prompt: a structural write
  * against a published/archived roadmap is refused because published roadmaps are
  * immutable (followers' progress stays stable). The recovery is to fork it into a
  * private draft you can edit and publish.

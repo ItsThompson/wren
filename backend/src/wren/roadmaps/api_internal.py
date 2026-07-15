@@ -5,11 +5,11 @@ resolves the caller via :func:`require_internal_user` (the trusted ``X-User-ID``
 header behind the shared ``INTERNAL_API_TOKEN``, spec section 08) instead of the
 human session cookie. Both are thin adapters over the same :class:`RoadmapService`:
 identical business rules, different identity resolution. The internal app is never
-tunnel-routed or host-published (spec section 11), so it is reachable only by the
+tunnel-routed or host-published, so it is reachable only by the
 MCP server on ``compute-net``; the trusted identity is taken on trust here, never
 re-validated.
 
-The MCP write/read tools (Tickets 21/22) are thin clients of these endpoints: one
+The MCP write/read tools are thin clients of these endpoints: one
 tool call becomes one internal HTTP call carrying the resolved ``X-User-ID``. This
 includes the fork and presentation-only metadata-edit tools, both agent-callable
 (spec section 07).
@@ -71,7 +71,7 @@ def create_internal_roadmaps_router(service_provider: RoadmapServiceProvider) ->
         user_id: str = Depends(require_internal_user),
         service: RoadmapService = Depends(service_provider),
     ) -> Roadmap:
-        # Full document to a reader (spec section 06): the trusted user reads their
+        # Full document to a reader: the trusted user reads their
         # own roadmap (any status) or a public published/archived one; a private
         # roadmap owned by another, or a non-owner's public draft, is a 404.
         return await service.get(user_id, roadmap_id)
@@ -83,7 +83,7 @@ def create_internal_roadmaps_router(service_provider: RoadmapServiceProvider) ->
         user_id: str = Depends(require_internal_user),
         service: RoadmapService = Depends(service_provider),
     ) -> Overview:
-        # Backs the roadmap_get_overview MCP tool (Ticket 22).
+        # Backs the roadmap_get_overview MCP tool.
         return await service.get_overview(user_id, roadmap_id, format)
 
     @router.get("/{roadmap_id}/nodes/{subsection_id}")
@@ -94,7 +94,7 @@ def create_internal_roadmaps_router(service_provider: RoadmapServiceProvider) ->
         user_id: str = Depends(require_internal_user),
         service: RoadmapService = Depends(service_provider),
     ) -> NodeDetail:
-        # Backs the roadmap_get_node MCP tool (Ticket 22): unknown id -> 404 naming
+        # Backs the roadmap_get_node MCP tool: unknown id -> 404 naming
         # valid siblings so the agent can self-correct.
         return await service.get_node(user_id, roadmap_id, subsection_id, format)
 
@@ -107,7 +107,7 @@ def create_internal_roadmaps_router(service_provider: RoadmapServiceProvider) ->
         user_id: str = Depends(require_internal_user),
         service: RoadmapService = Depends(service_provider),
     ) -> SectionPage:
-        # Backs the roadmap_get_section MCP tool (Ticket 22): opaque cursor + include.
+        # Backs the roadmap_get_section MCP tool: opaque cursor + include.
         return await service.get_section(user_id, roadmap_id, section_id, cursor, include)
 
     @router.get("/{roadmap_id}/search")
@@ -118,7 +118,7 @@ def create_internal_roadmaps_router(service_provider: RoadmapServiceProvider) ->
         user_id: str = Depends(require_internal_user),
         service: RoadmapService = Depends(service_provider),
     ) -> list[SearchHit]:
-        # Backs the roadmap_search MCP tool (Ticket 22): search, not list-all.
+        # Backs the roadmap_search MCP tool: search, not list-all.
         return await service.search(user_id, roadmap_id, q, tags)
 
     @router.patch("/{roadmap_id}")
@@ -129,7 +129,7 @@ def create_internal_roadmaps_router(service_provider: RoadmapServiceProvider) ->
         user_id: str = Depends(require_internal_user),
         service: RoadmapService = Depends(service_provider),
     ) -> PatchResult:
-        # If-Match carries the target revision (spec section 06): a mismatch is a
+        # If-Match carries the target revision: a mismatch is a
         # 409 "re-read", an invalid op is a 422, both rendered by the shared
         # exception handler. A malformed/absent header is a 422 via FastAPI.
         return await service.patch_draft(user_id, roadmap_id, if_match, body.operations)
@@ -143,7 +143,7 @@ def create_internal_roadmaps_router(service_provider: RoadmapServiceProvider) ->
         service: RoadmapService = Depends(service_provider),
     ) -> RoadmapReplaced:
         # The full-document import escape hatch backing the replace_roadmap_draft MCP
-        # tool (Ticket 21): guarded by the same If-Match optimistic concurrency and
+        # tool: guarded by the same If-Match optimistic concurrency and
         # immutability boundary as the external route.
         return await service.replace_draft(user_id, roadmap_id, if_match, body)
 
@@ -170,7 +170,7 @@ def create_internal_roadmaps_router(service_provider: RoadmapServiceProvider) ->
         user_id: str = Depends(require_internal_user),
         service: RoadmapService = Depends(service_provider),
     ) -> Roadmap:
-        # Backs the fork MCP tool (Ticket 21): forks any roadmap the trusted user
+        # Backs the fork MCP tool: forks any roadmap the trusted user
         # can read into a fresh draft with a new roadmap ID and no progress
         # carry-over; an unreadable source is a 404 (no existence leak).
         return await service.fork(user_id, roadmap_id)
@@ -182,7 +182,7 @@ def create_internal_roadmaps_router(service_provider: RoadmapServiceProvider) ->
         user_id: str = Depends(require_internal_user),
         service: RoadmapService = Depends(service_provider),
     ) -> Roadmap:
-        # Backs the edit_metadata MCP tool (Ticket 21): presentation-only, allowed
+        # Backs the edit_metadata MCP tool: presentation-only, allowed
         # post-publish, not If-Match-guarded; a smuggled structural field is a 409
         # IMMUTABLE at the wire boundary.
         body.reject_structural_fields()

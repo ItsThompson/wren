@@ -7,7 +7,7 @@ import type { ConsentContextState, DecisionState } from '../types'
 const GENERIC_ERROR = 'Something went wrong. Please try again.'
 
 /**
- * Owns the two consent-flow async concerns (section 08): it loads the parked
+ * Owns the two consent-flow async concerns: it loads the parked
  * request's context by its opaque `auth_request_id` and submits the human's
  * approve/deny decision. The session-aware client sends the `.usewren.com`
  * cookie cross-subdomain (CORS + credentials) and refreshes transparently.

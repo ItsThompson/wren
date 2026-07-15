@@ -1,4 +1,4 @@
-"""Contract tests for GET /skill (Ticket 27, US-SKILL-01).
+"""Contract tests for GET /skill.
 
 Asserts the shipped SKILL.md authoring guidance is served over real HTTP as
 UTF-8 Markdown, needs no session (it is PUBLIC guidance, not user data), and that

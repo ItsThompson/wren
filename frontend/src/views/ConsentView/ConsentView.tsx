@@ -26,7 +26,7 @@ interface ConsentViewProps {
 }
 
 /**
- * ConsentView (section 08/10): the OAuth consent screen. It reads the opaque
+ * ConsentView: the OAuth consent screen. It reads the opaque
  * `auth_request_id` from the query, loads the parked request's context, prompts
  * login when there is no session, and posts the approve/deny decision, then
  * navigates the browser to the returned agent loopback URL.

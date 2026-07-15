@@ -1,4 +1,4 @@
-"""Shared builders for the read-projection tests (Ticket 16).
+"""Shared builders for the read-projection tests.
 
 A richer published :class:`Roadmap` than the progress builder: subsections carry
 ``description``s, multiple ``resources`` (varied types), track ``tags``, effort

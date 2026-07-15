@@ -10,7 +10,7 @@ interface ProgressBarProps {
 /**
  * A completion bar (section 09 "Progress"): full-pill `muted` track, solid
  * terracotta fill, percent in mono tabular numerals. Bars appear only at roadmap
- * and section level: subsections and items never get one (section 10).
+ * and section level: subsections and items never get one.
  */
 export function ProgressBar({ checked, total, variant = 'roadmap', label }: ProgressBarProps) {
   const percent = total === 0 ? 0 : Math.round((checked / total) * 100)

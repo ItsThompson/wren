@@ -13,7 +13,7 @@ interface ClientRowProps {
 
 /**
  * One connected agent: its name, when it was last authorized, and the scopes it
- * holds. Revoke is destructive, so it is confirm-gated (design language): the
+ * holds. Revoke is destructive, so it is confirm-gated: the
  * first click reveals a brick Confirm plus a Cancel. On success the parent drops
  * the row; a failure surfaces an inline message.
  */

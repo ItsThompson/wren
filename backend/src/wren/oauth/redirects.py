@@ -4,7 +4,7 @@ Public (agent) clients use a loopback redirect, ``http://127.0.0.1:PORT/callback
 (or ``[::1]`` / ``localhost``), where the port is an ephemeral listener the agent
 opens per run. The AS therefore permits loopback redirect URIs on **any port**
 as long as scheme, host, and path match a registered loopback URI; non-loopback
-(HTTPS) redirects require an exact match (spec section 08).
+(HTTPS) redirects require an exact match.
 """
 
 from __future__ import annotations

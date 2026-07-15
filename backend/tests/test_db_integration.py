@@ -3,7 +3,7 @@
 Uses testcontainers-python to run ``postgres:17-alpine`` (the pinned dev/prod
 image, spec section 11). Skipped automatically when Docker is unavailable, so a
 Docker-less checkout still runs the unit suite; CI's ``test-backend`` job has
-Docker and runs these (spec section 13).
+Docker and runs these.
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ def test_alembic_upgrade_head_creates_version_table(
         finally:
             await engine.dispose()
 
-    # Head advances as domain slices add migrations; progress (#9) is the latest.
+    # Head advances as domain slices add migrations; progress is the latest.
     assert asyncio.run(_read_version()) == "0005_progress"
 
 

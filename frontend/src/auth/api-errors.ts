@@ -1,7 +1,7 @@
 import type { AuthResult } from './types'
 
 /**
- * The subset of the RFC 9457 problem+json body (section 06) the auth forms use:
+ * The subset of the RFC 9457 problem+json body the auth forms use:
  * a human `detail`/`title` and an optional field-level map. Other members
  * (type/status/code) are ignored here.
  */

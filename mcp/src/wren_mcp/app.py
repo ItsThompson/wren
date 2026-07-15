@@ -1,4 +1,4 @@
-"""MCP Resource Server application assembly (spec sections 03/07/08).
+"""MCP Resource Server application assembly.
 
 ``create_rs_app`` wires the RS: structured logging, the public PRM + health +
 ``/metrics`` endpoints, the JWKS readiness check, and the bearer-auth boundary
@@ -8,8 +8,8 @@ production graph (httpx-backed JWKS discovery + internal client) and manages the
 lifecycle.
 
 The MCP tool transport that sits behind the bearer boundary is mounted here: the
-write tools (Ticket 21) via :func:`register_write_tools` and the read tools
-(Ticket 22) via :func:`register_read_tools`, registered alongside onto the same
+write tools via:func:`register_write_tools` and the read tools
+ via:func:`register_read_tools`, registered alongside onto the same
 server.
 """
 

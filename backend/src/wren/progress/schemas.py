@@ -1,6 +1,6 @@
 """Progress data model + wire projections (spec sections 04, 07).
 
-Progress is the second top-level entity (spec section 04): one mutable record per
+Progress is the second top-level entity: one mutable record per
 ``(user_id, roadmap_id)``, holding the explicit-set ``checked`` map and an
 optional per-user ``deadline``. It is stored separately from the roadmap
 definition (one roadmap : many progress records) and is always private to its
@@ -14,7 +14,7 @@ the full section-07 ``get_next`` shape (structural ``why_now``,
 ``deadline`` is set/cleared via ``PUT /roadmaps/{id}/deadline`` (:class:`DeadlineRequest`).
 
 These Pydantic models are the single source of truth for the wire contract; the
-frontend consumes them as OpenAPI-generated TypeScript (spec sections 06/10).
+frontend consumes them as OpenAPI-generated TypeScript.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from wren.roadmaps.schemas import ResourceType
 class CompletionState(StrEnum):
     """The explicit target state a ``progress_update`` sets its items to.
 
-    Explicit set, never toggle (spec section 07): the client states the desired
+    Explicit set, never toggle: the client states the desired
     state so a retry is idempotent.
     """
 
@@ -42,7 +42,7 @@ class CompletionState(StrEnum):
 
 
 class Progress(BaseModel):
-    """A user's progress against one roadmap (spec section 04).
+    """A user's progress against one roadmap.
 
     ``checked`` maps a checklist-item id to its checked state; only checked items
     are retained (an unchecked item is simply absent), which keeps the map lean
@@ -72,7 +72,7 @@ class SectionProgress(BaseModel):
 class ProgressSnapshot(BaseModel):
     """The ``GET /progress`` body: roadmap-wide + per-section completion.
 
-    ``checked_ids`` is populated only in ``detailed`` mode (spec section 04),
+    ``checked_ids`` is populated only in ``detailed`` mode,
     keeping the default concise response small while still letting a client
     reconcile the exact checked set when it asks for it."""
 
@@ -99,7 +99,7 @@ class ResourceLink(BaseModel):
 class NextItem(BaseModel):
     """One unchecked, prereq-satisfied checklist item to work on next.
 
-    ``why_now`` is a STRUCTURAL rationale only (spec section 07): it states the
+    ``why_now`` is a STRUCTURAL rationale only: it states the
     mechanical facts the app owns (this is the next unchecked subsection in
     ``suggested_path`` and its named prerequisites are complete), never
     pedagogical / ZPD judgement (that intelligence lives in the agent and was
@@ -117,7 +117,7 @@ class NextItem(BaseModel):
 
 class NextResult(BaseModel):
     """The ``GET /next`` body: the next unchecked items in ``suggested_path``
-    order whose prerequisites are all complete (spec section 07).
+    order whose prerequisites are all complete.
 
     ``remaining_in_path`` counts the subsections still to do along the path (any
     with an unchecked item); ``complete`` is ``True`` when nothing remains."""
@@ -151,7 +151,7 @@ class DeadlineRequest(BaseModel):
 
 class ProgressUpdateResult(BaseModel):
     """The ``POST /progress`` body: the fresh snapshot after the set plus the
-    next suggestion (spec sections 04/07). The snapshot is returned in detailed
+    next suggestion. The snapshot is returned in detailed
     mode so the client can reconcile its checkbox state to the server truth."""
 
     progress: ProgressSnapshot

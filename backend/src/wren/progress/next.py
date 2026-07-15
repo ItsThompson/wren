@@ -1,4 +1,4 @@
-"""``next``: the pure server-side "what to do next" computation (spec section 05).
+"""``next``: the pure server-side "what to do next" computation.
 
 Computing next client-side would force the agent to pull the whole
 ``suggested_path`` + full checked set + every node's ``prereq_ids`` and run a
@@ -8,11 +8,11 @@ takes the roadmap + progress and returns the next unchecked, prereq-satisfied
 items in ``suggested_path`` order, each with a structural ``why_now`` and its
 resource links, plus a ``remaining_in_path`` count and a ``complete`` flag.
 
-The ``why_now`` rationale is STRUCTURAL only (spec section 07): the item is the
+The ``why_now`` rationale is STRUCTURAL only: the item is the
 next unchecked one in ``suggested_path`` and its named prerequisites are
 complete. It never contains pedagogical / ZPD reasoning: that intelligence lives
 in the agent and was baked into ``suggested_path`` at authoring time, which
-guards the load-bearing thesis that the app is not the brain (spec section 01).
+guards the load-bearing thesis that the app is not the brain.
 """
 
 from __future__ import annotations
@@ -129,13 +129,13 @@ def _unchecked_items(
 
 
 def _why_now(subsection: Subsection) -> str:
-    """The STRUCTURAL rationale for surfacing this subsection now (spec section 07).
+    """The STRUCTURAL rationale for surfacing this subsection now.
 
     States only mechanical facts the app owns: this is the next unchecked
     subsection in ``suggested_path`` and its named prerequisites are complete.
     Never pedagogical / ZPD judgement (no difficulty, readiness, or effort claim):
     that intelligence lives in the agent, which guards the thesis that the app is
-    not the brain (spec section 01)."""
+    not the brain."""
     if subsection.prereq_ids:
         prereqs = ", ".join(subsection.prereq_ids)
         return (

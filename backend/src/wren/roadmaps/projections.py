@@ -94,7 +94,7 @@ def build_node_detail(
     fmt: ResponseFormat = ResponseFormat.CONCISE,
     include: SectionInclude = SectionInclude.BOTH,
 ) -> NodeDetail:
-    """Resolve one subsection into its read projection (spec section 04).
+    """Resolve one subsection into its read projection.
 
     ``description`` is inlined only in ``detailed`` mode; concise omits it while
     keeping every follow-up ID. ``include`` selects which sub-collections are

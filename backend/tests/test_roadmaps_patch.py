@@ -1,7 +1,7 @@
 """Exhaustive + property-based tests for the pure ``patch`` deep module.
 
-The primary iterative-edit path (spec sections 05/07), so it is covered like the
-other pure deep modules (spec section 13): every op type, atomic all-or-nothing
+The primary iterative-edit path, so it is covered like the
+other pure deep modules: every op type, atomic all-or-nothing
 rollback on a mid-batch failure, model-recoverable errors that name valid
 siblings / explain a cycle, ``before_id``/``after_id`` positioning + reorder,
 ``proposed_id`` de-dup remap and intra-batch reference resolution, idempotency of
@@ -295,7 +295,7 @@ def test_update_subsection_can_change_title_without_changing_id() -> None:
     outcome = patch.apply(_draft(), [op])
     arrays = _arrays(outcome.roadmap)
     assert arrays.title == "Arrays & Slices"
-    # The slug ID is stable across a rename (spec section 04).
+    # The slug ID is stable across a rename.
     assert arrays.id == "sub_arrays"
 
 

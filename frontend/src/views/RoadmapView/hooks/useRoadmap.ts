@@ -116,7 +116,7 @@ export function useRoadmap(
   const editMetadata = useCallback(
     async (draft: MetadataDraft): Promise<boolean> => {
       // Presentation-only edit (title/description/subject_tags): not If-Match
-      // guarded and never bumps the structural revision (section 06). On success
+      // guarded and never bumps the structural revision. On success
       // the returned roadmap replaces the loaded one so the header updates in
       // place; a 409 (a smuggled structural field on a published roadmap) surfaces
       // the shared conflict prompt, and any other failure a retry message.
@@ -152,7 +152,7 @@ export function useRoadmap(
 
   const fork = useCallback(() => {
     // Fork any readable roadmap (own or public) into a fresh private draft, then
-    // navigate to it so the owner can edit and publish the copy (section 05).
+    // navigate to it so the owner can edit and publish the copy.
     setForkState({ phase: 'forking' })
     void (async () => {
       try {
@@ -173,7 +173,7 @@ export function useRoadmap(
 
   // Web-only lifecycle (visibility / archive / delete): a visibility toggle or
   // archive replaces the loaded roadmap in place; a successful delete leaves the
-  // now-removed roadmap's route for the landing page (section 06).
+  // now-removed roadmap's route for the landing page.
   const onLifecycleChanged = useCallback(
     (roadmap: Roadmap) => setState({ phase: 'loaded', roadmap }),
     [],

@@ -1,6 +1,6 @@
 import type { components } from '@/api'
 
-/** One structural rule failure from a publish hard-block (spec section 06). */
+/** One structural rule failure from a publish hard-block. */
 export type Violation = components['schemas']['Violation']
 
 /**

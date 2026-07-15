@@ -16,7 +16,7 @@ interface TreeCanvasProps {
 }
 
 /**
- * The React Flow surface for the tree (spec section 08 / section 11). Read-only
+ * The React Flow surface for the tree. Read-only
  * exploration: nodes are not draggable, connectable, or selectable (the layout
  * is dagre-computed, not user-edited), and `fitView` frames the whole layered
  * graph. Navigation lives in each node's link (see {@link DagNodeCard}), not an

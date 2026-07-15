@@ -9,7 +9,7 @@ interface VisibilityBadgeProps {
 }
 
 /**
- * Visibility badge (design language §7.9): a ghost pill with the lucide globe
+ * Visibility badge: a ghost pill with the lucide globe
  * (public) or lock (private) icon plus its text label, so visibility reads by
  * icon + word, never color alone.
  */

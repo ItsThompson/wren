@@ -28,7 +28,7 @@
 # health gate -> (rollback on failure) -> cleanup on success.
 #
 # Not zero-downtime (accepted at ~5 users). Concurrency (a manual dispatch vs a
-# push-deploy) is enforced at the CD layer (Ticket 30), not here.
+# push-deploy) is enforced at the CD layer, not here.
 # =============================================================================
 
 # --- Configuration (safe to evaluate when sourced; no args required) --------

@@ -1,4 +1,4 @@
-"""The real session verifier wired behind the identity seam (Ticket 3).
+"""The real session verifier wired behind the identity seam.
 
 ``core.identity.require_user`` resolves the external app's ``user_id`` through an
 injectable async :data:`SessionVerifier` (``deny_all_sessions`` until now). This

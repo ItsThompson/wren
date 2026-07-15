@@ -314,7 +314,7 @@ def test_edit_metadata_smuggled_structural_field_is_a_409_immutable(
     assert response.json()["code"] == "IMMUTABLE"
 
 
-# --- web-only lifecycle is NOT mounted on the internal app (spec §06/§07/§08) ---
+# --- web-only lifecycle is NOT mounted on the internal app ---
 
 
 def test_visibility_archive_delete_have_no_internal_route(make_settings: MakeSettings) -> None:

@@ -6,7 +6,7 @@ name: CD
 #   - workflow_dispatch: manual re-deploy of the current main.
 #
 # The single static concurrency group serializes deploys so an auto push-deploy
-# and a manual dispatch can never race onto the box (section 11). In-progress
+# and a manual dispatch can never race onto the box. In-progress
 # deploys are never cancelled mid-flight; a second run queues behind the first.
 on:
   workflow_run:

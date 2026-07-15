@@ -1,6 +1,6 @@
 """Prometheus HTTP metrics for the MCP server.
 
-Metric names and labels mirror the backend (spec section 11) so the same
+Metric names and labels mirror the backend so the same
 Prometheus rules and dashboards apply to both images:
 
 - ``http_requests_total{method,path,status}`` (counter)

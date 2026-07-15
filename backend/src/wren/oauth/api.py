@@ -1,4 +1,4 @@
-"""External REST adapter for the OAuth 2.1 AS (spec sections 06/08).
+"""External REST adapter for the OAuth 2.1 AS.
 
 Thin handlers: each maps one request to one service call. The AS-metadata and
 JWKS endpoints are static (built from pinned config + the signing key set at

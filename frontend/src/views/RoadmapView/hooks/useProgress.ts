@@ -18,7 +18,7 @@ import type { ProgressNotice } from '../types'
  * reconciles to the server's returned `checked_ids` and fresh `next`. A failed
  * write reverts the optimistic change and surfaces a `notice` (a 409 becomes the
  * stale re-read prompt; anything else a quiet inline notice) instead of failing
- * silently (ticket 26 / #9). `setDeadline` mirrors this for the countdown, and
+ * silently. `setDeadline` mirrors this for the countdown, and
  * `reload` refetches everything for the re-read recovery. `baseUrl` is injected
  * (defaulting at the view) so tests can point the client at an MSW server.
  */

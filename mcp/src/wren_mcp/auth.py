@@ -1,4 +1,4 @@
-"""The agent trust boundary: bearer validation on the MCP transport (spec section 08).
+"""The agent trust boundary: bearer validation on the MCP transport.
 
 This is the RS's security perimeter. A pure-ASGI middleware guards the MCP
 transport path prefix: every request under it must carry a valid
@@ -6,7 +6,7 @@ transport path prefix: every request under it must carry a valid
 to this RS). An invalid or missing token returns ``401`` with a
 ``WWW-Authenticate`` header pointing at the PRM document (RFC 9728), so a client
 can discover the AS and authenticate. Guarding at the boundary (not per route) is
-deliberate: a tool route mounted under the prefix (Tickets 21/22) cannot forget
+deliberate: a tool route mounted under the prefix cannot forget
 to authenticate.
 
 On success the resolved principal is stashed on ``request.state`` (never the raw
@@ -82,7 +82,7 @@ class BearerAuthMiddleware:
 def agent_identity(request: Request) -> VerifiedAgentToken:
     """Return the principal resolved by the boundary middleware.
 
-    Handlers mounted under the guarded prefix (Tickets 21/22) depend on this to
+    Handlers mounted under the guarded prefix depend on this to
     get the single ``user_id`` the request is scoped to. Fails closed with 401 if
     it is ever reached without the middleware having set the principal (a route
     mounted outside the guarded prefix), so identity can never be silently absent.

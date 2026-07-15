@@ -1,4 +1,4 @@
-"""Token-validation tests: the RS's agent trust boundary (spec section 08).
+"""Token-validation tests: the RS's agent trust boundary.
 
 A token is accepted only if its signature verifies against the AS JWKS and its
 ``iss``/``aud``/``exp`` claims hold; anything else resolves to ``None`` (rejected).

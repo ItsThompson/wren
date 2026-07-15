@@ -1,7 +1,7 @@
 """Roadmap persistence: the repository interface and its SQLAlchemy binding.
 
 The service depends on the :class:`RoadmapRepository` interface and receives a
-resolved ``user_id``; it never builds queries itself (spec section 05). Tests
+resolved ``user_id``; it never builds queries itself. Tests
 substitute an in-memory repository at this interface; production binds
 :class:`SqlAlchemyRoadmapRepository` over a request-scoped ``AsyncSession``.
 
@@ -130,7 +130,7 @@ class SqlAlchemyRoadmapRepository:
     async def list_owned(self, owner_id: str) -> list[RoadmapRecord]:
         """Every roadmap owned by ``owner_id`` at any status, newest-touched first.
 
-        Backs the dashboard "Yours" section (spec section 02 US-ACCT-03): the
+        Backs the dashboard "Yours" section: the
         owner sees their own drafts, private, and public roadmaps. Scoped to the
         owner at the query level, so it returns only the caller's own roadmaps.
         """
@@ -144,7 +144,7 @@ class SqlAlchemyRoadmapRepository:
     async def list_published_public(self, owner_id: str) -> list[RoadmapRecord]:
         """``owner_id``'s **published, public** roadmaps, newest-touched first.
 
-        Backs the public profile (spec section 02 US-ACCT-03): drafts, private,
+        Backs the public profile: drafts, private,
         and archived roadmaps are excluded at the query level, so a profile can
         never leak a non-public roadmap regardless of who is viewing.
         """

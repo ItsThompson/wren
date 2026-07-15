@@ -1,4 +1,4 @@
-"""Session and cookie configuration for the accounts domain (spec section 08).
+"""Session and cookie configuration for the accounts domain.
 
 Human sessions are HS256-signed JWTs with a dedicated ``SESSION_JWT_SECRET``,
 kept separate from the agent OAuth keypair so the two actors have separate blast
@@ -21,7 +21,7 @@ from wren.core.settings import AppSettings
 REFRESH_COOKIE_NAME = "wren_refresh"
 AUTH_PATH = "/auth"
 
-# Short access token, long rotating refresh (spec section 08). Defaults live in
+# Short access token, long rotating refresh. Defaults live in
 # the domain that owns them; overridable for tests.
 DEFAULT_ACCESS_TTL = timedelta(minutes=15)
 DEFAULT_REFRESH_TTL = timedelta(days=14)

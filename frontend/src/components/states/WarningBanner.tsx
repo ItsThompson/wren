@@ -12,7 +12,7 @@ interface WarningBannerProps {
 
 /**
  * The shared ochre (warning) surface for the first-class attention states of the
- * write contract (spec section 09 §3.4): stale-revision re-read, the immutable
+ * write contract: stale-revision re-read, the immutable
  * fork-to-change prompt, and publish hard-block violations. Meaning is carried by
  * the lucide alert icon AND the heading text, with ochre only as reinforcement,
  * so it is never encoded by color alone (§9/§10 accessibility). `role="alert"`

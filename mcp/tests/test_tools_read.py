@@ -1,4 +1,4 @@
-"""MCP read-tool behavior, annotations, scope gate, and token guidance (section 07).
+"""MCP read-tool behavior, annotations, scope gate, and token guidance.
 
 Drives the study-time tools through the real mounted transport (:mod:`mcp_harness`):
 the bearer boundary resolves identity, the shared scope gate authorizes, the tool
@@ -454,7 +454,7 @@ def test_progress_update_without_progress_write_scope_is_insufficient_scope() ->
 
 def test_read_responses_stay_within_the_mcp_token_guidance() -> None:
     # Summary-first + pagination keep responses lean: even a large single page is
-    # well within MCP's ~25k-token guidance (spec section 07). Estimate tokens at
+    # well within MCP's ~25k-token guidance. Estimate tokens at
     # ~4 chars/token over the serialized structured content.
     harness = AgentHarness(lambda _r: httpx.Response(200, json=_overview_body(sections=100)))
     with harness.open() as client:

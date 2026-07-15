@@ -1,4 +1,4 @@
-"""Internal-client tests: the RS -> backend internal hop (spec section 08).
+"""Internal-client tests: the RS -> backend internal hop.
 
 The security-critical invariant: every call carries the resolved ``X-User-ID`` and
 the shared ``INTERNAL_API_TOKEN``, the agent's bearer token is never forwarded,
@@ -148,7 +148,7 @@ async def test_extra_headers_cannot_override_the_trusted_identity() -> None:
     assert request.headers[INTERNAL_TOKEN_HEADER] == _API_TOKEN
 
 
-# ---------- read projections (Ticket 22) ----------
+# ---------- read projections ----------
 
 
 async def test_read_projection_calls_hit_their_routes_with_the_switches() -> None:

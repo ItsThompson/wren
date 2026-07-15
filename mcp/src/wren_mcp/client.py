@@ -1,6 +1,6 @@
-"""Thin client of the backend internal API (:8001) (spec sections 03/07/08).
+"""Thin client of the backend internal API (:8001).
 
-Each MCP tool call (Tickets 21/22) becomes one HTTP call to the backend internal
+Each MCP tool call becomes one HTTP call to the backend internal
 app over ``compute-net``. This client owns the one security-critical invariant of
 that hop: **every** request carries the resolved ``X-User-ID`` plus the shared
 ``INTERNAL_API_TOKEN``, and the agent's bearer token is **never** forwarded
@@ -61,7 +61,7 @@ class InternalApiClient:
         return await self.request("GET", f"/roadmaps/{roadmap_id}", user_id=user_id)
 
     # ---------- Read projections (spec section 07 study-time tools) ----------
-    # Each backs one MCP read tool (Ticket 22), one internal GET per tool. The
+    # Each backs one MCP read tool, one internal GET per tool. The
     # concise|detailed switch travels as ``?format=``; pagination as an opaque
     # ``?cursor=``; ``?include=`` selects the section-page shape.
 
@@ -119,7 +119,7 @@ class InternalApiClient:
     async def update_progress(
         self, user_id: str, roadmap_id: str, item_ids: list[str], state: str
     ) -> httpx.Response:
-        # Explicit set (complete|incomplete), batch item_ids (spec section 07): the
+        # Explicit set (complete|incomplete), batch item_ids: the
         # server applies atomically and returns the fresh snapshot + next.
         return await self.request(
             "POST",
@@ -131,7 +131,7 @@ class InternalApiClient:
     async def patch_draft(
         self, user_id: str, roadmap_id: str, revision: int, operations: list[Any]
     ) -> httpx.Response:
-        # The target revision travels in If-Match (spec section 06), matching the
+        # The target revision travels in If-Match, matching the
         # internal router's PATCH contract.
         return await self.request(
             "PATCH",
@@ -161,7 +161,7 @@ class InternalApiClient:
         return await self.request("POST", f"/roadmaps/{roadmap_id}:publish", user_id=user_id)
 
     async def fork(self, user_id: str, roadmap_id: str) -> httpx.Response:
-        # Forks any roadmap the user can read into a fresh draft (spec section 07).
+        # Forks any roadmap the user can read into a fresh draft.
         return await self.request("POST", f"/roadmaps/{roadmap_id}:fork", user_id=user_id)
 
     async def edit_metadata(

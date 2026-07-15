@@ -1,4 +1,4 @@
-"""OAuth 2.1 AS persistence models (spec section 08).
+"""OAuth 2.1 AS persistence models.
 
 Six tables back the AS:
 

@@ -1,7 +1,7 @@
 """Account persistence: the repository interface and its SQLAlchemy binding.
 
 The service depends on the :class:`AccountRepository` interface and receives a
-resolved identity, never building queries itself (spec section 05). Tests
+resolved identity, never building queries itself. Tests
 substitute an in-memory repository at this interface; production binds
 :class:`SqlAlchemyAccountRepository` over a request-scoped ``AsyncSession``.
 

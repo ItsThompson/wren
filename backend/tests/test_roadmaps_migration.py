@@ -3,7 +3,7 @@
 Applies Alembic to head on a containerized ``postgres:17-alpine`` and exercises
 the SQLAlchemy repository + service end to end, so the JSONB document round-trip,
 owner-scoped reads, and the global roadmap-ID existence check run against the
-real asyncpg driver. Skipped automatically when Docker is unavailable (§13).
+real asyncpg driver. Skipped automatically when Docker is unavailable.
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""MCP Resource Server constants (spec sections 07/08).
+"""MCP Resource Server constants.
 
 These are the wire-contract constants the RS shares with the backend: the
 well-known discovery paths, the OAuth scopes, and the internal-boundary header
@@ -23,7 +23,7 @@ AS_METADATA_PATH = "/.well-known/oauth-authorization-server"
 # Tickets 21/22.
 MCP_PATH = "/mcp"
 
-# OAuth scopes advertised in the PRM (spec section 08). Mirrors the backend AS's
+# OAuth scopes advertised in the PRM. Mirrors the backend AS's
 # supported scopes so a client sees a consistent set on both documents.
 SCOPE_ROADMAPS_READ = "roadmaps:read"
 SCOPE_ROADMAPS_WRITE = "roadmaps:write"

@@ -1,6 +1,6 @@
 """Contract tests for the internal read-projection surface (:8001, Ticket 16).
 
-The internal app is the surface the MCP read tools (Ticket 22) call: it resolves
+The internal app is the surface the MCP read tools call: it resolves
 identity from the trusted ``X-User-ID`` header behind ``INTERNAL_API_TOKEN`` (spec
 section 08), not a session cookie. These assert the four read routes resolve over
 the trusted identity, stay per-user scoped (a tool cannot read another user's

@@ -1,6 +1,6 @@
 """In-memory test double for the progress domain.
 
-The service is tested sociably (spec section 13): the real ``summary`` / ``next``
+The service is tested sociably: the real ``summary`` / ``next``
 / ``traversal`` deep modules run behind ``ProgressService``; only the repository
 (the Postgres boundary) is substituted here. The fake enforces the same
 one-row-per-(user, roadmap) upsert semantics as the ``progress`` table so the

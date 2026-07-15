@@ -1,4 +1,4 @@
-"""Per-tool OAuth scope enforcement + agent identity resolution (spec section 08).
+"""Per-tool OAuth scope enforcement + agent identity resolution.
 
 The bearer boundary (:mod:`wren_mcp.auth`) validates the token and stashes the
 resolved :class:`~wren_mcp.tokens.VerifiedAgentToken` (carrying its ``sub`` and
@@ -6,9 +6,9 @@ granted ``scope``) on ``request.state`` before any tool runs. Every tool then
 opens with :func:`require_scope`, which is the **one** way to obtain the request's
 ``user_id``: fusing identity resolution with the scope check means a tool cannot
 be written that skips authorization, so the gate is enforced uniformly across the
-write (Ticket 21) and read (Ticket 22) surfaces.
+write and read surfaces.
 
-Scope semantics follow OAuth 2.1 (spec section 08): ``scope`` is a
+Scope semantics follow OAuth 2.1: ``scope`` is a
 space-delimited set of granted scopes. A token lacking the scope a tool requires
 raises a **model-recoverable** :class:`ToolError` (``insufficient_scope``) naming
 the missing scope, not a crash, so the agent can re-authorize and retry.

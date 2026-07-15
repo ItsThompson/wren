@@ -3,7 +3,7 @@
 Applies Alembic to head on a containerized ``postgres:17-alpine`` and exercises
 the SQLAlchemy repository + service end to end, so the unique-constraint ->
 ``Conflict`` path and the ``sid`` blacklist run against the real driver. Skipped
-automatically when Docker is unavailable (spec section 13).
+automatically when Docker is unavailable.
 """
 
 from __future__ import annotations

@@ -7,8 +7,8 @@ injected, differing from the external app only by these settings.
 
 Mounts the roadmap routers as thin adapters over the same service layer the
 external app uses (:mod:`wren.roadmaps.api_internal`), resolving identity from the
-trusted header instead of the cookie (spec section 08). These are the endpoints
-the MCP write/read tools (Tickets 21/22) call, one HTTP call per tool. The
+trusted header instead of the cookie. These are the endpoints
+the MCP write/read tools call, one HTTP call per tool. The
 progress routers attach here the same way once the progress service lands.
 """
 
@@ -33,8 +33,8 @@ db = create_database(settings.database_url)
 # require_internal_user resolves the user from the trusted X-User-ID header.
 internal_roadmaps_router = create_internal_roadmaps_router(build_roadmap_service_provider())
 
-# Progress surface over the trusted identity (#9): follow / snapshot /
-# explicit-set / next, the endpoints the MCP progress tools (Ticket 22) call.
+# Progress surface over the trusted identity: follow / snapshot /
+# explicit-set / next, the endpoints the MCP progress tools call.
 # Ticket 20 mounted the internal roadmaps router and deferred these to #9.
 internal_progress_router = create_internal_progress_router(build_progress_service_provider())
 

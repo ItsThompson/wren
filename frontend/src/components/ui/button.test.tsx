@@ -4,7 +4,7 @@ import { Button } from './button'
 
 describe('Button', () => {
   it('renders the primary variant as a terracotta fill with a cream label', () => {
-    // The design contract (§7.1): primary = terracotta fill (--primary),
+    // The design contract: primary = terracotta fill (--primary),
     // cream label (--primary-foreground). Tailwind expresses this via tokens.
     render(<Button>Start a roadmap</Button>)
 

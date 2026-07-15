@@ -1,6 +1,6 @@
 """oauth: authorization-server tables
 
-Adds the six OAuth 2.1 AS tables (spec section 08): ``oauth_clients`` (DCR),
+Adds the six OAuth 2.1 AS tables: ``oauth_clients`` (DCR),
 ``oauth_auth_requests`` (parked authorize requests), ``oauth_authorization_codes``
 (one-time PKCE-bound codes), ``oauth_refresh_tokens`` (rotating refresh, stored
 hashed), ``oauth_grants`` (connected-client relationship), and ``oauth_audit_log``

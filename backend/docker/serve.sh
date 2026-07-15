@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Launches both backend ASGI apps in a single container (spec sections 08/11):
+# Launches both backend ASGI apps in a single container:
 # the external app on :8000 and the internal app on :8001, over one image and
 # one service layer. Kept out of src/ because it is deployment glue, not app code.
 #

@@ -16,7 +16,7 @@ export type Visibility = components['schemas']['Visibility']
 /**
  * Progress read types, also from the generated client. The published list view
  * fetches the detailed snapshot (for `checked_ids`) and posts explicit-set
- * updates (section 06/07).
+ * updates.
  */
 export type ProgressSnapshot = components['schemas']['ProgressSnapshot']
 export type ProgressUpdateResult = components['schemas']['ProgressUpdateResult']
@@ -55,7 +55,7 @@ export type RoadmapViewState =
  * The publish action's sub-state, separate from the fetch state (a single
  * discriminated union so a success/blocked/failed combination cannot coexist).
  * `blocked` carries the structural violations returned by a 422 hard-block
- * (section 06) so the author sees the full fix list inline.
+ * so the author sees the full fix list inline.
  */
 export type PublishState =
   | { phase: 'idle' }

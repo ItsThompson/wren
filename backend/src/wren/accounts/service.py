@@ -1,12 +1,12 @@
 """AccountService: registration, login/logout, session refresh, and profile.
 
-The single source of truth for account business rules (spec section 05). It
+The single source of truth for account business rules. It
 receives a repository and collaborators, resolves identity from credentials or
 tokens (never from caller-supplied ids), raises ``WrenError`` subclasses for the
 adapter to render, and owns the transaction boundary (commit on success,
 rollback on failure) because ``get_session`` is yield-only.
 
-Session model (spec section 08): an access/refresh pair shares one session id
+Session model: an access/refresh pair shares one session id
 (``sid``). Logout and refresh-rotation revoke the old ``sid`` via the blacklist,
 so a revoked refresh cannot mint a new access token and a revoked session's
 still-unexpired access token stops resolving.
@@ -31,13 +31,13 @@ from wren.core.logging import get_logger
 from wren.core.observability import track_failures
 
 # A public handle: 3..32 chars, lowercase letters/digits/underscore/hyphen. Kept
-# conservative because it appears in public profile URLs (Ticket 25).
+# conservative because it appears in public profile URLs.
 _HANDLE_PATTERN = re.compile(r"^[a-z0-9_-]{3,32}$")
 _HANDLE_REQUIREMENT = (
     "Username must be 3-32 characters using lowercase letters, digits, '_' or '-'."
 )
 # One message for both credential failures so login never reveals whether an
-# email is registered (spec section 08 / US-ACCT-02).
+# email is registered.
 _INVALID_CREDENTIALS = "Invalid email or password."
 
 _log = get_logger("wren-accounts")

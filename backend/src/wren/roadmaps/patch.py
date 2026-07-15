@@ -6,9 +6,9 @@ and the ``proposed_id -> minted_id`` remap, applying **all-or-nothing**: it work
 over a deep copy, so a failure on any op raises :class:`PatchError` and the input
 draft is left byte-for-byte unchanged (the service persists the result only on
 full success). No I/O: like ``dag``/``assembly`` this is a pure deep module,
-exhaustively and property-tested in isolation (spec section 13).
+exhaustively and property-tested in isolation.
 
-Addressing (spec sections 04/07): every op targets nodes by slug ID, never by
+Addressing: every op targets nodes by slug ID, never by
 array index; ordering is expressed with ``before_id``/``after_id`` resolved into
 positions in the sibling ``*_order`` array. IDs are resolved through the running
 remap first, so an op may reference a ``proposed_id`` an earlier ``add_*`` in the
@@ -62,7 +62,7 @@ from wren.roadmaps.schemas import (
 
 
 class PatchError(Exception):
-    """A model-recoverable failure applying one op (spec section 07).
+    """A model-recoverable failure applying one op.
 
     ``field`` is the dotted path to the offending input (e.g.
     ``operations[2].subsection_id``) and ``message`` names valid sibling IDs or
@@ -93,7 +93,7 @@ class PatchOutcome:
 
 
 def apply(draft: Roadmap, operations: list[PatchOp]) -> PatchOutcome:
-    """Apply ``operations`` atomically over a copy of ``draft`` (spec section 05).
+    """Apply ``operations`` atomically over a copy of ``draft``.
 
     Raises :class:`PatchError` (scoped to the failing op) on the first invalid op,
     leaving ``draft`` unchanged. On success returns the fully-mutated working copy.
@@ -386,7 +386,7 @@ class _Applier:
 
     def _resolve(self, ref: str) -> str:
         """Redirect a reference through the running remap so a batch can address a
-        ``proposed_id`` an earlier ``add_*`` minted or de-duped (spec section 07).
+        ``proposed_id`` an earlier ``add_*`` minted or de-duped.
         """
         return self._minter.remap.get(ref, ref)
 
@@ -428,7 +428,7 @@ class _Applier:
 
 def _unknown(field: str, kind: str, missing_id: str, valid: Iterable[str]) -> PatchError:
     """A model-recoverable unknown-ID error that names the valid siblings so the
-    agent can retry without a human (spec section 07)."""
+    agent can retry without a human."""
     names = ", ".join(sorted(valid))
     detail = f"valid {kind} ids: {names}" if names else f"no {kind} exists yet"
     return PatchError(field, f"no {kind} '{missing_id}'; {detail}")

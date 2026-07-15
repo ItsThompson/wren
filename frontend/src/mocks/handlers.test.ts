@@ -42,7 +42,7 @@ describe('mock handlers', () => {
     expect(response.status).toBe(200)
     const body = (await response.json()) as MockRoadmap
     expect(body.id).toBe(mockRoadmap.id)
-    // Sections are an ID-keyed map (section 04), not an array.
+    // Sections are an ID-keyed map, not an array.
     expect(Object.keys(body.sections ?? {})).toEqual(Object.keys(mockRoadmap.sections ?? {}))
   })
 

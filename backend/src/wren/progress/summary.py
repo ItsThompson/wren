@@ -1,4 +1,4 @@
-"""``summary``: the pure progress-snapshot computation (spec section 04).
+"""``summary``: the pure progress-snapshot computation.
 
 Derives the ``ProgressSnapshot`` (roadmap-wide + per-section completion) from a
 roadmap definition and a progress record. This is a **derived read** (spec
@@ -19,7 +19,7 @@ def summarize(roadmap: Roadmap, progress: Progress, *, detailed: bool) -> Progre
 
     Counts checked items per section (in ``section_order``) and overall.
     ``checked_ids`` is included only in ``detailed`` mode so the default read
-    stays concise (spec section 04)."""
+    stays concise."""
     checked = checked_item_ids(roadmap, progress)
     sections: list[SectionProgress] = []
     total_all = 0

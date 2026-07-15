@@ -1,4 +1,4 @@
-"""Shared tool registrar for the MCP write + read surfaces (spec sections 07/11).
+"""Shared tool registrar for the MCP write + read surfaces.
 
 Both :func:`wren_mcp.tools_write.register_write_tools` and
 :func:`wren_mcp.tools_read.register_read_tools` register their tools through this

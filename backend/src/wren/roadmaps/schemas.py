@@ -1,4 +1,4 @@
-"""Roadmap data model + authoring input types (spec section 04).
+"""Roadmap data model + authoring input types.
 
 The persisted shape is ID-keyed maps plus explicit ``*_order`` arrays (the EASE
 model), so operations are order-invariant and no contract ever addresses a node
@@ -8,7 +8,7 @@ becomes the persisted ``*_order``) and each node may carry an optional
 ``proposed_id`` so an agent can reference it within the same payload.
 
 These Pydantic models are the single source of truth for the wire contract; the
-frontend consumes them as OpenAPI-generated TypeScript (spec sections 06/10).
+frontend consumes them as OpenAPI-generated TypeScript.
 """
 
 from __future__ import annotations
@@ -164,7 +164,7 @@ class VisibilityRequest(BaseModel):
 
 class MetadataEditRequest(BaseModel):
     """The ``PATCH /roadmaps/{id}/metadata`` body: the presentation-only fields
-    that stay mutable after publish (spec sections 04/06).
+    that stay mutable after publish.
 
     Only ``title`` / ``description`` / ``subject_tags`` are editable here; a field
     left out (``None``) is unchanged (last-write-wins, deliberately not
@@ -206,7 +206,7 @@ class MetadataEditRequest(BaseModel):
 class RoadmapCreated(Roadmap):
     """The ``POST /roadmaps`` body: the full minted roadmap plus a ``remap`` of
     every de-duped ``proposed_id -> minted_id`` so the author can reconcile the
-    references it sent (spec section 04). ``remap`` is empty when no proposed ID
+    references it sent. ``remap`` is empty when no proposed ID
     had to be changed."""
 
     remap: dict[str, str] = Field(default_factory=dict)
@@ -217,7 +217,7 @@ class RoadmapReplaced(Roadmap):
     import (the escape hatch, spec section 07) plus the ``proposed_id -> minted_id``
     remap. Mirrors :class:`RoadmapCreated` because replace reuses the same
     mint-then-resolve assembly: ``proposed_id``s are preserved, every other node is
-    re-minted, and the roadmap's own ID is unchanged (spec section 04). ``remap`` is
+    re-minted, and the roadmap's own ID is unchanged. ``remap`` is
     empty when no proposed ID had to be de-duped."""
 
     remap: dict[str, str] = Field(default_factory=dict)
@@ -226,7 +226,7 @@ class RoadmapReplaced(Roadmap):
 class ValidateResult(BaseModel):
     """The ``POST /roadmaps/{id}:validate`` body: all structural violations in one
     pass (empty when the draft is publishable). The ``violations`` shape is
-    identical to the 422 publish hard-block body (spec section 06), so a client
+    identical to the 422 publish hard-block body, so a client
     handles one violation contract for both validate and publish."""
 
     violations: list[Violation] = Field(default_factory=list)
@@ -235,7 +235,7 @@ class ValidateResult(BaseModel):
 # ---------- Patch operations (spec section 07 grammar) ----------
 #
 # The canonical single-dispatch iterative-edit surface: an ``operations[]`` array
-# applied atomically (spec section 07). Every op addresses nodes by slug ID (never
+# applied atomically. Every op addresses nodes by slug ID (never
 # array index); ordering is expressed with ``before_id``/``after_id`` (never an
 # array resend). The ``op`` string is the Pydantic discriminator, so the union
 # is parsed unambiguously and surfaces to the frontend as an OpenAPI ``oneOf``.
@@ -267,7 +267,7 @@ class RemoveSubsectionOp(BaseModel):
 
 
 class AddEdgeOp(BaseModel):
-    """``to_id`` gains ``from_id`` as a prerequisite (spec section 07)."""
+    """``to_id`` gains ``from_id`` as a prerequisite."""
 
     op: Literal["add_edge"]
     from_id: str
@@ -375,7 +375,7 @@ PatchOp = Annotated[
 class PatchRequest(BaseModel):
     """The ``PATCH /roadmaps/{id}`` body: the ordered op list applied atomically.
 
-    The target ``revision`` travels in the ``If-Match`` header (spec section 06),
+    The target ``revision`` travels in the ``If-Match`` header,
     not the body. At least one op is required so a patch is never a silent no-op
     that would still burn a revision.
     """
@@ -410,7 +410,7 @@ class ChangedNode(BaseModel):
 class PatchResult(BaseModel):
     """The ``PATCH /roadmaps/{id}`` body: the post-batch ``revision``, the changed
     nodes, and the ``proposed_id -> minted_id`` remap for any de-duped ``add_*``
-    proposal (spec section 07). ``remap`` is empty when nothing was de-duped."""
+    proposal. ``remap`` is empty when nothing was de-duped."""
 
     roadmap_id: str
     revision: int

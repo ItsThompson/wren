@@ -1,4 +1,4 @@
-"""RoadmapService: draft authoring (spec section 05).
+"""RoadmapService: draft authoring.
 
 The single source of truth for roadmap business rules. It receives a repository
 and the resolved ``user_id`` (never trusted from payload), composes the pure
@@ -58,7 +58,7 @@ Clock = Callable[[], datetime]
 # How the service learns a roadmap's follower count for the delete guard. A narrow
 # injected callable (not the whole progress repository) keeps the roadmaps domain
 # decoupled from the progress domain: the wiring binds it to the progress
-# repository's indexed count, tests substitute a constant (spec sections 05/06).
+# repository's indexed count, tests substitute a constant.
 FollowerCounter = Callable[[str], Awaitable[int]]
 # How a read learns the caller's checked checklist-item ids for the progress-aware
 # projections (Overview counts, NodeDetail done-state). Like FollowerCounter, a
@@ -106,7 +106,7 @@ class RoadmapService:
         # ID collision (re-roll) and pin timestamps without patching globals.
         self._token_factory = token_factory
         self._clock = clock
-        # Server-set section page size (spec sections 06/07); injected so a test
+        # Server-set section page size; injected so a test
         # can force truncation on a small fixture.
         self._section_page_size = section_page_size
 
@@ -133,7 +133,7 @@ class RoadmapService:
         self, user_id: str, roadmap_id: str, revision: int, operations: list[PatchOp]
     ) -> PatchResult:
         """Apply an atomic op batch to the caller's draft under optimistic
-        concurrency (spec sections 05/07).
+        concurrency.
 
         Loads through the shared content-write guard (:meth:`_load_writable_draft`:
         404 for a non-owner / unknown ID, 409 ``IMMUTABLE`` on a published or
@@ -195,7 +195,7 @@ class RoadmapService:
         for a non-owner / unknown ID, 409 ``IMMUTABLE`` on a published/archived
         roadmap) and is guarded by the same optimistic-concurrency ``If-Match``
         ``revision`` (stale -> 409 "re-read"), because a full replace is a
-        structure-mutating write (spec section 06).
+        structure-mutating write.
 
         ID semantics (spec section 04 v1.1): the roadmap's own ID (the route param)
         is unchanged, nodes carrying a ``proposed_id`` keep it, and every other node
@@ -250,13 +250,13 @@ class RoadmapService:
         non-owner may read a **public** roadmap that is published or archived (by
         direct link). A private roadmap owned by someone else, or a non-owner's
         request for a public *draft* (not discoverable), is a 404 with no existence
-        leak. This is the read that backs the public list view / profile (#25).
+        leak. This is the read that backs the public list view / profile.
         """
         return await self._load_readable_document(user_id, roadmap_id)
 
     async def get_overview(self, user_id: str, roadmap_id: str, fmt: ResponseFormat) -> Overview:
         """Orientation overview: sections in ``section_order`` with per-section and
-        overall completion counts, no checklist-item bodies (spec sections 04/07).
+        overall completion counts, no checklist-item bodies.
 
         Readable by the owner (any non-draft or their own draft) or a non-owner on
         a public published/archived roadmap; the counts reflect the **caller's**
@@ -270,7 +270,7 @@ class RoadmapService:
     ) -> NodeDetail:
         """One subsection resolved for study: description (detailed only), tags,
         resource links, ``prereq_ids`` resolved to ``{id,title,done}``, and items
-        ``{id,text,done}`` (spec sections 04/07).
+        ``{id,text,done}``.
 
         An unknown subsection id is a 404 that names the valid sibling subsection
         ids so the agent can self-correct. Done-state is the caller's own."""
@@ -294,7 +294,7 @@ class RoadmapService:
         cursor: str | None,
         include: SectionInclude,
     ) -> SectionPage:
-        """Paginated section drill-down (spec sections 04/07).
+        """Paginated section drill-down.
 
         Returns a ``SectionPage`` of the section's subsections in
         ``subsection_order`` with a server-set page size, an opaque ``next_cursor``
@@ -378,7 +378,7 @@ class RoadmapService:
         freshly-minted, globally-unique roadmap ID (never derived from the source),
         owned by the forking user, reset to a private ``draft`` at ``revision`` 1.
         No progress is carried over: fork creates no progress record, so the forker
-        starts the copy with a clean slate (spec section 15). The source is never
+        starts the copy with a clean slate. The source is never
         mutated (the copy is a fresh insert).
         """
         source = await self._load_readable(user_id, source_roadmap_id)
@@ -543,7 +543,7 @@ class RoadmapService:
 
     async def _load_readable(self, user_id: str, roadmap_id: str) -> Roadmap:
         """Load a roadmap the caller may **read**: their own (any status) or a
-        public one (spec sections 05/06).
+        public one.
 
         Readability first: a private roadmap owned by someone else is a 404 that
         leaks no existence, matching the progress readability convention. This is
@@ -586,7 +586,7 @@ class RoadmapService:
 
         A published or archived roadmap is content-immutable: any structural write
         raises ``Conflict`` with the ``IMMUTABLE`` code and a message pointing to
-        fork-to-change (spec sections 04/05/07). This is the guard that protects
+        fork-to-change. This is the guard that protects
         follower progress: the only way to change published content is to fork it
         into a fresh draft. Presentation edits (``edit_metadata``, Ticket 14) do
         **not** load through here, which is why they stay allowed post-publish.

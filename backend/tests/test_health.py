@@ -53,7 +53,7 @@ def test_readyz_503_when_any_check_fails() -> None:
 
 
 def test_readyz_503_when_a_check_raises() -> None:
-    # Seam hardening (Ticket 2): a check that raises must degrade to 503, not 500,
+    # Seam hardening: a check that raises must degrade to 503, not 500,
     # so one misbehaving probe cannot crash readiness for the others.
     async def cache_ok() -> CheckResult:
         return CheckResult(name="cache", ok=True)

@@ -15,7 +15,7 @@ interface ErrorStateProps {
  * meaning never rides on color alone (§9 accessibility). Used for dedicated
  * 404/403 views (which share one message so a private roadmap's existence never
  * leaks) and for generic load failures with a retry. Shared across views so
- * error surfaces read consistently (ticket 26).
+ * error surfaces read consistently.
  */
 export function ErrorState({ title, description, action }: ErrorStateProps) {
   return (

@@ -8,7 +8,7 @@
 # locally the stack runs without it (the base file defines no cloudflared), and
 # the `tunnels` profile keeps cloudflared from ever starting outside a deploy.
 #
-# Kept separate from docker-compose.yml (Ticket 28) so the base stack stays a
+# Kept separate from docker-compose.yml so the base stack stays a
 # self-contained, tunnel-free local artifact and the ingress lives with the
 # rest of the Ticket-29 deploy machinery.
 # =============================================================================
@@ -39,12 +39,12 @@ services:
           memory: 128M
     restart: unless-stopped
 
-  # The OAuth AS signing key is a mounted secret (spec section 08 / §8.3): the
+  # The OAuth AS signing key is a mounted secret: the
   # operator places the PEM on the host at OAUTH_PRIVATE_KEY_PATH (chmod 600) at
   # bring-up, and deploy.sh asserts it exists before starting the stack. Bind-mount
   # it read-only at the SAME path inside the container, so the app opens it at
   # exactly the OAUTH_PRIVATE_KEY_PATH it already reads from .env (one value; host
-  # path == container path). Without this the AS (#18) fails fast on boot outside
+  # path == container path). Without this the AS fails fast on boot outside
   # development and the deploy health gate rolls back. Deploy-only (this overlay):
   # local `just up` and the CI e2e stack run ENVIRONMENT=development and generate
   # an ephemeral in-memory key, so the base file mounts nothing.

@@ -1,6 +1,6 @@
 """accounts: users table + refresh-jti blacklist
 
-Adds the first domain tables on top of the empty baseline (spec section 08):
+Adds the first domain tables on top of the empty baseline:
 ``users`` (public handle + email + bcrypt hash) and ``revoked_sessions`` (the
 refresh-``jti`` blacklist for session revocation).
 

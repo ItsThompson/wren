@@ -7,7 +7,7 @@ place rather than being re-decided per call site.
 
 from __future__ import annotations
 
-# The external REST mount point (spec section 06). Roadmaps are addressed by the
+# The external REST mount point. Roadmaps are addressed by the
 # flat global route ``/roadmaps/{id}``.
 ROADMAPS_PATH = "/roadmaps"
 

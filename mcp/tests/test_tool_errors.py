@@ -1,4 +1,4 @@
-"""Problem+json -> ToolError mapping (spec sections 06/07).
+"""Problem+json -> ToolError mapping.
 
 The backend renders failures as RFC 9457 problem+json; these assert the mapping
 that turns that body into one model-recoverable message (code + detail, plus

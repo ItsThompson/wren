@@ -1,4 +1,4 @@
-"""Sociable unit tests for :class:`ProgressService` (spec section 05).
+"""Sociable unit tests for:class:`ProgressService`.
 
 The real ``summary`` / ``next`` / ``traversal`` deep modules run behind the
 service; only the two repositories (the Postgres boundary) are substituted with

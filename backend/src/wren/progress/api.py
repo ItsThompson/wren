@@ -1,6 +1,6 @@
 """External REST adapter for progress: follow, snapshot, explicit-set, next.
 
-Thin handlers (spec sections 05/06): each resolves the caller via ``require_user``
+Thin handlers: each resolves the caller via ``require_user``
 (the cookie session; a spoofed ``X-User-ID`` is stripped upstream), calls one
 :class:`ProgressService` method, and lets the shared exception handler render any
 ``WrenError`` as RFC 9457 problem+json. The service is injected via

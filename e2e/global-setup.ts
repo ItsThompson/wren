@@ -21,7 +21,7 @@ async function waitForOk(label: string, url: string): Promise<void> {
 }
 
 /**
- * Stack health pre-flight (spec section 13): block the suite until the live
+ * Stack health pre-flight: block the suite until the live
  * stack answers, so a slow container start surfaces as a clear setup failure
  * rather than a flaky first test.
  */

@@ -15,7 +15,7 @@ interface NodeCardProps {
   progress?: ProgressBinding
   /**
    * The current "next" node (from `GET /next`, section 07/Ticket 17). The one
-   * next subsection gets the accent-tinted highlight (§7.2): an accent-tint
+   * next subsection gets the accent-tinted highlight: an accent-tint
    * surface, an accent-tint left border, and the reserved faint shadow.
    */
   isNext?: boolean
@@ -27,7 +27,7 @@ interface NodeCardProps {
  * `<a href>` links, and the checklist. When a progress binding is passed the
  * checklist rows are interactive and the subsection shows its derived done-state
  * (olive check + border tint, no bar); without one the checklist is read-only.
- * The current-"next" subsection is highlighted with the accent tint (§7.2).
+ * The current-"next" subsection is highlighted with the accent tint.
  */
 export function NodeCard({ subsection, progress, isNext = false }: NodeCardProps) {
   const resourceIds = subsection.resource_order ?? []

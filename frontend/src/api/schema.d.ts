@@ -575,7 +575,7 @@ export interface components {
     schemas: {
         /**
          * AddEdgeOp
-         * @description ``to_id`` gains ``from_id`` as a prerequisite (spec section 07).
+         * @description ``to_id`` gains ``from_id`` as a prerequisite.
          */
         AddEdgeOp: {
             /**
@@ -782,7 +782,7 @@ export interface components {
          * CompletionState
          * @description The explicit target state a ``progress_update`` sets its items to.
          *
-         *     Explicit set, never toggle (spec section 07): the client states the desired
+         *     Explicit set, never toggle: the client states the desired
          *     state so a retry is idempotent.
          * @enum {string}
          */
@@ -811,7 +811,7 @@ export interface components {
          *
          *     ``authored`` is everything the caller owns at any status (draft / private /
          *     public), rendered in the "Yours" section; ``followed`` is every roadmap the
-         *     caller follows, rendered in the "Following" section (spec section 09 §7.9). A
+         *     caller follows, rendered in the "Following" section. A
          *     roadmap the caller both authored and follows appears in both lists. Scoped to
          *     the caller: another user's dashboard is never returned.
          */
@@ -887,7 +887,7 @@ export interface components {
         /**
          * MetadataEditRequest
          * @description The ``PATCH /roadmaps/{id}/metadata`` body: the presentation-only fields
-         *     that stay mutable after publish (spec sections 04/06).
+         *     that stay mutable after publish.
          *
          *     Only ``title`` / ``description`` / ``subject_tags`` are editable here; a field
          *     left out (``None``) is unchanged (last-write-wins, deliberately not
@@ -912,7 +912,7 @@ export interface components {
          * NextItem
          * @description One unchecked, prereq-satisfied checklist item to work on next.
          *
-         *     ``why_now`` is a STRUCTURAL rationale only (spec section 07): it states the
+         *     ``why_now`` is a STRUCTURAL rationale only: it states the
          *     mechanical facts the app owns (this is the next unchecked subsection in
          *     ``suggested_path`` and its named prerequisites are complete), never
          *     pedagogical / ZPD judgement (that intelligence lives in the agent and was
@@ -937,7 +937,7 @@ export interface components {
         /**
          * NextResult
          * @description The ``GET /next`` body: the next unchecked items in ``suggested_path``
-         *     order whose prerequisites are all complete (spec section 07).
+         *     order whose prerequisites are all complete.
          *
          *     ``remaining_in_path`` counts the subsections still to do along the path (any
          *     with an unchecked item); ``complete`` is ``True`` when nothing remains.
@@ -998,7 +998,7 @@ export interface components {
         /**
          * Overview
          * @description The ``GET /overview`` body: sections in ``section_order`` with per-section
-         *     and overall completion, and no checklist-item bodies (spec section 04).
+         *     and overall completion, and no checklist-item bodies.
          *
          *     The orientation call; from here the agent drills into a node (``get_node``) or
          *     a section (``get_section``). ``checked_items`` / ``percent`` reflect the
@@ -1020,7 +1020,7 @@ export interface components {
          * PatchRequest
          * @description The ``PATCH /roadmaps/{id}`` body: the ordered op list applied atomically.
          *
-         *     The target ``revision`` travels in the ``If-Match`` header (spec section 06),
+         *     The target ``revision`` travels in the ``If-Match`` header,
          *     not the body. At least one op is required so a patch is never a silent no-op
          *     that would still burn a revision.
          */
@@ -1032,7 +1032,7 @@ export interface components {
          * PatchResult
          * @description The ``PATCH /roadmaps/{id}`` body: the post-batch ``revision``, the changed
          *     nodes, and the ``proposed_id -> minted_id`` remap for any de-duped ``add_*``
-         *     proposal (spec section 07). ``remap`` is empty when nothing was de-duped.
+         *     proposal. ``remap`` is empty when nothing was de-duped.
          */
         PatchResult: {
             /** Roadmap Id */
@@ -1082,7 +1082,7 @@ export interface components {
         };
         /**
          * Progress
-         * @description A user's progress against one roadmap (spec section 04).
+         * @description A user's progress against one roadmap.
          *
          *     ``checked`` maps a checklist-item id to its checked state; only checked items
          *     are retained (an unchecked item is simply absent), which keeps the map lean
@@ -1111,7 +1111,7 @@ export interface components {
          * ProgressSnapshot
          * @description The ``GET /progress`` body: roadmap-wide + per-section completion.
          *
-         *     ``checked_ids`` is populated only in ``detailed`` mode (spec section 04),
+         *     ``checked_ids`` is populated only in ``detailed`` mode,
          *     keeping the default concise response small while still letting a client
          *     reconcile the exact checked set when it asks for it.
          */
@@ -1145,7 +1145,7 @@ export interface components {
         /**
          * ProgressUpdateResult
          * @description The ``POST /progress`` body: the fresh snapshot after the set plus the
-         *     next suggestion (spec sections 04/07). The snapshot is returned in detailed
+         *     next suggestion. The snapshot is returned in detailed
          *     mode so the client can reconcile its checkbox state to the server truth.
          */
         ProgressUpdateResult: {
@@ -1263,7 +1263,7 @@ export interface components {
         };
         /**
          * ResourceRef
-         * @description A subsection resource as a link, never an inlined body (spec section 07).
+         * @description A subsection resource as a link, never an inlined body.
          */
         ResourceRef: {
             /** Id */
@@ -1281,7 +1281,7 @@ export interface components {
         ResourceType: "article" | "video" | "book" | "course" | "docs" | "other";
         /**
          * ResponseFormat
-         * @description The ``concise | detailed`` switch on the read tools (spec section 07).
+         * @description The ``concise | detailed`` switch on the read tools.
          *
          *     Concise is roughly one-third the tokens and still carries the follow-up IDs;
          *     detailed adds the explanatory free-text (the node ``description``).
@@ -1334,10 +1334,10 @@ export interface components {
         };
         /**
          * RoadmapCard
-         * @description A roadmap summarized for a list/grid card (spec sections 06/09).
+         * @description A roadmap summarized for a list/grid card.
          *
          *     ``status`` drives the Draft/Published/Archived badge and ``visibility`` the
-         *     lock/globe badge (spec section 09 §7.9). Content (sections, items, progress)
+         *     lock/globe badge. Content (sections, items, progress)
          *     is never inlined: a card links to the full roadmap view for that.
          */
         RoadmapCard: {
@@ -1354,7 +1354,7 @@ export interface components {
          * RoadmapCreated
          * @description The ``POST /roadmaps`` body: the full minted roadmap plus a ``remap`` of
          *     every de-duped ``proposed_id -> minted_id`` so the author can reconcile the
-         *     references it sent (spec section 04). ``remap`` is empty when no proposed ID
+         *     references it sent. ``remap`` is empty when no proposed ID
          *     had to be changed.
          */
         RoadmapCreated: {
@@ -1426,7 +1426,7 @@ export interface components {
          *     import (the escape hatch, spec section 07) plus the ``proposed_id -> minted_id``
          *     remap. Mirrors :class:`RoadmapCreated` because replace reuses the same
          *     mint-then-resolve assembly: ``proposed_id``s are preserved, every other node is
-         *     re-minted, and the roadmap's own ID is unchanged (spec section 04). ``remap`` is
+         *     re-minted, and the roadmap's own ID is unchanged. ``remap`` is
          *     empty when no proposed ID had to be de-duped.
          */
         RoadmapReplaced: {
@@ -1479,7 +1479,7 @@ export interface components {
         RoadmapStatus: "draft" | "published" | "archived";
         /**
          * SearchHit
-         * @description One search match, carrying the IDs needed to drill down (spec section 04).
+         * @description One search match, carrying the IDs needed to drill down.
          *
          *     ``item_id`` is present only when ``kind == item``; ``matched_tags`` names the
          *     subsection tags that matched a tag filter (absent for a keyword-only match).
@@ -1519,7 +1519,7 @@ export interface components {
         };
         /**
          * SectionInclude
-         * @description Which parts of each node a ``SectionPage`` populates (spec section 07).
+         * @description Which parts of each node a ``SectionPage`` populates.
          *
          *     ``subsections`` = node metadata (tags, effort, resources, resolved prereqs);
          *     ``items`` = the checklist items only; ``both`` = everything. Every variant
@@ -1538,7 +1538,7 @@ export interface components {
         };
         /**
          * SectionOverview
-         * @description Per-section completion counts, no checklist-item bodies (spec section 04).
+         * @description Per-section completion counts, no checklist-item bodies.
          */
         SectionOverview: {
             /** Section Id */
@@ -1728,7 +1728,7 @@ export interface components {
          * ValidateResult
          * @description The ``POST /roadmaps/{id}:validate`` body: all structural violations in one
          *     pass (empty when the draft is publishable). The ``violations`` shape is
-         *     identical to the 422 publish hard-block body (spec section 06), so a client
+         *     identical to the 422 publish hard-block body, so a client
          *     handles one violation contract for both validate and publish.
          */
         ValidateResult: {

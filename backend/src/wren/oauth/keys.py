@@ -1,4 +1,4 @@
-"""Asymmetric signing keys and the published JWKS (spec section 08).
+"""Asymmetric signing keys and the published JWKS.
 
 The AS holds an RSA private key and signs agent access tokens with RS256; the MCP
 Resource Server verifies them via the public JWKS this module publishes. Key

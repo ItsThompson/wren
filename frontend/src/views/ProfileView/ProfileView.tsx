@@ -21,7 +21,7 @@ interface ProfileViewProps {
 }
 
 /**
- * ProfileView (section 02 US-ACCT-03; design language §8): a user's public
+ * ProfileView: a user's public
  * profile at `/user/{handle}`. It renders the display name in Fraunces, the
  * handle in mono, and a grid of the user's published-public roadmap cards. An
  * unknown handle routes to a 404 view; loading / error / empty are handled too.

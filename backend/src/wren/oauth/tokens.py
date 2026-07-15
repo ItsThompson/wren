@@ -1,7 +1,7 @@
 """Agent tokens: RS256 access tokens and opaque rotating refresh tokens.
 
 Access tokens are asymmetrically signed (RS256) and **audience-bound** to the MCP
-resource (spec section 08), so the Resource Server verifies them via the AS JWKS
+resource, so the Resource Server verifies them via the AS JWKS
 and rejects any token whose ``aud`` is not the MCP resource. Refresh tokens are
 high-entropy opaque strings stored only as a SHA-256 hash (secrets hashed at
 rest, spec section 12); rotation is enforced by the service, which revokes the
@@ -79,7 +79,7 @@ class AccessTokenCodec:
     def verify(self, token: str) -> VerifiedAccessToken | None:
         """Verify signature (via JWKS), issuer, audience, and expiry; ``None`` on failure.
 
-        The Resource Server (Ticket 20) owns request-time bearer validation; this
+        The Resource Server owns request-time bearer validation; this
         mirror is used to prove audience binding and expiry in the AS's own tests.
         """
         try:

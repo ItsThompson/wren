@@ -83,7 +83,7 @@ file is gitignored; never commit a real webhook.
 **This render is release-gating, not merely "needed for live firing."**
 Alertmanager v0.27 **exits on config load** if `webhook_url` is not a valid URL
 (an unrendered/blank placeholder → `unsupported scheme ""`). Because the deploy
-health gate (spec §11) polls *every* service's healthcheck, a deploy that starts
+health gate polls *every* service's healthcheck, a deploy that starts
 Alertmanager without a rendered webhook will fail the gate and roll back. To avoid
 crash-looping local dev, the `alertmanager` service is gated behind the `tunnels`
 compose profile (the only profile the deploy activates), so `just up`/`up-dev` do

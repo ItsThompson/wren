@@ -21,7 +21,7 @@ interface TreeViewProps {
 }
 
 /**
- * The Tree/DAG view (spec section 08/10, ticket 24): the roadmap's subsections
+ * The Tree/DAG view: the roadmap's subsections
  * as a layered top-down DAG over their prerequisite edges (React Flow + dagre).
  * Node soft-state (done / available / locked) is derived from progress + prereqs
  * and shown by color + icon; clicking a node navigates to that subsection in the

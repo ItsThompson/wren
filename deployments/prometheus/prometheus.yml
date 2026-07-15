@@ -1,5 +1,5 @@
 # =============================================================================
-# Prometheus scrape + alerting config for the Wren stack (spec section 11).
+# Prometheus scrape + alerting config for the Wren stack.
 #
 # Prometheus runs on monitoring-net only; backend, mcp and node-exporter are all
 # reachable there by service name. Retention (3d / 2GB) and the query

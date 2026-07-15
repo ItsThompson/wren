@@ -595,7 +595,7 @@ async def test_replace_on_a_published_roadmap_is_an_immutability_conflict() -> N
 async def test_replace_on_an_archived_roadmap_is_an_immutability_conflict() -> None:
     service, repo = _service()
     created = await service.create_draft("user-1", _publishable_doc())
-    # No archive path yet (#15); simulate the persisted archived state via the repo.
+    # No archive path yet; simulate the persisted archived state via the repo.
     await repo.save(created.model_copy(update={"status": RoadmapStatus.ARCHIVED}))
     with pytest.raises(Conflict) as excinfo:
         await service.replace_draft("user-1", created.id, created.revision, _replace_doc())

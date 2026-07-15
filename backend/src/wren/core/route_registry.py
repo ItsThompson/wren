@@ -54,26 +54,26 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     RouteKey(method="POST", path="/auth/login"): AccessLevel.PUBLIC,
     RouteKey(method="POST", path="/auth/refresh"): AccessLevel.PUBLIC,
     RouteKey(method="POST", path="/auth/logout"): AccessLevel.PUBLIC,
-    # Roadmap authoring (#7): create a draft and read an owned roadmap. Both
+    # Roadmap authoring: create a draft and read an owned roadmap. Both
     # resolve the human session via require_user (owner-scoped in the service).
     RouteKey(method="POST", path="/roadmaps"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}"): AccessLevel.EXTERNAL_COOKIE,
-    # Iterative edit (#12): the atomic op-list PATCH under If-Match optimistic
+    # Iterative edit: the atomic op-list PATCH under If-Match optimistic
     # concurrency. Owner-scoped draft-only write, resolving the human session via
     # require_user (the service rejects a stale revision with 409 and an invalid
     # op with 422).
     RouteKey(method="PATCH", path="/roadmaps/{roadmap_id}"): AccessLevel.EXTERNAL_COOKIE,
-    # Full-document import (#13): the PUT escape hatch replacing the entire draft
+    # Full-document import: the PUT escape hatch replacing the entire draft
     # under If-Match optimistic concurrency. Owner-scoped draft-only content write
     # (published/archived -> 409 IMMUTABLE), resolving the human session via
     # require_user.
     RouteKey(method="PUT", path="/roadmaps/{roadmap_id}"): AccessLevel.EXTERNAL_COOKIE,
-    # Roadmap validate + publish lifecycle (#8): owner-scoped draft actions on
+    # Roadmap validate + publish lifecycle: owner-scoped draft actions on
     # the :verb sub-resource. Publish is the one-way draft -> published
     # transition; both resolve the human session via require_user.
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:validate"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:publish"): AccessLevel.EXTERNAL_COOKIE,
-    # Fork + presentation-only metadata edit (#14), both agent+web callable
+    # Fork + presentation-only metadata edit, both agent+web callable
     # (spec section 07). Fork seeds a new draft from any readable roadmap (own or
     # public); the metadata PATCH edits title/description/subject_tags and stays
     # allowed post-publish (not If-Match-guarded). Both resolve the human session
@@ -81,7 +81,7 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     # readability-scoped, not owner-scoped).
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:fork"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="PATCH", path="/roadmaps/{roadmap_id}/metadata"): AccessLevel.EXTERNAL_COOKIE,
-    # Study-time read projections (#16): the purpose-built reads the web views and
+    # Study-time read projections: the purpose-built reads the web views and
     # (mirrored on the internal app) the MCP read tools consume. All resolve the
     # human session via require_user; readability is enforced in the service
     # (owner draft preview, or a non-owner reading a public published/archived
@@ -94,25 +94,25 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
         method="GET", path="/roadmaps/{roadmap_id}/sections/{section_id}"
     ): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/search"): AccessLevel.EXTERNAL_COOKIE,
-    # Web-only lifecycle (#15): visibility toggle, archive, and delete. Mounted on
+    # Web-only lifecycle: visibility toggle, archive, and delete. Mounted on
     # the external (human) app ONLY: no internal-app route and no MCP tool (spec
     # sections 06/07/08). All resolve the human session via require_user and are
     # owner-scoped in the service; delete is guarded by a zero-followers check.
     RouteKey(method="PUT", path="/roadmaps/{roadmap_id}/visibility"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:archive"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="DELETE", path="/roadmaps/{roadmap_id}"): AccessLevel.EXTERNAL_COOKIE,
-    # Follow, progress, and server-computed next (#9): the study-time surface over
+    # Follow, progress, and server-computed next: the study-time surface over
     # the progress service. All resolve the human session via require_user and are
     # scoped to that user (another user's progress is never returned).
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}/follow"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/progress"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}/progress"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/next"): AccessLevel.EXTERNAL_COOKIE,
-    # Per-user deadline set/clear (#17): editable anytime, drives a countdown
+    # Per-user deadline set/clear: editable anytime, drives a countdown
     # only (no pacing/forecast). Resolves the human session via require_user and
     # is scoped to that user's progress record.
     RouteKey(method="PUT", path="/roadmaps/{roadmap_id}/deadline"): AccessLevel.EXTERNAL_COOKIE,
-    # OAuth 2.1 AS (#18), external-only. The AS-handshake endpoints are OAUTH
+    # OAuth 2.1 AS, external-only. The AS-handshake endpoints are OAUTH
     # (unauthenticated protocol surface: discovery, DCR, authorize, token,
     # revoke); the SPA-driven consent decision and connected-clients management
     # resolve the human session via require_user (EXTERNAL_COOKIE).
@@ -126,7 +126,7 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     RouteKey(method="POST", path="/revoke"): AccessLevel.OAUTH,
     RouteKey(method="GET", path="/me/clients"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="DELETE", path="/me/clients/{client_id}"): AccessLevel.EXTERNAL_COOKIE,
-    # Dashboard + public profile (#25, spec section 02 US-ACCT-03). The private
+    # Dashboard + public profile. The private
     # dashboard resolves the human session via require_user (EXTERNAL_COOKIE) and
     # is caller-scoped (authored + followed). The public profile is PUBLIC: it
     # resolves no identity and returns only the handle owner's published-public
@@ -134,7 +134,7 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     # on the external app only.
     RouteKey(method="GET", path="/me/dashboard"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="GET", path="/users/{handle}"): AccessLevel.PUBLIC,
-    # Shipped SKILL.md authoring guidance (#27, spec sections 07/14). PUBLIC:
+    # Shipped SKILL.md authoring guidance. PUBLIC:
     # generic agent guidance served for download/copy, not user data, so it
     # resolves no identity. Referenced from the MCP tool descriptions so an agent
     # can discover it. Mounted on the external app only.
@@ -144,7 +144,7 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
 # Every route resolves identity via require_internal_user (the trusted X-User-ID
 # header behind INTERNAL_API_TOKEN), so all are INTERNAL_TRUSTED. These mirror the
 # external roadmap surface op-for-op (see wren.roadmaps.api_internal); the MCP
-# tools (Tickets 21/22) are thin clients of exactly these endpoints.
+# tools are thin clients of exactly these endpoints.
 INTERNAL_ROUTE_ACCESS: RouteRegistry = {
     RouteKey(method="POST", path="/roadmaps"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}"): AccessLevel.INTERNAL_TRUSTED,
@@ -152,13 +152,13 @@ INTERNAL_ROUTE_ACCESS: RouteRegistry = {
     RouteKey(method="PUT", path="/roadmaps/{roadmap_id}"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:validate"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:publish"): AccessLevel.INTERNAL_TRUSTED,
-    # Fork + metadata edit (#14) mirrored on the internal app so the MCP tools
-    # (Ticket 21) call them: both resolve the trusted X-User-ID and are scoped in
+    # Fork + metadata edit mirrored on the internal app so the MCP tools
+    # call them: both resolve the trusted X-User-ID and are scoped in
     # the service the same way as the external routes.
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:fork"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="PATCH", path="/roadmaps/{roadmap_id}/metadata"): AccessLevel.INTERNAL_TRUSTED,
-    # Study-time read projections (#16) mirrored on the internal app so the MCP
-    # read tools (Ticket 22) call them: overview / node / paginated section /
+    # Study-time read projections mirrored on the internal app so the MCP
+    # read tools call them: overview / node / paginated section /
     # search, each resolving the trusted X-User-ID and readability-scoped in the
     # service the same way as the external routes.
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/overview"): AccessLevel.INTERNAL_TRUSTED,
@@ -169,15 +169,15 @@ INTERNAL_ROUTE_ACCESS: RouteRegistry = {
         method="GET", path="/roadmaps/{roadmap_id}/sections/{section_id}"
     ): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/search"): AccessLevel.INTERNAL_TRUSTED,
-    # Progress surface (#9), mirrored on the internal app so the MCP progress
-    # tools (Ticket 22) call it: follow / snapshot / explicit-set / next, each
+    # Progress surface, mirrored on the internal app so the MCP progress
+    # tools call it: follow / snapshot / explicit-set / next, each
     # resolving the trusted X-User-ID and scoped to that user.
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}/follow"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/progress"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}/progress"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/next"): AccessLevel.INTERNAL_TRUSTED,
-    # Per-user deadline set/clear (#17), mirrored on the internal app so the MCP
-    # progress tools (Ticket 22) can call it: resolves the trusted X-User-ID and
+    # Per-user deadline set/clear, mirrored on the internal app so the MCP
+    # progress tools can call it: resolves the trusted X-User-ID and
     # is scoped to that user's progress record (countdown only, no pacing).
     RouteKey(method="PUT", path="/roadmaps/{roadmap_id}/deadline"): AccessLevel.INTERNAL_TRUSTED,
 }

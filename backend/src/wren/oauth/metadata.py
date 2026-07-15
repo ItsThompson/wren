@@ -2,7 +2,7 @@
 
 The document advertises the AS's endpoints and capabilities to clients. Every URL
 in it is derived from :class:`OAuthConfig` (the pinned issuer), never the request
-host: the Site-URL gotcha (spec section 08) means a request-derived issuer would
+host: the Site-URL gotcha means a request-derived issuer would
 be rejected by clients that opened the flow at ``api.usewren.com``. ``S256`` is
 advertised as the only PKCE method, matching the enforcement in the flow.
 """

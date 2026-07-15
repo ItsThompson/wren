@@ -117,7 +117,7 @@ def test_unauthenticated_tool_call_is_401_pointing_at_the_prm(make_settings: Mak
 
 def test_valid_bearer_passes_the_boundary(make_settings: MakeSettings) -> None:
     # A valid token clears the auth boundary and reaches the now-mounted MCP tool
-    # transport (Ticket 21); tools/list returns the registered write tools.
+    # transport; tools/list returns the registered write tools.
     key = new_key()
     app = create_rs_app(
         make_settings(),

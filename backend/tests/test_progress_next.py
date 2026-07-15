@@ -1,4 +1,4 @@
-"""Unit tests for the pure ``progress.next`` deep module (spec sections 05/07).
+"""Unit tests for the pure ``progress.next`` deep module.
 
 ``next.compute`` is pure over the roadmap + progress, so it is tested in complete
 isolation (no DB, request, or token). Covers the walk down ``suggested_path``,
@@ -189,7 +189,7 @@ def test_order_arrays_out_of_sync_with_their_maps_are_skipped() -> None:
     assert result.items[0].resources == []
 
 
-# --- why_now: structural rationale only (spec section 07) -------------------
+# --- why_now: structural rationale only -------------------
 
 
 def test_why_now_states_no_prerequisites_for_a_root_subsection() -> None:

@@ -2,7 +2,7 @@
 
 Internet-reachable via the Cloudflare tunnel (``mcp.usewren.com``). Serves the
 PRM, validates agent bearer tokens as an OAuth Resource Server, and forwards tool
-calls (Tickets 21/22) to the backend internal app. Built from :func:`build_app`.
+calls to the backend internal app. Built from:func:`build_app`.
 """
 
 from __future__ import annotations

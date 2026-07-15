@@ -1,4 +1,4 @@
-"""MCP server bootstrap: transport-security policy (spec sections 07/08/11).
+"""MCP server bootstrap: transport-security policy.
 
 DNS-rebinding protection is scoped to the pinned resource host in production
 (defense-in-depth behind the tunnel + bearer boundary) and relaxed in

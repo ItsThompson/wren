@@ -2,7 +2,7 @@
 
 ``username`` is the public handle; ``email`` is stored normalized (lowercased by
 the service) and both are uniquely constrained. The password is stored only as a
-bcrypt hash. ``revoked_sessions`` is the ``jti`` blacklist (spec section 08):
+bcrypt hash. ``revoked_sessions`` is the ``jti`` blacklist:
 each row revokes one session id (shared by an access/refresh pair); ``expires_at``
 lets a later cleanup job drop rows once the refresh token would have expired
 anyway.

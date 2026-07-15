@@ -1,6 +1,6 @@
 """Exhaustive + property-based tests for the pure ``dag`` deep module.
 
-The sharpest correctness surface in the epic (spec §13): a false negative lets a
+The sharpest correctness surface in the epic: a false negative lets a
 structurally broken roadmap publish. So the four structural checks
 (``check_acyclic``, ``find_dangling_prereqs``, and ``validate_suggested_path``'s
 V3 coverage + V4 topological order) are covered with exhaustive example cases and
@@ -213,7 +213,7 @@ def test_out_of_order_prereq_is_a_v4_violation() -> None:
 
 def test_v4_reports_only_the_first_out_of_order_pair() -> None:
     # Both b<-a and c<-b are violated by the fully-reversed order, but V4 names
-    # only the first pair encountered (spec §04).
+    # only the first pair encountered.
     nodes, edges = _complete_dag()
 
     violations = validate_suggested_path(["sub_c", "sub_b", "sub_a"], nodes, edges)

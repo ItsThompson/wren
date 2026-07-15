@@ -1,6 +1,6 @@
 """Prometheus HTTP metrics.
 
-Metric names and labels follow a stable convention (spec section 11) so alert
+Metric names and labels follow a stable convention so alert
 rules and dashboards can be dropped in later:
 
 - ``http_requests_total{method,path,status}`` (counter)

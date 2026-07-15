@@ -1,6 +1,6 @@
-"""``dag``: the pure structural validator for the prerequisite DAG (spec §05).
+"""``dag``: the pure structural validator for the prerequisite DAG.
 
-This is the highest test-density deep module in the epic (spec §13): a false
+This is the highest test-density deep module in the epic: a false
 negative here lets a structurally broken roadmap publish and break followers, so
 the module is covered exhaustively *and* with ``hypothesis`` property tests.
 
@@ -14,7 +14,7 @@ composes these into the ``validate_structure`` contract and maps them onto the
 wire ``wren.core.errors.Violation`` (which lives with the HTTP boundary and pulls
 in FastAPI, hence is kept out of this pure module).
 
-Edge convention (spec §04): ``edges[x]`` is the list of ``x``'s prerequisites, so
+Edge convention: ``edges[x]`` is the list of ``x``'s prerequisites, so
 an edge ``x -> y`` reads "``x`` depends on ``y``" and a valid learning order
 places every prerequisite *before* its dependent.
 """
@@ -51,7 +51,7 @@ class CycleReport:
     ``cycle`` is a closed walk in dependency order: the first node repeats at the
     end, so a self-edge is ``["sub_x", "sub_x"]`` and a two-node cycle is
     ``["sub_x", "sub_y", "sub_x"]``. Naming the cycle is what makes the failure
-    model-recoverable (spec §05): the agent can see exactly which edge to remove.
+    model-recoverable: the agent can see exactly which edge to remove.
     """
 
     cycle: list[str]
@@ -95,7 +95,7 @@ def check_acyclic(nodes: set[str], edges: Mapping[str, list[str]]) -> CycleRepor
 
 def find_dangling_prereqs(nodes: set[str], edges: Mapping[str, list[str]]) -> list[RuleViolation]:
     """Return a V2 violation per subsection whose ``prereq_ids`` reference a node
-    that does not exist (spec §04). Each violation names the owning subsection
+    that does not exist. Each violation names the owning subsection
     followed by its unknown references, so the agent can fix the edge in place.
     """
     violations: list[RuleViolation] = []

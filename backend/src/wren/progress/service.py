@@ -1,6 +1,6 @@
 """ProgressService: follow, explicit-set progress, and server-computed next.
 
-The single source of truth for progress business rules (spec section 05). It
+The single source of truth for progress business rules. It
 receives the roadmaps read repository and its own progress repository plus the
 resolved ``user_id`` (never trusted from payload), composes the pure ``summary``
 and ``next`` deep modules, raises ``WrenError`` subclasses for the adapter to
@@ -100,7 +100,7 @@ class ProgressService:
         self, user_id: str, roadmap_id: str, item_ids: list[str], state: CompletionState
     ) -> ProgressUpdateResult:
         """Explicit-set ``item_ids`` to ``state`` (not toggle) and return the fresh
-        snapshot + next suggestion (spec section 07).
+        snapshot + next suggestion.
 
         Idempotent on retry: setting the same items to the same state twice is a
         no-op beyond the timestamp. A foreign or nonexistent item id is a 422 and
@@ -140,7 +140,7 @@ class ProgressService:
     ) -> NextResult:
         """Return the next unchecked, prereq-satisfied items in path order.
 
-        Computed server-side in :func:`progress.next.compute` (spec section 07),
+        Computed server-side in:func:`progress.next.compute`,
         never delegated to the agent. Each item carries a structural ``why_now``
         and its resource links; ``detailed`` mode adds each item's
         ``path_position``. Scoped to the caller's progress. Trackable on a
@@ -168,7 +168,7 @@ class ProgressService:
 
     async def _load_readable(self, user_id: str, roadmap_id: str) -> Roadmap:
         """Load a roadmap the caller may read: their own (any status) or a public
-        one (spec sections 05/06).
+        one.
 
         Readability first: a private roadmap owned by someone else is a 404 that
         leaks no existence. Callers layer their own status gate on top (follow vs

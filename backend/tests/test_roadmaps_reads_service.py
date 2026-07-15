@@ -1,4 +1,4 @@
-"""Service-level tests for the read projections + readability (Ticket 16).
+"""Service-level tests for the read projections + readability.
 
 Sociable tests through :class:`RoadmapService`'s public read methods with the
 real projection modules behind it and only the repository substituted (spec

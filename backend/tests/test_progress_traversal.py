@@ -1,4 +1,4 @@
-"""Unit tests for the pure ``progress.traversal`` helpers (spec sections 04/05).
+"""Unit tests for the pure ``progress.traversal`` helpers.
 
 Locks in the canonical "which items exist" source: ``item_order`` (the
 addressable order array), matching the counting/done/next helpers. For a

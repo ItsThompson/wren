@@ -40,7 +40,7 @@ const STATE_PRESENTATION: Record<
 }
 
 /**
- * One subsection rendered as a tree node (spec section 08). The whole node is a
+ * One subsection rendered as a tree node. The whole node is a
  * real `<Link>` to the subsection in the list view (frontend rule: links over
  * navigation handlers, so cmd/middle-click and hover-preview work). Soft-state
  * shows as color + icon; there is NO gating (a locked node is still a live link)

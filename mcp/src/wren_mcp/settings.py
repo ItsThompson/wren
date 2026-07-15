@@ -21,7 +21,7 @@ DEFAULT_PORT = 9000
 class EnvSettings(BaseSettings):
     """Deployment config for the MCP server, sourced from the environment.
 
-    Field names mirror the shared ``.env`` keys (spec section 11). Unknown keys
+    Field names mirror the shared ``.env`` keys. Unknown keys
     are ignored so the single sectioned root ``.env`` can carry vars for other
     consumers.
     """

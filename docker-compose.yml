@@ -3,7 +3,7 @@
 #
 # Every service is expose-only (NO host `ports:`): the Cloudflare tunnel is the
 # only ingress and is added in Ticket 29 (locally the stack runs without it).
-# Four segmented bridge networks (section 08) isolate the tiers; Postgres lives
+# Four segmented bridge networks isolate the tiers; Postgres lives
 # on data-net alone and the internal app (:8001) is never on edge-net.
 #
 # Local development layers docker-compose.dev.yml on top (bind mounts, --reload,

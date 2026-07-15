@@ -1,10 +1,10 @@
-"""Service-level tests for the dashboard + profile listing (Ticket 25).
+"""Service-level tests for the dashboard + profile listing.
 
 Sociable per spec section 13: the real :class:`ListingService` runs over the
 in-memory roadmap repository (the Postgres boundary substituted); the two
 cross-domain lookups (handle -> owner, caller -> followed ids) are injected as the
 same narrow callables the wiring binds, here backed by simple test doubles. These
-assert the scoping contract (US-ACCT-03): the dashboard is caller-scoped
+assert the scoping contract: the dashboard is caller-scoped
 (authored any status + followed), and the profile exposes only published-public
 roadmaps with a 404 for an unknown handle.
 """

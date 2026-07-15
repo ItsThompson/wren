@@ -1,7 +1,7 @@
 import { Loader2 } from 'lucide-react'
 
 /**
- * The consent loading state (section 10): a quiet spinner while the parked
+ * The consent loading state: a quiet spinner while the parked
  * request's context resolves. The trust moment stays calm, never loud.
  */
 export function ConsentSpinner() {

@@ -1,5 +1,5 @@
 /**
- * Pure deadline-countdown derivation (spec sections 04/10/15).
+ * Pure deadline-countdown derivation.
  *
  * The per-user deadline drives a COUNTDOWN only: the whole-day delta between
  * today and the target date. It is never a pacing signal: there is no

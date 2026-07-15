@@ -33,7 +33,7 @@ export default defineConfig({
         'src/components/ui/**', // vendored shadcn primitives
         'src/mocks/**', // dev-only MSW harness
       ],
-      // Frontend floor from the testing strategy (section 13), enforced both
+      // Frontend floor from the testing strategy, enforced both
       // locally (`npm run test:coverage`) and in CI (`test-frontend` job,
       // Ticket 30). vitest exits non-zero below the floor, failing the build.
       thresholds: {

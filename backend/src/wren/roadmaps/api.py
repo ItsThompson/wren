@@ -2,7 +2,7 @@
 full-document import (replace), validate, publish, fork, presentation-only
 metadata edit, and the web-only lifecycle (visibility / archive / delete).
 
-Thin handlers (spec sections 05/06): each resolves the caller via ``require_user``
+Thin handlers: each resolves the caller via ``require_user``
 (the cookie session; a spoofed ``X-User-ID`` is stripped upstream), calls one
 :class:`RoadmapService` method, and lets the shared exception handler render any
 ``WrenError`` as RFC 9457 problem+json. The service is injected via
@@ -17,7 +17,7 @@ draft. ``PATCH /roadmaps/{id}/metadata`` is the presentation-only edit that stay
 allowed post-publish (not ``If-Match``-guarded). The web-only lifecycle actions
 (``PUT /roadmaps/{id}/visibility``, ``POST /roadmaps/{id}:archive``,
 ``DELETE /roadmaps/{id}``) are mounted on the external app **only**: they have no
-internal-app route and no MCP tool (spec sections 06/07/08). Delete is guarded by
+internal-app route and no MCP tool. Delete is guarded by
 a zero-followers check (409 ``DELETE_HAS_FOLLOWERS`` otherwise); archive is the
 safe retirement path.
 """
@@ -73,7 +73,7 @@ def create_roadmaps_router(service_provider: RoadmapServiceProvider) -> APIRoute
         user_id: str = Depends(require_user),
         service: RoadmapService = Depends(service_provider),
     ) -> Roadmap:
-        # Full document to a reader (spec section 06): the owner (any status, draft
+        # Full document to a reader: the owner (any status, draft
         # preview) or a non-owner reading a public published/archived roadmap by
         # link. A private roadmap or a non-owner's public draft is a 404 (no leak).
         return await service.get(user_id, roadmap_id)
@@ -132,7 +132,7 @@ def create_roadmaps_router(service_provider: RoadmapServiceProvider) -> APIRoute
         user_id: str = Depends(require_user),
         service: RoadmapService = Depends(service_provider),
     ) -> PatchResult:
-        # If-Match carries the target revision (spec section 06): a mismatch is a
+        # If-Match carries the target revision: a mismatch is a
         # 409 "re-read", an invalid op is a 422, both rendered by the shared
         # exception handler. A malformed/absent header is a 422 via FastAPI.
         return await service.patch_draft(user_id, roadmap_id, if_match, body.operations)
@@ -145,7 +145,7 @@ def create_roadmaps_router(service_provider: RoadmapServiceProvider) -> APIRoute
         user_id: str = Depends(require_user),
         service: RoadmapService = Depends(service_provider),
     ) -> RoadmapReplaced:
-        # The full-document import escape hatch (spec section 07), never the
+        # The full-document import escape hatch, never the
         # iterative path: it replaces the entire draft. Guarded by the same If-Match
         # optimistic concurrency as PATCH (stale -> 409) and the same immutability
         # boundary (published/archived -> 409 IMMUTABLE), rendered by the shared
@@ -176,7 +176,7 @@ def create_roadmaps_router(service_provider: RoadmapServiceProvider) -> APIRoute
         service: RoadmapService = Depends(service_provider),
     ) -> Roadmap:
         # Fork any roadmap the caller can read (own, or public): a new draft with a
-        # freshly-minted roadmap ID and no progress carry-over (spec sections 04/05).
+        # freshly-minted roadmap ID and no progress carry-over.
         # An unreadable source is a 404 (no existence leak) via the service.
         return await service.fork(user_id, roadmap_id)
 
@@ -187,7 +187,7 @@ def create_roadmaps_router(service_provider: RoadmapServiceProvider) -> APIRoute
         user_id: str = Depends(require_user),
         service: RoadmapService = Depends(service_provider),
     ) -> Roadmap:
-        # Presentation-only edit, allowed even when published (spec section 06): not
+        # Presentation-only edit, allowed even when published: not
         # If-Match-guarded and never bumps the structural revision. A smuggled
         # structural/lifecycle field is rejected 409 IMMUTABLE at the wire boundary.
         body.reject_structural_fields()
@@ -202,7 +202,7 @@ def create_roadmaps_router(service_provider: RoadmapServiceProvider) -> APIRoute
         user_id: str = Depends(require_user),
         service: RoadmapService = Depends(service_provider),
     ) -> Roadmap:
-        # Web-only visibility toggle (spec sections 06/08): mounted on the external
+        # Web-only visibility toggle: mounted on the external
         # app only, no internal-app route and no MCP tool. Owner-scoped in the
         # service (a non-owner is a 404, no existence leak); last-write-wins.
         return await service.set_visibility(user_id, roadmap_id, body.visibility)
@@ -213,7 +213,7 @@ def create_roadmaps_router(service_provider: RoadmapServiceProvider) -> APIRoute
         user_id: str = Depends(require_user),
         service: RoadmapService = Depends(service_provider),
     ) -> Roadmap:
-        # Web-only archive (spec sections 06/08): the safe retirement path (hides
+        # Web-only archive: the safe retirement path (hides
         # from discovery, existing followers keep access). External app only, no
         # internal-app route and no MCP tool. Only a published roadmap can be
         # archived (else 409 via the service).
@@ -225,7 +225,7 @@ def create_roadmaps_router(service_provider: RoadmapServiceProvider) -> APIRoute
         user_id: str = Depends(require_user),
         service: RoadmapService = Depends(service_provider),
     ) -> None:
-        # Web-only delete (spec sections 06/08): external app only, no internal-app
+        # Web-only delete: external app only, no internal-app
         # route and no MCP tool. Guarded by a zero-followers check in the service; a
         # roadmap with followers is a 409 DELETE_HAS_FOLLOWERS steering to archive.
         await service.delete(user_id, roadmap_id)

@@ -2,7 +2,7 @@
 
 Boots both real apps in one process and asserts /healthz and /metrics respond.
 Booting both together also proves the per-app metric registries do not collide.
-Readiness is now dependency-gated (Ticket 2), so this asserts the Postgres check
+Readiness is now dependency-gated, so this asserts the Postgres check
 is wired into both apps; its up/down state is covered by the DB readiness tests.
 """
 

@@ -1,4 +1,4 @@
-"""Unit tests for the shared scope gate + identity resolution (spec section 08).
+"""Unit tests for the shared scope gate + identity resolution.
 
 :func:`wren_mcp.scopes.require_scope` is the single gate every write and read tool
 opens with: it resolves the request's identity from the bearer the boundary

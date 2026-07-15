@@ -1,6 +1,6 @@
 """PKCE (RFC 7636) verification, S256 only.
 
-The AS requires the ``S256`` challenge method (spec section 08). The challenge
+The AS requires the ``S256`` challenge method. The challenge
 transform (SHA-256 + base64url) is delegated to Authlib; this module only wraps
 it with a constant-time comparison so a token exchange proves possession of the
 original ``code_verifier``.

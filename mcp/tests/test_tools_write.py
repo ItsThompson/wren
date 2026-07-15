@@ -1,4 +1,4 @@
-"""MCP write-tool behavior, annotations, and error surfacing (spec section 07).
+"""MCP write-tool behavior, annotations, and error surfacing.
 
 Drives the tools through the real mounted transport (:mod:`mcp_harness`): the
 bearer boundary resolves identity, the tool makes one internal call, and the
@@ -65,7 +65,7 @@ def _roadmap(**overrides: object) -> dict[str, object]:
 
 
 def test_the_write_tools_are_registered() -> None:
-    # The read tools (Ticket 22) are registered on the same server, so assert the
+    # The read tools are registered on the same server, so assert the
     # write surface is present as a subset; the schema snapshot enforces that the
     # full tool set (write + read) is exactly frozen.
     harness = AgentHarness(lambda _r: httpx.Response(200, json={}))

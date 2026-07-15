@@ -1,7 +1,7 @@
 import { CircleCheck } from 'lucide-react'
 
 /**
- * The calm `get_next` completion state (spec section 10; US-ERR-04): shown in the
+ * The calm `get_next` completion state: shown in the
  * list view once the learner has completed every item in the suggested path.
  * Quiet and encouraging (olive done-state, not a loud accent block), with meaning
  * carried by the check icon and the text, never color alone.

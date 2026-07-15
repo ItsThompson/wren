@@ -1,4 +1,4 @@
-"""MCP tool-invocation domain counter (spec section 11).
+"""MCP tool-invocation domain counter.
 
 Counts every agent tool call as ``mcp_tool_invocations_total{tool,outcome}`` so
 the operator can see authoring/study activity and per-tool error rates. Kept on a

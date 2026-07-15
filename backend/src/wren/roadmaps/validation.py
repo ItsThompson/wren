@@ -1,7 +1,7 @@
 """Structural validation of a draft roadmap (spec sections 04, 05).
 
 Pure functions over the domain :class:`Roadmap`: no I/O, no request, no database,
-so they are exhaustively and property-tested in isolation (spec section 13).
+so they are exhaustively and property-tested in isolation.
 
 This is the FULL structural contract (V1..V8, spec section 04). It composes the
 pure :mod:`wren.roadmaps.dag` module with the local content rules:

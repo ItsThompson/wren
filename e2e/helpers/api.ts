@@ -5,7 +5,7 @@ import type { NextResult, ProgressSnapshot } from './types'
 import type { TestUser } from './users'
 
 /**
- * The APIRequestContext seeding helper (spec section 13). Each function is one
+ * The APIRequestContext seeding helper. Each function is one
  * external-app (`:8000`) call, mirroring the backend spine fixture, so the
  * Playwright suite drives the study spine against the live containerized stack
  * without re-implementing business rules. A registered context's cookie jar

@@ -9,8 +9,8 @@ public :class:`Profile` carries a handle's published-public roadmaps.
 Defined once here as Pydantic models (the single source of truth for the wire
 contract) and surfaced to the frontend as OpenAPI-generated TypeScript (spec
 sections 06/10). The card deliberately omits per-user progress: the dashboard
-shows status badges (spec section 09 §7.9) and the profile is a viewer-agnostic
-public page, so neither leaks who follows what (spec sections 02/08).
+shows status badges and the profile is a viewer-agnostic
+public page, so neither leaks who follows what.
 """
 
 from __future__ import annotations
@@ -21,10 +21,10 @@ from wren.roadmaps.schemas import RoadmapStatus, Visibility
 
 
 class RoadmapCard(BaseModel):
-    """A roadmap summarized for a list/grid card (spec sections 06/09).
+    """A roadmap summarized for a list/grid card.
 
     ``status`` drives the Draft/Published/Archived badge and ``visibility`` the
-    lock/globe badge (spec section 09 §7.9). Content (sections, items, progress)
+    lock/globe badge. Content (sections, items, progress)
     is never inlined: a card links to the full roadmap view for that."""
 
     id: str
@@ -40,7 +40,7 @@ class Dashboard(BaseModel):
 
     ``authored`` is everything the caller owns at any status (draft / private /
     public), rendered in the "Yours" section; ``followed`` is every roadmap the
-    caller follows, rendered in the "Following" section (spec section 09 §7.9). A
+    caller follows, rendered in the "Following" section. A
     roadmap the caller both authored and follows appears in both lists. Scoped to
     the caller: another user's dashboard is never returned."""
 

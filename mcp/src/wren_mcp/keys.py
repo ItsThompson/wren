@@ -1,4 +1,4 @@
-"""AS public-key discovery for Resource-Server token verification (spec section 08).
+"""AS public-key discovery for Resource-Server token verification.
 
 The AS holds the RSA private key and signs agent access tokens (RS256); this RS
 verifies them against the AS's **public** JWKS. This module discovers the JWKS

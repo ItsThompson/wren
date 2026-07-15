@@ -1,5 +1,5 @@
 # =============================================================================
-# E2E overlay (Ticket 30) — layered ON TOP of docker-compose.yml for the CI
+# E2E overlay — layered ON TOP of docker-compose.yml for the CI
 # `e2e` job and local `just e2e-up` / `just test-e2e`.
 #
 # The base stack is expose-only (the tunnel is the only ingress in prod), so a
