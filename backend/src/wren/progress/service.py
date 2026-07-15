@@ -11,9 +11,10 @@ for ``(user_id, roadmap_id)``, so another user's progress is never returned
 (spec sections 05/08). Starting to **follow** requires a **published** roadmap the
 caller may read (owner, or public): a draft is not startable and an archived
 roadmap is hidden from discovery (no new followers). Reading/updating progress is
-allowed on a **published or archived** roadmap, so an archived roadmap's existing
-followers keep it and their progress (spec section 04). An unreadable roadmap is a
-404 with no existence leak.
+allowed on a **published** roadmap, or on an **archived** roadmap the caller
+**already follows**: an archived roadmap keeps its existing followers and their
+progress, but gains no new ones (no progress row is ever created on an archived
+roadmap; spec section 04). An unreadable roadmap is a 404 with no existence leak.
 """
 
 from __future__ import annotations
@@ -85,9 +86,9 @@ class ProgressService:
 
         Recomputed from the roadmap + the caller's record (an empty record when
         they have not started), so the counts never drift. Scoped to
-        ``user_id``; another user's progress is never returned. Readable on a
-        published or archived roadmap, so a follower keeps reading an archived
-        roadmap they follow."""
+        ``user_id``; another user's progress is never returned. Trackable on a
+        published roadmap, or an archived one the caller already follows (an
+        archived roadmap keeps its existing followers)."""
         roadmap = await self._require_trackable_readable(user_id, roadmap_id)
         progress = await self._load_or_empty(user_id, roadmap_id)
         return summarize(roadmap, progress, detailed=detailed)
@@ -101,9 +102,10 @@ class ProgressService:
         Idempotent on retry: setting the same items to the same state twice is a
         no-op beyond the timestamp. A foreign or nonexistent item id is a 422 and
         applies nothing (all-or-nothing validation before any write). Upserts the
-        caller's private record, so the first update also starts following.
-        Trackable on a published or archived roadmap (an archived roadmap's
-        followers keep updating their progress).
+        caller's private record, so the first update on a **published** roadmap
+        also starts following. On an **archived** roadmap only an existing follower
+        may update (the guard refuses a caller with no record, so the upsert never
+        creates a new follower).
         """
         roadmap = await self._require_trackable_readable(user_id, roadmap_id)
         self._reject_foreign_items(roadmap, roadmap_id, item_ids)
@@ -135,7 +137,7 @@ class ProgressService:
 
         Computed server-side in :func:`progress.next.compute` (spec section 07),
         never delegated to the agent. Scoped to the caller's progress. Trackable
-        on a published or archived roadmap."""
+        on a published roadmap, or an archived one the caller already follows."""
         roadmap = await self._require_trackable_readable(user_id, roadmap_id)
         progress = await self._load_or_empty(user_id, roadmap_id)
         return compute_next(roadmap, progress)
@@ -175,13 +177,20 @@ class ProgressService:
         return roadmap
 
     async def _require_trackable_readable(self, user_id: str, roadmap_id: str) -> Roadmap:
-        """Readable **and** trackable (``published`` *or* ``archived``): the guard
-        for reading / updating progress and computing next.
+        """Readable **and** trackable: the guard for reading / updating progress and
+        computing next.
 
-        Archiving hides a roadmap from discovery but must not break its existing
-        followers, so a follower keeps reading, updating, and computing next on an
-        archived roadmap they follow (spec section 04). Only a ``draft`` is not
-        trackable (a draft is not startable) and raises ``Conflict``.
+        A published roadmap is trackable by any reader (owner, or public). An
+        archived roadmap is **closed to new participation**: only a caller who
+        already has a progress record (an existing follower) may read/update/track
+        it, and no new progress row is ever created on it (this is what keeps
+        ``count_followers`` stable for the owner's delete guard, and mirrors
+        :meth:`follow`, which blocks a fresh follow on an archived roadmap). A
+        ``draft`` is not trackable at all (a draft is not startable).
+
+        Readability is checked first (:meth:`_load_readable`), so a private roadmap
+        the caller does not own is a 404 with no existence leak before any status
+        or followership signal is exposed.
         """
         roadmap = await self._load_readable(user_id, roadmap_id)
         if roadmap.status is RoadmapStatus.DRAFT:
@@ -190,7 +199,21 @@ class ProgressService:
                 "tracked.",
                 instance=f"/roadmaps/{roadmap_id}",
             )
+        if roadmap.status is RoadmapStatus.ARCHIVED and not await self._is_follower(
+            user_id, roadmap_id
+        ):
+            # Archived gains no new followers: a caller with no existing progress
+            # record cannot start tracking it (a write here would create a phantom
+            # follower via the upsert). New follows are already blocked by follow().
+            raise Conflict(
+                f"Roadmap '{roadmap_id}' is archived; only its existing followers can track it.",
+                instance=f"/roadmaps/{roadmap_id}",
+            )
         return roadmap
+
+    async def _is_follower(self, user_id: str, roadmap_id: str) -> bool:
+        """Whether the caller already has a progress record for the roadmap."""
+        return await self._progress.get(user_id, roadmap_id) is not None
 
     def _reject_foreign_items(self, roadmap: Roadmap, roadmap_id: str, item_ids: list[str]) -> None:
         """Reject any item id not defined in this roadmap (422, applies nothing)."""

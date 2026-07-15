@@ -276,3 +276,36 @@ async def test_read_of_an_archived_private_roadmap_by_a_non_follower_is_a_404_no
         await service.get(_FOLLOWER, archived.id, detailed=True)
     with pytest.raises(NotFound):
         await service.get_next(_FOLLOWER, archived.id)
+
+
+async def test_update_on_a_public_archived_roadmap_by_a_non_follower_creates_no_follower() -> None:
+    # The phantom-follower guard: a non-follower's update on a PUBLIC archived
+    # roadmap is refused before any write, so the upsert cannot mint a new
+    # progress row (which would be a new follower and could block the owner's
+    # delete). Archived gains no new followers, via update just as via follow.
+    archived = build_roadmap(status=RoadmapStatus.ARCHIVED, visibility=Visibility.PUBLIC)
+    service, _, progress_repo = _service(archived)
+    with pytest.raises(Conflict):
+        await service.update(_FOLLOWER, archived.id, [CHK_ARRAYS_READ], CompletionState.COMPLETE)
+    # No phantom follower: no row was created and the follower count stays zero.
+    assert await progress_repo.get(_FOLLOWER, archived.id) is None
+    assert await progress_repo.count_followers(archived.id) == 0
+    assert progress_repo.commits == 0
+
+
+async def test_get_next_on_a_public_archived_roadmap_by_a_non_follower_is_a_409() -> None:
+    # A non-follower cannot start tracking an archived roadmap, so get_next is
+    # refused too (archived is closed to new participation).
+    archived = build_roadmap(status=RoadmapStatus.ARCHIVED, visibility=Visibility.PUBLIC)
+    service, _, _ = _service(archived)
+    with pytest.raises(Conflict):
+        await service.get_next(_FOLLOWER, archived.id)
+
+
+async def test_get_on_a_public_archived_roadmap_by_a_non_follower_is_a_409() -> None:
+    # Consistent with update/get_next: a non-follower cannot track an archived
+    # roadmap. (A private archived roadmap is a 404 first; this one is public.)
+    archived = build_roadmap(status=RoadmapStatus.ARCHIVED, visibility=Visibility.PUBLIC)
+    service, _, _ = _service(archived)
+    with pytest.raises(Conflict):
+        await service.get(_FOLLOWER, archived.id, detailed=True)
