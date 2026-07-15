@@ -83,7 +83,18 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     RouteKey(method="GET", path="/me/clients"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="DELETE", path="/me/clients/{client_id}"): AccessLevel.EXTERNAL_COOKIE,
 }
-INTERNAL_ROUTE_ACCESS: RouteRegistry = {}
+# Internal app routes (:8001), reachable only by the MCP server on compute-net.
+# Every route resolves identity via require_internal_user (the trusted X-User-ID
+# header behind INTERNAL_API_TOKEN), so all are INTERNAL_TRUSTED. These mirror the
+# external roadmap surface op-for-op (see wren.roadmaps.api_internal); the MCP
+# tools (Tickets 21/22) are thin clients of exactly these endpoints.
+INTERNAL_ROUTE_ACCESS: RouteRegistry = {
+    RouteKey(method="POST", path="/roadmaps"): AccessLevel.INTERNAL_TRUSTED,
+    RouteKey(method="GET", path="/roadmaps/{roadmap_id}"): AccessLevel.INTERNAL_TRUSTED,
+    RouteKey(method="PATCH", path="/roadmaps/{roadmap_id}"): AccessLevel.INTERNAL_TRUSTED,
+    RouteKey(method="POST", path="/roadmaps/{roadmap_id}:validate"): AccessLevel.INTERNAL_TRUSTED,
+    RouteKey(method="POST", path="/roadmaps/{roadmap_id}:publish"): AccessLevel.INTERNAL_TRUSTED,
+}
 
 # OpenAPI operation keys that are HTTP methods (a path item also carries non-method
 # keys such as "parameters").
