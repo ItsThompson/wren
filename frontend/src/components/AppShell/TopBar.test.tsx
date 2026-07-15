@@ -15,7 +15,7 @@ describe('TopBar', () => {
     expect(dashboard).toHaveAttribute('href', '/dashboard')
 
     const profile = screen.getByRole('link', { name: 'Profile' })
-    expect(profile).toHaveAttribute('href', '/profile')
+    expect(profile).toHaveAttribute('href', '/user/ada')
 
     expect(screen.getByRole('button', { name: 'Open account menu' })).toBeInTheDocument()
   })
@@ -26,5 +26,13 @@ describe('TopBar', () => {
     const header = container.querySelector('header')
     expect(header).toHaveClass('bg-card', 'border-b', 'border-border')
     expect(container.querySelector('aside')).toBeNull()
+  })
+
+  it('hides the personal Dashboard / Profile links when anonymous', () => {
+    renderWithAuth(<TopBar />, { authValue: buildAuthValue({ status: 'anonymous' }) })
+
+    expect(screen.queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Profile' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Log in' })).toBeInTheDocument()
   })
 })

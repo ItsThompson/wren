@@ -44,7 +44,11 @@ describe('AvatarMenu', () => {
     )
     expect(screen.getByRole('menuitem', { name: /your profile/i })).toHaveAttribute(
       'href',
-      '/profile',
+      '/user/ada',
+    )
+    expect(screen.getByRole('menuitem', { name: /connected agents/i })).toHaveAttribute(
+      'href',
+      '/settings/connections',
     )
     expect(screen.getByRole('menuitem', { name: /log out/i })).toBeInTheDocument()
   })

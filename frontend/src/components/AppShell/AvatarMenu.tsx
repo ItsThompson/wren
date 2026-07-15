@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router'
-import { LayoutDashboard, LogOut, User } from 'lucide-react'
+import { LayoutDashboard, LogOut, Plug, User } from 'lucide-react'
 
 import { useAuth } from '@/auth'
 import {
@@ -58,9 +58,15 @@ export function AvatarMenu() {
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link to="/profile">
+          <Link to={`/user/${user.username}`}>
             <User />
             Your profile
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/settings/connections">
+            <Plug />
+            Connected agents
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
