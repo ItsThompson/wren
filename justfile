@@ -33,6 +33,29 @@ lint-backend:
 fmt-backend:
     cd backend && uv run ruff format . && uv run ruff check --fix .
 
+# --- MCP server -------------------------------------------------------------
+
+# Install MCP server dependencies (creates mcp/.venv from uv.lock)
+setup-mcp:
+    cd mcp && uv sync
+
+# Boot the MCP Resource Server (:9000) with autoreload. Also used by the MCP
+# Inspector to attach during development (spec section 07).
+dev-mcp:
+    cd mcp && uv run uvicorn wren_mcp.main:app --host 127.0.0.1 --port 9000 --reload
+
+# Run MCP server tests with coverage
+test-mcp:
+    cd mcp && uv run pytest
+
+# Lint the MCP server (ruff check + format check + mypy)
+lint-mcp:
+    cd mcp && uv run ruff check . && uv run ruff format --check . && uv run mypy
+
+# Format the MCP server
+fmt-mcp:
+    cd mcp && uv run ruff format . && uv run ruff check --fix .
+
 # --- Infra & migrations -----------------------------------------------------
 
 # Bring up local dev infrastructure (Postgres; observability added later)
