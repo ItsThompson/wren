@@ -17,7 +17,7 @@ interface AuthProviderProps {
 }
 
 /**
- * Owns the session and transparent refresh (section 10 view tree) and publishes
+ * Owns the session and transparent refresh, and publishes
  * `status`/`user` plus the register/login/logout actions to the tree via context.
  */
 export function AuthProvider({ children, baseUrl = API_BASE_URL }: AuthProviderProps) {

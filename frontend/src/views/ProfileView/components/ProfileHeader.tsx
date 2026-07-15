@@ -4,7 +4,7 @@ interface ProfileHeaderProps {
 }
 
 /**
- * The profile header (design language §8 Profile): the display name set in the
+ * The profile header: the display name set in the
  * warm Fraunces serif (the one human moment on the page) with the handle beneath
  * it in monospace.
  */

@@ -76,7 +76,7 @@ describe('DashboardView', () => {
     expect(screen.getByText('Systems Design')).toBeInTheDocument()
     expect(screen.getByText('Rust in Practice')).toBeInTheDocument()
 
-    // Status badges follow section 09 §7.9 (label carries meaning, not color alone).
+    // Status badges: the label carries meaning, not color alone.
     expect(screen.getByText('Draft')).toBeInTheDocument()
     expect(screen.getAllByText('Published').length).toBe(2)
     expect(screen.getByText('Private')).toBeInTheDocument()

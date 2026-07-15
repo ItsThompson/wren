@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 /**
  * Public landing (usewren.com): accent-forward. A Fraunces display-xl hero on
  * bone, one terracotta CTA, and a terracotta showcase block, with generous
- * whitespace (§8 Landing). No API calls: this is the loud showcase.
+ * whitespace. No API calls: this is the loud showcase.
  */
 export function LandingView() {
   return (

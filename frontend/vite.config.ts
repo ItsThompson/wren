@@ -20,7 +20,7 @@ export default defineConfig({
       // Vitest v4 measures every file matched by `include` by default (no `all`
       // flag needed; the v3 `coverage.all` option was removed), so the 70% floor
       // accounts for untested modules and cannot be gamed by omitting a file's
-      // tests (Ticket 30 / #5 review). Excludes below carve out non-source
+      // tests. Excludes below carve out non-source
       // (types, entry, vendored primitives, dev-only mocks).
       reporter: ['text-summary', 'text'],
       include: ['src/**/*.{ts,tsx}'],
@@ -34,8 +34,8 @@ export default defineConfig({
         'src/mocks/**', // dev-only MSW harness
       ],
       // Frontend floor from the testing strategy, enforced both
-      // locally (`npm run test:coverage`) and in CI (`test-frontend` job,
-      // Ticket 30). vitest exits non-zero below the floor, failing the build.
+      // locally (`npm run test:coverage`) and in CI (`test-frontend` job).
+      // vitest exits non-zero below the floor, failing the build.
       thresholds: {
         lines: 70,
       },

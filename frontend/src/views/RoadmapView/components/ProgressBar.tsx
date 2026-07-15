@@ -1,14 +1,14 @@
 interface ProgressBarProps {
   checked: number
   total: number
-  /** `roadmap` bars are 8px, `section` bars 6px (section 09 progress spec). */
+  /** `roadmap` bars are 8px, `section` bars 6px. */
   variant?: 'roadmap' | 'section'
   /** Accessible name for the bar (never color/number alone). */
   label: string
 }
 
 /**
- * A completion bar (section 09 "Progress"): full-pill `muted` track, solid
+ * A completion bar: full-pill `muted` track, solid
  * terracotta fill, percent in mono tabular numerals. Bars appear only at roadmap
  * and section level: subsections and items never get one.
  */

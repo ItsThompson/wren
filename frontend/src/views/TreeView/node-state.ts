@@ -3,8 +3,7 @@ import { isSubsectionDone } from '@/views/RoadmapView/progress-derive'
 import { NODE_STATE, type NodeState, type Subsection } from './types'
 
 /**
- * Derive a tree node's soft state from the caller's progress (spec section 08 /
- * ticket 24):
+ * Derive a tree node's soft state from the caller's progress:
  *
  * - **done**: the subsection's own items are all checked. Delegates to the list
  *   view's canonical `isSubsectionDone`, so the tree and list always agree on

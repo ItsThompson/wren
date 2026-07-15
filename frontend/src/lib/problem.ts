@@ -4,8 +4,8 @@ import type { components } from '@/api'
 export type Violation = components['schemas']['Violation']
 
 /**
- * The RFC 9457 `application/problem+json` body every Wren error renders (spec
- * section 06, backend `core/errors.py`). The generated client types error bodies
+ * The RFC 9457 `application/problem+json` body every Wren error renders (backend
+ * `core/errors.py`). The generated client types error bodies
  * only as the default validation shape, so this is the canonical client-side
  * mirror of the backend `ProblemDetail` wire contract. `code` is the branch key:
  * `STALE_REVISION` -> re-read, `IMMUTABLE` -> fork-to-change, `VALIDATION` ->

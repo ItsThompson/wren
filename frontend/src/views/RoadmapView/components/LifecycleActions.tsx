@@ -10,8 +10,8 @@ interface LifecycleActionsProps {
 }
 
 /**
- * The owner-only web-only lifecycle bar (section 06/08; design language section
- * 09.1 destructive = brick fill, confirm-gated): a visibility toggle plus the
+ * The owner-only web-only lifecycle bar (destructive = brick fill,
+ * confirm-gated): a visibility toggle plus the
  * confirm-gated archive and delete actions. No agent surface exists for any of
  * these; they are human-web only.
  *

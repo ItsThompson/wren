@@ -6,8 +6,7 @@ import { NODE_HEIGHT, NODE_WIDTH } from './constants'
 import type { TreeNode } from './types'
 
 /**
- * Compute a layered top-down layout for the tree with dagre (spec section 08 /
- * section 11: React Flow + dagre is the recorded decision). Pure and DOM-free:
+ * Compute a layered top-down layout for the tree with dagre. Pure and DOM-free:
  * dagre positions nodes purely from the given fixed box size + prerequisite
  * edges, so this runs identically in the browser and under jsdom (no real layout
  * needed to test it).

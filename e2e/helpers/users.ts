@@ -7,10 +7,9 @@ export interface TestUser {
 let sequence = 0
 
 /**
- * A fresh, unique user per call so the suite's per-test users never collide
- * (spec section 13: "per-test unique users"). The handle is lowercase
- * alphanumeric to satisfy username validation; the email derives from it so it
- * is unique too.
+ * A fresh, unique user per call so the suite's per-test users never collide.
+ * The handle is lowercase alphanumeric to satisfy username validation; the
+ * email derives from it so it is unique too.
  */
 export function uniqueUser(role = 'user'): TestUser {
   sequence += 1

@@ -1,8 +1,7 @@
 # Wren E2E (Playwright)
 
 End-to-end tests that drive the **study spine** (register → create → publish →
-follow → track) against a live, containerized Wren stack. See spec section 13
-for the testing strategy this suite implements.
+follow → track) against a live, containerized Wren stack.
 
 ## Design
 

@@ -27,8 +27,8 @@ interface RoadmapListViewProps {
 }
 
 /**
- * The published-roadmap list view with progress tracking (section 10 "List
- * view"): the header (title, subject tags, overall progress bar, deadline
+ * The published-roadmap list view with progress tracking: the header (title,
+ * subject tags, overall progress bar, deadline
  * countdown, List/Tree tabs), track-tag filter chips, then sections in
  * `section_order`, each with its own bar and interactive checklist. Checking an
  * item persists to the caller's progress record and the bars + subsection

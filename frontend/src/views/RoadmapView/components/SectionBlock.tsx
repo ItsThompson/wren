@@ -26,7 +26,7 @@ interface SectionBlockProps {
 
 /**
  * One section header plus its subsections, rendered in `suggested_path` order
- * with a `subsection_order` fallback (section 10 "List view"). When tracking, a
+ * with a `subsection_order` fallback. When tracking, a
  * per-section progress bar sits under the header; subsections never get a bar.
  * An active track-tag filter narrows which subsections show (hiding the whole
  * section when none match); the current-"next" subsection is highlighted.

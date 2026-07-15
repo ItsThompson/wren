@@ -20,7 +20,7 @@ interface ConnectedClientsViewProps {
 }
 
 /**
- * ConnectedClientsView (section 08 `/me/clients`): the connected-agents
+ * ConnectedClientsView (`/me/clients`): the connected-agents
  * management surface. It lists the agents the signed-in user has authorized and
  * lets them revoke access. Fetching is gated on an authenticated session; the
  * body routes loading / anonymous / error / empty / loaded states inside a

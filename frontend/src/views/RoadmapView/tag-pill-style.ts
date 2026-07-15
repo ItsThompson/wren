@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import { colorForTag } from '@/lib/tag-color'
 
 /**
- * The section-09 track-tag pill style, computed from the shared hash
+ * The track-tag pill style, computed from the shared hash
  * palette: background = the tag's hue mixed ~16% into `card`, text = the hue
  * mixed ~72% into `foreground`. The hue itself comes from the canonical
  * `colorForTag` util (never re-derived here), so a given tag always renders in

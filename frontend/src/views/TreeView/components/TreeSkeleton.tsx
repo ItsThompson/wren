@@ -1,6 +1,5 @@
 /**
- * Loading placeholder for the tree view. Ticket 26 harmonizes the loading
- * pattern across every view; this is the basic in-view state until then.
+ * Loading placeholder for the tree view.
  */
 export function TreeSkeleton() {
   return (

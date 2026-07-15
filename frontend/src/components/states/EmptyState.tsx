@@ -10,7 +10,7 @@ interface EmptyStateProps {
 }
 
 /**
- * The design-language empty-state pattern: one Fraunces
+ * The empty-state pattern: one Fraunces
  * `display-m` line, a muted sub-line, and at most one primary action. The single
  * place Fraunces + warmth shine in a dense app; keep the copy encouraging. Shared
  * across every view so empty states read consistently.

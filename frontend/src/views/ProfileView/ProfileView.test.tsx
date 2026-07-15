@@ -9,7 +9,7 @@ import { ProfileView } from './ProfileView'
 
 const BASE = 'https://api.test'
 
-/** RFC 9457 problem-details 404, matching the section-06 error contract. */
+/** RFC 9457 problem-details 404. */
 function notFound(handle: string) {
   return HttpResponse.json(
     {

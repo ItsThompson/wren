@@ -4,7 +4,7 @@ import type { components } from '@/api'
 
 /**
  * Tree-view read types, sourced from the OpenAPI-generated client (never
- * hand-written; section 06/10 codegen contract). The tree consumes the full
+ * hand-written; the codegen contract). The tree consumes the full
  * `GET /roadmaps/{id}` document (subsections carry `prereq_ids`, the DAG edges)
  * plus the caller's progress snapshot for done-state.
  */

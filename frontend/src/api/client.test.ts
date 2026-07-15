@@ -9,8 +9,8 @@ import type { MockDashboard } from '@/mocks/types'
 
 /**
  * The generated `paths` now holds the /auth routes, but `/me/dashboard` is a
- * dev-harness mock route not yet in the schema (dashboard lands in Ticket 25),
- * so this test casts the client to a minimal path shape at the boundary to prove
+ * dev-harness mock route not yet in the schema, so this test casts the client
+ * to a minimal path shape at the boundary to prove
  * the factory wires openapi-fetch: it issues a request to the configured base
  * URL and parses the JSON response. Real product reads are typed from
  * `schema.d.ts` as their endpoints land.

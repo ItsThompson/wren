@@ -15,7 +15,7 @@ interface WarningBannerProps {
  * write contract: stale-revision re-read, the immutable
  * fork-to-change prompt, and publish hard-block violations. Meaning is carried by
  * the lucide alert icon AND the heading text, with ochre only as reinforcement,
- * so it is never encoded by color alone (§9/§10 accessibility). `role="alert"`
+ * so it is never encoded by color alone. `role="alert"`
  * announces it to assistive tech. Compose it via the specific notices rather than
  * using it directly.
  */

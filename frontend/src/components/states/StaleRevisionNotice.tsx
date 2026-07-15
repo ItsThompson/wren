@@ -9,10 +9,9 @@ interface StaleRevisionNoticeProps {
 }
 
 /**
- * The 409 `STALE_REVISION` re-read prompt (spec section 09 §3.4, section 12,
- * US-ERR-01). A first-class UI state, not a generic failure toast: an ochre
- * banner telling the user their view is stale, plus a refetch action to reload
- * before continuing.
+ * The 409 `STALE_REVISION` re-read prompt. A first-class UI state, not a generic
+ * failure toast: an ochre banner telling the user their view is stale, plus a
+ * refetch action to reload before continuing.
  */
 export function StaleRevisionNotice({ detail, onReload }: StaleRevisionNoticeProps) {
   return (

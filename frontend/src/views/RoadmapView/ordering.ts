@@ -1,8 +1,8 @@
 import type { Section } from './types'
 
 /**
- * The order subsections render within a section (section 04 "Ordering",
- * section 10 "List view"): pedagogical `suggested_path` order first, then any
+ * The order subsections render within a section: pedagogical `suggested_path`
+ * order first, then any
  * subsection not yet in the path in its structural `subsection_order` position.
  *
  * For a published roadmap `suggested_path` covers every subsection exactly once,

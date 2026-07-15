@@ -12,8 +12,8 @@ import {
 import type { MockProgressUpdateResult } from './types'
 
 /**
- * MSW request handlers for the zero-backend dev harness (section 11 "Local
- * development", `npm run dev:mock`). Paths mirror the section-06 REST surface
+ * MSW request handlers for the zero-backend dev harness (`npm run dev:mock`).
+ * Paths mirror the REST surface
  * and are prefixed with `*` so they match regardless of the client's API base
  * URL (relative in dev, absolute against `api.usewren.com` in prod).
  *
@@ -24,7 +24,7 @@ import type { MockProgressUpdateResult } from './types'
 
 const LATENCY_MS = 120
 
-/** RFC 9457 problem-details body, matching the section-06 error contract. */
+/** RFC 9457 problem-details body. */
 function notFound(instance: string) {
   return HttpResponse.json(
     {
@@ -39,7 +39,7 @@ function notFound(instance: string) {
 }
 
 export const handlers = [
-  // --- auth (section 06 external-only) ---
+  // --- auth (external-only) ---
   // The mock harness starts anonymous: refresh has no session to resume. Login
   // and register return the demo user so the authed shell can be exercised.
   http.post('*/auth/refresh', () => new HttpResponse(null, { status: 401 })),

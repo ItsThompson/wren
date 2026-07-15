@@ -11,9 +11,9 @@ const ACTIVE_TAB = 'bg-accent text-accent-foreground'
 const INACTIVE_TAB = 'text-muted-foreground no-underline hover:text-foreground'
 
 /**
- * The List/Tree view switcher shared by both roadmap views (spec section 10
- * "RoadmapView ... tab: list | tree"). The active view renders as a static
- * segment (`aria-current="page"`) and the other as a real `<Link>`, giving both
+ * The List/Tree view switcher shared by both roadmap views. The active view
+ * renders as a static segment (`aria-current="page"`) and the other as a real
+ * `<Link>`, giving both
  * directions (List->Tree and Tree->List) one consistent entry point.
  */
 export function RoadmapViewTabs({ roadmapId, active }: RoadmapViewTabsProps) {

@@ -5,8 +5,8 @@ import { isStaleRevision, toProblem } from '@/lib/problem'
 import type { ProgressNotice } from '../types'
 
 /**
- * Fetch and mutate the caller's progress for one published roadmap (section 10
- * "Data fetching", section 06/07 progress endpoints). Uses the session-aware
+ * Fetch and mutate the caller's progress for one published roadmap. Uses the
+ * session-aware
  * client (credentials + transparent refresh), so the record resolves for the
  * signed-in user and is scoped to them server-side.
  *

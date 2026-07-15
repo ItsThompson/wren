@@ -4,7 +4,7 @@ import { createSessionClient } from '@/auth/createSessionClient'
 import type { DashboardState } from '../types'
 
 /**
- * Owns the private dashboard fetch (section 02 US-ACCT-03, `GET /me/dashboard`):
+ * Owns the private dashboard fetch (`GET /me/dashboard`):
  * the caller's authored roadmaps (any status) plus the ones they follow. Uses the
  * session-aware client (credentials + transparent refresh), so the backend scopes
  * the response to the resolved session user; another user's dashboard is never

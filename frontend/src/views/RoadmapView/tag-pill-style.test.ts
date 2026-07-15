@@ -8,7 +8,7 @@ function styleOf(tag: string): Record<string, string> {
 
 describe('tagPillStyle', () => {
   it('exposes the tag hue from the shared palette as --tag-hue', () => {
-    // 'arrays' hashes to palette index 8 (#B05A72) per the section-09 oracle.
+    // 'arrays' hashes to palette index 8 (#B05A72) per the reference oracle.
     expect(styleOf('arrays')['--tag-hue']).toBe('#B05A72')
     expect(styleOf('arrays')['--tag-hue']).toBe(colorForTag('arrays'))
   })

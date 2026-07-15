@@ -27,8 +27,7 @@ interface TreeViewProps {
  * and shown by color + icon; clicking a node navigates to that subsection in the
  * list view. It owns its own roadmap + progress fetch and renders standalone at
  * `/roadmaps/{id}/tree` (a sibling route to the list view). Loading / empty /
- * error use the shared state surfaces so the tree reads like the rest of the app
- * (ticket 26).
+ * error use the shared state surfaces so the tree reads like the rest of the app.
  */
 export function TreeView({ baseUrl = API_BASE_URL }: TreeViewProps) {
   const { roadmapId } = useParams()
@@ -44,8 +43,8 @@ export function TreeView({ baseUrl = API_BASE_URL }: TreeViewProps) {
   if (state.phase === 'loading') return <TreeSkeleton />
 
   if (state.phase === 'error') {
-    // A 404/403 is indistinguishable by design (no-existence-leak convention,
-    // section 10); a network failure lands here too. One calm dedicated view.
+    // A 404/403 is indistinguishable by design (no-existence-leak convention);
+    // a network failure lands here too. One calm dedicated view.
     return (
       <ErrorState
         title="Roadmap not found"

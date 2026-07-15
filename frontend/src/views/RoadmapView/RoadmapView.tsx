@@ -22,14 +22,14 @@ interface RoadmapViewProps {
 }
 
 /**
- * RoadmapView (section 10 view tree): fetches a roadmap by the route `:roadmapId`
+ * RoadmapView: fetches a roadmap by the route `:roadmapId`
  * and routes loading / error / loaded. A draft the caller owns renders in
- * read-only preview mode with the publish action (section 10 "Preview mode"); a
+ * read-only preview mode with the publish action; a
  * published roadmap renders the list view with progress tracking. Both surface
- * the fork action (any reader) and the owner-only presentation-metadata edit
- * (section 05); ownership is the signed-in user matching `roadmap.owner`. A 409
+ * the fork action (any reader) and the owner-only presentation-metadata edit;
+ * ownership is the signed-in user matching `roadmap.owner`. A 409
  * write conflict (stale re-read / immutable fork-to-change) surfaces as a shared
- * ochre prompt above the view (section 12, US-ERR-01/03).
+ * ochre prompt above the view.
  */
 export function RoadmapView({ baseUrl = API_BASE_URL }: RoadmapViewProps) {
   const { roadmapId } = useParams()

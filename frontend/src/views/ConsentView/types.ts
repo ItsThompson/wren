@@ -1,5 +1,5 @@
 /**
- * State shapes for the OAuth consent flow (section 08 SPA-rendered consent).
+ * State shapes for the OAuth consent flow (SPA-rendered consent).
  *
  * The consent screen has two independent async concerns: loading the parked
  * request's context (client name + requested scopes, keyed by the opaque

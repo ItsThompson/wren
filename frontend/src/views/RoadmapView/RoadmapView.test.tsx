@@ -1138,7 +1138,7 @@ describe('RoadmapView states (loading/empty/error, 409/422, tabs, anchor)', () =
     const checkbox = await screen.findByRole('checkbox', { name: 'Read the walkthrough' })
     fireEvent.click(checkbox)
 
-    // A failed persist is announced (US-ERR: never a silent revert) ...
+    // A failed persist is announced (never a silent revert) ...
     expect(await screen.findByRole('status')).toHaveTextContent(/couldn.t save that change/i)
     // ... and the optimistic check is rolled back.
     await waitFor(() => expect(checkbox).not.toBeChecked())

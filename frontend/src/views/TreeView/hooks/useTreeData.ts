@@ -5,8 +5,8 @@ import { createSessionClient } from '@/auth/createSessionClient'
 import type { TreeDataState } from '../types'
 
 /**
- * Fetch everything the tree view needs for one roadmap (spec section 10 "Data
- * fetching"): the full roadmap document (subsections + `prereq_ids`, the graph)
+ * Fetch everything the tree view needs for one roadmap: the full roadmap
+ * document (subsections + `prereq_ids`, the graph)
  * and the caller's progress snapshot (for done-state). Uses the session-aware
  * client (credentials + transparent refresh), so a private draft resolves for
  * its owner and returns an error to anyone else.

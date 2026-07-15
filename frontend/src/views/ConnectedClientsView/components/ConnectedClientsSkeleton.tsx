@@ -1,5 +1,5 @@
 /**
- * Loading skeleton for the connected-agents list (section 10 "Loading" state): a
+ * Loading skeleton for the connected-agents list: a
  * couple of muted placeholder rows standing in for client cards.
  */
 export function ConnectedClientsSkeleton() {

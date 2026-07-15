@@ -14,8 +14,8 @@ import { uniqueUser } from '../helpers/users'
 
 /**
  * The study spine over the live stack: register -> create -> publish -> follow
- * -> track (spec section 13 smoke #1, #5, #6). Seeded via the APIRequestContext
- * helper; each test mints its own unique users.
+ * -> track. Seeded via the APIRequestContext helper; each test mints its own
+ * unique users.
  */
 test.describe('study spine (register -> create -> publish -> follow -> track)', () => {
   test('a follower can study a published roadmap end to end', async ({ playwright }) => {

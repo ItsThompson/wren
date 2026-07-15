@@ -25,8 +25,8 @@ export function flattenSubsections(roadmap: Roadmap): Subsection[] {
 }
 
 /**
- * Build the tree graph from the roadmap document + the caller's checked set
- * (spec section 08). Subsections become nodes carrying their derived soft-state
+ * Build the tree graph from the roadmap document + the caller's checked set.
+ * Subsections become nodes carrying their derived soft-state
  * and a list-view navigation target; `prereq_ids` become edges pointing from the
  * prerequisite down to the dependent (source = prereq, target = dependent) for
  * the layered top-down layout. Dangling prereq ids (targets of a removed node)

@@ -8,7 +8,7 @@ interface DashboardSectionProps {
 }
 
 /**
- * One titled dashboard section ("Yours" or "Following", section 09 §7.9). Renders
+ * One titled dashboard section ("Yours" or "Following"). Renders
  * the roadmap-card grid, or a quiet muted line when this particular list is empty
  * (the whole-dashboard empty state is handled a level up).
  */

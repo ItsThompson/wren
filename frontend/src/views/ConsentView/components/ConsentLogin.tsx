@@ -8,8 +8,8 @@ interface ConsentLoginProps {
 }
 
 /**
- * The login-first gate of the consent flow (section 08: "prompt login if there
- * is no session, then return to the decision"). Reuses the canonical auth forms
+ * The login-first gate of the consent flow: prompt login if there
+ * is no session, then return to the decision. Reuses the canonical auth forms
  * so the login/register logic is not duplicated, wrapped in consent-specific
  * framing. On success the `AuthProvider` flips to authenticated and the parent
  * `ConsentView` re-renders straight into the decision, keeping the human on this

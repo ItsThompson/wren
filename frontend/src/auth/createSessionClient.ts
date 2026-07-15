@@ -6,7 +6,7 @@ import type { paths } from '@/api'
 const AUTH_PREFIX = '/auth/'
 
 /**
- * Build the session-aware API client (section 10 "Data fetching").
+ * Build the session-aware API client.
  *
  * `credentials: 'include'` sends and stores the session cookie across the
  * SPA/API subdomains (cookie `Domain=.usewren.com`). A response middleware makes

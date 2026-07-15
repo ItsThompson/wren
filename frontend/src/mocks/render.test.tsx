@@ -10,8 +10,8 @@ import { mockRoadmap } from './data'
 
 /**
  * A runtime proof that the dev:mock fixtures render populated views: mounts the
- * real RoadmapView against the actual MSW handlers + fixtures. Before ticket 26
- * the fixtures used a pre-schema array shape, so `sections[id]` was undefined and
+ * real RoadmapView against the actual MSW handlers + fixtures. The fixtures
+ * previously used a pre-schema array shape, so `sections[id]` was undefined and
  * dev:mock rendered empty; this locks in that the generated-schema fixtures paint
  * real content.
  */

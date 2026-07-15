@@ -3,7 +3,7 @@ import createClient, { type Client } from 'openapi-fetch'
 import type { paths } from './schema'
 
 /**
- * Typed API client (section 10 "Data fetching").
+ * Typed API client.
  *
  * `openapi-fetch` turns the generated OpenAPI `paths` into one typed call per
  * endpoint over a single generic fetch (`client.GET("/roadmaps/{id}", ...)`),

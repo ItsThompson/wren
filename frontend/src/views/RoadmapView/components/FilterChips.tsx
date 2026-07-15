@@ -10,10 +10,10 @@ interface FilterChipsProps {
 }
 
 /**
- * The track-tag filter chips above the sections (section 10 "List view",
- * section 09 §7.4). Each chip reuses the track-tag pill look ({@link tagPillStyle});
- * the active chip switches to the LOUD accent tint + terracotta text (§9 accent
- * placement: an active filter is a loud surface). Selecting the active chip
+ * The track-tag filter chips above the sections. Each chip reuses the track-tag
+ * pill look ({@link tagPillStyle});
+ * the active chip switches to the LOUD accent tint + terracotta text (an active
+ * filter is a loud surface). Selecting the active chip
  * again clears the filter and restores every subsection. Nothing renders when a
  * roadmap has no track tags.
  */

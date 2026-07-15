@@ -14,7 +14,7 @@ interface NodeCardProps {
    */
   progress?: ProgressBinding
   /**
-   * The current "next" node (from `GET /next`, section 07/Ticket 17). The one
+   * The current "next" node (from `GET /next`). The one
    * next subsection gets the accent-tinted highlight: an accent-tint
    * surface, an accent-tint left border, and the reserved faint shadow.
    */
@@ -22,8 +22,7 @@ interface NodeCardProps {
 }
 
 /**
- * One subsection ("node") in the list view (section 10 "List view" / NodeCard):
- * title, effort, hash-colored track-tag pills, description, resources as real
+ * One subsection ("node") in the list view: title, effort, hash-colored track-tag pills, description, resources as real
  * `<a href>` links, and the checklist. When a progress binding is passed the
  * checklist rows are interactive and the subsection shows its derived done-state
  * (olive check + border tint, no bar); without one the checklist is read-only.
@@ -37,9 +36,8 @@ export function NodeCard({ subsection, progress, isNext = false }: NodeCardProps
   const tags = subsection.tags ?? []
   const done = progress ? isSubsectionDone(subsection, progress.checkedIds) : false
   const borderClass = done ? 'border-success/50' : 'border-border'
-  // §7.2 "next" card: accent-tint surface + accent-tint left border + the
-  // reserved faint shadow (the specific component spec, not the general §9
-  // loud-map, governs the border color; the surface tint carries the emphasis).
+  // "next" card: accent-tint surface + accent-tint left border + the
+  // reserved faint shadow. The surface tint carries the emphasis.
   // `aria-current="step"` announces it as the current step (never color alone).
   const nextClass = isNext
     ? 'border-l-4 border-l-accent bg-accent shadow-[0_1px_2px_rgba(33,26,21,0.06),0_4px_16px_rgba(33,26,21,0.04)]'

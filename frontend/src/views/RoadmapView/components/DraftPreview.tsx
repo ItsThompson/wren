@@ -14,10 +14,10 @@ interface DraftPreviewProps {
 }
 
 /**
- * The owned-draft preview (section 10 "Preview mode"): a header with the title,
+ * The owned-draft preview: a header with the title,
  * subject-tag chips, and a clear draft badge, then the sections in
  * `section_order` rendered read-only (no interactive checkboxes: a draft is not
- * startable). The owner publishes from here (section 06 `:publish`); on success
+ * startable). The owner publishes from here (`:publish`); on success
  * the RoadmapView routes to the published list view with progress tracking.
  */
 export function DraftPreview({ roadmap, publishState, onPublish, isOwner, actions }: DraftPreviewProps) {

@@ -3,7 +3,7 @@ import type { Roadmap } from './types'
 /**
  * The distinct subsection track tags across a roadmap, in first-appearance
  * order (section_order → subsection_order → tag order). These are the tags that
- * become filter chips above the list view (section 10 "List view"). Subject
+ * become filter chips above the list view. Subject
  * tags are roadmap-level categorization and are never included: only subsection
  * track tags are hash-colored and filterable.
  */

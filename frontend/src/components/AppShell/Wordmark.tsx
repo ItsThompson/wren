@@ -2,7 +2,7 @@ import { Link } from 'react-router'
 
 /**
  * The one place the brand signs its name in Fraunces. Lowercase `wren`, tight
- * tracking, medium weight (§2 Brand). Everything else in the UI is grotesque.
+ * tracking, medium weight. Everything else in the UI is grotesque.
  */
 export function Wordmark() {
   return (

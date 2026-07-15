@@ -12,7 +12,7 @@ interface DagNodeCardProps {
 
 /**
  * Per-state presentation. State is conveyed by color AND icon (distinct shapes:
- * check / circle / lock), never color alone (spec section 09 accessibility); the
+ * check / circle / lock), never color alone; the
  * state word also rides in the link's accessible name for screen readers.
  */
 const STATE_PRESENTATION: Record<

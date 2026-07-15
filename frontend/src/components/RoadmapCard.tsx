@@ -11,8 +11,8 @@ interface RoadmapCardProps {
 }
 
 /**
- * A roadmap summarized as a card for the dashboard and profile grids (spec
- * sections 06/09). The whole card is a real link to the roadmap view; it shows
+ * A roadmap summarized as a card for the dashboard and profile grids. The whole
+ * card is a real link to the roadmap view; it shows
  * the title, the status + visibility badges, and neutral subject-tag chips
  * (subject tags are never hash-colored: only subsection track tags get color).
  */

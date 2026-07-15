@@ -1,5 +1,5 @@
 /**
- * Deterministic tag -> color mapping (design language section 09, "Tag palette").
+ * Deterministic tag -> color mapping.
  *
  * This is a shared DOMAIN TRUTH. Subsection track-tag colors are assigned by
  * hashing the tag string into a fixed 10-hue palette so a given tag always
@@ -8,7 +8,7 @@
  * stay stable). The same hues live as the `--tag-1..10` CSS variables in
  * globals.css; this module is their canonical source in TypeScript.
  *
- * Reproduced verbatim from section 09; do not "improve" the algorithm.
+ * Do not "improve" the algorithm.
  */
 
 /**

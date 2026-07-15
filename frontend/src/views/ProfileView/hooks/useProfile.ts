@@ -4,7 +4,7 @@ import { createApiClient } from '@/api/client'
 import type { ProfileState } from '../types'
 
 /**
- * Owns the public profile fetch (section 02 US-ACCT-03, `GET /users/{handle}`):
+ * Owns the public profile fetch (`GET /users/{handle}`):
  * a handle's published-public roadmaps. Uses the plain (credential-free) client
  * because the profile is public and viewer-agnostic: no session is sent or
  * needed, and the backend never exposes drafts, private roadmaps, or who follows

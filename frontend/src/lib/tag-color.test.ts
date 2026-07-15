@@ -1,12 +1,12 @@
 import { colorForTag, hashString, TAG_PALETTE } from './tag-color'
 
 /**
- * The expected values below are the ground truth from the section-09 reference
+ * The expected values below are the ground truth from the reference
  * algorithm (an independent oracle run), not values copied out of this module.
  * A regression in the hash or a reordered palette must break these assertions.
  */
 describe('TAG_PALETTE', () => {
-  it('has ten hues in the exact, unchanged order from section 09', () => {
+  it('has ten hues in the exact, unchanged order', () => {
     expect(TAG_PALETTE).toEqual([
       '#B06A43',
       '#B8862F',

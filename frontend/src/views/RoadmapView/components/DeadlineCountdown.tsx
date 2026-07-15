@@ -10,7 +10,7 @@ interface DeadlineCountdownProps {
 }
 
 /**
- * The roadmap-header deadline control (section 10 "List view", section 09):
+ * The roadmap-header deadline control:
  * an optional per-user deadline that renders a calm countdown in mono /
  * tabular-nums. It is a COUNTDOWN only: days left, due today, or overdue for a
  * past date, never a behind/ahead pacing signal. A native date

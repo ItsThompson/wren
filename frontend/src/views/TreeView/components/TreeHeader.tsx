@@ -6,8 +6,8 @@ interface TreeHeaderProps {
 }
 
 /**
- * The tree-view header (spec section 10 "RoadmapView owns ... tab: list |
- * tree"). Shows the roadmap title plus the shared List/Tree switcher with Tree
+ * The tree-view header. Shows the roadmap title plus the shared List/Tree
+ * switcher with Tree
  * active, so List links back to the primary reading view at `/roadmaps/{id}`.
  */
 export function TreeHeader({ roadmapId, title }: TreeHeaderProps) {

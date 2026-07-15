@@ -15,8 +15,8 @@ import type {
 } from '../types'
 
 /**
- * Fetch one roadmap by ID for the owner and drive its publish action (section 10
- * "RoadmapView owns roadmap fetch"; section 06 `:publish`). Uses the
+ * Fetch one roadmap by ID for the owner and drive its publish action
+ * (`:publish`). Uses the
  * session-aware client (credentials + transparent refresh), so a private draft
  * resolves for its owner and returns 404/403 to anyone else.
  *

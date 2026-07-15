@@ -9,8 +9,8 @@ import type { ProgressSnapshot, Roadmap, TreeNodeData } from './types'
 import { TreeView } from './TreeView'
 
 /**
- * React Flow performs no real layout under jsdom, so we mock it (per the ticket:
- * test the state-mapping + navigation + node props, not pixel layout). The mock
+ * React Flow performs no real layout under jsdom, so we mock it: we
+ * test the state-mapping + navigation + node props, not pixel layout. The mock
  * renders each node through its registered `nodeTypes` component and exposes the
  * edges + laid-out y so the built graph is assertable end-to-end.
  */

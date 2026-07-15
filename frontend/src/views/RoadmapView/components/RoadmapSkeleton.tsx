@@ -1,5 +1,5 @@
 /**
- * Loading skeleton for the roadmap preview (section 10 "Loading" state): a few
+ * Loading skeleton for the roadmap preview: a few
  * muted placeholder blocks standing in for the header and section cards.
  */
 export function RoadmapSkeleton() {

@@ -26,7 +26,7 @@ function parseTags(raw: string): string[] {
 }
 
 /**
- * The presentation-only metadata editor (section 06 `PATCH /metadata`): edit the
+ * The presentation-only metadata editor (`PATCH /metadata`): edit the
  * three fields that stay mutable after publish (title, description, subject_tags).
  * Structure and lifecycle are never editable here, so the form exposes only these
  * inputs. Seeded from the current roadmap; Save calls the owner's edit action and

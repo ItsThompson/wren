@@ -1,7 +1,7 @@
 import type { Roadmap, Section, Subsection } from './types'
 
 /**
- * Pure client-side progress derivation (section 10 "List view"): overall and
+ * Pure client-side progress derivation: overall and
  * per-section completion counts and per-subsection done-state, computed from the
  * roadmap plus the set of checked item ids. Done-state is **derived**, never
  * stored, so the bars and check styling update instantly from

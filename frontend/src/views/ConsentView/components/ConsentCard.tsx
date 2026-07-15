@@ -24,7 +24,7 @@ interface ConsentCardProps {
 }
 
 /**
- * The OAuth consent card (section 09 consent view): branded, calm, centered. The
+ * The OAuth consent card: branded, calm, centered. The
  * one Fraunces moment states "<Agent> wants to act as <you>," the requested
  * scopes render as a plain list, and the decision is a primary Authorize plus a
  * ghost Deny. The trust moment: quiet and legible, not loud.

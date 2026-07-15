@@ -13,7 +13,7 @@ interface RoadmapActionsProps {
 }
 
 /**
- * The owner/reader action bar for a roadmap (section 05 fork + metadata edit).
+ * The owner/reader action bar for a roadmap (fork + metadata edit).
  *
  * Fork is offered to any reader (you can fork a public roadmap or your own),
  * producing a fresh draft the view then navigates to. The presentation-only

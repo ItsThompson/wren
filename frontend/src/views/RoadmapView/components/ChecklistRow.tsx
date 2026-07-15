@@ -7,7 +7,7 @@ interface ChecklistRowProps {
 }
 
 /**
- * An interactive checklist row (section 09 "Checklist row"): an olive-accented
+ * An interactive checklist row: an olive-accented
  * checkbox and the item text. Checked rows get the olive fill plus a
  * `muted-foreground` strikethrough label, so done-state is conveyed by more than
  * color (checkbox state + strikethrough + text). Toggling calls `onToggle`,

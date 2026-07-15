@@ -8,7 +8,7 @@ interface PublishPanelProps {
 }
 
 /**
- * The draft publish affordance (section 06 `:publish` action). Offers a Publish
+ * The draft publish affordance (`:publish` action). Offers a Publish
  * action and, when a publish is hard-blocked (422), renders the returned
  * structural violations via the shared ochre `ViolationList` so the author sees
  * the full fix list (rule + message + offending ids) in one pass.

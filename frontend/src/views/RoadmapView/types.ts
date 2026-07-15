@@ -2,8 +2,8 @@ import type { components } from '@/api'
 
 /**
  * Roadmap read types, sourced from the OpenAPI-generated client (never
- * hand-written; section 06/10 codegen contract). The `GET /roadmaps/{id}`
- * response is the full section-04 `Roadmap`.
+ * hand-written; the codegen contract). The `GET /roadmaps/{id}`
+ * response is the full `Roadmap`.
  */
 export type Roadmap = components['schemas']['Roadmap']
 export type Section = components['schemas']['Section']
@@ -25,7 +25,7 @@ export type ProgressUpdateResult = components['schemas']['ProgressUpdateResult']
  * The progress binding threaded from the list view down to each checklist row:
  * the derived done-state reads `checkedIds` and each toggle calls `onToggle`
  * (which persists via `progress_update`). Absent in draft preview mode, where
- * progress does not persist (section 10 "Preview mode").
+ * progress does not persist.
  */
 export interface ProgressBinding {
   checkedIds: Set<string>
@@ -33,9 +33,9 @@ export interface ProgressBinding {
 }
 
 /**
- * A surfaced progress-write failure (section 10 "Any write"; ticket 26 / #9). A
+ * A surfaced progress-write failure. A
  * failed persist is optimistically reverted and then announced instead of failing
- * silently: `stale` is a 409 re-read (US-ERR-01, shown as the ochre reload
+ * silently: `stale` is a 409 re-read (shown as the ochre reload
  * prompt); `save-failed` is any other failure (shown as a quiet inline notice).
  */
 export type ProgressNotice = { kind: 'stale' } | { kind: 'save-failed' }
@@ -65,8 +65,8 @@ export type PublishState =
 
 /**
  * The presentation-only fields editable via `PATCH /roadmaps/{id}/metadata`
- * (title / description / subject_tags), which stay mutable even after publish
- * (section 04/06). The metadata editor form collects exactly these.
+ * (title / description / subject_tags), which stay mutable even after publish.
+ * The metadata editor form collects exactly these.
  */
 export interface MetadataDraft {
   title: string
@@ -91,8 +91,8 @@ export type MetadataEditState =
 export type ForkState = { phase: 'idle' } | { phase: 'forking' } | { phase: 'failed'; status: number | null }
 
 /**
- * The web-only visibility toggle sub-state (`PUT /roadmaps/{id}/visibility`,
- * section 06). Last-write-wins: on success the returned roadmap replaces the
+ * The web-only visibility toggle sub-state (`PUT /roadmaps/{id}/visibility`).
+ * Last-write-wins: on success the returned roadmap replaces the
  * loaded one so the badge updates in place; `failed` carries the status.
  */
 export type VisibilityState =
@@ -101,7 +101,7 @@ export type VisibilityState =
   | { phase: 'failed'; status: number | null }
 
 /**
- * The web-only archive sub-state (`POST /roadmaps/{id}:archive`, section 06). On
+ * The web-only archive sub-state (`POST /roadmaps/{id}:archive`). On
  * success the returned archived roadmap replaces the loaded one; `failed` carries
  * the status for a retry message.
  */
@@ -111,7 +111,7 @@ export type ArchiveState =
   | { phase: 'failed'; status: number | null }
 
 /**
- * The web-only delete sub-state (`DELETE /roadmaps/{id}`, section 06). `blocked`
+ * The web-only delete sub-state (`DELETE /roadmaps/{id}`). `blocked`
  * is the 409 `DELETE_HAS_FOLLOWERS` hard-stop: the roadmap has followers, so the
  * UI offers archive instead. A successful delete navigates away (no loaded
  * state); `failed` carries the status for a retry message.
@@ -123,8 +123,8 @@ export type DeleteState =
   | { phase: 'failed'; status: number | null }
 
 /**
- * The owner-only web-only lifecycle bundle (visibility / archive / delete,
- * section 06). No agent surface: these are human-web actions only. Threaded into
+ * The owner-only web-only lifecycle bundle (visibility / archive / delete).
+ * No agent surface: these are human-web actions only. Threaded into
  * the {@link RoadmapActions} bundle and rendered by `LifecycleActions` when the
  * signed-in user owns the roadmap.
  */

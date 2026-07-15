@@ -12,9 +12,9 @@ import type {
  * Coherent dev fixtures for the MSW harness, in the OpenAPI-generated schema
  * shape. One published roadmap plus the dashboard/profile/progress
  * projections built from it, so the SPA renders populated views with zero backend
- * (`npm run dev:mock`). The roadmap uses the section-04 ID-keyed maps
+ * (`npm run dev:mock`). The roadmap uses the ID-keyed maps
  * (`sections` / `subsections` / `resources` / `checklist_items`) with explicit
- * `*_order` arrays, and slug ids in the section-06 form (`{title-slug}-{short}`).
+ * `*_order` arrays, and slug ids in the form (`{title-slug}-{short}`).
  */
 
 export const OWNER_ID = 'usr_ada'

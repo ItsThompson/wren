@@ -10,7 +10,7 @@ describe('LandingView', () => {
       level: 1,
       name: /learn anything, in the right order/i,
     })
-    // display-xl is the Fraunces landing-hero moment (§4.1 type scale).
+    // display-xl is the Fraunces landing-hero moment.
     expect(hero).toHaveClass('display-xl')
   })
 

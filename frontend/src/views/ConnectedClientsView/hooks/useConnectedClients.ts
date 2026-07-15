@@ -4,7 +4,7 @@ import { createSessionClient } from '@/auth/createSessionClient'
 import type { ClientsListState } from '../types'
 
 /**
- * Owns the connected-clients surface (section 08 `/me/clients`): it lists the
+ * Owns the connected-clients surface (`/me/clients`): it lists the
  * signed-in user's authorized agents and revokes one (RFC 7009). The
  * session-aware client scopes every call to the caller's own grants, so the
  * action is inherently limited to the user's own clients.

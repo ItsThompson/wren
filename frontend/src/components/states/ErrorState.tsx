@@ -10,9 +10,9 @@ interface ErrorStateProps {
 }
 
 /**
- * A full-view error surface (spec section 10 error states): a headline, a muted
+ * A full-view error surface: a headline, a muted
  * explanation, and an optional recovery action. Text-first and `role="alert"` so
- * meaning never rides on color alone (§9 accessibility). Used for dedicated
+ * meaning never rides on color alone. Used for dedicated
  * 404/403 views (which share one message so a private roadmap's existence never
  * leaks) and for generic load failures with a retry. Shared across views so
  * error surfaces read consistently.

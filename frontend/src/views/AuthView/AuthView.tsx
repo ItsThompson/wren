@@ -8,9 +8,8 @@ import { RegisterForm } from './components/RegisterForm'
 type AuthMode = 'login' | 'register'
 
 /**
- * Register / login screen (section 10 view tree). Toggles between the two forms
- * and, once the session resolves to authenticated, redirects into the app. The
- * post-auth destination is the dashboard once Ticket 25 lands; until then home.
+ * Register / login screen. Toggles between the two forms
+ * and, once the session resolves to authenticated, redirects home.
  */
 export function AuthView() {
   const { status } = useAuth()

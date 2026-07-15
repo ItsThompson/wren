@@ -6,9 +6,9 @@ interface ViolationListProps {
 }
 
 /**
- * The 422 publish/validate hard-block rendering (spec section 06, section 09
- * §10, US-ERR-02): the returned structural `violations` as readable ochre text,
- * each naming the rule, the human message, and the offending node ids. Meaning is
+ * The 422 publish/validate hard-block rendering: the returned structural
+ * `violations` as readable ochre text, each naming the rule, the human message,
+ * and the offending node ids. Meaning is
  * carried entirely by text (never color alone), so an author can fix every issue
  * in one pass and a screen-reader user gets the same information.
  */

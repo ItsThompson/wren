@@ -9,7 +9,7 @@ interface RoadmapCardGridProps {
 
 /**
  * A responsive grid of {@link RoadmapCard}s, shared by the dashboard sections and
- * the profile view (spec section 09: wider grid layout for these list views).
+ * the profile view.
  */
 export function RoadmapCardGrid({ roadmaps }: RoadmapCardGridProps) {
   return (

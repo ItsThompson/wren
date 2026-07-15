@@ -13,7 +13,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 /**
  * The app's only chrome: a full-width top bar on card/bone with a hairline
- * bottom border and no sidebar (§8 App shell). Wordmark left; the personal
+ * bottom border and no sidebar. Wordmark left; the personal
  * Dashboard + Profile destinations and the avatar menu on the right. The
  * personal links resolve the signed-in user's handle, so they show only when
  * authenticated; anonymous visitors get just the wordmark and the log-in control.

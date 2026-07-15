@@ -1,7 +1,7 @@
 /**
  * The dashboard loading state: a pair of titled section headers over skeleton
  * card rows, matching the loaded "Yours" / "Following" layout so the swap is
- * calm (section 10 loading states).
+ * calm.
  */
 export function DashboardSkeleton() {
   return (

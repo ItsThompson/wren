@@ -3,10 +3,10 @@ import type { components } from '@/api'
 /**
  * Shapes for the MSW dev fixtures (`src/mocks/data.ts`). These now alias the
  * OpenAPI-generated schema (`src/api/schema.d.ts`) directly, so the zero-backend
- * dev harness (`npm run dev:mock`) serves exactly the section 06 response shapes
+ * dev harness (`npm run dev:mock`) serves exactly the response shapes
  * the views consume. Kept as `Mock*` aliases so the handlers/fixtures read as the
  * dev doubles they are, while staying pinned to the real contract (drift-gated by
- * codegen in CI, ticket 26 / #5).
+ * codegen in CI).
  */
 export type MockRoadmap = components['schemas']['Roadmap']
 export type MockProgressSnapshot = components['schemas']['ProgressSnapshot']

@@ -3,7 +3,7 @@
  *
  * The per-user deadline drives a COUNTDOWN only: the whole-day delta between
  * today and the target date. It is never a pacing signal: there is no
- * behind/ahead judgement and no effort forecast (section 15 out-of-scope). A
+ * behind/ahead judgement and no effort forecast. A
  * deadline in the past is allowed and renders as elapsed/overdue.
  */
 
