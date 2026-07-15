@@ -60,6 +60,74 @@ class InternalApiClient:
     async def get_roadmap(self, user_id: str, roadmap_id: str) -> httpx.Response:
         return await self.request("GET", f"/roadmaps/{roadmap_id}", user_id=user_id)
 
+    # ---------- Read projections (spec section 07 study-time tools) ----------
+    # Each backs one MCP read tool (Ticket 22), one internal GET per tool. The
+    # concise|detailed switch travels as ``?format=``; pagination as an opaque
+    # ``?cursor=``; ``?include=`` selects the section-page shape.
+
+    async def get_overview(self, user_id: str, roadmap_id: str, fmt: str) -> httpx.Response:
+        return await self.request(
+            "GET", f"/roadmaps/{roadmap_id}/overview", user_id=user_id, params={"format": fmt}
+        )
+
+    async def get_next(self, user_id: str, roadmap_id: str, fmt: str) -> httpx.Response:
+        return await self.request(
+            "GET", f"/roadmaps/{roadmap_id}/next", user_id=user_id, params={"format": fmt}
+        )
+
+    async def get_node(
+        self, user_id: str, roadmap_id: str, subsection_id: str, fmt: str
+    ) -> httpx.Response:
+        return await self.request(
+            "GET",
+            f"/roadmaps/{roadmap_id}/nodes/{subsection_id}",
+            user_id=user_id,
+            params={"format": fmt},
+        )
+
+    async def get_section(
+        self, user_id: str, roadmap_id: str, section_id: str, cursor: str | None, include: str
+    ) -> httpx.Response:
+        # The opaque cursor is omitted on the first page (a null cursor is not a
+        # valid token); ``include`` always travels.
+        params: dict[str, Any] = {"include": include}
+        if cursor is not None:
+            params["cursor"] = cursor
+        return await self.request(
+            "GET", f"/roadmaps/{roadmap_id}/sections/{section_id}", user_id=user_id, params=params
+        )
+
+    async def search(
+        self, user_id: str, roadmap_id: str, q: str, tags: list[str] | None
+    ) -> httpx.Response:
+        # ``tags`` is a repeated query param (tags=a&tags=b), omitted when empty.
+        params: dict[str, Any] = {"q": q}
+        if tags:
+            params["tags"] = tags
+        return await self.request(
+            "GET", f"/roadmaps/{roadmap_id}/search", user_id=user_id, params=params
+        )
+
+    async def get_progress(self, user_id: str, roadmap_id: str, detailed: bool) -> httpx.Response:
+        return await self.request(
+            "GET",
+            f"/roadmaps/{roadmap_id}/progress",
+            user_id=user_id,
+            params={"detailed": detailed},
+        )
+
+    async def update_progress(
+        self, user_id: str, roadmap_id: str, item_ids: list[str], state: str
+    ) -> httpx.Response:
+        # Explicit set (complete|incomplete), batch item_ids (spec section 07): the
+        # server applies atomically and returns the fresh snapshot + next.
+        return await self.request(
+            "POST",
+            f"/roadmaps/{roadmap_id}/progress",
+            user_id=user_id,
+            json={"item_ids": item_ids, "state": state},
+        )
+
     async def patch_draft(
         self, user_id: str, roadmap_id: str, revision: int, operations: list[Any]
     ) -> httpx.Response:

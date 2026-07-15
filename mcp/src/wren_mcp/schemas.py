@@ -18,6 +18,7 @@ visibility is a web-only lifecycle control with no agent tool (spec section 07).
 
 from __future__ import annotations
 
+from datetime import date
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
@@ -37,6 +38,45 @@ class RoadmapStatus(StrEnum):
     DRAFT = "draft"
     PUBLISHED = "published"
     ARCHIVED = "archived"
+
+
+# ---------- Read/study switches (spec section 07) ----------
+
+
+class ResponseFormat(StrEnum):
+    """The ``concise | detailed`` switch on the read tools (spec section 07).
+
+    Concise (default) is roughly one-third the tokens and still carries every
+    follow-up ID; detailed adds the explanatory free-text (a node ``description``
+    on ``roadmap_get_node``, ``path_position`` on ``roadmap_get_next``)."""
+
+    CONCISE = "concise"
+    DETAILED = "detailed"
+
+
+class SectionInclude(StrEnum):
+    """Which parts of each node a ``roadmap_get_section`` page populates."""
+
+    SUBSECTIONS = "subsections"
+    ITEMS = "items"
+    BOTH = "both"
+
+
+class SearchHitKind(StrEnum):
+    """Whether a search hit is a subsection (DAG node) or a checklist item."""
+
+    SUBSECTION = "subsection"
+    ITEM = "item"
+
+
+class CompletionState(StrEnum):
+    """The explicit target state ``progress_update`` sets its items to.
+
+    Explicit set, never toggle (spec section 07): the client states the desired
+    end state so a retry is idempotent."""
+
+    COMPLETE = "complete"
+    INCOMPLETE = "incomplete"
 
 
 # ---------- Authoring inputs (ordered arrays + optional proposed_id) ----------
@@ -387,3 +427,203 @@ class MetadataResult(BaseModel):
             description=body.get("description"),
             subject_tags=body.get("subject_tags", []),
         )
+
+
+# ---------- Read projections (study-time; spec sections 04/07) -----------------
+#
+# These mirror the backend read projections (``wren.roadmaps.read_schemas`` /
+# ``wren.progress.schemas``) field-for-field, so each read tool validates the
+# backend body straight into the frozen MCP shape (``model_validate``) with no
+# field renaming. They are re-declared here (not imported) because the MCP server
+# is a separate image with no backend-code dependency: the same "duplicated domain
+# truth kept in sync by contract" pattern as the authoring inputs above, frozen by
+# the schema snapshot. Design rules encoded (spec section 07): summary-first (no
+# item bodies on ``Overview``), resource links never inlined bodies, and the
+# ``concise | detailed`` switch (the verbose ``description`` / ``path_position``
+# is present only under detailed).
+
+
+class ResourceRef(BaseModel):
+    """A subsection resource as a link, never an inlined body (spec section 07)."""
+
+    id: str
+    title: str
+    url: str
+    type: ResourceType
+
+
+class PrereqRef(BaseModel):
+    """A resolved prerequisite: its id, title, and the caller's done state
+    (``done`` = every checklist item of the prerequisite subsection is checked)."""
+
+    id: str
+    title: str
+    done: bool
+
+
+class ItemState(BaseModel):
+    """A checklist item with the caller's done state (``done`` = checked)."""
+
+    id: str
+    text: str
+    done: bool
+
+
+class NodeDetail(BaseModel):
+    """One subsection resolved for study (``roadmap_get_node`` + section pages).
+
+    ``description`` is populated only in ``detailed`` mode; concise leaves it
+    ``None`` while still carrying every follow-up ID (subsection, resources,
+    resolved prereqs, items). External bodies are never inlined: ``resources`` are
+    links only."""
+
+    subsection_id: str
+    title: str
+    description: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    effort_estimate: str | None = None
+    resources: list[ResourceRef] = Field(default_factory=list)
+    prereqs: list[PrereqRef] = Field(default_factory=list)
+    items: list[ItemState] = Field(default_factory=list)
+
+
+class SectionOverview(BaseModel):
+    """Per-section completion counts, no checklist-item bodies (spec section 04)."""
+
+    section_id: str
+    title: str
+    total_items: int
+    checked_items: int
+    percent: int
+
+
+class OverallProgress(BaseModel):
+    """Roadmap-wide completion totals (derived, never stored)."""
+
+    total_items: int
+    checked_items: int
+    percent: int
+
+
+class Overview(BaseModel):
+    """``roadmap_get_overview`` result: the orientation call.
+
+    Sections in ``section_order`` with per-section + overall completion and no
+    checklist-item bodies; ``checked_items`` / ``percent`` reflect the caller's
+    own progress. Drill in with ``roadmap_get_node`` or ``roadmap_get_section``."""
+
+    roadmap_id: str
+    title: str
+    status: RoadmapStatus
+    revision: int
+    sections: list[SectionOverview] = Field(default_factory=list)
+    overall: OverallProgress
+
+
+class SectionPage(BaseModel):
+    """``roadmap_get_section`` result: a paginated section drill-down.
+
+    ``include`` selects which parts of each node are populated. ``next_cursor`` is
+    an **opaque** token for the next page (absent on the last page); ``steering``
+    is present only when the response was truncated ("showing N of M; pass
+    cursor=..."). Pass ``next_cursor`` back as ``cursor`` to page forward."""
+
+    section_id: str
+    title: str
+    include: SectionInclude
+    subsections: list[NodeDetail] = Field(default_factory=list)
+    next_cursor: str | None = None
+    steering: str | None = None
+
+
+class SearchHit(BaseModel):
+    """One search match carrying the IDs needed to drill down (spec section 04).
+
+    ``item_id`` is present only when ``kind == item``; ``matched_tags`` names the
+    subsection tags that matched a tag filter (absent for a keyword-only match)."""
+
+    kind: SearchHitKind
+    subsection_id: str
+    item_id: str | None = None
+    title_or_text: str
+    matched_tags: list[str] | None = None
+
+
+class SearchResults(BaseModel):
+    """``roadmap_search`` result: the matching hits (search, not list-all).
+
+    A thin object wrapper around the hit list so the tool returns a structured
+    ``outputSchema`` object like every other tool (rather than a bare array)."""
+
+    hits: list[SearchHit] = Field(default_factory=list)
+
+
+class ResourceLink(BaseModel):
+    """A resource on a next item: a link, never an inlined body (no id needed)."""
+
+    title: str
+    url: str
+    type: ResourceType
+
+
+class NextItem(BaseModel):
+    """One unchecked, prereq-satisfied checklist item to work on next.
+
+    ``why_now`` is a STRUCTURAL rationale only (spec section 07): the mechanical
+    facts the app owns (next unchecked in ``suggested_path``; named prerequisites
+    complete), never pedagogical / ZPD judgement. ``path_position`` (the 1-based
+    index of the item's subsection in ``suggested_path``) is present only in
+    ``detailed`` mode."""
+
+    subsection_id: str
+    item_id: str
+    text: str
+    why_now: str
+    resources: list[ResourceLink] = Field(default_factory=list)
+    path_position: int | None = None
+
+
+class NextResult(BaseModel):
+    """``roadmap_get_next`` result: the next unchecked items in ``suggested_path``
+    order whose prerequisites are all complete (server-computed; spec section 07).
+
+    ``remaining_in_path`` counts the path subsections still to do; ``complete`` is
+    ``True`` when nothing remains."""
+
+    items: list[NextItem] = Field(default_factory=list)
+    remaining_in_path: int = 0
+    complete: bool = False
+
+
+class SectionProgress(BaseModel):
+    """Per-section completion counts, derived from progress + roadmap."""
+
+    section_id: str
+    total_items: int
+    checked_items: int
+    percent: int
+
+
+class ProgressSnapshot(BaseModel):
+    """``progress_get`` result: roadmap-wide + per-section completion.
+
+    ``checked_ids`` is populated only under ``detailed`` (keeping the default
+    concise and small while still letting the agent reconcile the exact checked
+    set when it asks). ``deadline`` is the per-user countdown date, if set."""
+
+    roadmap_id: str
+    total_items: int
+    checked_items: int
+    percent: int
+    deadline: date | None = None
+    sections: list[SectionProgress] = Field(default_factory=list)
+    checked_ids: list[str] | None = None
+
+
+class ProgressUpdateResult(BaseModel):
+    """``progress_update`` result: the fresh snapshot after the explicit set plus
+    the next suggestion (spec sections 04/07). The snapshot is detailed so the
+    agent can reconcile its checkbox state to the server truth."""
+
+    progress: ProgressSnapshot
+    next: NextResult

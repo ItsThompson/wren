@@ -146,3 +146,71 @@ async def test_extra_headers_cannot_override_the_trusted_identity() -> None:
     request = captured[0]
     assert request.headers[USER_ID_HEADER] == "user-ada"
     assert request.headers[INTERNAL_TOKEN_HEADER] == _API_TOKEN
+
+
+# ---------- read projections (Ticket 22) ----------
+
+
+async def test_read_projection_calls_hit_their_routes_with_the_switches() -> None:
+    # Each read tool is one internal GET; the concise|detailed switch travels as
+    # ?format=, and every call still carries the trusted identity headers.
+    client, captured = _client_with_capture()
+
+    await client.get_overview("user-ada", "r-1", "concise")
+    await client.get_next("user-ada", "r-1", "detailed")
+    await client.get_node("user-ada", "r-1", "sub_hashing", "detailed")
+    await client.get_progress("user-ada", "r-1", True)
+
+    overview, nxt, node, progress = captured
+    assert overview.url.path == "/roadmaps/r-1/overview"
+    assert overview.url.params.get("format") == "concise"
+    assert nxt.url.path == "/roadmaps/r-1/next"
+    assert nxt.url.params.get("format") == "detailed"
+    assert node.url.path == "/roadmaps/r-1/nodes/sub_hashing"
+    assert progress.url.path == "/roadmaps/r-1/progress"
+    assert progress.url.params.get("detailed") == "true"
+    for request in captured:
+        assert request.method == "GET"
+        assert request.headers[USER_ID_HEADER] == "user-ada"
+        assert request.headers[INTERNAL_TOKEN_HEADER] == _API_TOKEN
+
+
+async def test_get_section_omits_the_cursor_on_the_first_page() -> None:
+    client, captured = _client_with_capture()
+
+    await client.get_section("user-ada", "r-1", "sec_1", None, "both")
+    await client.get_section("user-ada", "r-1", "sec_1", "b3BhcXVl", "items")
+
+    first, second = captured
+    assert "cursor" not in first.url.params
+    assert first.url.params.get("include") == "both"
+    assert second.url.params.get("cursor") == "b3BhcXVl"
+    assert second.url.params.get("include") == "items"
+
+
+async def test_search_sends_query_and_repeated_tag_params() -> None:
+    client, captured = _client_with_capture()
+
+    await client.search("user-ada", "r-1", "hash", ["core", "graphs"])
+    await client.search("user-ada", "r-1", "graphs", None)
+
+    with_tags, without_tags = captured
+    assert with_tags.url.params.get("q") == "hash"
+    assert "tags=core" in str(with_tags.url) and "tags=graphs" in str(with_tags.url)
+    assert without_tags.url.params.get("q") == "graphs"
+    assert "tags" not in without_tags.url.params
+
+
+async def test_update_progress_posts_the_explicit_set_batch() -> None:
+    client, captured = _client_with_capture()
+
+    await client.update_progress("user-ada", "r-1", ["item_1", "item_2"], "complete")
+
+    request = captured[0]
+    assert request.method == "POST"
+    assert request.url.path == "/roadmaps/r-1/progress"
+    assert json.loads(request.content) == {
+        "item_ids": ["item_1", "item_2"],
+        "state": "complete",
+    }
+    assert request.headers[USER_ID_HEADER] == "user-ada"
