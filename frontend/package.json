@@ -49,6 +49,11 @@
     "vite": "^8.1.1",
     "vitest": "^4.1.10"
   },
+  "overrides": {
+    "openapi-typescript": {
+      "typescript": "$typescript"
+    }
+  },
   "msw": {
     "workerDirectory": [
       "public"
