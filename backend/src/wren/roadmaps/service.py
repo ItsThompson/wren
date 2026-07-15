@@ -1,0 +1,103 @@
+"""RoadmapService: draft authoring (spec section 05).
+
+The single source of truth for roadmap business rules. It receives a repository
+and the resolved ``user_id`` (never trusted from payload), composes the pure
+``slugs``/``assembly`` deep modules, raises ``WrenError`` subclasses for the
+adapter to render, and owns the transaction boundary (``get_session`` is
+yield-only).
+
+This slice implements ``create_draft`` and the owner-scoped ``get``; patch,
+replace, validate, publish, fork, and the read projections are later slices.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from datetime import UTC, datetime
+
+from wren.core.errors import NotFound
+from wren.core.logging import get_logger
+from wren.roadmaps import slugs
+from wren.roadmaps.assembly import assemble_draft
+from wren.roadmaps.config import MAX_ID_MINT_ATTEMPTS
+from wren.roadmaps.models import RoadmapRecord
+from wren.roadmaps.repository import RoadmapRepository
+from wren.roadmaps.schemas import Roadmap, RoadmapCreated, RoadmapInput
+
+_log = get_logger("wren-roadmaps")
+
+TokenFactory = Callable[[], str]
+Clock = Callable[[], datetime]
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
+class RoadmapService:
+    """Business rules for authoring roadmap drafts."""
+
+    def __init__(
+        self,
+        repo: RoadmapRepository,
+        *,
+        token_factory: TokenFactory = slugs.random_token,
+        clock: Clock = _utcnow,
+    ) -> None:
+        self._repo = repo
+        # The random-token source and clock are injected so tests can force an
+        # ID collision (re-roll) and pin timestamps without patching globals.
+        self._token_factory = token_factory
+        self._clock = clock
+
+    async def create_draft(self, user_id: str, doc: RoadmapInput) -> RoadmapCreated:
+        """Mint slug IDs, resolve references, and persist a private draft.
+
+        Returns the full roadmap at ``revision`` 1 plus the ``proposed_id ->
+        minted_id`` remap for any de-duped proposal.
+        """
+        roadmap_id = await self._mint_unique_roadmap_id(doc.proposed_id or doc.title)
+        assembled = assemble_draft(doc, roadmap_id, owner=user_id, now=self._clock())
+        try:
+            await self._repo.add(_to_record(assembled.roadmap))
+            await self._repo.commit()
+        except Exception:
+            await self._repo.rollback()
+            raise
+        _log.info("roadmap_draft_created", roadmap_id=roadmap_id, owner=user_id)
+        return RoadmapCreated.model_validate(
+            {**assembled.roadmap.model_dump(), "remap": assembled.remap}
+        )
+
+    async def get(self, user_id: str, roadmap_id: str) -> Roadmap:
+        """Return the caller's own roadmap, or 404 (never revealing existence to
+        a non-owner: the query is owner-scoped)."""
+        record = await self._repo.get_owned(roadmap_id, user_id)
+        if record is None:
+            raise NotFound(f"No roadmap '{roadmap_id}'.", instance=f"/roadmaps/{roadmap_id}")
+        return Roadmap.model_validate(record.document)
+
+    async def _mint_unique_roadmap_id(self, base: str) -> str:
+        """Mint a globally-unique ``{slug}-{token}`` ID, silently re-rolling the
+        random token on the (astronomically unlikely) collision."""
+        for _ in range(MAX_ID_MINT_ATTEMPTS):
+            candidate = slugs.compose_roadmap_id(base, self._token_factory())
+            if not await self._repo.roadmap_id_exists(candidate):
+                return candidate
+        raise RuntimeError("Exhausted roadmap-ID mint attempts.")  # pragma: no cover
+
+
+def _to_record(roadmap: Roadmap) -> RoadmapRecord:
+    """Serialize the domain roadmap into its row: the full document plus the
+    write-derived index columns."""
+    return RoadmapRecord(
+        id=roadmap.id,
+        owner=roadmap.owner,
+        title=roadmap.title,
+        status=roadmap.status.value,
+        visibility=roadmap.visibility.value,
+        revision=roadmap.revision,
+        document=roadmap.model_dump(mode="json"),
+        created_at=roadmap.created_at,
+        updated_at=roadmap.updated_at,
+    )

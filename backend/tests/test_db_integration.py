@@ -59,8 +59,8 @@ def test_alembic_upgrade_head_creates_version_table(
         finally:
             await engine.dispose()
 
-    # Head advances as domain slices add migrations; accounts (#6) is the latest.
-    assert asyncio.run(_read_version()) == "0002_accounts"
+    # Head advances as domain slices add migrations; roadmaps (#7) is the latest.
+    assert asyncio.run(_read_version()) == "0003_roadmaps"
 
 
 async def test_db_readiness_check_ok_against_real_db(postgres_url: str) -> None:
