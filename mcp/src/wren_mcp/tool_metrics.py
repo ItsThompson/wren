@@ -4,7 +4,7 @@ Counts every agent tool call as ``mcp_tool_invocations_total{tool,outcome}`` so
 the operator can see authoring/study activity and per-tool error rates. Kept on a
 dedicated registry that :func:`wren_mcp.metrics.instrument` exposes on
 ``/metrics`` alongside the private HTTP registry, mirroring the backend split
-(names/labels mirror gofin so rules/dashboards drop in later).
+(names/labels follow a stable convention so rules/dashboards drop in later).
 
 The counting wrapper preserves the wrapped function's name, signature, and return
 annotation via :func:`functools.wraps`, so FastMCP's schema generation (which

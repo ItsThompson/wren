@@ -94,7 +94,7 @@ services:
       resources:
         limits:
           cpus: "1.00"
-          memory: 768M  # Python floor is higher than gofin's Go services.
+          memory: 768M  # Python floor needs more headroom than a comparable Go service.
     restart: unless-stopped
 
   mcp:

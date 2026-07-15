@@ -6,8 +6,8 @@ for the testing strategy this suite implements.
 
 ## Design
 
-- **Serial, one shared stack.** `workers: 1` + `fullyParallel: false` (gofin
-  discipline): every test runs against one live stack, deterministically.
+- **Serial, one shared stack.** `workers: 1` + `fullyParallel: false`: every
+  test runs against one live stack, deterministically.
 - **API seeding + UI smoke.** The spine is seeded and asserted through an
   `APIRequestContext` against the external app (`:8000`); a separate smoke proves
   the frontend image serves the SPA and client routing resolves. Authenticated

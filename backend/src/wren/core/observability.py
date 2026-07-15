@@ -8,8 +8,8 @@ registered on the dedicated :data:`WREN_REGISTRY`, which
 :func:`wren.core.metrics.instrument` exposes on ``/metrics`` alongside each app's
 private HTTP registry.
 
-Metric names and labels mirror gofin (spec section 11) so its alert rules and
-dashboards drop in later:
+Metric names and labels follow a stable convention (spec section 11) so alert
+rules and dashboards can be dropped in later:
 
 - ``service_method_failures_total{service,method}`` (counter): one increment when
   a public service method exits with an *unexpected* error. A ``WrenError`` is a

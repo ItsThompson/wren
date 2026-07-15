@@ -1,6 +1,6 @@
 """Route -> access-level coverage: every mounted product route must have a
-declared level, and an undeclared route fails safe (deny). Mirrors gofin's
-VerifyRegistration; also guards the two real apps against an unscoped endpoint."""
+declared level, and an undeclared route fails safe (deny); also guards the two
+real apps against an unscoped endpoint."""
 
 from __future__ import annotations
 

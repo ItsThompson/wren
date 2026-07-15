@@ -3,8 +3,8 @@
 Every mounted product route must have a declared access level. A coverage test
 (``tests/test_route_registry.py``) compares the mounted routes against the
 registries below and **fails safe (deny)** if any mounted route has no entry, so
-an unscoped endpoint cannot ship. This mirrors gofin's ``VerifyRegistration``
-(route registration cross-checked against a central access registry).
+an unscoped endpoint cannot ship: route registration is cross-checked against a
+central access registry.
 
 The registries are declared centrally and separately from where routers are
 mounted, on purpose: forgetting to declare a route is exactly what the coverage

@@ -2,8 +2,8 @@
 
 Wren's P0 observability: what is measured, what alerts, and how long data is kept.
 There is **no Grafana at P0** (Prometheus retains the data regardless); the only
-alert sink is Discord. Metric names and labels mirror gofin so its rules and
-dashboards can be dropped in later.
+alert sink is Discord. Metric names and labels follow a stable convention so
+rules and dashboards can be dropped in later.
 
 Canonical sources:
 

@@ -9,7 +9,7 @@
 # wiring.
 #
 # The three P0 alert rules live in alerts.yml (mounted alongside this file). Metric
-# names/labels mirror gofin so its rules/dashboards drop in later.
+# names/labels follow a stable convention so rules/dashboards drop in later.
 # =============================================================================
 
 global:

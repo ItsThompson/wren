@@ -1,7 +1,7 @@
 """Prometheus HTTP metrics.
 
-Metric names and labels mirror gofin (spec section 11) so its alert rules and
-dashboards drop in later:
+Metric names and labels follow a stable convention (spec section 11) so alert
+rules and dashboards can be dropped in later:
 
 - ``http_requests_total{method,path,status}`` (counter)
 - ``http_request_duration_seconds{method,path}`` (histogram)

@@ -1,4 +1,4 @@
-"""HTTP metrics: gofin-mirrored names/labels, self-exclusion, registry isolation."""
+"""HTTP metrics: conventional names/labels, self-exclusion, registry isolation."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from wren.core.settings import AppSettings
 MakeSettings = Callable[..., AppSettings]
 
 
-def test_exposes_gofin_metric_names_with_route_template_and_status(
+def test_exposes_metric_names_with_route_template_and_status(
     make_settings: MakeSettings,
 ) -> None:
     client = TestClient(create_app(make_settings()))

@@ -3,8 +3,8 @@
 # scripts/deploy.sh
 #
 # Push-based SSH deploy orchestration for Wren (spec section 11, §7.2 phases
-# 1-14). Adapted from gofin's deploy.sh, collapsed to the modular-monolith
-# topology and hardened for a non-root deploy user.
+# 1-14), collapsed to the modular-monolith topology and hardened for a non-root
+# deploy user.
 #
 # Runs from a checkout of this repo (CI runner or an operator's machine) and
 # orchestrates a single VPS over SSH. It never creates secrets on the box: it
