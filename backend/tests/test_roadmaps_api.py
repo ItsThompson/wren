@@ -16,7 +16,11 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from accounts_fakes import InMemoryAccountRepository, build_test_codec, build_test_hasher
-from roadmaps_fakes import InMemoryRoadmapRepository, sequence_token_factory
+from roadmaps_fakes import (
+    InMemoryRoadmapRepository,
+    constant_follower_counter,
+    sequence_token_factory,
+)
 from wren.accounts.api import create_accounts_router
 from wren.accounts.config import CookieConfig
 from wren.accounts.service import AccountService
@@ -97,11 +101,12 @@ _REPLACE_ROADMAP = {
 
 
 def _build_client(
-    make_settings: MakeSettings, *, tokens: list[str] | None = None
+    make_settings: MakeSettings, *, tokens: list[str] | None = None, followers: int = 0
 ) -> tuple[TestClient, InMemoryRoadmapRepository]:
     """An external-shaped app with the /auth + /roadmaps routers over in-memory
     repositories and the real session verifier (so login sets a resolvable
-    cookie)."""
+    cookie). ``followers`` drives the injected follower counter for the delete
+    guard (0 lets a delete through; a positive value forces the 409)."""
     account_repo = InMemoryAccountRepository()
     codec = build_test_codec()
     hasher = build_test_hasher()
@@ -113,6 +118,7 @@ def _build_client(
     def roadmap_provider() -> RoadmapService:
         return RoadmapService(
             roadmap_repo,
+            follower_counter=constant_follower_counter(followers),
             token_factory=sequence_token_factory(tokens or ["7f3k", "9x2b", "abcd", "efgh"]),
         )
 
@@ -746,3 +752,147 @@ def test_published_rejects_structural_write_but_allows_metadata_edit(
     metadata = client.patch(f"/roadmaps/{published_id}/metadata", json={"title": "Renamed live"})
     assert metadata.status_code == 200, metadata.text
     assert metadata.json()["title"] == "Renamed live"
+
+
+# --- web-only lifecycle: visibility toggle ----------------------------------
+
+
+def test_set_visibility_toggles_public_and_private(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
+
+    made_public = client.put(f"/roadmaps/{created_id}/visibility", json={"visibility": "public"})
+    assert made_public.status_code == 200, made_public.text
+    assert made_public.json()["visibility"] == "public"
+    assert client.get(f"/roadmaps/{created_id}").json()["visibility"] == "public"
+
+    made_private = client.put(f"/roadmaps/{created_id}/visibility", json={"visibility": "private"})
+    assert made_private.status_code == 200
+    assert made_private.json()["visibility"] == "private"
+
+
+def test_set_visibility_does_not_bump_the_revision(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
+    body = client.put(f"/roadmaps/{created_id}/visibility", json={"visibility": "public"}).json()
+    assert body["revision"] == 1
+
+
+def test_set_visibility_rejects_a_bad_value_as_422(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
+    response = client.put(f"/roadmaps/{created_id}/visibility", json={"visibility": "secret"})
+    assert response.status_code == 422
+    assert response.headers["content-type"] == "application/problem+json"
+
+
+def test_set_visibility_is_404_to_a_non_owner(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client, username="owner", email="owner@example.com")
+    created_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
+
+    client.cookies.clear()
+    _login(client, username="intruder", email="intruder@example.com")
+    response = client.put(f"/roadmaps/{created_id}/visibility", json={"visibility": "public"})
+    assert response.status_code == 404
+    assert response.json()["code"] == "NOT_FOUND"
+
+
+def test_set_visibility_requires_authentication(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings)
+    response = client.put("/roadmaps/anything-0000/visibility", json={"visibility": "public"})
+    assert response.status_code == 401
+
+
+# --- web-only lifecycle: archive --------------------------------------------
+
+
+def test_archive_hides_a_published_roadmap(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    published_id = _publish(client)
+
+    response = client.post(f"/roadmaps/{published_id}:archive")
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "archived"
+    assert client.get(f"/roadmaps/{published_id}").json()["status"] == "archived"
+
+
+def test_archive_a_draft_is_a_409(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created_id = _create_publishable(client)
+    response = client.post(f"/roadmaps/{created_id}:archive")
+    assert response.status_code == 409
+    assert response.headers["content-type"] == "application/problem+json"
+
+
+def test_archive_is_404_to_a_non_owner(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client, username="owner", email="owner@example.com")
+    published_id = _publish(client)
+
+    client.cookies.clear()
+    _login(client, username="intruder", email="intruder@example.com")
+    response = client.post(f"/roadmaps/{published_id}:archive")
+    assert response.status_code == 404
+    assert response.json()["code"] == "NOT_FOUND"
+
+
+def test_archive_requires_authentication(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings)
+    response = client.post("/roadmaps/anything-0000:archive")
+    assert response.status_code == 401
+
+
+# --- web-only lifecycle: delete (zero-followers guard) ----------------------
+
+
+def test_delete_returns_204_with_zero_followers(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"], followers=0)
+    _login(client)
+    created_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
+
+    response = client.delete(f"/roadmaps/{created_id}")
+    assert response.status_code == 204, response.text
+    assert response.content == b""
+    # Gone: a subsequent read is a 404.
+    assert client.get(f"/roadmaps/{created_id}").status_code == 404
+
+
+def test_delete_with_followers_is_a_409_steering_to_archive(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"], followers=2)
+    _login(client)
+    published_id = _publish(client)
+
+    response = client.delete(f"/roadmaps/{published_id}")
+    assert response.status_code == 409
+    assert response.headers["content-type"] == "application/problem+json"
+    body = response.json()
+    assert body["code"] == "DELETE_HAS_FOLLOWERS"
+    assert "archive" in body["detail"].lower()
+    # Not deleted: still readable.
+    assert client.get(f"/roadmaps/{published_id}").status_code == 200
+
+
+def test_delete_is_404_to_a_non_owner(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"], followers=0)
+    _login(client, username="owner", email="owner@example.com")
+    created_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
+
+    client.cookies.clear()
+    _login(client, username="intruder", email="intruder@example.com")
+    response = client.delete(f"/roadmaps/{created_id}")
+    assert response.status_code == 404
+    assert response.json()["code"] == "NOT_FOUND"
+    # The intruder cannot even see it (owner-scoped, no existence leak).
+    assert client.get(f"/roadmaps/{created_id}").status_code == 404
+
+
+def test_delete_requires_authentication(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings)
+    response = client.delete("/roadmaps/anything-0000")
+    assert response.status_code == 401

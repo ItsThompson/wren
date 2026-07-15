@@ -148,6 +148,20 @@ class RoadmapInput(BaseModel):
     suggested_path: list[str] = Field(default_factory=list)
 
 
+class VisibilityRequest(BaseModel):
+    """The ``PUT /roadmaps/{id}/visibility`` body: toggle public/private (web-only,
+    spec sections 04/06).
+
+    Visibility is a lifecycle/presentation field, editable by the owner on a
+    roadmap of any status (draft or published): a public roadmap is reachable by
+    link and appears on the owner's profile, a private one is owner-only. The
+    toggle is last-write-wins (never ``If-Match``-guarded) and touches no
+    follower-visible structure, so it never bumps the structural ``revision``.
+    """
+
+    visibility: Visibility
+
+
 class MetadataEditRequest(BaseModel):
     """The ``PATCH /roadmaps/{id}/metadata`` body: the presentation-only fields
     that stay mutable after publish (spec sections 04/06).

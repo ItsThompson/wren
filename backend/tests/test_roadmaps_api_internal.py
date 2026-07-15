@@ -17,7 +17,11 @@ from collections.abc import Callable
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from roadmaps_fakes import InMemoryRoadmapRepository, sequence_token_factory
+from roadmaps_fakes import (
+    InMemoryRoadmapRepository,
+    constant_follower_counter,
+    sequence_token_factory,
+)
 from wren.core.app_factory import create_app
 from wren.core.errors import build_exception_handlers
 from wren.core.identity import INTERNAL_TOKEN_HEADER, USER_ID_HEADER
@@ -96,6 +100,7 @@ def _build_client(
     def roadmap_provider() -> RoadmapService:
         return RoadmapService(
             roadmap_repo,
+            follower_counter=constant_follower_counter(),
             token_factory=sequence_token_factory(tokens or ["7f3k", "9x2b", "abcd", "efgh"]),
         )
 
@@ -307,3 +312,38 @@ def test_edit_metadata_smuggled_structural_field_is_a_409_immutable(
     )
     assert response.status_code == 409
     assert response.json()["code"] == "IMMUTABLE"
+
+
+# --- web-only lifecycle is NOT mounted on the internal app (spec §06/§07/§08) ---
+
+
+def test_visibility_archive_delete_have_no_internal_route(make_settings: MakeSettings) -> None:
+    # Visibility / archive / delete are web-only: they have no internal-app route
+    # (and no MCP tool). The MCP surface therefore cannot reach them. A published
+    # source exists so the assertions reflect routing, not a missing roadmap.
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    source_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP, headers=_trusted()).json()["id"]
+    assert client.post(f"/roadmaps/{source_id}:publish", headers=_trusted()).status_code == 200
+
+    # DELETE /roadmaps/{id}: the path template exists for GET/PATCH/PUT, so an
+    # unmounted DELETE is a 405 Method Not Allowed (never a successful delete).
+    delete_resp = client.delete(f"/roadmaps/{source_id}", headers=_trusted())
+    assert delete_resp.status_code == 405
+    # The roadmap is untouched.
+    assert client.get(f"/roadmaps/{source_id}", headers=_trusted()).status_code == 200
+
+    # POST :archive and PUT /visibility are not mounted on the internal app: they
+    # never succeed (404 unmounted sub-resource, or 405 when the greedy
+    # {roadmap_id} capture matches a different method on /roadmaps/{id}).
+    assert client.post(f"/roadmaps/{source_id}:archive", headers=_trusted()).status_code in (
+        404,
+        405,
+    )
+    visibility = client.put(
+        f"/roadmaps/{source_id}/visibility", headers=_trusted(), json={"visibility": "public"}
+    )
+    assert visibility.status_code in (404, 405)
+    # Still published, never archived or made public through the internal surface.
+    body = client.get(f"/roadmaps/{source_id}", headers=_trusted()).json()
+    assert body["status"] == "published"
+    assert body["visibility"] == "private"

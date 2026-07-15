@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from sqlalchemy import delete as sa_delete
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,6 +35,8 @@ class RoadmapRepository(Protocol):
     async def add(self, record: RoadmapRecord) -> None: ...
 
     async def save(self, roadmap: Roadmap) -> None: ...
+
+    async def delete(self, roadmap_id: str) -> None: ...
 
     async def get(self, roadmap_id: str) -> RoadmapRecord | None: ...
 
@@ -83,6 +86,17 @@ class SqlAlchemyRoadmapRepository:
                 updated_at=roadmap.updated_at,
             )
         )
+        await self._session.flush()
+
+    async def delete(self, roadmap_id: str) -> None:
+        """Remove a roadmap row by id (the web-only delete, spec sections 05/06).
+
+        The service enforces the zero-followers guard before calling this, so the
+        row is deleted unconditionally here. Progress rows are keyed separately by
+        ``(user_id, roadmap_id)`` and are not touched: a delete is only reached when
+        no progress rows reference the roadmap.
+        """
+        await self._session.execute(sa_delete(RoadmapRecord).where(RoadmapRecord.id == roadmap_id))
         await self._session.flush()
 
     async def get_owned(self, roadmap_id: str, owner_id: str) -> RoadmapRecord | None:

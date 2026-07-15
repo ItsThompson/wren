@@ -34,11 +34,12 @@ ERROR_TYPE_BASE = "https://usewren.com/errors/"
 class ErrorCode(StrEnum):
     """Single source of machine-readable error codes carried in ``problem.code``.
 
-    Later slices extend this with further domain-specific codes (e.g.
-    ``DELETE_HAS_FOLLOWERS``). ``STALE_REVISION`` and ``IMMUTABLE`` are the two
-    409 sub-codes the write contract needs: ``STALE_REVISION`` for an optimistic-
-    concurrency mismatch (re-read) and ``IMMUTABLE`` for a structural write against
-    a published/archived roadmap (fork-to-change), both defined in spec section 06.
+    ``STALE_REVISION``, ``IMMUTABLE``, and ``DELETE_HAS_FOLLOWERS`` are the 409
+    sub-codes the write/lifecycle contract needs: ``STALE_REVISION`` for an
+    optimistic-concurrency mismatch (re-read), ``IMMUTABLE`` for a structural write
+    against a published/archived roadmap (fork-to-change), and
+    ``DELETE_HAS_FOLLOWERS`` for a delete refused because the roadmap still has
+    followers (archive instead), all defined in spec section 06.
     """
 
     NOT_FOUND = "NOT_FOUND"
@@ -48,6 +49,7 @@ class ErrorCode(StrEnum):
     CONFLICT = "CONFLICT"
     STALE_REVISION = "STALE_REVISION"
     IMMUTABLE = "IMMUTABLE"
+    DELETE_HAS_FOLLOWERS = "DELETE_HAS_FOLLOWERS"
 
 
 def _type_uri(code: ErrorCode) -> str:

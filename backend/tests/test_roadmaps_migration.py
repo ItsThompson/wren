@@ -17,6 +17,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import text
 
+from roadmaps_fakes import constant_follower_counter
 from wren.core.db import create_database
 from wren.core.errors import NotFound
 from wren.roadmaps.models import RoadmapRecord
@@ -100,13 +101,17 @@ async def test_create_draft_persists_and_owner_read_round_trips(
     database = create_database(migrated_roadmaps_url)
     try:
         async with database.sessionmaker() as session:
-            service = RoadmapService(SqlAlchemyRoadmapRepository(session))
+            service = RoadmapService(
+                SqlAlchemyRoadmapRepository(session), follower_counter=constant_follower_counter()
+            )
             created = await service.create_draft("owner-1", _doc())
             roadmap_id = created.id
 
         # A fresh session reads the persisted JSONB document back into the model.
         async with database.sessionmaker() as session:
-            service = RoadmapService(SqlAlchemyRoadmapRepository(session))
+            service = RoadmapService(
+                SqlAlchemyRoadmapRepository(session), follower_counter=constant_follower_counter()
+            )
             fetched = await service.get("owner-1", roadmap_id)
             assert fetched.id == roadmap_id
             assert fetched.subject_tags == ["cs"]
@@ -114,7 +119,9 @@ async def test_create_draft_persists_and_owner_read_round_trips(
 
         # A non-owner read is a NotFound (owner-scoped query, no existence leak).
         async with database.sessionmaker() as session:
-            service = RoadmapService(SqlAlchemyRoadmapRepository(session))
+            service = RoadmapService(
+                SqlAlchemyRoadmapRepository(session), follower_counter=constant_follower_counter()
+            )
             with pytest.raises(NotFound):
                 await service.get("intruder", roadmap_id)
     finally:
@@ -127,7 +134,9 @@ async def test_roadmap_id_existence_check_sees_persisted_rows(
     database = create_database(migrated_roadmaps_url)
     try:
         async with database.sessionmaker() as session:
-            service = RoadmapService(SqlAlchemyRoadmapRepository(session))
+            service = RoadmapService(
+                SqlAlchemyRoadmapRepository(session), follower_counter=constant_follower_counter()
+            )
             created = await service.create_draft("owner-2", _doc("Unique Title"))
 
         async with database.sessionmaker() as session:
@@ -147,7 +156,9 @@ async def test_repository_rollback_after_a_duplicate_insert(migrated_roadmaps_ur
     database = create_database(migrated_roadmaps_url)
     try:
         async with database.sessionmaker() as session:
-            service = RoadmapService(SqlAlchemyRoadmapRepository(session))
+            service = RoadmapService(
+                SqlAlchemyRoadmapRepository(session), follower_counter=constant_follower_counter()
+            )
             created = await service.create_draft("owner-3", _doc("Collision Title"))
 
         async with database.sessionmaker() as session:

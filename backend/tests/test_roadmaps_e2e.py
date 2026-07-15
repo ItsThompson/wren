@@ -411,3 +411,139 @@ def test_edit_metadata_on_published_end_to_end_over_http(
         assert fetched["subject_tags"] == ["cs"]
         assert fetched["status"] == "published"
         assert fetched["revision"] == 1
+
+
+def test_visibility_toggle_end_to_end_over_http(
+    migrated_url: str, make_settings: MakeSettings
+) -> None:
+    app = _external_app(migrated_url, make_settings(database_url=migrated_url))
+    with TestClient(app) as client:
+        register = client.post(
+            "/auth/register",
+            json={
+                "username": "e2evis",
+                "email": "e2e-vis@example.com",
+                "password": _PASSWORD,
+            },
+        )
+        assert register.status_code == 201, register.text
+        roadmap_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
+        assert client.get(f"/roadmaps/{roadmap_id}").json()["visibility"] == "private"
+
+        made_public = client.put(
+            f"/roadmaps/{roadmap_id}/visibility", json={"visibility": "public"}
+        )
+        assert made_public.status_code == 200, made_public.text
+        assert made_public.json()["visibility"] == "public"
+        # Persisted, and the structural revision is untouched by the toggle.
+        fetched = client.get(f"/roadmaps/{roadmap_id}").json()
+        assert fetched["visibility"] == "public"
+        assert fetched["revision"] == 1
+
+
+def test_delete_zero_followers_end_to_end_over_http(
+    migrated_url: str, make_settings: MakeSettings
+) -> None:
+    app = _external_app(migrated_url, make_settings(database_url=migrated_url))
+    with TestClient(app) as client:
+        register = client.post(
+            "/auth/register",
+            json={
+                "username": "e2edel",
+                "email": "e2e-del@example.com",
+                "password": _PASSWORD,
+            },
+        )
+        assert register.status_code == 201, register.text
+        roadmap_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
+
+        # Zero followers: delete succeeds (204) and the row is gone from Postgres.
+        deleted = client.delete(f"/roadmaps/{roadmap_id}")
+        assert deleted.status_code == 204, deleted.text
+        assert client.get(f"/roadmaps/{roadmap_id}").status_code == 404
+
+
+def test_delete_blocked_by_followers_then_archive_keeps_follower_end_to_end_over_http(
+    migrated_url: str, make_settings: MakeSettings
+) -> None:
+    # The gold web-only-lifecycle proof over real Postgres: a followed roadmap
+    # cannot be deleted (real follower-count guard), archive is the retirement
+    # path, and the existing follower keeps reading their progress on the archived
+    # roadmap (Ticket 15 + the #9 read-guard relaxation).
+    app = _external_app(migrated_url, make_settings(database_url=migrated_url))
+    with TestClient(app) as client:
+        # Owner publishes and makes the roadmap public so a follower can reach it.
+        assert (
+            client.post(
+                "/auth/register",
+                json={
+                    "username": "e2eowner15",
+                    "email": "e2e-owner15@example.com",
+                    "password": _PASSWORD,
+                },
+            ).status_code
+            == 201
+        )
+        roadmap_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+        assert client.post(f"/roadmaps/{roadmap_id}:publish").status_code == 200
+        assert (
+            client.put(
+                f"/roadmaps/{roadmap_id}/visibility", json={"visibility": "public"}
+            ).status_code
+            == 200
+        )
+
+        # A second user follows it and records some progress.
+        client.cookies.clear()
+        assert (
+            client.post(
+                "/auth/register",
+                json={
+                    "username": "e2efollower15",
+                    "email": "e2e-follower15@example.com",
+                    "password": _PASSWORD,
+                },
+            ).status_code
+            == 201
+        )
+        assert client.post(f"/roadmaps/{roadmap_id}/follow").status_code == 201
+        item_id = client.get(f"/roadmaps/{roadmap_id}").json()["sections"]["sec_foundations"][
+            "subsections"
+        ]["sub_arrays"]["item_order"][0]
+        assert (
+            client.post(
+                f"/roadmaps/{roadmap_id}/progress",
+                json={"item_ids": [item_id], "state": "complete"},
+            ).status_code
+            == 200
+        )
+
+        # The owner logs back in: delete is refused (real follower present), archive
+        # succeeds.
+        client.cookies.clear()
+        assert (
+            client.post(
+                "/auth/login",
+                json={"email": "e2e-owner15@example.com", "password": _PASSWORD},
+            ).status_code
+            == 200
+        )
+        blocked = client.delete(f"/roadmaps/{roadmap_id}")
+        assert blocked.status_code == 409, blocked.text
+        assert blocked.json()["code"] == "DELETE_HAS_FOLLOWERS"
+        archived = client.post(f"/roadmaps/{roadmap_id}:archive")
+        assert archived.status_code == 200, archived.text
+        assert archived.json()["status"] == "archived"
+
+        # The follower still keeps their progress on the archived roadmap.
+        client.cookies.clear()
+        assert (
+            client.post(
+                "/auth/login",
+                json={"email": "e2e-follower15@example.com", "password": _PASSWORD},
+            ).status_code
+            == 200
+        )
+        progress = client.get(f"/roadmaps/{roadmap_id}/progress?detailed=true")
+        assert progress.status_code == 200, progress.text
+        assert progress.json()["checked_items"] == 1

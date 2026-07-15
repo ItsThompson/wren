@@ -81,6 +81,13 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     # readability-scoped, not owner-scoped).
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:fork"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="PATCH", path="/roadmaps/{roadmap_id}/metadata"): AccessLevel.EXTERNAL_COOKIE,
+    # Web-only lifecycle (#15): visibility toggle, archive, and delete. Mounted on
+    # the external (human) app ONLY: no internal-app route and no MCP tool (spec
+    # sections 06/07/08). All resolve the human session via require_user and are
+    # owner-scoped in the service; delete is guarded by a zero-followers check.
+    RouteKey(method="PUT", path="/roadmaps/{roadmap_id}/visibility"): AccessLevel.EXTERNAL_COOKIE,
+    RouteKey(method="POST", path="/roadmaps/{roadmap_id}:archive"): AccessLevel.EXTERNAL_COOKIE,
+    RouteKey(method="DELETE", path="/roadmaps/{roadmap_id}"): AccessLevel.EXTERNAL_COOKIE,
     # Follow, progress, and server-computed next (#9): the study-time surface over
     # the progress service. All resolve the human session via require_user and are
     # scoped to that user (another user's progress is never returned).

@@ -8,7 +8,11 @@ from datetime import UTC, datetime
 import pytest
 
 from progress_fakes import InMemoryProgressRepository
-from roadmaps_fakes import InMemoryRoadmapRepository, sequence_token_factory
+from roadmaps_fakes import (
+    InMemoryRoadmapRepository,
+    constant_follower_counter,
+    sequence_token_factory,
+)
 from wren.core.errors import Conflict, ErrorCode, NotFound, Validation
 from wren.progress.schemas import CompletionState
 from wren.progress.service import ProgressService
@@ -36,10 +40,12 @@ def _service(
     repo: InMemoryRoadmapRepository | None = None,
     *,
     tokens: list[str] | None = None,
+    followers: int = 0,
 ) -> tuple[RoadmapService, InMemoryRoadmapRepository]:
     repo = repo or InMemoryRoadmapRepository()
     service = RoadmapService(
         repo,
+        follower_counter=constant_follower_counter(followers),
         token_factory=sequence_token_factory(tokens or ["7f3k", "9x2b", "abcd"]),
         clock=lambda: _FIXED_NOW,
     )
@@ -191,6 +197,7 @@ async def test_roadmap_id_collision_silently_re_rolls_the_token() -> None:
     # A second create with the same title: first token collides, re-rolls to 9x2b.
     service2 = RoadmapService(
         repo,
+        follower_counter=constant_follower_counter(),
         token_factory=sequence_token_factory(["7f3k", "9x2b"]),
         clock=lambda: _FIXED_NOW,
     )
@@ -744,6 +751,7 @@ async def test_fork_starts_with_fresh_progress_no_carry_over() -> None:
     progress_repo = InMemoryProgressRepository()
     roadmaps = RoadmapService(
         roadmap_repo,
+        follower_counter=progress_repo.count_followers,
         token_factory=sequence_token_factory(["7f3k", "9x2b"]),
         clock=lambda: _FIXED_NOW,
     )
@@ -864,3 +872,211 @@ async def test_edit_metadata_rolls_back_when_persistence_fails() -> None:
             "user-1", created.id, title="Renamed", description=None, subject_tags=None
         )
     assert repo.rollbacks == 1
+
+
+# --- replace preserves the stored visibility (#13 review item) --------------
+
+
+async def test_replace_preserves_the_stored_drafts_visibility() -> None:
+    # A full-document import replaces content but must NOT silently flip the
+    # draft's visibility: visibility is a web-only lifecycle toggle, not part of
+    # the imported document's authority (#13 review; spec sections 04/06).
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    # Make the draft public via the sanctioned lifecycle path.
+    await service.set_visibility("user-1", created.id, Visibility.PUBLIC)
+    # _replace_doc() defaults to visibility=private; the replace must ignore it.
+    replaced = await service.replace_draft("user-1", created.id, created.revision, _replace_doc())
+    assert replaced.visibility is Visibility.PUBLIC
+    # And it is persisted public, not reset to the imported doc's private default.
+    assert (await service.get("user-1", created.id)).visibility is Visibility.PUBLIC
+
+
+# --- web-only lifecycle: set_visibility -------------------------------------
+
+
+async def test_set_visibility_toggles_public_and_back_to_private() -> None:
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    assert created.visibility is Visibility.PRIVATE
+
+    made_public = await service.set_visibility("user-1", created.id, Visibility.PUBLIC)
+    assert made_public.visibility is Visibility.PUBLIC
+    assert (await service.get("user-1", created.id)).visibility is Visibility.PUBLIC
+
+    made_private = await service.set_visibility("user-1", created.id, Visibility.PRIVATE)
+    assert made_private.visibility is Visibility.PRIVATE
+    assert (await service.get("user-1", created.id)).visibility is Visibility.PRIVATE
+
+
+async def test_set_visibility_does_not_alter_content_or_the_revision() -> None:
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    toggled = await service.set_visibility("user-1", created.id, Visibility.PUBLIC)
+    # Structure and the structural revision are untouched by a visibility toggle.
+    assert toggled.sections == created.sections
+    assert toggled.section_order == created.section_order
+    assert toggled.suggested_path == created.suggested_path
+    assert toggled.revision == created.revision
+    assert (await service.get("user-1", created.id)).revision == created.revision
+
+
+async def test_set_visibility_works_on_a_published_roadmap() -> None:
+    # Visibility is a lifecycle field editable on any status: a published roadmap
+    # can still be toggled public/private (it governs discovery, not structure).
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    await service.publish("user-1", created.id)
+    toggled = await service.set_visibility("user-1", created.id, Visibility.PUBLIC)
+    assert toggled.visibility is Visibility.PUBLIC
+    assert toggled.status is RoadmapStatus.PUBLISHED
+
+
+async def test_set_visibility_is_404_for_a_non_owner() -> None:
+    service, _ = _service()
+    created = await service.create_draft("owner", _publishable_doc())
+    with pytest.raises(NotFound):
+        await service.set_visibility("intruder", created.id, Visibility.PUBLIC)
+
+
+async def test_set_visibility_rolls_back_when_persistence_fails() -> None:
+    service, repo = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+
+    async def failing_save(_roadmap: object) -> None:
+        raise RuntimeError("db down")
+
+    repo.save = failing_save  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError):
+        await service.set_visibility("user-1", created.id, Visibility.PUBLIC)
+    assert repo.rollbacks == 1
+
+
+# --- web-only lifecycle: archive --------------------------------------------
+
+
+async def test_archive_transitions_a_published_roadmap_to_archived() -> None:
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    await service.publish("user-1", created.id)
+    archived = await service.archive("user-1", created.id)
+    assert archived.status is RoadmapStatus.ARCHIVED
+    assert (await service.get("user-1", created.id)).status is RoadmapStatus.ARCHIVED
+
+
+async def test_archive_a_draft_is_a_conflict() -> None:
+    # The lifecycle is linear (draft -> published -> archived): a draft is deleted,
+    # not archived, so archiving one is a 409.
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    with pytest.raises(Conflict):
+        await service.archive("user-1", created.id)
+    assert (await service.get("user-1", created.id)).status is RoadmapStatus.DRAFT
+
+
+async def test_archive_an_already_archived_roadmap_is_a_conflict() -> None:
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    await service.publish("user-1", created.id)
+    await service.archive("user-1", created.id)
+    with pytest.raises(Conflict):
+        await service.archive("user-1", created.id)
+
+
+async def test_archive_is_404_for_a_non_owner() -> None:
+    service, _ = _service()
+    created = await service.create_draft("owner", _publishable_doc())
+    await service.publish("owner", created.id)
+    with pytest.raises(NotFound):
+        await service.archive("intruder", created.id)
+
+
+async def test_archive_rolls_back_when_persistence_fails() -> None:
+    service, repo = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    await service.publish("user-1", created.id)
+
+    async def failing_save(_roadmap: object) -> None:
+        raise RuntimeError("db down")
+
+    repo.save = failing_save  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError):
+        await service.archive("user-1", created.id)
+    assert repo.rollbacks == 1
+
+
+# --- web-only lifecycle: delete (zero-followers guard) ----------------------
+
+
+async def test_delete_removes_a_roadmap_with_zero_followers() -> None:
+    service, repo = _service(followers=0)
+    created = await service.create_draft("user-1", _publishable_doc())
+    await service.delete("user-1", created.id)
+    # The row is gone: a subsequent read is a 404.
+    assert await repo.get(created.id) is None
+    with pytest.raises(NotFound):
+        await service.get("user-1", created.id)
+
+
+async def test_delete_with_followers_is_a_409_and_keeps_the_roadmap() -> None:
+    service, repo = _service(followers=3)
+    created = await service.create_draft("user-1", _publishable_doc())
+    await service.publish("user-1", created.id)
+    with pytest.raises(Conflict) as excinfo:
+        await service.delete("user-1", created.id)
+    assert excinfo.value.code is ErrorCode.DELETE_HAS_FOLLOWERS
+    assert "archive" in excinfo.value.detail.lower()
+    # Not deleted: still readable by the owner.
+    assert await repo.get(created.id) is not None
+
+
+async def test_delete_is_404_for_a_non_owner() -> None:
+    service, repo = _service(followers=0)
+    created = await service.create_draft("owner", _publishable_doc())
+    with pytest.raises(NotFound):
+        await service.delete("intruder", created.id)
+    # A non-owner delete never removes the row (owner-scoped, no existence leak).
+    assert await repo.get(created.id) is not None
+
+
+async def test_delete_rolls_back_when_persistence_fails() -> None:
+    service, repo = _service(followers=0)
+    created = await service.create_draft("user-1", _publishable_doc())
+
+    async def failing_delete(_roadmap_id: str) -> None:
+        raise RuntimeError("db down")
+
+    repo.delete = failing_delete  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError):
+        await service.delete("user-1", created.id)
+    assert repo.rollbacks == 1
+
+
+async def test_delete_guard_reads_a_real_follower_count() -> None:
+    # The sociable proof: the delete guard reads the actual progress-row count via
+    # the injected counter, so a published roadmap with a real follower is blocked
+    # while the same roadmap with none is deletable.
+    roadmap_repo = InMemoryRoadmapRepository()
+    progress_repo = InMemoryProgressRepository()
+    roadmaps = RoadmapService(
+        roadmap_repo,
+        follower_counter=progress_repo.count_followers,
+        token_factory=sequence_token_factory(["7f3k", "9x2b"]),
+        clock=lambda: _FIXED_NOW,
+    )
+    progress = ProgressService(roadmap_repo, progress_repo, clock=lambda: _FIXED_NOW)
+
+    source = await roadmaps.create_draft("owner", _publishable_doc())
+    await roadmaps.publish("owner", source.id)
+    # Public so a different user can reach and follow it.
+    await roadmaps.set_visibility("owner", source.id, Visibility.PUBLIC)
+    # A different user follows it: the delete guard now sees one follower.
+    await progress.follow("follower", source.id)
+    with pytest.raises(Conflict) as excinfo:
+        await roadmaps.delete("owner", source.id)
+    assert excinfo.value.code is ErrorCode.DELETE_HAS_FOLLOWERS
+
+    # A second, unfollowed roadmap by the same owner deletes cleanly.
+    other = await roadmaps.create_draft("owner", _publishable_doc("Untouched Path"))
+    await roadmaps.delete("owner", other.id)
+    assert await roadmap_repo.get(other.id) is None

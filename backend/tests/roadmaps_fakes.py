@@ -9,7 +9,7 @@ without a database.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Awaitable, Callable, Iterator, Sequence
 
 from sqlalchemy.exc import IntegrityError
 
@@ -63,6 +63,11 @@ class InMemoryRoadmapRepository:
         # own readability rule before using the result.
         return self._by_id.get(roadmap_id)
 
+    async def delete(self, roadmap_id: str) -> None:
+        # Mirror the real repository: remove the row unconditionally (the service
+        # enforces the zero-followers guard before calling this).
+        self._by_id.pop(roadmap_id, None)
+
     async def commit(self) -> None:
         self.commits += 1
 
@@ -78,3 +83,18 @@ def sequence_token_factory(tokens: Sequence[str]) -> Callable[[], str]:
     """
     it: Iterator[str] = iter(tokens)
     return lambda: next(it)
+
+
+def constant_follower_counter(count: int = 0) -> Callable[[str], Awaitable[int]]:
+    """A :data:`~wren.roadmaps.service.FollowerCounter` returning a fixed ``count``.
+
+    Injected into :class:`RoadmapService` so the delete guard is exercised without
+    the progress domain: ``0`` (the default) lets a delete through, a positive
+    value drives the delete-has-followers 409. For a sociable follower count backed
+    by real progress rows, bind ``InMemoryProgressRepository.count_followers``.
+    """
+
+    async def counter(_roadmap_id: str) -> int:
+        return count
+
+    return counter

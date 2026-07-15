@@ -14,6 +14,7 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from wren.core.db import get_session
+from wren.progress.repository import SqlAlchemyProgressRepository
 from wren.roadmaps.repository import SqlAlchemyRoadmapRepository
 from wren.roadmaps.service import RoadmapService
 
@@ -22,6 +23,13 @@ def build_roadmap_service_provider() -> Callable[[AsyncSession], RoadmapService]
     """A FastAPI dependency that builds a request-scoped :class:`RoadmapService`."""
 
     def provider(session: AsyncSession = Depends(get_session)) -> RoadmapService:
-        return RoadmapService(SqlAlchemyRoadmapRepository(session))
+        # The follower counter is bound to the progress repository over the SAME
+        # request-scoped session (delete's zero-followers guard, spec sections
+        # 05/06). The roadmaps service stays decoupled from the progress domain:
+        # it only receives the narrow count callable, not the repository.
+        return RoadmapService(
+            SqlAlchemyRoadmapRepository(session),
+            follower_counter=SqlAlchemyProgressRepository(session).count_followers,
+        )
 
     return provider

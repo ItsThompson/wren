@@ -1,6 +1,6 @@
 """External REST adapter for roadmaps: create, read, iterative-edit (patch),
-full-document import (replace), validate, publish, fork, and presentation-only
-metadata edit.
+full-document import (replace), validate, publish, fork, presentation-only
+metadata edit, and the web-only lifecycle (visibility / archive / delete).
 
 Thin handlers (spec sections 05/06): each resolves the caller via ``require_user``
 (the cookie session; a spoofed ``X-User-ID`` is stripped upstream), calls one
@@ -14,7 +14,12 @@ The lifecycle commands use the ``:verb`` action sub-resource form
 hard-blocks with a 422 carrying the ``Violation`` list, while ``validate`` always
 returns 200 with a (possibly empty) list and ``fork`` returns 201 with the new
 draft. ``PATCH /roadmaps/{id}/metadata`` is the presentation-only edit that stays
-allowed post-publish (not ``If-Match``-guarded).
+allowed post-publish (not ``If-Match``-guarded). The web-only lifecycle actions
+(``PUT /roadmaps/{id}/visibility``, ``POST /roadmaps/{id}:archive``,
+``DELETE /roadmaps/{id}``) are mounted on the external app **only**: they have no
+internal-app route and no MCP tool (spec sections 06/07/08). Delete is guarded by
+a zero-followers check (409 ``DELETE_HAS_FOLLOWERS`` otherwise); archive is the
+safe retirement path.
 """
 
 from __future__ import annotations
@@ -34,6 +39,7 @@ from wren.roadmaps.schemas import (
     RoadmapInput,
     RoadmapReplaced,
     ValidateResult,
+    VisibilityRequest,
 )
 from wren.roadmaps.service import RoadmapService
 
@@ -131,5 +137,40 @@ def create_roadmaps_router(service_provider: RoadmapServiceProvider) -> APIRoute
         return await service.edit_metadata(
             user_id, roadmap_id, body.title, body.description, body.subject_tags
         )
+
+    @router.put("/{roadmap_id}/visibility")
+    async def set_roadmap_visibility(
+        roadmap_id: str,
+        body: VisibilityRequest,
+        user_id: str = Depends(require_user),
+        service: RoadmapService = Depends(service_provider),
+    ) -> Roadmap:
+        # Web-only visibility toggle (spec sections 06/08): mounted on the external
+        # app only, no internal-app route and no MCP tool. Owner-scoped in the
+        # service (a non-owner is a 404, no existence leak); last-write-wins.
+        return await service.set_visibility(user_id, roadmap_id, body.visibility)
+
+    @router.post("/{roadmap_id}:archive")
+    async def archive_roadmap(
+        roadmap_id: str,
+        user_id: str = Depends(require_user),
+        service: RoadmapService = Depends(service_provider),
+    ) -> Roadmap:
+        # Web-only archive (spec sections 06/08): the safe retirement path (hides
+        # from discovery, existing followers keep access). External app only, no
+        # internal-app route and no MCP tool. Only a published roadmap can be
+        # archived (else 409 via the service).
+        return await service.archive(user_id, roadmap_id)
+
+    @router.delete("/{roadmap_id}", status_code=204)
+    async def delete_roadmap(
+        roadmap_id: str,
+        user_id: str = Depends(require_user),
+        service: RoadmapService = Depends(service_provider),
+    ) -> None:
+        # Web-only delete (spec sections 06/08): external app only, no internal-app
+        # route and no MCP tool. Guarded by a zero-followers check in the service; a
+        # roadmap with followers is a 409 DELETE_HAS_FOLLOWERS steering to archive.
+        await service.delete(user_id, roadmap_id)
 
     return router

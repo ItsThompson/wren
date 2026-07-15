@@ -10,14 +10,17 @@ This slice implements ``create_draft``, the owner-scoped ``get``, the iterative
 ``patch_draft``, the full-document ``replace_draft`` import escape hatch, the
 minimal ``validate`` / ``publish`` lifecycle (the draft -> published one-way
 transition that makes content immutable), ``fork`` (a new draft seeded from any
-readable roadmap), and ``edit_metadata`` (the sanctioned presentation-only edit
-that stays allowed post-publish). The read projections are later slices; the full
-structural contract composes onto ``validate`` in a later slice (spec section 05).
+readable roadmap), ``edit_metadata`` (the sanctioned presentation-only edit
+that stays allowed post-publish), and the web-only lifecycle actions
+``set_visibility`` / ``archive`` / ``delete`` (delete guarded by a zero-followers
+check; archive the safe retirement path). The read projections are later slices;
+the full structural contract composes onto ``validate`` in a later slice (spec
+section 05).
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 
 from wren.core.errors import Conflict, ErrorCode, NotFound, Validation, Violation
@@ -43,6 +46,11 @@ _log = get_logger("wren-roadmaps")
 
 TokenFactory = Callable[[], str]
 Clock = Callable[[], datetime]
+# How the service learns a roadmap's follower count for the delete guard. A narrow
+# injected callable (not the whole progress repository) keeps the roadmaps domain
+# decoupled from the progress domain: the wiring binds it to the progress
+# repository's indexed count, tests substitute a constant (spec sections 05/06).
+FollowerCounter = Callable[[str], Awaitable[int]]
 
 
 def _utcnow() -> datetime:
@@ -56,10 +64,14 @@ class RoadmapService:
         self,
         repo: RoadmapRepository,
         *,
+        follower_counter: FollowerCounter,
         token_factory: TokenFactory = slugs.random_token,
         clock: Clock = _utcnow,
     ) -> None:
         self._repo = repo
+        # Counts followers for the delete guard; injected so the roadmaps domain
+        # never imports the progress repository (the wiring composes them).
+        self._follower_counter = follower_counter
         # The random-token source and clock are injected so tests can force an
         # ID collision (re-roll) and pin timestamps without patching globals.
         self._token_factory = token_factory
@@ -155,9 +167,14 @@ class RoadmapService:
         ID semantics (spec section 04 v1.1): the roadmap's own ID (the route param)
         is unchanged, nodes carrying a ``proposed_id`` keep it, and every other node
         is re-minted, all via the shared :func:`assemble_draft` mint-then-resolve
-        pass. ``created_at`` and ``owner`` are preserved; ``revision`` bumps by one
-        and the ``proposed_id -> minted_id`` remap is returned so the author can
-        reconcile any de-duped reference.
+        pass. ``created_at``, ``owner``, and ``visibility`` are preserved; ``revision``
+        bumps by one and the ``proposed_id -> minted_id`` remap is returned so the
+        author can reconcile any de-duped reference.
+
+        Visibility is deliberately taken from the **stored** draft, not the imported
+        document: a full-document import replaces content, so it must not silently
+        flip a draft public/private. Visibility is a web-only lifecycle toggle (spec
+        sections 04/06), changed only through :meth:`set_visibility`.
         """
         draft = await self._load_writable_draft(user_id, roadmap_id)
         if draft.revision != revision:
@@ -172,7 +189,11 @@ class RoadmapService:
         # needed. Preserve created_at + bump the revision (assemble_draft resets both).
         assembled = assemble_draft(doc, roadmap_id, owner=user_id, now=self._clock())
         replaced = assembled.roadmap.model_copy(
-            update={"revision": draft.revision + 1, "created_at": draft.created_at}
+            update={
+                "revision": draft.revision + 1,
+                "created_at": draft.created_at,
+                "visibility": draft.visibility,
+            }
         )
         try:
             await self._repo.save(replaced)
@@ -298,6 +319,98 @@ class RoadmapService:
             raise
         _log.info("roadmap_metadata_edited", roadmap_id=roadmap_id, owner=user_id)
         return edited
+
+    async def set_visibility(
+        self, user_id: str, roadmap_id: str, visibility: Visibility
+    ) -> Roadmap:
+        """Toggle the caller's own roadmap public/private (web-only, spec sections
+        04/06).
+
+        Loads through the plain owner guard (:meth:`_load_owned`), so it applies to
+        a roadmap of any status (a draft or a published one): visibility is a
+        lifecycle field, not follower-visible structure. A public roadmap is
+        reachable by link and appears on the owner's profile; a private one is
+        owner-only. Last-write-wins (deliberately not ``If-Match``-guarded) and it
+        never bumps the structural ``revision`` or alters any content. Setting the
+        current value again is an idempotent no-op beyond the timestamp.
+        """
+        roadmap = await self._load_owned(user_id, roadmap_id)
+        updated = roadmap.model_copy(update={"visibility": visibility, "updated_at": self._clock()})
+        try:
+            await self._repo.save(updated)
+            await self._repo.commit()
+        except Exception:
+            await self._repo.rollback()
+            raise
+        _log.info(
+            "roadmap_visibility_set",
+            roadmap_id=roadmap_id,
+            owner=user_id,
+            visibility=visibility.value,
+        )
+        return updated
+
+    async def archive(self, user_id: str, roadmap_id: str) -> Roadmap:
+        """Archive the caller's own published roadmap (web-only, spec sections
+        04/05/06).
+
+        Archive is the safe retirement path (the alternative offered when a delete
+        is blocked by followers): it hides the roadmap from discovery (the owner's
+        profile) while existing followers keep it and their progress. Only a
+        ``published`` roadmap can be archived (the ``draft -> published -> archived``
+        lifecycle is linear); a draft (delete it instead) or an already-archived
+        roadmap raises ``Conflict``. Archiving alters no content and keeps the
+        structural ``revision``.
+        """
+        roadmap = await self._load_owned(user_id, roadmap_id)
+        if roadmap.status is not RoadmapStatus.PUBLISHED:
+            raise Conflict(
+                f"Roadmap '{roadmap_id}' is {roadmap.status.value}; only a published roadmap can "
+                "be archived.",
+                instance=f"/roadmaps/{roadmap_id}",
+            )
+        archived = roadmap.model_copy(
+            update={"status": RoadmapStatus.ARCHIVED, "updated_at": self._clock()}
+        )
+        try:
+            await self._repo.save(archived)
+            await self._repo.commit()
+        except Exception:
+            await self._repo.rollback()
+            raise
+        _log.info("roadmap_archived", roadmap_id=roadmap_id, owner=user_id)
+        return archived
+
+    async def delete(self, user_id: str, roadmap_id: str) -> None:
+        """Delete the caller's own roadmap, but only when it has zero followers
+        (web-only, spec sections 04/05/06).
+
+        Loads through the plain owner guard (:meth:`_load_owned`: a non-owner /
+        unknown ID is a 404 with no existence leak), then counts followers via the
+        injected :attr:`_follower_counter`. With any follower the delete is refused
+        with a 409 ``DELETE_HAS_FOLLOWERS`` steering the caller to ``archive``
+        instead (which retires the roadmap while followers keep their progress);
+        with zero followers the row is removed. Applies to a roadmap of any status
+        (a draft always has zero followers, since a draft is not followable).
+        """
+        roadmap = await self._load_owned(user_id, roadmap_id)
+        followers = await self._follower_counter(roadmap.id)
+        if followers > 0:
+            noun = "follower" if followers == 1 else "followers"
+            raise Conflict(
+                f"Roadmap '{roadmap_id}' has {followers} {noun}; delete is only allowed with zero "
+                "followers. Archive it instead to retire it while existing followers keep their "
+                "progress.",
+                code=ErrorCode.DELETE_HAS_FOLLOWERS,
+                instance=f"/roadmaps/{roadmap_id}",
+            )
+        try:
+            await self._repo.delete(roadmap_id)
+            await self._repo.commit()
+        except Exception:
+            await self._repo.rollback()
+            raise
+        _log.info("roadmap_deleted", roadmap_id=roadmap_id, owner=user_id)
 
     async def _load_owned(self, user_id: str, roadmap_id: str) -> Roadmap:
         """Load the caller's own roadmap or raise ``NotFound``.
