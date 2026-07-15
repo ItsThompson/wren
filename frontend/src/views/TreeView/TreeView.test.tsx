@@ -1,9 +1,11 @@
 import type { ComponentType } from 'react'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
+import { Route, Routes, useLocation } from 'react-router'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+
+import { renderWithProviders } from '@/test/renderWithProviders'
 
 import type { ProgressSnapshot, Roadmap, TreeNodeData } from './types'
 import { TreeView } from './TreeView'
@@ -90,6 +92,9 @@ function buildProgress(checkedIds: string[] = []): ProgressSnapshot {
 }
 
 const server = setupServer(
+  // useRealAuth mounts the real AuthProvider, which resumes via POST /auth/refresh
+  // on mount; resolve it to anonymous (the tree read is unconditional either way).
+  http.post('*/auth/refresh', () => new HttpResponse(null, { status: 401 })),
   http.get('*/roadmaps/:id/progress', () => HttpResponse.json(buildProgress([]))),
   http.get('*/roadmaps/:id', () => HttpResponse.json(buildRoadmap())),
 )
@@ -110,14 +115,15 @@ function LocationProbe() {
 }
 
 function renderTree() {
-  return render(
-    <MemoryRouter initialEntries={[`/roadmaps/${ROADMAP_ID}/tree`]}>
+  return renderWithProviders(
+    <>
       <Routes>
-        <Route path="/roadmaps/:roadmapId/tree" element={<TreeView baseUrl={BASE} />} />
+        <Route path="/roadmaps/:roadmapId/tree" element={<TreeView />} />
         <Route path="/roadmaps/:roadmapId" element={<div>list view stub</div>} />
       </Routes>
       <LocationProbe />
-    </MemoryRouter>,
+    </>,
+    { initialEntries: [`/roadmaps/${ROADMAP_ID}/tree`], baseUrl: BASE, useRealAuth: true },
   )
 }
 
