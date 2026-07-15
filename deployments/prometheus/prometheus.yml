@@ -36,9 +36,9 @@ scrape_configs:
     static_configs:
       - targets: ["backend:8000", "backend:8001"]
 
-  # MCP /metrics is scraped here over monitoring-net, never via the tunnel
-  # (tracked constraint from Ticket 20 review): mcp.usewren.com only path-exposes
-  # the PRM doc + /mcp transport at ingress, so /metrics is unreachable publicly.
+  # MCP /metrics is scraped here over monitoring-net, never via the tunnel:
+  # mcp.usewren.com only path-exposes the PRM doc + /mcp transport at ingress,
+  # so /metrics is unreachable publicly.
   - job_name: mcp
     metrics_path: /metrics
     static_configs:

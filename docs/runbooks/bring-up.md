@@ -1,8 +1,7 @@
 # Runbook: one-time production bring-up
 
 The **one-time** procedure that stands up the single production VPS and does the
-first live release (spec section 11 §7.1 bring-up, §4.4 hardening, §4.1 tunnel,
-§8.3 secrets). Everything here is done **once, by hand, by the operator**, because
+first live release. Everything here is done **once, by hand, by the operator**, because
 it depends on external infrastructure a human must supply. The repeatable deploy
 that runs afterward is `deploy.md`; this runbook never has to run again unless the
 box is rebuilt.
@@ -159,7 +158,7 @@ Production values that differ from the dev defaults in `.env.example`:
 `ENVIRONMENT=production` makes the app **fail fast** if `SESSION_JWT_SECRET` is
 too short or the OAuth key is missing, and makes cookies `Secure`. All OAuth
 issuer/metadata/redirect URLs are built from the pinned `*_PUBLIC_URL` values, not
-the request host (the "Site-URL gotcha", section 08).
+the request host (the "Site-URL gotcha").
 
 ### C2. OAuth AS private key
 
@@ -293,4 +292,4 @@ docker compose -f docker-compose.yml -f docker-compose.tunnel.yml --profile tunn
 The box is provisioned, hardened, and serving. From here, every change ships
 through the repeatable deploy in `deploy.md` (CD on merge to `main`, or a manual
 `just deploy`). Post-P0 follow-ups (accepted risks) are off-host `pg_dump`
-backups and Grafana dashboards; see section 11.
+backups and Grafana dashboards.

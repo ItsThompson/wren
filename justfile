@@ -44,7 +44,7 @@ setup-mcp:
     cd mcp && uv sync
 
 # Boot the MCP Resource Server (:9000) with autoreload. Also used by the MCP
-# Inspector to attach during development (spec section 07).
+# Inspector to attach during development.
 dev-mcp:
     cd mcp && uv run uvicorn wren_mcp.main:app --host 127.0.0.1 --port 9000 --reload
 
@@ -76,7 +76,7 @@ sync-skill:
 build:
     docker compose build
 
-# Run the production-shaped stack locally (expose-only; tunnel added in Ticket 29)
+# Run the production-shaped stack locally (expose-only; tunnel added at deploy time)
 up:
     docker compose up -d --build
 
@@ -138,8 +138,8 @@ lint-frontend:
 
 # Regenerate the OpenAPI -> TypeScript client from the live FastAPI schema.
 # Exports the external app's OpenAPI document, then runs openapi-typescript.
-# CI runs this and `git diff --exit-code` to fail on a stale committed client
-# (spec sections 06/13). Run after any change to the external REST surface.
+# CI runs this and `git diff --exit-code` to fail on a stale committed client.
+# Run after any change to the external REST surface.
 codegen:
     cd backend && LOG_LEVEL=critical uv run python -c "import json; from wren.api.main import app; print(json.dumps(app.openapi(), indent=2))" > ../frontend/openapi.json
     cd frontend && npm run codegen

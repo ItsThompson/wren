@@ -2,14 +2,13 @@
 # =============================================================================
 # scripts/deploy.sh
 #
-# Push-based SSH deploy orchestration for Wren (spec section 11, §7.2 phases
-# 1-14), collapsed to the modular-monolith topology and hardened for a non-root
-# deploy user.
+# Push-based SSH deploy orchestration for Wren (phases 1-14), collapsed to the
+# modular-monolith topology and hardened for a non-root deploy user.
 #
 # Runs from a checkout of this repo (CI runner or an operator's machine) and
 # orchestrates a single VPS over SSH. It never creates secrets on the box: it
 # asserts /opt/wren/.env and the OAuth key already exist (placed at one-time
-# bring-up, Ticket 32).
+# bring-up).
 #
 # Usage:
 #   DEPLOY_SHA=<git-sha> ./scripts/deploy.sh <server-ip> [ssh-user]
@@ -38,8 +37,8 @@ CRED_DIR="${REPO_ROOT}/deployments/cloudflare"
 REMOTE_DIR="${WREN_REMOTE_DIR:-/opt/wren}"
 REPO_URL="${WREN_REPO_URL:-https://github.com/${GITHUB_REPOSITORY:-wren-platform/wren}.git}"
 
-# Every compose invocation layers the tunnel overlay (Ticket 29 owns it; the
-# base docker-compose.yml, Ticket 28, is untouched). The tunnels profile keeps
+# Every compose invocation layers the tunnel overlay (the overlay owns ingress;
+# the base docker-compose.yml is untouched). The tunnels profile keeps
 # cloudflared from starting outside a deploy.
 COMPOSE="docker compose -f docker-compose.yml -f docker-compose.tunnel.yml"
 COMPOSE_TUNNEL="${COMPOSE} --profile tunnels"

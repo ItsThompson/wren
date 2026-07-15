@@ -1,15 +1,15 @@
 # =============================================================================
-# Wren production-shaped stack (spec sections 08 + 11).
+# Wren production-shaped stack.
 #
 # Every service is expose-only (NO host `ports:`): the Cloudflare tunnel is the
-# only ingress and is added in Ticket 29 (locally the stack runs without it).
-# Four segmented bridge networks isolate the tiers; Postgres lives
+# only ingress and is added by the tunnel overlay (locally the stack runs
+# without it). Four segmented bridge networks isolate the tiers; Postgres lives
 # on data-net alone and the internal app (:8001) is never on edge-net.
 #
 # Local development layers docker-compose.dev.yml on top (bind mounts, --reload,
 # relaxed cookies, in-network public URLs, host-published Postgres): see
-# `just up-dev`. This base file is the deployable artifact the ops tickets (29,
-# 31, 32) operate on.
+# `just up-dev`. This base file is the deployable artifact the deploy and
+# monitoring tooling operate on.
 #
 # Image version pinning: third-party images are pinned to exact tags. Review
 # quarterly; check release notes before bumping.
@@ -163,8 +163,8 @@ services:
 
   # ---------------------------------------------------------------------------
   # Observability tier (monitoring-net only; never edge).
-  # Containers + networks + volumes land here; the scrape/alert config is the
-  # seam Ticket 31 fills in (deployments/prometheus, deployments/alertmanager).
+  # Containers + networks + volumes land here; the scrape/alert config lives in
+  # deployments/prometheus and deployments/alertmanager.
   # ---------------------------------------------------------------------------
   prometheus:
     image: prom/prometheus:v3.1.0
@@ -262,9 +262,6 @@ services:
           memory: 128M
     restart: unless-stopped
 
-# -----------------------------------------------------------------------------
-# Networks (spec section 08 segmentation)
-# -----------------------------------------------------------------------------
 networks:
   edge-net:
     driver: bridge

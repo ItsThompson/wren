@@ -1,6 +1,6 @@
 name: CI
 
-# Spec section 11 §CI (ci.yml). Runs on every push and on PRs into main. The
+# Runs on every push and on PRs into main. The
 # lint job runs first and gates the three test jobs; codegen-drift is
 # independent. Coverage gates are hard: backend 80%, frontend 70%.
 on:

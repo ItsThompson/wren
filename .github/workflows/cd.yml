@@ -1,6 +1,6 @@
 name: CD
 
-# Spec section 11 §CD (cd.yml). Two triggers:
+# Two triggers:
 #   - workflow_run: fires after CI completes on main; the build/deploy jobs are
 #     gated on CI having concluded successfully.
 #   - workflow_dispatch: manual re-deploy of the current main.
@@ -114,8 +114,8 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # deploy: decode the Cloudflare tunnel secrets to the paths deploy.sh asserts,
-  # set up SSH to the VPS, then hand off to scripts/deploy.sh (owned by Ticket
-  # 29) with DEPLOY_SHA so it deploys/records the just-built images.
+  # set up SSH to the VPS, then hand off to scripts/deploy.sh with DEPLOY_SHA so
+  # it deploys/records the just-built images.
   # ---------------------------------------------------------------------------
   deploy:
     needs: [build-and-push]

@@ -1,5 +1,5 @@
 # =============================================================================
-# Cloudflare Tunnel ingress for Wren (spec section 11 §4.1 + §7.2 phase 9).
+# Cloudflare Tunnel ingress for Wren.
 #
 # This is the COMMITTED TEMPLATE. scripts/deploy.sh renders it to
 # config.rendered.yml with envsubst (substituting only the CF_* vars below,
@@ -29,8 +29,8 @@ ingress:
   # 3. MCP (mcp.usewren.com): PUBLICLY expose ONLY the PRM discovery document
   #    (/.well-known/oauth-protected-resource) and the /mcp transport. The MCP
   #    server's /metrics, /healthz and /readyz are scraped over monitoring-net
-  #    and MUST NOT be reachable through the tunnel (tracked from Ticket 20's
-  #    review). The path allow-list is enforced here at ingress: any other path
+  #    and MUST NOT be reachable through the tunnel. The path allow-list is
+  #    enforced here at ingress: any other path
   #    on this hostname falls through to the per-host 404 rule below.
   - hostname: ${CF_MCP_HOSTNAME}
     path: '^/(mcp(/.*)?|\.well-known/oauth-protected-resource)$'

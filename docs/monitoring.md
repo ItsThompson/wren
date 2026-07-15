@@ -89,7 +89,7 @@ crash-looping local dev, the `alertmanager` service is gated behind the `tunnels
 compose profile (the only profile the deploy activates), so `just up`/`up-dev` do
 not start it; Prometheus and node-exporter still run locally. The render is wired
 into `scripts/deploy.sh` (phase 9a, alongside the tunnel render); provisioning a
-real `DISCORD_WEBHOOK_URL` in the VPS `.env` is a prerequisite of the #32 live
+real `DISCORD_WEBHOOK_URL` in the VPS `.env` is a prerequisite of the live
 bring-up.
 
 ## Retention and query guards

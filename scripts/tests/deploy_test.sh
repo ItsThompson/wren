@@ -7,7 +7,7 @@
 #   - pure helpers (image filtering, health parsing)
 #   - the dry-run phase plan and ordering
 #   - the rollback path (via a stubbed SSH boundary)
-# Live execution against a real box is Ticket 32.
+# Live execution against a real box is out of scope for this harness.
 #
 # Run: scripts/tests/deploy_test.sh   (or: just test-deploy)
 # =============================================================================

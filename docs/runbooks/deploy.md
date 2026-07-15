@@ -32,7 +32,7 @@ accepted at this scale (~5 users).
 
 ## Triggering a deploy
 
-- **Automatic:** CD (`cd.yml`, Ticket 30) builds/pushes `:latest` + `:sha-<sha>`
+- **Automatic:** CD (`cd.yml`) builds/pushes `:latest` + `:sha-<sha>`
   images, then runs `./scripts/deploy.sh <ip>` with `DEPLOY_SHA` set. A
   concurrency lock at the CD layer prevents a manual dispatch and a push-deploy
   racing onto the box.

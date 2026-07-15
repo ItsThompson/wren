@@ -1,5 +1,5 @@
 # =============================================================================
-# Cloudflare Tunnel overlay (spec section 11 §4.1, §7.2 phase 11).
+# Cloudflare Tunnel overlay.
 #
 # Layered ON TOP of docker-compose.yml at DEPLOY TIME ONLY:
 #   docker compose -f docker-compose.yml -f docker-compose.tunnel.yml \
@@ -10,13 +10,13 @@
 #
 # Kept separate from docker-compose.yml so the base stack stays a
 # self-contained, tunnel-free local artifact and the ingress lives with the
-# rest of the Ticket-29 deploy machinery.
+# rest of the deploy machinery.
 # =============================================================================
 name: wren
 
 services:
   cloudflared:
-    # Pinned (spec: pin third-party images; review quarterly, check release notes).
+    # Pinned third-party image; review quarterly and check release notes.
     image: cloudflare/cloudflared:2026.7.1
     profiles: [tunnels]
     command: tunnel --config /etc/cloudflared/config.yml run
