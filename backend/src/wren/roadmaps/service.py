@@ -6,8 +6,11 @@ and the resolved ``user_id`` (never trusted from payload), composes the pure
 adapter to render, and owns the transaction boundary (``get_session`` is
 yield-only).
 
-This slice implements ``create_draft`` and the owner-scoped ``get``; patch,
-replace, validate, publish, fork, and the read projections are later slices.
+This slice implements ``create_draft``, the owner-scoped ``get``, and the minimal
+``validate`` / ``publish`` lifecycle (the draft -> published one-way transition
+that makes content immutable). Patch, replace, fork, and the read projections are
+later slices; the full structural contract composes onto ``validate`` in a later
+slice (spec section 05).
 """
 
 from __future__ import annotations
@@ -15,14 +18,15 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from wren.core.errors import NotFound
+from wren.core.errors import Conflict, NotFound, Validation, Violation
 from wren.core.logging import get_logger
 from wren.roadmaps import slugs
 from wren.roadmaps.assembly import assemble_draft
 from wren.roadmaps.config import MAX_ID_MINT_ATTEMPTS
 from wren.roadmaps.models import RoadmapRecord
 from wren.roadmaps.repository import RoadmapRepository
-from wren.roadmaps.schemas import Roadmap, RoadmapCreated, RoadmapInput
+from wren.roadmaps.schemas import Roadmap, RoadmapCreated, RoadmapInput, RoadmapStatus
+from wren.roadmaps.validation import validate_structure
 
 _log = get_logger("wren-roadmaps")
 
@@ -76,6 +80,62 @@ class RoadmapService:
         if record is None:
             raise NotFound(f"No roadmap '{roadmap_id}'.", instance=f"/roadmaps/{roadmap_id}")
         return Roadmap.model_validate(record.document)
+
+    async def validate(self, user_id: str, roadmap_id: str) -> list[Violation]:
+        """Run the structural checks on the caller's own draft and return every
+        violation in one pass (possibly empty). Never mutates; drafts only (a
+        published/archived roadmap raises ``Conflict``)."""
+        draft = await self._load_owned_draft(user_id, roadmap_id)
+        return validate_structure(draft)
+
+    async def publish(self, user_id: str, roadmap_id: str) -> Roadmap:
+        """Validate then transition the caller's draft ``draft -> published``.
+
+        Hard-block: any structural violation raises ``Validation`` (422) and the
+        roadmap stays ``draft``. Publish is one-way and makes the content
+        immutable (structural writes on a non-draft are refused by the same
+        :meth:`_load_owned_draft` guard).
+        """
+        draft = await self._load_owned_draft(user_id, roadmap_id)
+        violations = validate_structure(draft)
+        if violations:
+            raise Validation(
+                f"{len(violations)} structural rule(s) failed.",
+                violations=violations,
+                instance=f"/roadmaps/{roadmap_id}",
+            )
+        published = draft.model_copy(
+            update={"status": RoadmapStatus.PUBLISHED, "updated_at": self._clock()}
+        )
+        try:
+            await self._repo.save(published)
+            await self._repo.commit()
+        except Exception:
+            await self._repo.rollback()
+            raise
+        _log.info("roadmap_published", roadmap_id=roadmap_id, owner=user_id)
+        return published
+
+    async def _load_owned_draft(self, user_id: str, roadmap_id: str) -> Roadmap:
+        """Load the caller's own roadmap and assert it is a mutable draft.
+
+        The single guard for draft-only operations: a non-owner (or unknown ID)
+        gets ``NotFound`` (owner-scoped, no existence leak); a published/archived
+        roadmap gets ``Conflict`` (the immutability boundary). Structural writes
+        (patch / replace, later slices) load through here so a published roadmap's
+        content stays immutable.
+        """
+        record = await self._repo.get_owned(roadmap_id, user_id)
+        if record is None:
+            raise NotFound(f"No roadmap '{roadmap_id}'.", instance=f"/roadmaps/{roadmap_id}")
+        roadmap = Roadmap.model_validate(record.document)
+        if roadmap.status is not RoadmapStatus.DRAFT:
+            raise Conflict(
+                f"Roadmap '{roadmap_id}' is {roadmap.status.value}; only a draft can be "
+                "validated or published.",
+                instance=f"/roadmaps/{roadmap_id}",
+            )
+        return roadmap
 
     async def _mint_unique_roadmap_id(self, base: str) -> str:
         """Mint a globally-unique ``{slug}-{token}`` ID, silently re-rolling the

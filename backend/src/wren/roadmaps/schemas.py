@@ -18,6 +18,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
+from wren.core.errors import Violation
+
 
 class RoadmapStatus(StrEnum):
     DRAFT = "draft"
@@ -155,3 +157,12 @@ class RoadmapCreated(Roadmap):
     had to be changed."""
 
     remap: dict[str, str] = Field(default_factory=dict)
+
+
+class ValidateResult(BaseModel):
+    """The ``POST /roadmaps/{id}:validate`` body: all structural violations in one
+    pass (empty when the draft is publishable). The ``violations`` shape is
+    identical to the 422 publish hard-block body (spec section 06), so a client
+    handles one violation contract for both validate and publish."""
+
+    violations: list[Violation] = Field(default_factory=list)

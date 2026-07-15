@@ -14,6 +14,7 @@ from collections.abc import Callable, Iterator, Sequence
 from sqlalchemy.exc import IntegrityError
 
 from wren.roadmaps.models import RoadmapRecord
+from wren.roadmaps.schemas import Roadmap
 
 
 class _PkViolation(Exception):
@@ -37,6 +38,19 @@ class InMemoryRoadmapRepository:
         if record.id in self._by_id:
             raise IntegrityError("INSERT INTO roadmaps", {}, _PkViolation())
         self._by_id[record.id] = record
+
+    async def save(self, roadmap: Roadmap) -> None:
+        # Mirror the real repository: re-derive the write-managed columns from the
+        # authoritative document so a transition (e.g. draft -> published) is
+        # reflected on the stored record the same way Postgres would persist it.
+        record = self._by_id[roadmap.id]
+        record.owner = roadmap.owner
+        record.title = roadmap.title
+        record.status = roadmap.status.value
+        record.visibility = roadmap.visibility.value
+        record.revision = roadmap.revision
+        record.document = roadmap.model_dump(mode="json")
+        record.updated_at = roadmap.updated_at
 
     async def get_owned(self, roadmap_id: str, owner_id: str) -> RoadmapRecord | None:
         record = self._by_id.get(roadmap_id)

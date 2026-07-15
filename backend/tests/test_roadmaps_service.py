@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 import pytest
 
 from roadmaps_fakes import InMemoryRoadmapRepository, sequence_token_factory
-from wren.core.errors import NotFound
+from wren.core.errors import Conflict, NotFound, Validation
 from wren.roadmaps.schemas import (
     ChecklistItemInput,
     ResourceInput,
@@ -20,6 +20,7 @@ from wren.roadmaps.schemas import (
     Visibility,
 )
 from wren.roadmaps.service import RoadmapService
+from wren.roadmaps.validation import StructuralRule
 
 _FIXED_NOW = datetime(2026, 7, 15, tzinfo=UTC)
 
@@ -58,6 +59,15 @@ def _minimal_doc(title: str = "Grokking DSA") -> RoadmapInput:
             )
         ],
     )
+
+
+def _publishable_doc(title: str = "Grokking DSA") -> RoadmapInput:
+    """A draft that satisfies the minimal structural contract: one non-empty
+    section/subsection with a resource + item, and a present suggested_path."""
+    doc = _minimal_doc(title)
+    doc.sections[0].subsections[0].proposed_id = "sub_arrays"
+    doc.suggested_path = ["sub_arrays"]
+    return doc
 
 
 async def test_create_draft_mints_a_title_slug_random_id() -> None:
@@ -195,4 +205,95 @@ async def test_create_rolls_back_when_persistence_fails() -> None:
     service2 = _service(repo, tokens=["7f3k"])[0]
     with pytest.raises(IntegrityError):
         await service2.create_draft("user-1", _minimal_doc())
+    assert repo.rollbacks == 1
+
+
+# --- validate ---------------------------------------------------------------
+
+
+async def test_validate_returns_no_violations_for_a_publishable_draft() -> None:
+    service, repo = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    violations = await service.validate("user-1", created.id)
+    assert violations == []
+    # Validate never mutates: no extra commit beyond the create.
+    assert repo.commits == 1
+
+
+async def test_validate_returns_violations_for_an_incomplete_draft() -> None:
+    # The minimal doc omits suggested_path, so the minimal V3 gate fires.
+    service, _ = _service()
+    created = await service.create_draft("user-1", _minimal_doc())
+    violations = await service.validate("user-1", created.id)
+    assert [v.rule for v in violations] == [StructuralRule.V3_PATH_COVERAGE]
+    # Still a draft afterwards (validate is read-only).
+    assert (await service.get("user-1", created.id)).status is RoadmapStatus.DRAFT
+
+
+async def test_validate_is_404_for_a_non_owner() -> None:
+    service, _ = _service()
+    created = await service.create_draft("owner", _publishable_doc())
+    with pytest.raises(NotFound):
+        await service.validate("intruder", created.id)
+
+
+async def test_validate_is_a_conflict_on_a_published_roadmap() -> None:
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    await service.publish("user-1", created.id)
+    with pytest.raises(Conflict):
+        await service.validate("user-1", created.id)
+
+
+# --- publish ----------------------------------------------------------------
+
+
+async def test_publish_transitions_a_valid_draft_to_published() -> None:
+    service, repo = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    published = await service.publish("user-1", created.id)
+    assert published.status is RoadmapStatus.PUBLISHED
+    assert published.id == created.id
+    # Persisted: a fresh read reflects the transition, and publish committed once.
+    assert (await service.get("user-1", created.id)).status is RoadmapStatus.PUBLISHED
+    assert repo.commits == 2
+
+
+async def test_publish_hard_blocks_on_violations_and_keeps_the_draft() -> None:
+    service, repo = _service()
+    created = await service.create_draft("user-1", _minimal_doc())  # no suggested_path
+    with pytest.raises(Validation) as excinfo:
+        await service.publish("user-1", created.id)
+    assert [v.rule for v in excinfo.value.violations] == [StructuralRule.V3_PATH_COVERAGE]
+    # No transition and no commit for the blocked publish.
+    assert (await service.get("user-1", created.id)).status is RoadmapStatus.DRAFT
+    assert repo.commits == 1
+
+
+async def test_publish_is_404_for_a_non_owner() -> None:
+    service, _ = _service()
+    created = await service.create_draft("owner", _publishable_doc())
+    with pytest.raises(NotFound):
+        await service.publish("intruder", created.id)
+
+
+async def test_publish_is_one_way_republish_is_a_conflict() -> None:
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    await service.publish("user-1", created.id)
+    # A published roadmap is immutable: re-publishing is refused (draft-only guard).
+    with pytest.raises(Conflict):
+        await service.publish("user-1", created.id)
+
+
+async def test_publish_rolls_back_when_the_transition_fails_to_persist() -> None:
+    service, repo = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+
+    async def failing_save(_roadmap: object) -> None:
+        raise RuntimeError("db down")
+
+    repo.save = failing_save  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError):
+        await service.publish("user-1", created.id)
     assert repo.rollbacks == 1

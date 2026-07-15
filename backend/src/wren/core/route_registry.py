@@ -58,6 +58,11 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     # resolve the human session via require_user (owner-scoped in the service).
     RouteKey(method="POST", path="/roadmaps"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}"): AccessLevel.EXTERNAL_COOKIE,
+    # Roadmap validate + publish lifecycle (#8): owner-scoped draft actions on
+    # the :verb sub-resource. Publish is the one-way draft -> published
+    # transition; both resolve the human session via require_user.
+    RouteKey(method="POST", path="/roadmaps/{roadmap_id}:validate"): AccessLevel.EXTERNAL_COOKIE,
+    RouteKey(method="POST", path="/roadmaps/{roadmap_id}:publish"): AccessLevel.EXTERNAL_COOKIE,
     # OAuth 2.1 AS (#18), external-only. The AS-handshake endpoints are OAUTH
     # (unauthenticated protocol surface: discovery, DCR, authorize, token,
     # revoke); the SPA-driven consent decision and connected-clients management

@@ -18,11 +18,12 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from wren.core.db import fetch_optional
 from wren.roadmaps.models import RoadmapRecord
+from wren.roadmaps.schemas import Roadmap
 
 
 class RoadmapRepository(Protocol):
@@ -31,6 +32,8 @@ class RoadmapRepository(Protocol):
     async def roadmap_id_exists(self, roadmap_id: str) -> bool: ...
 
     async def add(self, record: RoadmapRecord) -> None: ...
+
+    async def save(self, roadmap: Roadmap) -> None: ...
 
     async def get_owned(self, roadmap_id: str, owner_id: str) -> RoadmapRecord | None: ...
 
@@ -55,6 +58,29 @@ class SqlAlchemyRoadmapRepository:
         self._session.add(record)
         # Flush so a PK collision surfaces as an IntegrityError now, inside the
         # service's try/except, rather than at commit time.
+        await self._session.flush()
+
+    async def save(self, roadmap: Roadmap) -> None:
+        """Persist an update to an existing roadmap from the domain object.
+
+        Re-derives every write-managed column from the authoritative ``document``
+        so the scalar index cannot drift (``updated_at`` is set explicitly, which
+        also suppresses the column's ``onupdate`` so the persisted value matches
+        the returned roadmap). The row must already exist (created via ``add``).
+        """
+        await self._session.execute(
+            update(RoadmapRecord)
+            .where(RoadmapRecord.id == roadmap.id)
+            .values(
+                owner=roadmap.owner,
+                title=roadmap.title,
+                status=roadmap.status.value,
+                visibility=roadmap.visibility.value,
+                revision=roadmap.revision,
+                document=roadmap.model_dump(mode="json"),
+                updated_at=roadmap.updated_at,
+            )
+        )
         await self._session.flush()
 
     async def get_owned(self, roadmap_id: str, owner_id: str) -> RoadmapRecord | None:

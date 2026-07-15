@@ -48,6 +48,26 @@ _MINIMAL_ROADMAP = {
     ],
 }
 
+# A draft that satisfies the minimal structural contract (adds the suggested_path
+# the minimal validator requires once there is a subsection to sequence).
+_PUBLISHABLE_ROADMAP = {
+    "title": "Grokking DSA",
+    "suggested_path": ["sub_arrays"],
+    "sections": [
+        {
+            "title": "Foundations",
+            "subsections": [
+                {
+                    "proposed_id": "sub_arrays",
+                    "title": "Arrays",
+                    "resources": [{"title": "Guide", "url": "https://x.test", "type": "article"}],
+                    "checklist_items": [{"text": "Read it"}],
+                }
+            ],
+        }
+    ],
+}
+
 
 def _build_client(
     make_settings: MakeSettings, *, tokens: list[str] | None = None
@@ -185,4 +205,105 @@ def test_get_ignores_a_spoofed_x_user_id_header(make_settings: MakeSettings) -> 
     client.cookies.clear()
     _login(client, username="intruder", email="intruder@example.com")
     response = client.get(f"/roadmaps/{created_id}", headers={USER_ID_HEADER: "owner"})
+    assert response.status_code == 404
+
+
+# --- validate ---------------------------------------------------------------
+
+
+def test_validate_returns_200_and_an_empty_list_for_a_publishable_draft(
+    make_settings: MakeSettings,
+) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+
+    response = client.post(f"/roadmaps/{created_id}:validate")
+    assert response.status_code == 200, response.text
+    assert response.json() == {"violations": []}
+
+
+def test_validate_returns_200_with_violations_for_an_incomplete_draft(
+    make_settings: MakeSettings,
+) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
+
+    response = client.post(f"/roadmaps/{created_id}:validate")
+    assert response.status_code == 200, response.text
+    violations = response.json()["violations"]
+    assert [v["rule"] for v in violations] == ["V3_PATH_COVERAGE"]
+    assert violations[0]["ids"] == ["sub_arrays"]
+    # Validate never mutates: the roadmap stays a draft.
+    assert client.get(f"/roadmaps/{created_id}").json()["status"] == "draft"
+
+
+def test_validate_is_404_to_a_non_owner(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client, username="owner", email="owner@example.com")
+    created_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+
+    client.cookies.clear()
+    _login(client, username="intruder", email="intruder@example.com")
+    response = client.post(f"/roadmaps/{created_id}:validate")
+    assert response.status_code == 404
+    assert response.json()["code"] == "NOT_FOUND"
+
+
+def test_validate_requires_authentication(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings)
+    response = client.post("/roadmaps/anything-0000:validate")
+    assert response.status_code == 401
+
+
+# --- publish ----------------------------------------------------------------
+
+
+def test_publish_transitions_a_valid_draft_to_published(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+
+    response = client.post(f"/roadmaps/{created_id}:publish")
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "published"
+    # Persisted transition, visible on a fresh read.
+    assert client.get(f"/roadmaps/{created_id}").json()["status"] == "published"
+
+
+def test_publish_hard_blocks_with_a_422_problem_json(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
+
+    response = client.post(f"/roadmaps/{created_id}:publish")
+    assert response.status_code == 422, response.text
+    assert response.headers["content-type"] == "application/problem+json"
+    body = response.json()
+    assert body["code"] == "VALIDATION"
+    assert [v["rule"] for v in body["violations"]] == ["V3_PATH_COVERAGE"]
+    # Hard-block: the roadmap stays a draft.
+    assert client.get(f"/roadmaps/{created_id}").json()["status"] == "draft"
+
+
+def test_publish_is_one_way_republishing_is_a_409(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+    assert client.post(f"/roadmaps/{created_id}:publish").status_code == 200
+
+    republish = client.post(f"/roadmaps/{created_id}:publish")
+    assert republish.status_code == 409
+    assert republish.json()["code"] == "CONFLICT"
+
+
+def test_publish_is_404_to_a_non_owner(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client, username="owner", email="owner@example.com")
+    created_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+
+    client.cookies.clear()
+    _login(client, username="intruder", email="intruder@example.com")
+    response = client.post(f"/roadmaps/{created_id}:publish")
     assert response.status_code == 404

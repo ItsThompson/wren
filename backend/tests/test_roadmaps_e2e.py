@@ -55,6 +55,24 @@ _MINIMAL_ROADMAP = {
     ],
 }
 
+_PUBLISHABLE_ROADMAP = {
+    "title": "Grokking DSA",
+    "suggested_path": ["sub_arrays"],
+    "sections": [
+        {
+            "title": "Foundations",
+            "subsections": [
+                {
+                    "proposed_id": "sub_arrays",
+                    "title": "Arrays",
+                    "resources": [{"title": "Guide", "url": "https://x.test", "type": "article"}],
+                    "checklist_items": [{"text": "Read it"}],
+                }
+            ],
+        }
+    ],
+}
+
 
 @pytest.fixture(scope="session")
 def migrated_url(postgres_url: str) -> Iterator[str]:
@@ -129,3 +147,58 @@ def test_create_and_read_draft_end_to_end_over_http(
         )
         denied = client.get(f"/roadmaps/{roadmap_id}")
         assert denied.status_code == 404
+
+
+def test_validate_and_publish_transition_end_to_end_over_http(
+    migrated_url: str, make_settings: MakeSettings
+) -> None:
+    app = _external_app(migrated_url, make_settings(database_url=migrated_url))
+    with TestClient(app) as client:
+        register = client.post(
+            "/auth/register",
+            json={
+                "username": "e2epublisher",
+                "email": "e2e-publisher@example.com",
+                "password": _PASSWORD,
+            },
+        )
+        assert register.status_code == 201, register.text
+
+        roadmap_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+
+        # Validate is clean for a publishable draft, and never mutates.
+        validated = client.post(f"/roadmaps/{roadmap_id}:validate")
+        assert validated.status_code == 200, validated.text
+        assert validated.json() == {"violations": []}
+        assert client.get(f"/roadmaps/{roadmap_id}").json()["status"] == "draft"
+
+        # Publish transitions to published and persists to Postgres.
+        published = client.post(f"/roadmaps/{roadmap_id}:publish")
+        assert published.status_code == 200, published.text
+        assert published.json()["status"] == "published"
+        assert client.get(f"/roadmaps/{roadmap_id}").json()["status"] == "published"
+
+        # One-way: republishing an already-published roadmap is a 409.
+        assert client.post(f"/roadmaps/{roadmap_id}:publish").status_code == 409
+
+
+def test_publish_hard_block_end_to_end_over_http(
+    migrated_url: str, make_settings: MakeSettings
+) -> None:
+    app = _external_app(migrated_url, make_settings(database_url=migrated_url))
+    with TestClient(app) as client:
+        client.post(
+            "/auth/register",
+            json={
+                "username": "e2eblocked",
+                "email": "e2e-blocked@example.com",
+                "password": _PASSWORD,
+            },
+        )
+        # No suggested_path: the minimal validator hard-blocks publish.
+        roadmap_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
+        blocked = client.post(f"/roadmaps/{roadmap_id}:publish")
+        assert blocked.status_code == 422, blocked.text
+        assert [v["rule"] for v in blocked.json()["violations"]] == ["V3_PATH_COVERAGE"]
+        # The draft is untouched.
+        assert client.get(f"/roadmaps/{roadmap_id}").json()["status"] == "draft"
