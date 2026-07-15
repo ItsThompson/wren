@@ -4,10 +4,9 @@ The migration engine reuses ``wren.core.db.create_db_engine`` and reads the URL
 from ``EnvSettings`` (``DATABASE_URL``), so migrations, the app, and tests share
 one source of truth for the connection string (spec section 11: no hardcoded URL).
 
-``target_metadata`` is an empty ``MetaData()`` for now: Ticket 2 is DB plumbing
-only, with no domain tables yet (so ``--autogenerate`` emits empty migrations).
-Ticket 6 sets it to the shared declarative ``Base.metadata`` so ``--autogenerate``
-can diff the real schema.
+``target_metadata`` is the shared declarative ``Base.metadata``. Each domain's
+model module is imported below so its tables attach to that metadata and
+``--autogenerate`` can diff the real schema.
 """
 
 from __future__ import annotations
@@ -16,10 +15,13 @@ import asyncio
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import MetaData
 from sqlalchemy.engine import Connection
 
+# Import every domain's models for their side effect of registering tables on
+# Base.metadata. Add new domain model modules here as slices land (roadmaps #7+).
+import wren.accounts.models  # noqa: F401  (registers the accounts tables)
 from wren.core.db import create_db_engine
+from wren.core.orm import Base
 from wren.core.settings import EnvSettings
 
 config = context.config
@@ -27,11 +29,9 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Empty for now: Ticket 2 is DB plumbing only, with no domain tables. Ticket 6
-# replaces this with the shared declarative ``Base.metadata`` so ``--autogenerate``
-# diffs the real schema. Until then autogenerate produces empty migrations
-# (``alembic_version`` is managed by Alembic and never diffed).
-target_metadata = MetaData()
+# The shared schema Alembic diffs. All ORM models subclass wren.core.orm.Base,
+# so their tables live on this one metadata once their modules are imported.
+target_metadata = Base.metadata
 
 
 def _database_url() -> str:
