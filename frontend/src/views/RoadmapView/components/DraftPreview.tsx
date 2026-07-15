@@ -1,5 +1,6 @@
-import type { PublishState, Roadmap } from '../types'
+import type { PublishState, RoadmapActions as Actions, Roadmap } from '../types'
 import { PublishPanel } from './PublishPanel'
+import { RoadmapActions } from './RoadmapActions'
 import { SectionBlock } from './SectionBlock'
 import { SubjectTags } from './SubjectTags'
 
@@ -7,6 +8,9 @@ interface DraftPreviewProps {
   roadmap: Roadmap
   publishState: PublishState
   onPublish: () => void
+  /** Whether the signed-in user owns this draft (drafts are owner-only anyway). */
+  isOwner: boolean
+  actions: Actions
 }
 
 /**
@@ -16,7 +20,7 @@ interface DraftPreviewProps {
  * startable). The owner publishes from here (section 06 `:publish`); on success
  * the RoadmapView routes to the published list view with progress tracking.
  */
-export function DraftPreview({ roadmap, publishState, onPublish }: DraftPreviewProps) {
+export function DraftPreview({ roadmap, publishState, onPublish, isOwner, actions }: DraftPreviewProps) {
   const sectionOrder = roadmap.section_order ?? []
   const sections = roadmap.sections ?? {}
   const suggestedPath = roadmap.suggested_path ?? []
@@ -42,6 +46,8 @@ export function DraftPreview({ roadmap, publishState, onPublish }: DraftPreviewP
           published.
         </p>
       </header>
+
+      <RoadmapActions roadmap={roadmap} isOwner={isOwner} actions={actions} />
 
       <div className="mt-8">
         {sectionOrder.map((id) => {

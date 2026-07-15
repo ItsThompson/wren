@@ -53,3 +53,42 @@ export type PublishState =
   | { phase: 'publishing' }
   | { phase: 'blocked'; violations: Violation[] }
   | { phase: 'failed'; status: number | null }
+
+/**
+ * The presentation-only fields editable via `PATCH /roadmaps/{id}/metadata`
+ * (title / description / subject_tags), which stay mutable even after publish
+ * (section 04/06). The metadata editor form collects exactly these.
+ */
+export interface MetadataDraft {
+  title: string
+  description: string
+  subject_tags: string[]
+}
+
+/**
+ * The metadata-edit sub-state. `saving` covers the in-flight PATCH; `failed`
+ * carries the HTTP status (or null when the request never resolved) so the
+ * editor can surface a retry message without conflating with the fetch state.
+ */
+export type MetadataEditState =
+  | { phase: 'idle' }
+  | { phase: 'saving' }
+  | { phase: 'failed'; status: number | null }
+
+/**
+ * The fork sub-state. On success the view navigates to the new draft, so there
+ * is no loaded-fork state here; `failed` carries the status for a retry message.
+ */
+export type ForkState = { phase: 'idle' } | { phase: 'forking' } | { phase: 'failed'; status: number | null }
+
+/**
+ * The owner/reader action bundle threaded from RoadmapView into whichever view
+ * renders (draft preview or published list). Fork is available to any reader;
+ * the metadata edit is owner-only and gated by `isOwner` at the render site.
+ */
+export interface RoadmapActions {
+  metadataState: MetadataEditState
+  editMetadata: (draft: MetadataDraft) => Promise<boolean>
+  forkState: ForkState
+  fork: () => void
+}

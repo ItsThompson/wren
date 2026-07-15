@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router'
 
 import { createSessionClient } from '@/auth/createSessionClient'
-import type { PublishState, RoadmapViewState, Violation } from '../types'
+import type {
+  ForkState,
+  MetadataDraft,
+  MetadataEditState,
+  PublishState,
+  RoadmapViewState,
+  Violation,
+} from '../types'
 
 /**
  * The 422 publish hard-block body is RFC 9457 problem+json carrying `violations`
@@ -29,15 +37,28 @@ interface PublishProblem {
 export function useRoadmap(
   roadmapId: string,
   baseUrl: string,
-): { state: RoadmapViewState; publishState: PublishState; publish: () => Promise<void> } {
+): {
+  state: RoadmapViewState
+  publishState: PublishState
+  publish: () => Promise<void>
+  metadataState: MetadataEditState
+  editMetadata: (draft: MetadataDraft) => Promise<boolean>
+  forkState: ForkState
+  fork: () => void
+} {
   const client = useMemo(() => createSessionClient(baseUrl), [baseUrl])
+  const navigate = useNavigate()
   const [state, setState] = useState<RoadmapViewState>({ phase: 'loading' })
   const [publishState, setPublishState] = useState<PublishState>({ phase: 'idle' })
+  const [metadataState, setMetadataState] = useState<MetadataEditState>({ phase: 'idle' })
+  const [forkState, setForkState] = useState<ForkState>({ phase: 'idle' })
 
   useEffect(() => {
     let active = true
     setState({ phase: 'loading' })
     setPublishState({ phase: 'idle' })
+    setMetadataState({ phase: 'idle' })
+    setForkState({ phase: 'idle' })
 
     void (async () => {
       try {
@@ -83,5 +104,57 @@ export function useRoadmap(
     }
   }, [client, roadmapId])
 
-  return { state, publishState, publish }
+  const editMetadata = useCallback(
+    async (draft: MetadataDraft): Promise<boolean> => {
+      // Presentation-only edit (title/description/subject_tags): not If-Match
+      // guarded and never bumps the structural revision (section 06). On success
+      // the returned roadmap replaces the loaded one so the header updates in
+      // place; a failure surfaces a retry message without touching the roadmap.
+      setMetadataState({ phase: 'saving' })
+      try {
+        const { data, response } = await client.PATCH('/roadmaps/{roadmap_id}/metadata', {
+          params: { path: { roadmap_id: roadmapId } },
+          body: {
+            title: draft.title,
+            description: draft.description,
+            subject_tags: draft.subject_tags,
+          },
+        })
+        if (data) {
+          setState({ phase: 'loaded', roadmap: data })
+          setMetadataState({ phase: 'idle' })
+          return true
+        }
+        setMetadataState({ phase: 'failed', status: response.status })
+        return false
+      } catch {
+        setMetadataState({ phase: 'failed', status: null })
+        return false
+      }
+    },
+    [client, roadmapId],
+  )
+
+  const fork = useCallback(() => {
+    // Fork any readable roadmap (own or public) into a fresh private draft, then
+    // navigate to it so the owner can edit and publish the copy (section 05).
+    setForkState({ phase: 'forking' })
+    void (async () => {
+      try {
+        const { data, response } = await client.POST('/roadmaps/{roadmap_id}:fork', {
+          params: { path: { roadmap_id: roadmapId } },
+        })
+        if (data) {
+          setForkState({ phase: 'idle' })
+          navigate(`/roadmaps/${data.id}`)
+          return
+        }
+        setForkState({ phase: 'failed', status: response.status })
+      } catch {
+        setForkState({ phase: 'failed', status: null })
+      }
+    })()
+  }, [client, navigate, roadmapId])
+
+  return { state, publishState, publish, metadataState, editMetadata, forkState, fork }
 }

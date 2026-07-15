@@ -2,13 +2,22 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll } from 'vitest'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 
+import { AuthProvider } from '@/auth'
 import type { ProgressSnapshot, ProgressUpdateResult, Roadmap } from './types'
 import { RoadmapView } from './RoadmapView'
 
 const BASE = 'https://api.test'
 const ROADMAP_ID = 'grokking-dsa-7f3k'
+
+/** The signed-in user; `id` matches `buildDraft`'s owner so ownership resolves. */
+const AUTH_USER = {
+  id: 'user-1',
+  username: 'ada',
+  email: 'ada@example.com',
+  created_at: '2026-07-15T00:00:00Z',
+}
 
 /** A minimal owned draft in the OpenAPI-generated `Roadmap` shape. */
 function buildDraft(overrides: Partial<Roadmap> = {}): Roadmap {
@@ -89,13 +98,27 @@ function buildUpdateResult(checkedIds: string[]): ProgressUpdateResult {
   return { progress: buildProgress(checkedIds), next: { items: [], complete: false } }
 }
 
-function renderView() {
+/** Renders the current pathname so navigation (e.g. after a fork) is assertable. */
+function LocationProbe() {
+  const location = useLocation()
+  return <div data-testid="location">{location.pathname}</div>
+}
+
+function renderView(user: typeof AUTH_USER | null = AUTH_USER) {
+  server.use(
+    user
+      ? http.post('*/auth/refresh', () => HttpResponse.json(user))
+      : http.post('*/auth/refresh', () => new HttpResponse(null, { status: 401 })),
+  )
   return render(
-    <MemoryRouter initialEntries={[`/roadmaps/${ROADMAP_ID}`]}>
-      <Routes>
-        <Route path="/roadmaps/:roadmapId" element={<RoadmapView baseUrl={BASE} />} />
-      </Routes>
-    </MemoryRouter>,
+    <AuthProvider baseUrl={BASE}>
+      <MemoryRouter initialEntries={[`/roadmaps/${ROADMAP_ID}`]}>
+        <Routes>
+          <Route path="/roadmaps/:roadmapId" element={<RoadmapView baseUrl={BASE} />} />
+        </Routes>
+        <LocationProbe />
+      </MemoryRouter>
+    </AuthProvider>,
   )
 }
 
@@ -377,6 +400,166 @@ describe('RoadmapView progress tracking', () => {
 
     // The done label appears once (for sub_arrays), not for the unfinished node.
     expect(await screen.findAllByText('done')).toHaveLength(1)
+  })
+})
+
+describe('RoadmapView fork', () => {
+  const FORK_URL = `${BASE}/roadmaps/${ROADMAP_ID}:fork`
+  const OTHER_USER = {
+    id: 'user-2',
+    username: 'grace',
+    email: 'grace@example.com',
+    created_at: '2026-07-15T00:00:00Z',
+  }
+
+  it('forks an owned draft and navigates to the new draft', async () => {
+    server.use(
+      // Any id resolves to a draft (the source, then the fork after navigation).
+      http.get('*/roadmaps/:id', ({ params }) =>
+        HttpResponse.json(buildDraft({ id: String(params.id) })),
+      ),
+      http.post(FORK_URL, () =>
+        HttpResponse.json(buildDraft({ id: 'grokking-dsa-9x2b' }), { status: 201 }),
+      ),
+    )
+    renderView()
+    await screen.findByText('Grokking DSA')
+
+    fireEvent.click(screen.getByRole('button', { name: /^fork$/i }))
+
+    // Fork navigates to the freshly-minted draft's route.
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent('/roadmaps/grokking-dsa-9x2b'),
+    )
+  })
+
+  it('offers Fork but not Edit details to a non-owner on a published roadmap', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () =>
+        HttpResponse.json(buildDraft({ status: 'published', owner: 'user-1' })),
+      ),
+      http.get('*/roadmaps/:id/progress', () => HttpResponse.json(buildProgress())),
+    )
+    // A different signed-in user (a reader/follower), not the owner.
+    renderView(OTHER_USER)
+    await screen.findByRole('progressbar', { name: /overall progress/i })
+
+    // Any reader can fork a public roadmap; only the owner can edit its metadata.
+    expect(screen.getByRole('button', { name: /^fork$/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /edit details/i })).not.toBeInTheDocument()
+  })
+
+  it('surfaces a retry message when a fork fails unexpectedly (500)', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
+      http.post(FORK_URL, () => new HttpResponse(null, { status: 500 })),
+    )
+    renderView()
+    await screen.findByText('Grokking DSA')
+
+    fireEvent.click(screen.getByRole('button', { name: /^fork$/i }))
+
+    expect(await screen.findByText(/couldn.t fork this roadmap/i)).toBeInTheDocument()
+    // Did not navigate away: still on the source route.
+    expect(screen.getByTestId('location')).toHaveTextContent(`/roadmaps/${ROADMAP_ID}`)
+  })
+})
+
+describe('RoadmapView metadata edit', () => {
+  const METADATA_URL = `${BASE}/roadmaps/${ROADMAP_ID}/metadata`
+
+  it('lets the owner edit presentation metadata and reflects the new title', async () => {
+    let patched: unknown
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
+      http.patch(METADATA_URL, async ({ request }) => {
+        patched = await request.json()
+        const body = patched as { title: string; description: string; subject_tags: string[] }
+        return HttpResponse.json(
+          buildDraft({
+            title: body.title,
+            description: body.description,
+            subject_tags: body.subject_tags,
+          }),
+        )
+      }),
+    )
+    renderView()
+    await screen.findByText('Grokking DSA')
+
+    fireEvent.click(screen.getByRole('button', { name: /edit details/i }))
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renamed' } })
+    fireEvent.change(screen.getByLabelText('Subject tags'), { target: { value: 'cs, dsa' } })
+    fireEvent.click(screen.getByRole('button', { name: /save details/i }))
+
+    // Only the three presentation fields are sent; parsed tags are trimmed.
+    await waitFor(() =>
+      expect(patched).toEqual({
+        title: 'Renamed',
+        description: 'A prerequisite-aware path.',
+        subject_tags: ['cs', 'dsa'],
+      }),
+    )
+    // The header reflects the returned roadmap and the editor closes.
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Renamed'),
+    )
+    expect(screen.queryByRole('button', { name: /save details/i })).not.toBeInTheDocument()
+  })
+
+  it('edits metadata on a published roadmap (allowed post-publish)', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
+      http.get('*/roadmaps/:id/progress', () => HttpResponse.json(buildProgress())),
+      http.patch(METADATA_URL, () =>
+        HttpResponse.json(buildDraft({ status: 'published', title: 'Renamed live' })),
+      ),
+    )
+    renderView()
+    await screen.findByRole('progressbar', { name: /overall progress/i })
+
+    fireEvent.click(screen.getByRole('button', { name: /edit details/i }))
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renamed live' } })
+    fireEvent.click(screen.getByRole('button', { name: /save details/i }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Renamed live'),
+    )
+    // Still the published tracking view (a metadata edit is not a lifecycle change).
+    expect(
+      screen.getByRole('progressbar', { name: /overall progress/i }),
+    ).toBeInTheDocument()
+  })
+
+  it('keeps the editor open and shows a retry message when the edit fails (500)', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
+      http.patch(METADATA_URL, () => new HttpResponse(null, { status: 500 })),
+    )
+    renderView()
+    await screen.findByText('Grokking DSA')
+
+    fireEvent.click(screen.getByRole('button', { name: /edit details/i }))
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renamed' } })
+    fireEvent.click(screen.getByRole('button', { name: /save details/i }))
+
+    expect(await screen.findByText(/couldn.t save your changes/i)).toBeInTheDocument()
+    // The editor stays open so the entered values are not lost.
+    expect(screen.getByRole('button', { name: /save details/i })).toBeInTheDocument()
+  })
+
+  it('closes the editor on Cancel without saving', async () => {
+    server.use(http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())))
+    renderView()
+    await screen.findByText('Grokking DSA')
+
+    fireEvent.click(screen.getByRole('button', { name: /edit details/i }))
+    expect(screen.getByRole('button', { name: /save details/i })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+    // The editor collapses; the toggle returns to "Edit details".
+    expect(screen.queryByRole('button', { name: /save details/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /edit details/i })).toBeInTheDocument()
   })
 })
 

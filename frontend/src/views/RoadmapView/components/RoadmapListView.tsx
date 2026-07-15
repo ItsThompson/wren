@@ -1,7 +1,8 @@
 import { useProgress } from '../hooks/useProgress'
 import { overallCount } from '../progress-derive'
-import type { ProgressBinding, Roadmap } from '../types'
+import type { ProgressBinding, RoadmapActions as Actions, Roadmap } from '../types'
 import { ProgressBar } from './ProgressBar'
+import { RoadmapActions } from './RoadmapActions'
 import { SectionBlock } from './SectionBlock'
 import { SubjectTags } from './SubjectTags'
 
@@ -9,6 +10,9 @@ interface RoadmapListViewProps {
   roadmap: Roadmap
   /** API base URL, injected so tests can point the progress client at MSW. */
   baseUrl: string
+  /** Whether the signed-in user owns this roadmap (owner-only metadata edit). */
+  isOwner: boolean
+  actions: Actions
 }
 
 /**
@@ -18,7 +22,7 @@ interface RoadmapListViewProps {
  * an item persists to the caller's progress record and the bars + subsection
  * done-state update from the derived checked set.
  */
-export function RoadmapListView({ roadmap, baseUrl }: RoadmapListViewProps) {
+export function RoadmapListView({ roadmap, baseUrl, isOwner, actions }: RoadmapListViewProps) {
   const { checkedIds, toggle } = useProgress(roadmap.id, baseUrl)
   const sectionOrder = roadmap.section_order ?? []
   const sections = roadmap.sections ?? {}
@@ -43,6 +47,8 @@ export function RoadmapListView({ roadmap, baseUrl }: RoadmapListViewProps) {
           />
         </div>
       </header>
+
+      <RoadmapActions roadmap={roadmap} isOwner={isOwner} actions={actions} />
 
       <div className="mt-8">
         {sectionOrder.map((id) => {
