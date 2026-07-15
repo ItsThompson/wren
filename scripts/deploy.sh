@@ -24,7 +24,7 @@
 #
 # Phases: preflight -> ssh probe -> dep install -> docker daemon config ->
 # prune cron -> repo sync -> copy tunnel credentials -> assert secrets ->
-# render tunnel config + pull -> pre-traffic migrations -> start ->
+# render deploy configs + pull -> pre-traffic migrations -> start ->
 # health gate -> (rollback on failure) -> cleanup on success.
 #
 # Not zero-downtime (accepted at ~5 users). Concurrency (a manual dispatch vs a
@@ -295,7 +295,7 @@ echo "    .env and OAuth key present"
 REMOTE
 }
 
-# --- Phase 9: render tunnel config (envsubst) + pull ------------------------
+# --- Phase 9: render deploy configs (envsubst) + pull -----------------------
 
 render_tunnel_config() {
   log "==> Phase 9a: render tunnel config (envsubst)"
@@ -312,8 +312,37 @@ echo "    rendered deployments/cloudflare/config.rendered.yml"
 REMOTE
 }
 
-render_and_pull() {
+render_alertmanager_config() {
+  log "==> Phase 9a: render Alertmanager config (envsubst DISCORD_WEBHOOK_URL)"
+  remote_script "${REMOTE_DIR}" <<'REMOTE'
+set -euo pipefail
+cd "$1"
+set -a; . ./.env; set +a
+# Alertmanager v0.27 EXITS on config load if webhook_url is not a valid URL, and
+# the tunnels profile the deploy activates DOES start alertmanager, so a missing
+# webhook is release-gating: fail here with a clear message rather than let the
+# container crash-loop until the health gate times out and rolls back.
+: "${DISCORD_WEBHOOK_URL:?DISCORD_WEBHOOK_URL must be set in /opt/wren/.env (bring-up)}"
+# Substitute ONLY the webhook token (single-var allow-list) so the Go templating
+# ({{ ... }}) in title/message survives. The rendered file holds a real secret,
+# so chmod 600; it is gitignored and mounted by the alertmanager service.
+envsubst '${DISCORD_WEBHOOK_URL}' \
+  < deployments/alertmanager/alertmanager.yml \
+  > deployments/alertmanager/alertmanager.rendered.yml
+chmod 600 deployments/alertmanager/alertmanager.rendered.yml
+echo "    rendered deployments/alertmanager/alertmanager.rendered.yml (chmod 600)"
+REMOTE
+}
+
+# Render every deploy-time config the stack mounts (tunnel ingress + Alertmanager
+# webhook) from /opt/wren/.env before any `up`.
+render_configs() {
   render_tunnel_config
+  render_alertmanager_config
+}
+
+render_and_pull() {
+  render_configs
   log "==> Phase 9b: docker compose pull"
   remote "cd ${REMOTE_DIR} && ${COMPOSE_TUNNEL} pull"
 }
@@ -409,7 +438,7 @@ rollback() {
   done <<< "${images}"
   log "    pinning git checkout to ${prev}"
   remote "git -C ${REMOTE_DIR} reset --hard ${prev}"
-  render_tunnel_config
+  render_configs
   log "    bringing the stack back up on :sha-${prev}"
   remote "cd ${REMOTE_DIR} && WREN_IMAGE_TAG=sha-${prev} ${COMPOSE_TUNNEL} up -d"
 }

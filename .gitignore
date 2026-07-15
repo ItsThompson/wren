@@ -31,6 +31,9 @@ deployments/cloudflare/*.json
 deployments/cloudflare/*.rendered.yml
 deployments/cloudflare/cert.pem
 
+# --- Alertmanager rendered config (holds the real Discord webhook) ----------
+deployments/alertmanager/*.rendered.yml
+
 # --- IDE / OS ---------------------------------------------------------------
 .idea/
 .vscode/

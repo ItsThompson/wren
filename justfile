@@ -165,6 +165,14 @@ render-tunnel:
     envsubst '$CF_TUNNEL_ID $CF_APP_HOSTNAME $CF_API_HOSTNAME $CF_MCP_HOSTNAME' \
       < deployments/cloudflare/config.yml
 
+# Preview the rendered Alertmanager config from the local .env (substitutes only
+# DISCORD_WEBHOOK_URL; the Go templating survives). Redirect to
+# deployments/alertmanager/alertmanager.rendered.yml to exercise alerting locally.
+render-alertmanager:
+    set -a; . ./.env; set +a; \
+    envsubst '$DISCORD_WEBHOOK_URL' \
+      < deployments/alertmanager/alertmanager.yml
+
 # --- E2E (Playwright, full stack) -------------------------------------------
 
 # Every e2e compose invocation layers the e2e overlay (published frontend +

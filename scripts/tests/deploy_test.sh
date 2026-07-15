@@ -130,6 +130,7 @@ test_dry_run_full_phase_sequence() {
   contains "${out}" "Phase 7: copy tunnel credentials" || return 1
   contains "${out}" "Phase 8: assert .env + OAuth key" || return 1
   contains "${out}" "Phase 9a: render tunnel config" || return 1
+  contains "${out}" "Phase 9a: render Alertmanager config" || return 1
   contains "${out}" "Phase 10: migrations" || return 1
   contains "${out}" "Phase 11: start stack" || return 1
   contains "${out}" "Phase 12: health gate" || return 1
@@ -182,7 +183,7 @@ test_rollback_repulls_all_first_party_pins_git_and_up() {
   # Stub the SSH boundary and the derived image list.
   remote() { printf '%s\n' "$*" >> "${calls}"; }
   first_party_images() { printf '%s\n' "ghcr.io/o/wren/backend" "ghcr.io/o/wren/mcp" "ghcr.io/o/wren/frontend"; }
-  render_tunnel_config() { :; }
+  render_configs() { :; }
 
   rollback "abc123" >/dev/null 2>&1
 

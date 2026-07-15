@@ -229,12 +229,14 @@ services:
     image: prom/alertmanager:v0.27.0
     # Gated behind the `tunnels` profile (the only profile the deploy activates,
     # via scripts/deploy.sh's COMPOSE_TUNNEL). Alertmanager v0.27 EXITS on config
-    # load if webhook_url is not a valid URL, and the committed config keeps the
-    # unrendered ${DISCORD_WEBHOOK_URL} placeholder (deploy-time sed substitutes a
-    # real webhook). Without the gate, local `just up`/`up-dev` (no profile) would
-    # crash-loop this restart:unless-stopped + healthchecked container. In the
-    # real deploy the profile is active and the webhook is rendered in, so it
-    # boots; local dev skips it (Prometheus + node-exporter still run).
+    # load if webhook_url is not a valid URL, and the committed alertmanager.yml
+    # keeps the unrendered ${DISCORD_WEBHOOK_URL} placeholder, so deploy.sh renders
+    # alertmanager.rendered.yml (envsubst, chmod 600) with the real webhook and
+    # this mount points at that rendered file. Without the profile gate, local
+    # `just up`/`up-dev` (no profile) would crash-loop this restart:unless-stopped
+    # + healthchecked container. In the real deploy the profile is active and the
+    # rendered config supplies a valid webhook, so it boots; local dev skips it
+    # (Prometheus + node-exporter still run).
     profiles: ["tunnels"]
     command:
       - "--config.file=/etc/alertmanager/alertmanager.yml"
@@ -242,7 +244,7 @@ services:
     expose:
       - "9093"
     volumes:
-      - ./deployments/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./deployments/alertmanager/alertmanager.rendered.yml:/etc/alertmanager/alertmanager.yml:ro
     networks:
       - monitoring-net
     depends_on:
