@@ -34,9 +34,11 @@ ERROR_TYPE_BASE = "https://usewren.com/errors/"
 class ErrorCode(StrEnum):
     """Single source of machine-readable error codes carried in ``problem.code``.
 
-    Later slices extend this with domain-specific codes (e.g. ``IMMUTABLE``,
-    ``DELETE_HAS_FOLLOWERS``); ``STALE_REVISION`` is included now because the
-    optimistic-concurrency 409 contract is defined in spec section 06.
+    Later slices extend this with further domain-specific codes (e.g.
+    ``DELETE_HAS_FOLLOWERS``). ``STALE_REVISION`` and ``IMMUTABLE`` are the two
+    409 sub-codes the write contract needs: ``STALE_REVISION`` for an optimistic-
+    concurrency mismatch (re-read) and ``IMMUTABLE`` for a structural write against
+    a published/archived roadmap (fork-to-change), both defined in spec section 06.
     """
 
     NOT_FOUND = "NOT_FOUND"
@@ -45,6 +47,7 @@ class ErrorCode(StrEnum):
     VALIDATION = "VALIDATION"
     CONFLICT = "CONFLICT"
     STALE_REVISION = "STALE_REVISION"
+    IMMUTABLE = "IMMUTABLE"
 
 
 def _type_uri(code: ErrorCode) -> str:
