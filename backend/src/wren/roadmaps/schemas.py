@@ -160,6 +160,17 @@ class RoadmapCreated(Roadmap):
     remap: dict[str, str] = Field(default_factory=dict)
 
 
+class RoadmapReplaced(Roadmap):
+    """The ``PUT /roadmaps/{id}`` body: the full rebuilt draft after a full-document
+    import (the escape hatch, spec section 07) plus the ``proposed_id -> minted_id``
+    remap. Mirrors :class:`RoadmapCreated` because replace reuses the same
+    mint-then-resolve assembly: ``proposed_id``s are preserved, every other node is
+    re-minted, and the roadmap's own ID is unchanged (spec section 04). ``remap`` is
+    empty when no proposed ID had to be de-duped."""
+
+    remap: dict[str, str] = Field(default_factory=dict)
+
+
 class ValidateResult(BaseModel):
     """The ``POST /roadmaps/{id}:validate`` body: all structural violations in one
     pass (empty when the draft is publishable). The ``violations`` shape is
