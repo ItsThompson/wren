@@ -17,6 +17,11 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     coverage: {
       provider: 'v8',
+      // Measure every file matched by `include`, not just files a test imported,
+      // so the 70% floor accounts for untested modules and cannot be gamed by
+      // omitting a file's tests (Ticket 30 / #5 review). Excludes below carve
+      // out non-source (types, entry, vendored primitives, dev-only mocks).
+      all: true,
       reporter: ['text-summary', 'text'],
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
@@ -28,9 +33,9 @@ export default defineConfig({
         'src/components/ui/**', // vendored shadcn primitives
         'src/mocks/**', // dev-only MSW harness
       ],
-      // Frontend floor from the testing strategy (section 13). The CI gate that
-      // fails the build below this lands in Ticket 30; the threshold is
-      // established here so `npm run test:coverage` enforces it locally now.
+      // Frontend floor from the testing strategy (section 13), enforced both
+      // locally (`npm run test:coverage`) and in CI (`test-frontend` job,
+      // Ticket 30). vitest exits non-zero below the floor, failing the build.
       thresholds: {
         lines: 70,
       },
