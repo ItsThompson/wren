@@ -475,6 +475,22 @@ describe('RoadmapView deadline countdown', () => {
     await waitFor(() => expect(put).toEqual({ deadline: null }))
     await waitFor(() => expect(screen.getByLabelText('Deadline')).toHaveValue(''))
   })
+
+  it('reverts an optimistic deadline set when the PUT errors at the network level', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
+      http.get(PROGRESS_URL, () => HttpResponse.json(progressWithDeadline(null))),
+      http.put(DEADLINE_URL, () => HttpResponse.error()),
+    )
+    renderView()
+
+    const input = await screen.findByLabelText('Deadline')
+    fireEvent.change(input, { target: { value: '2026-12-01' } })
+    // Optimistically shows the new date synchronously ...
+    expect(input).toHaveValue('2026-12-01')
+    // ... then reverts to the prior (empty) value when the write throws.
+    await waitFor(() => expect(input).toHaveValue(''))
+  })
 })
 
 describe('RoadmapView fork', () => {
