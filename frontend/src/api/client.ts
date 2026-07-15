@@ -16,3 +16,10 @@ export const createApiClient = (baseUrl: string): Client<paths> =>
   createClient<paths>({ baseUrl })
 
 export type ApiClient = Client<paths>
+
+/**
+ * The session-aware client (credentials + 401→refresh→retry middleware), built
+ * by `createSessionClient`. Structurally identical to `ApiClient`; the distinct
+ * alias lets the query hooks read as binding separate clients.
+ */
+export type SessionClient = Client<paths>
