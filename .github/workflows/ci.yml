@@ -5,7 +5,7 @@ name: CI
 # independent. Coverage gates are hard (section 13): backend 80%, frontend 70%.
 on:
   push:
-    branches: ["*"]
+    branches: ["**"]
   pull_request:
     branches: [main]
 
@@ -133,11 +133,11 @@ jobs:
           uv sync --frozen
           uv run pytest --cov-fail-under=80
 
-      - name: MCP tests (tool-schema snapshot + tool contract)
+      - name: MCP tests (tool-schema snapshot + tool contract, 80% coverage gate)
         working-directory: mcp
         run: |
           uv sync --frozen
-          uv run pytest
+          uv run pytest --cov-fail-under=80
 
   # ---------------------------------------------------------------------------
   # test-frontend: vitest with the hard 70% coverage gate (thresholds + all:true
