@@ -18,14 +18,21 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from wren.core.errors import Conflict, NotFound, Validation, Violation
+from wren.core.errors import Conflict, ErrorCode, NotFound, Validation, Violation
 from wren.core.logging import get_logger
-from wren.roadmaps import slugs
+from wren.roadmaps import patch, slugs
 from wren.roadmaps.assembly import assemble_draft
 from wren.roadmaps.config import MAX_ID_MINT_ATTEMPTS
 from wren.roadmaps.models import RoadmapRecord
 from wren.roadmaps.repository import RoadmapRepository
-from wren.roadmaps.schemas import Roadmap, RoadmapCreated, RoadmapInput, RoadmapStatus
+from wren.roadmaps.schemas import (
+    PatchOp,
+    PatchResult,
+    Roadmap,
+    RoadmapCreated,
+    RoadmapInput,
+    RoadmapStatus,
+)
 from wren.roadmaps.validation import validate_structure
 
 _log = get_logger("wren-roadmaps")
@@ -73,6 +80,60 @@ class RoadmapService:
             {**assembled.roadmap.model_dump(), "remap": assembled.remap}
         )
 
+    async def patch_draft(
+        self, user_id: str, roadmap_id: str, revision: int, operations: list[PatchOp]
+    ) -> PatchResult:
+        """Apply an atomic op batch to the caller's draft under optimistic
+        concurrency (spec sections 05/07).
+
+        Loads through the shared draft-only guard (:meth:`_load_owned_draft`: 404
+        for a non-owner / unknown ID, 409 immutability on a published or archived
+        roadmap), then rejects a stale ``If-Match`` ``revision`` with a 409
+        "re-read". :func:`patch.apply` is all-or-nothing: an invalid op raises and
+        nothing is persisted; on success the ``revision`` bumps by one and only the
+        changed nodes (plus any de-dup remap) are echoed.
+        """
+        draft = await self._load_owned_draft(user_id, roadmap_id)
+        if draft.revision != revision:
+            raise Conflict(
+                f"Your edit targeted revision {revision} but the current revision is "
+                f"{draft.revision}. Re-read and retry.",
+                code=ErrorCode.STALE_REVISION,
+                instance=f"/roadmaps/{roadmap_id}",
+            )
+        try:
+            outcome = patch.apply(draft, operations)
+        except patch.PatchError as err:
+            # A model-recoverable op failure (unknown ID naming valid siblings, or
+            # a cycle-creating edge explaining the cycle) -> field-level 422.
+            raise Validation(
+                err.message,
+                fields={err.field: err.message},
+                instance=f"/roadmaps/{roadmap_id}",
+            ) from err
+        patched = outcome.roadmap.model_copy(
+            update={"revision": draft.revision + 1, "updated_at": self._clock()}
+        )
+        try:
+            await self._repo.save(patched)
+            await self._repo.commit()
+        except Exception:
+            await self._repo.rollback()
+            raise
+        _log.info(
+            "roadmap_patched",
+            roadmap_id=roadmap_id,
+            owner=user_id,
+            revision=patched.revision,
+            ops=len(operations),
+        )
+        return PatchResult(
+            roadmap_id=roadmap_id,
+            revision=patched.revision,
+            changed_nodes=outcome.changed_nodes,
+            remap=outcome.remap,
+        )
+
     async def get(self, user_id: str, roadmap_id: str) -> Roadmap:
         """Return the caller's own roadmap, or 404 (never revealing existence to
         a non-owner: the query is owner-scoped)."""
@@ -99,8 +160,9 @@ class RoadmapService:
         draft = await self._load_owned_draft(user_id, roadmap_id)
         violations = validate_structure(draft)
         if violations:
+            rules = "rule" if len(violations) == 1 else "rules"
             raise Validation(
-                f"{len(violations)} structural rule(s) failed.",
+                f"{len(violations)} structural {rules} failed.",
                 violations=violations,
                 instance=f"/roadmaps/{roadmap_id}",
             )

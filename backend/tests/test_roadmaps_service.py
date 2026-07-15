@@ -8,14 +8,17 @@ from datetime import UTC, datetime
 import pytest
 
 from roadmaps_fakes import InMemoryRoadmapRepository, sequence_token_factory
-from wren.core.errors import Conflict, NotFound, Validation
+from wren.core.errors import Conflict, ErrorCode, NotFound, Validation
 from wren.roadmaps.schemas import (
+    AddItemOp,
+    AddSubsectionOp,
     ChecklistItemInput,
     ResourceInput,
     ResourceType,
     RoadmapInput,
     RoadmapStatus,
     SectionInput,
+    SetTagsOp,
     SubsectionInput,
     Visibility,
 )
@@ -296,4 +299,146 @@ async def test_publish_rolls_back_when_the_transition_fails_to_persist() -> None
     repo.save = failing_save  # type: ignore[method-assign]
     with pytest.raises(RuntimeError):
         await service.publish("user-1", created.id)
+    assert repo.rollbacks == 1
+
+
+async def test_publish_hard_block_message_is_singular_for_one_violation() -> None:
+    service, _ = _service()
+    created = await service.create_draft("user-1", _minimal_doc())  # exactly one V3 violation
+    with pytest.raises(Validation) as excinfo:
+        await service.publish("user-1", created.id)
+    assert excinfo.value.detail == "1 structural rule failed."
+
+
+# --- patch ------------------------------------------------------------------
+
+
+async def test_patch_applies_ops_bumps_revision_and_persists() -> None:
+    service, repo = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    result = await service.patch_draft(
+        "user-1",
+        created.id,
+        created.revision,
+        [SetTagsOp(op="set_tags", subsection_id="sub_arrays", tags=["core"])],
+    )
+    assert result.roadmap_id == created.id
+    assert result.revision == created.revision + 1
+    # Persisted: a fresh read reflects the edit and the bumped revision.
+    fetched = await service.get("user-1", created.id)
+    assert fetched.revision == created.revision + 1
+    assert fetched.sections["sec_foundations"].subsections["sub_arrays"].tags == ["core"]
+    assert repo.commits == 2
+
+
+async def test_patch_echoes_only_changed_nodes() -> None:
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    result = await service.patch_draft(
+        "user-1",
+        created.id,
+        created.revision,
+        [
+            AddItemOp(
+                op="add_item", subsection_id="sub_arrays", text="Extra", proposed_id="chk_extra"
+            )
+        ],
+    )
+    assert [(node.kind.value, node.id, node.change.value) for node in result.changed_nodes] == [
+        ("item", "chk_extra", "added")
+    ]
+
+
+async def test_patch_returns_a_remap_for_a_deduped_proposed_id() -> None:
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    add = AddSubsectionOp(
+        op="add_subsection",
+        section_id="sec_foundations",
+        subsection=SubsectionInput(
+            proposed_id="sub_arrays",  # collides with the existing subsection
+            title="Arrays II",
+            resources=[ResourceInput(title="G", url="https://x.test", type=ResourceType.ARTICLE)],
+            checklist_items=[ChecklistItemInput(text="x")],
+        ),
+    )
+    result = await service.patch_draft("user-1", created.id, created.revision, [add])
+    assert result.remap == {"sub_arrays": "sub_arrays-2"}
+
+
+async def test_patch_with_a_stale_revision_is_a_stale_revision_conflict() -> None:
+    service, repo = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    with pytest.raises(Conflict) as excinfo:
+        await service.patch_draft(
+            "user-1",
+            created.id,
+            created.revision + 5,  # stale
+            [SetTagsOp(op="set_tags", subsection_id="sub_arrays", tags=["x"])],
+        )
+    assert excinfo.value.code is ErrorCode.STALE_REVISION
+    assert "re-read" in excinfo.value.detail.lower()
+    # Nothing persisted on the stale write.
+    assert repo.commits == 1
+
+
+async def test_patch_is_404_for_a_non_owner() -> None:
+    service, _ = _service()
+    created = await service.create_draft("owner", _publishable_doc())
+    with pytest.raises(NotFound):
+        await service.patch_draft(
+            "intruder",
+            created.id,
+            created.revision,
+            [SetTagsOp(op="set_tags", subsection_id="sub_arrays", tags=["x"])],
+        )
+
+
+async def test_patch_on_a_published_roadmap_is_a_conflict() -> None:
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    await service.publish("user-1", created.id)
+    with pytest.raises(Conflict):
+        await service.patch_draft(
+            "user-1",
+            created.id,
+            created.revision,
+            [SetTagsOp(op="set_tags", subsection_id="sub_arrays", tags=["x"])],
+        )
+
+
+async def test_patch_with_an_invalid_op_is_a_field_level_validation_error() -> None:
+    service, repo = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    with pytest.raises(Validation) as excinfo:
+        await service.patch_draft(
+            "user-1",
+            created.id,
+            created.revision,
+            [SetTagsOp(op="set_tags", subsection_id="sub_ghost", tags=["x"])],
+        )
+    assert excinfo.value.fields is not None
+    field, message = next(iter(excinfo.value.fields.items()))
+    assert field == "operations[0].subsection_id"
+    assert "sub_arrays" in message  # names the valid sibling
+    # Atomic: the failed batch persisted nothing.
+    assert repo.commits == 1
+    assert (await service.get("user-1", created.id)).revision == created.revision
+
+
+async def test_patch_rolls_back_when_persistence_fails() -> None:
+    service, repo = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+
+    async def failing_save(_roadmap: object) -> None:
+        raise RuntimeError("db down")
+
+    repo.save = failing_save  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError):
+        await service.patch_draft(
+            "user-1",
+            created.id,
+            created.revision,
+            [SetTagsOp(op="set_tags", subsection_id="sub_arrays", tags=["x"])],
+        )
     assert repo.rollbacks == 1
