@@ -321,6 +321,39 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Delete Roadmap",
+        "operationId": "delete_roadmap_roadmaps__roadmap_id__delete",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/roadmaps/{roadmap_id}:validate": {
@@ -477,6 +510,100 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Roadmap"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}/visibility": {
+      "put": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Set Roadmap Visibility",
+        "operationId": "set_roadmap_visibility_roadmaps__roadmap_id__visibility_put",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VisibilityRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Roadmap"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}:archive": {
+      "post": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Archive Roadmap",
+        "operationId": "archive_roadmap_roadmaps__roadmap_id__archive_post",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3287,6 +3414,19 @@
           "private"
         ],
         "title": "Visibility"
+      },
+      "VisibilityRequest": {
+        "properties": {
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility"
+          }
+        },
+        "type": "object",
+        "required": [
+          "visibility"
+        ],
+        "title": "VisibilityRequest",
+        "description": "The ``PUT /roadmaps/{id}/visibility`` body: toggle public/private (web-only,\nspec sections 04/06).\n\nVisibility is a lifecycle/presentation field, editable by the owner on a\nroadmap of any status (draft or published): a public roadmap is reachable by\nlink and appears on the owner's profile, a private one is owner-only. The\ntoggle is last-write-wins (never ``If-Match``-guarded) and touches no\nfollower-visible structure, so it never bumps the structural ``revision``."
       }
     }
   }

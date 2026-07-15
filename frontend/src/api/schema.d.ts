@@ -101,7 +101,8 @@ export interface paths {
         /** Replace Roadmap */
         put: operations["replace_roadmap_roadmaps__roadmap_id__put"];
         post?: never;
-        delete?: never;
+        /** Delete Roadmap */
+        delete: operations["delete_roadmap_roadmaps__roadmap_id__delete"];
         options?: never;
         head?: never;
         /** Patch Roadmap */
@@ -174,6 +175,40 @@ export interface paths {
         head?: never;
         /** Edit Roadmap Metadata */
         patch: operations["edit_roadmap_metadata_roadmaps__roadmap_id__metadata_patch"];
+        trace?: never;
+    };
+    "/roadmaps/{roadmap_id}/visibility": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Roadmap Visibility */
+        put: operations["set_roadmap_visibility_roadmaps__roadmap_id__visibility_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/roadmaps/{roadmap_id}:archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive Roadmap */
+        post: operations["archive_roadmap_roadmaps__roadmap_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/roadmaps/{roadmap_id}/follow": {
@@ -1337,6 +1372,20 @@ export interface components {
          * @enum {string}
          */
         Visibility: "public" | "private";
+        /**
+         * VisibilityRequest
+         * @description The ``PUT /roadmaps/{id}/visibility`` body: toggle public/private (web-only,
+         *     spec sections 04/06).
+         *
+         *     Visibility is a lifecycle/presentation field, editable by the owner on a
+         *     roadmap of any status (draft or published): a public roadmap is reachable by
+         *     link and appears on the owner's profile, a private one is owner-only. The
+         *     toggle is last-write-wins (never ``If-Match``-guarded) and touches no
+         *     follower-visible structure, so it never bumps the structural ``revision``.
+         */
+        VisibilityRequest: {
+            visibility: components["schemas"]["Visibility"];
+        };
     };
     responses: never;
     parameters: never;
@@ -1551,6 +1600,35 @@ export interface operations {
             };
         };
     };
+    delete_roadmap_roadmaps__roadmap_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                roadmap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     patch_roadmap_roadmaps__roadmap_id__patch: {
         parameters: {
             query?: never;
@@ -1695,6 +1773,72 @@ export interface operations {
                 "application/json": components["schemas"]["MetadataEditRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Roadmap"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_roadmap_visibility_roadmaps__roadmap_id__visibility_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                roadmap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VisibilityRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Roadmap"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_roadmap_roadmaps__roadmap_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                roadmap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
