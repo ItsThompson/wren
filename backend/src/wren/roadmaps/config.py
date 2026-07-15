@@ -23,3 +23,8 @@ RESOURCE_PREFIX = "res_"
 # pathological repository (always reporting a collision) can never spin forever;
 # with a 32^4 token space a real run resolves on the first attempt.
 MAX_ID_MINT_ATTEMPTS = 8
+
+# Server-set page size for the paginated section drill-down (spec sections 06/07:
+# the server sets the page size; the client pages with an opaque cursor). Injected
+# into RoadmapService (overridable in tests to force truncation on a small fixture).
+SECTION_PAGE_SIZE = 20
