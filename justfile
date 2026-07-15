@@ -3,6 +3,10 @@
 # Backend and infra recipes live here. Frontend and full-stack recipes are added
 # by the slices that own them; keep recipes grouped and this file appendable.
 
+# The dev stack is always the base compose file plus the dev overlay; the
+# overlay is never valid standalone (it only carries overrides).
+dev_compose := "-f docker-compose.yml -f docker-compose.dev.yml"
+
 # List available recipes
 default:
     @just --list
@@ -56,15 +60,41 @@ lint-mcp:
 fmt-mcp:
     cd mcp && uv run ruff format . && uv run ruff check --fix .
 
+# --- Docker stack -----------------------------------------------------------
+
+# Build the three first-party images (backend, mcp, frontend)
+build:
+    docker compose build
+
+# Run the production-shaped stack locally (expose-only; tunnel added in Ticket 29)
+up:
+    docker compose up -d --build
+
+# Stop the production-shaped stack (keeps named volumes)
+down:
+    docker compose down
+
+# Run the full stack locally in dev mode (bind mounts, --reload, relaxed cookies)
+up-dev:
+    docker compose {{dev_compose}} up -d --build
+
+# Stop the dev stack (keeps named volumes)
+down-dev:
+    docker compose {{dev_compose}} down
+
+# Tear down the dev stack AND drop its named volumes (fresh Postgres + TSDB)
+reset:
+    docker compose {{dev_compose}} down -v
+
 # --- Infra & migrations -----------------------------------------------------
 
 # Bring up local dev infrastructure (Postgres; observability added later)
 dev-infra:
-    docker compose -f docker-compose.dev.yml up -d postgres
+    docker compose {{dev_compose}} up -d postgres
 
 # Tear down local dev infrastructure (keeps the pgdata volume)
 dev-infra-down:
-    docker compose -f docker-compose.dev.yml down
+    docker compose {{dev_compose}} down
 
 # Apply all migrations up to head (run pre-traffic; never at app startup)
 migrate:
