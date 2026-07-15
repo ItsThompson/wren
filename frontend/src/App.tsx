@@ -10,6 +10,7 @@ import { LandingView } from '@/views/LandingView'
 import { NotFoundView } from '@/views/NotFoundView'
 import { ProfileView } from '@/views/ProfileView'
 import { RoadmapView } from '@/views/RoadmapView'
+import { TreeView } from '@/views/TreeView'
 
 const router = createBrowserRouter([
   {
@@ -22,6 +23,7 @@ const router = createBrowserRouter([
       { path: 'dashboard', element: <DashboardView /> },
       { path: 'user/:handle', element: <ProfileView /> },
       { path: 'settings/connections', element: <ConnectedClientsView /> },
+      { path: 'roadmaps/:roadmapId/tree', element: <TreeView /> },
       { path: 'roadmaps/:roadmapId', element: <RoadmapView /> },
       { path: '*', element: <NotFoundView /> },
     ],
