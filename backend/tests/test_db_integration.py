@@ -9,7 +9,6 @@ Docker and runs these (spec section 13).
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -40,21 +39,6 @@ _widgets = sa.Table(
 )
 
 
-@pytest.fixture(scope="session")
-def postgres_url() -> Iterator[str]:
-    """A live ``postgres:17-alpine`` connection URL (asyncpg driver)."""
-    try:
-        from testcontainers.postgres import PostgresContainer
-    except ImportError:  # pragma: no cover - env without testcontainers
-        pytest.skip("testcontainers not installed")
-
-    try:
-        with PostgresContainer("postgres:17-alpine", driver="asyncpg") as postgres:
-            yield postgres.get_connection_url()
-    except Exception as exc:  # pragma: no cover - Docker daemon unavailable
-        pytest.skip(f"Docker unavailable for integration tests: {exc}")
-
-
 def test_alembic_upgrade_head_creates_version_table(
     postgres_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -75,7 +59,8 @@ def test_alembic_upgrade_head_creates_version_table(
         finally:
             await engine.dispose()
 
-    assert asyncio.run(_read_version()) == "0001_baseline"
+    # Head advances as domain slices add migrations; accounts (#6) is the latest.
+    assert asyncio.run(_read_version()) == "0002_accounts"
 
 
 async def test_db_readiness_check_ok_against_real_db(postgres_url: str) -> None:
