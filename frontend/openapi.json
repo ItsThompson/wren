@@ -205,6 +205,90 @@
         }
       }
     },
+    "/roadmaps/{roadmap_id}:validate": {
+      "post": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Validate Roadmap",
+        "operationId": "validate_roadmap_roadmaps__roadmap_id__validate_post",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidateResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}:publish": {
+      "post": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Publish Roadmap",
+        "operationId": "publish_roadmap_roadmaps__roadmap_id__publish_post",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Roadmap"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/.well-known/oauth-authorization-server": {
       "get": {
         "tags": [
@@ -1655,6 +1739,20 @@
         ],
         "title": "SubsectionInput"
       },
+      "ValidateResult": {
+        "properties": {
+          "violations": {
+            "items": {
+              "$ref": "#/components/schemas/Violation"
+            },
+            "type": "array",
+            "title": "Violations"
+          }
+        },
+        "type": "object",
+        "title": "ValidateResult",
+        "description": "The ``POST /roadmaps/{id}:validate`` body: all structural violations in one\npass (empty when the draft is publishable). The ``violations`` shape is\nidentical to the 422 publish hard-block body (spec section 06), so a client\nhandles one violation contract for both validate and publish."
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -1694,6 +1792,33 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "Violation": {
+        "properties": {
+          "rule": {
+            "type": "string",
+            "title": "Rule"
+          },
+          "ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ids"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule",
+          "ids",
+          "message"
+        ],
+        "title": "Violation",
+        "description": "One structural rule failure, model-recoverable by naming the rule and IDs.\n\nProduced by the structural validator (spec section 05 ``validation.py``, a\nlater slice) and carried in a ``Validation`` error's problem+json body. Lives\nin the error contract because it is part of the wire shape every client reads."
       },
       "Visibility": {
         "type": "string",

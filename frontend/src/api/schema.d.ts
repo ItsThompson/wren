@@ -106,6 +106,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/roadmaps/{roadmap_id}:validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate Roadmap */
+        post: operations["validate_roadmap_roadmaps__roadmap_id__validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/roadmaps/{roadmap_id}:publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish Roadmap */
+        post: operations["publish_roadmap_roadmaps__roadmap_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/.well-known/oauth-authorization-server": {
         parameters: {
             query?: never;
@@ -691,6 +725,17 @@ export interface components {
             /** Checklist Items */
             checklist_items?: components["schemas"]["ChecklistItemInput"][];
         };
+        /**
+         * ValidateResult
+         * @description The ``POST /roadmaps/{id}:validate`` body: all structural violations in one
+         *     pass (empty when the draft is publishable). The ``violations`` shape is
+         *     identical to the 422 publish hard-block body (spec section 06), so a client
+         *     handles one violation contract for both validate and publish.
+         */
+        ValidateResult: {
+            /** Violations */
+            violations?: components["schemas"]["Violation"][];
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -703,6 +748,22 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * Violation
+         * @description One structural rule failure, model-recoverable by naming the rule and IDs.
+         *
+         *     Produced by the structural validator (spec section 05 ``validation.py``, a
+         *     later slice) and carried in a ``Validation`` error's problem+json body. Lives
+         *     in the error contract because it is part of the wire shape every client reads.
+         */
+        Violation: {
+            /** Rule */
+            rule: string;
+            /** Ids */
+            ids: string[];
+            /** Message */
+            message: string;
         };
         /**
          * Visibility
@@ -856,6 +917,68 @@ export interface operations {
         };
     };
     get_roadmap_roadmaps__roadmap_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                roadmap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Roadmap"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_roadmap_roadmaps__roadmap_id__validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                roadmap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidateResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_roadmap_roadmaps__roadmap_id__publish_post: {
         parameters: {
             query?: never;
             header?: never;
