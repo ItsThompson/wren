@@ -407,6 +407,100 @@
         }
       }
     },
+    "/roadmaps/{roadmap_id}:fork": {
+      "post": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Fork Roadmap",
+        "operationId": "fork_roadmap_roadmaps__roadmap_id__fork_post",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Roadmap"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}/metadata": {
+      "patch": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Edit Roadmap Metadata",
+        "operationId": "edit_roadmap_metadata_roadmaps__roadmap_id__metadata_patch",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetadataEditRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Roadmap"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/roadmaps/{roadmap_id}/follow": {
       "post": {
         "tags": [
@@ -1699,6 +1793,50 @@
         ],
         "title": "LoginRequest",
         "description": "Login input. ``email`` is a plain string (not ``EmailStr``) so a malformed\naddress takes the same generic 401 path as a wrong password, never leaking\nwhether the address is even well-formed vs. registered."
+      },
+      "MetadataEditRequest": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "subject_tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Tags"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "title": "MetadataEditRequest",
+        "description": "The ``PATCH /roadmaps/{id}/metadata`` body: the presentation-only fields\nthat stay mutable after publish (spec sections 04/06).\n\nOnly ``title`` / ``description`` / ``subject_tags`` are editable here; a field\nleft out (``None``) is unchanged (last-write-wins, deliberately not\n``If-Match``-guarded and never bumps the structural ``revision``). ``extra`` is\n``allow``ed so a smuggled structural, lifecycle, or identity field (e.g.\n``sections`` / ``visibility`` / ``status`` / ``revision``) is *captured* rather\nthan silently dropped, then rejected as immutable by\n:meth:`reject_structural_fields`: the metadata endpoint can never touch\nanything but presentation."
       },
       "NextItem": {
         "properties": {

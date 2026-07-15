@@ -142,6 +142,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/roadmaps/{roadmap_id}:fork": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fork Roadmap */
+        post: operations["fork_roadmap_roadmaps__roadmap_id__fork_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/roadmaps/{roadmap_id}/metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Edit Roadmap Metadata */
+        patch: operations["edit_roadmap_metadata_roadmaps__roadmap_id__metadata_patch"];
+        trace?: never;
+    };
     "/roadmaps/{roadmap_id}/follow": {
         parameters: {
             query?: never;
@@ -637,6 +671,30 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /**
+         * MetadataEditRequest
+         * @description The ``PATCH /roadmaps/{id}/metadata`` body: the presentation-only fields
+         *     that stay mutable after publish (spec sections 04/06).
+         *
+         *     Only ``title`` / ``description`` / ``subject_tags`` are editable here; a field
+         *     left out (``None``) is unchanged (last-write-wins, deliberately not
+         *     ``If-Match``-guarded and never bumps the structural ``revision``). ``extra`` is
+         *     ``allow``ed so a smuggled structural, lifecycle, or identity field (e.g.
+         *     ``sections`` / ``visibility`` / ``status`` / ``revision``) is *captured* rather
+         *     than silently dropped, then rejected as immutable by
+         *     :meth:`reject_structural_fields`: the metadata endpoint can never touch
+         *     anything but presentation.
+         */
+        MetadataEditRequest: {
+            /** Title */
+            title?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Subject Tags */
+            subject_tags?: string[] | null;
+        } & {
+            [key: string]: unknown;
         };
         /**
          * NextItem
@@ -1571,6 +1629,72 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Roadmap"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fork_roadmap_roadmaps__roadmap_id__fork_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                roadmap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Roadmap"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_roadmap_metadata_roadmaps__roadmap_id__metadata_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                roadmap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MetadataEditRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
