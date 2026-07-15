@@ -1,5 +1,7 @@
 import { createBrowserRouter, RouterProvider } from 'react-router'
+import { SWRConfig } from 'swr'
 
+import { ApiClientProvider } from '@/api'
 import { AuthProvider } from '@/auth'
 import { AppShell } from '@/components/AppShell'
 import { AuthView } from '@/views/AuthView'
@@ -30,10 +32,29 @@ const router = createBrowserRouter([
   },
 ])
 
+/**
+ * Same-origin by default (dev proxy + MSW); prod points at the API subdomain via
+ * `VITE_API_BASE_URL`. Read once at the app root: the deployment base never
+ * changes at runtime, and the shared clients bind to it here.
+ */
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+
 export function App() {
   return (
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>
+    <SWRConfig
+      value={{
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+        revalidateIfStale: false,
+        revalidateOnMount: true,
+        dedupingInterval: 2000,
+      }}
+    >
+      <ApiClientProvider baseUrl={API_BASE_URL}>
+        <AuthProvider>
+          <RouterProvider router={router} />
+        </AuthProvider>
+      </ApiClientProvider>
+    </SWRConfig>
   )
 }
