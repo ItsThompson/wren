@@ -1,31 +1,19 @@
 import { Button } from '@/components/ui/button'
-import type { PublishState, Roadmap } from '../types'
+import type { PublishState } from '../types'
 
 interface PublishPanelProps {
-  status: Roadmap['status']
   publishState: PublishState
   onPublish: () => void
 }
 
 /**
- * The draft publish affordance (section 06 `:publish` action). On an owned draft
- * it offers a Publish action and, when a publish is hard-blocked (422), renders
- * the returned structural violations inline so the author sees the full fix list
- * in one pass. Once published it shows an immutable-published confirmation:
- * publish is one-way.
+ * The draft publish affordance (section 06 `:publish` action). Offers a Publish
+ * action and, when a publish is hard-blocked (422), renders the returned
+ * structural violations inline so the author sees the full fix list in one pass.
+ * Rendered only in draft preview mode: on a successful publish the RoadmapView
+ * routes to the published list view, so there is no published state here.
  */
-export function PublishPanel({ status, publishState, onPublish }: PublishPanelProps) {
-  if (status === 'published') {
-    return (
-      <section className="mt-8 rounded-lg border border-border bg-muted/40 p-4">
-        <p className="text-sm font-medium text-foreground">Published</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          This roadmap is live. Its structure is now immutable.
-        </p>
-      </section>
-    )
-  }
-
+export function PublishPanel({ publishState, onPublish }: PublishPanelProps) {
   const isPublishing = publishState.phase === 'publishing'
 
   return (

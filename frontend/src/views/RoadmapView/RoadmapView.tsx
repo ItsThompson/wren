@@ -2,6 +2,7 @@ import { useParams } from 'react-router'
 
 import { DraftPreview } from './components/DraftPreview'
 import { RoadmapErrorState } from './components/RoadmapErrorState'
+import { RoadmapListView } from './components/RoadmapListView'
 import { RoadmapSkeleton } from './components/RoadmapSkeleton'
 import { useRoadmap } from './hooks/useRoadmap'
 
@@ -18,9 +19,9 @@ interface RoadmapViewProps {
 
 /**
  * RoadmapView (section 10 view tree): fetches a roadmap by the route `:roadmapId`
- * and routes the three states (loading / error / loaded). For this slice the
- * loaded state is the owned-draft list preview; the tree tab and published
- * progress views arrive in later slices.
+ * and routes loading / error / loaded. A draft the caller owns renders in
+ * read-only preview mode with the publish action (section 10 "Preview mode"); a
+ * published roadmap renders the list view with progress tracking.
  */
 export function RoadmapView({ baseUrl = API_BASE_URL }: RoadmapViewProps) {
   const { roadmapId } = useParams()
@@ -32,5 +33,10 @@ export function RoadmapView({ baseUrl = API_BASE_URL }: RoadmapViewProps) {
   if (state.phase === 'error') {
     return <RoadmapErrorState status={state.status} />
   }
-  return <DraftPreview roadmap={state.roadmap} publishState={publishState} onPublish={publish} />
+  if (state.roadmap.status === 'draft') {
+    return (
+      <DraftPreview roadmap={state.roadmap} publishState={publishState} onPublish={publish} />
+    )
+  }
+  return <RoadmapListView roadmap={state.roadmap} baseUrl={baseUrl} />
 }

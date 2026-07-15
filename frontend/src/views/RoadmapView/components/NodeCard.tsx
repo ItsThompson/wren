@@ -1,28 +1,49 @@
+import { Check } from 'lucide-react'
+
 import { colorForTag } from '@/lib/tag-color'
-import type { Subsection } from '../types'
+import { isSubsectionDone } from '../progress-derive'
+import type { ProgressBinding, Subsection } from '../types'
+import { ChecklistRow } from './ChecklistRow'
 
 interface NodeCardProps {
   subsection: Subsection
+  /**
+   * Present on a published roadmap being tracked: makes the checklist
+   * interactive and derives the subsection done-state. Absent in draft preview
+   * mode, where the checklist is read-only (a draft is not startable).
+   */
+  progress?: ProgressBinding
 }
 
 /**
- * One subsection ("node") in the draft preview (section 10 "List view" /
- * NodeCard): title, effort, hash-colored track-tag pills, description, resources
- * as real `<a href>` links, and the checklist rendered read-only. Preview mode
- * has no interactive checkboxes: a draft is not startable, so no progress
- * persists (section 10 "Preview mode").
+ * One subsection ("node") in the list view (section 10 "List view" / NodeCard):
+ * title, effort, hash-colored track-tag pills, description, resources as real
+ * `<a href>` links, and the checklist. When a progress binding is passed the
+ * checklist rows are interactive and the subsection shows its derived done-state
+ * (olive check + border tint, no bar); without one the checklist is read-only.
  */
-export function NodeCard({ subsection }: NodeCardProps) {
+export function NodeCard({ subsection, progress }: NodeCardProps) {
   const resourceIds = subsection.resource_order ?? []
   const itemIds = subsection.item_order ?? []
   const resources = subsection.resources ?? {}
   const items = subsection.checklist_items ?? {}
   const tags = subsection.tags ?? []
+  const done = progress ? isSubsectionDone(subsection, progress.checkedIds) : false
 
   return (
-    <article className="rounded-lg border border-border bg-card p-5">
+    <article
+      className={`rounded-lg border bg-card p-5 ${done ? 'border-success/50' : 'border-border'}`}
+    >
       <div className="flex items-baseline justify-between gap-3">
-        <h3 className="font-serif text-lg font-medium text-foreground">{subsection.title}</h3>
+        <div className="flex items-baseline gap-2">
+          {done ? (
+            <Check aria-hidden className="size-4 shrink-0 self-center text-success" />
+          ) : null}
+          <h3 className="font-serif text-lg font-medium text-foreground">{subsection.title}</h3>
+          {done ? (
+            <span className="font-mono text-[11px] uppercase tracking-wide text-success">done</span>
+          ) : null}
+        </div>
         {subsection.effort_estimate ? (
           <span className="font-mono text-xs text-muted-foreground">
             {subsection.effort_estimate}
@@ -75,12 +96,22 @@ export function NodeCard({ subsection }: NodeCardProps) {
       ) : null}
 
       {itemIds.length > 0 ? (
-        <ul className="mt-4 space-y-1.5 border-t border-border pt-3">
+        <ul className="mt-4 space-y-1 border-t border-border pt-3">
           {itemIds.map((id) => {
             const item = items[id]
             if (!item) return null
+            if (progress) {
+              return (
+                <ChecklistRow
+                  key={id}
+                  item={item}
+                  checked={progress.checkedIds.has(id)}
+                  onToggle={(checked) => progress.onToggle(id, checked)}
+                />
+              )
+            }
             return (
-              <li key={id} className="flex items-start gap-2 text-sm text-foreground">
+              <li key={id} className="flex items-start gap-2 py-1.5 text-sm text-foreground">
                 <span aria-hidden className="mt-0.5 text-muted-foreground">
                   ☐
                 </span>

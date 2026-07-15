@@ -1,10 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router'
 
-import type { Roadmap } from './types'
+import type { ProgressSnapshot, ProgressUpdateResult, Roadmap } from './types'
 import { RoadmapView } from './RoadmapView'
 
 const BASE = 'https://api.test'
@@ -72,6 +72,22 @@ const server = setupServer()
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
+
+/** A progress snapshot for the tracking view; the UI derives counts from ids. */
+function buildProgress(checkedIds: string[] = []): ProgressSnapshot {
+  return {
+    roadmap_id: ROADMAP_ID,
+    total_items: 2,
+    checked_items: checkedIds.length,
+    percent: 0,
+    checked_ids: checkedIds,
+  }
+}
+
+/** A progress_update result echoing the fresh checked set + a next suggestion. */
+function buildUpdateResult(checkedIds: string[]): ProgressUpdateResult {
+  return { progress: buildProgress(checkedIds), next: { items: [], complete: false } }
+}
 
 function renderView() {
   return render(
@@ -225,30 +241,39 @@ describe('RoadmapView publish', () => {
     expect(screen.getByText(/draft · preview/i)).toBeInTheDocument()
   })
 
-  it('shows the published confirmation after a successful publish (200)', async () => {
+  it('routes to the tracking list view after a successful publish (200)', async () => {
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
       http.post(PUBLISH_URL, () => HttpResponse.json(buildDraft({ status: 'published' }))),
+      http.get('*/roadmaps/:id/progress', () => HttpResponse.json(buildProgress())),
     )
     renderView()
     await screen.findByText('Grokking DSA')
 
     fireEvent.click(screen.getByRole('button', { name: /^publish$/i }))
 
-    expect(await screen.findByText('Published')).toBeInTheDocument()
-    // Publish is one-way: the action and the draft badge are gone afterwards.
+    // Publish is one-way: the tracking list view (progress bar + interactive
+    // checklist) replaces the preview; the action and the draft badge are gone.
+    expect(
+      await screen.findByRole('progressbar', { name: /overall progress/i }),
+    ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^publish$/i })).not.toBeInTheDocument()
     expect(screen.queryByText(/draft · preview/i)).not.toBeInTheDocument()
+    expect(screen.getAllByRole('checkbox').length).toBeGreaterThan(0)
   })
 
-  it('shows the immutable-published confirmation and no Publish action on a published roadmap', async () => {
+  it('renders the tracking list view (not the preview) on a published roadmap', async () => {
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
+      http.get('*/roadmaps/:id/progress', () => HttpResponse.json(buildProgress())),
     )
     renderView()
 
-    expect(await screen.findByText('Published')).toBeInTheDocument()
+    expect(
+      await screen.findByRole('progressbar', { name: /overall progress/i }),
+    ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^publish$/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(/draft · preview/i)).not.toBeInTheDocument()
   })
 
   it('surfaces a retry message when publish fails unexpectedly (500)', async () => {
@@ -266,3 +291,92 @@ describe('RoadmapView publish', () => {
     expect(screen.getByRole('button', { name: /^publish$/i })).toBeInTheDocument()
   })
 })
+
+describe('RoadmapView progress tracking', () => {
+  const PROGRESS_URL = `${BASE}/roadmaps/${ROADMAP_ID}/progress`
+
+  function publishedRoadmap() {
+    // suggested_path [sub_hashing, sub_arrays]; one item each (2 items total).
+    return buildDraft({ status: 'published' })
+  }
+
+  it('renders interactive checkboxes and roadmap + section bars, but no per-item bars', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(publishedRoadmap())),
+      http.get(PROGRESS_URL, () => HttpResponse.json(buildProgress())),
+    )
+    renderView()
+
+    // Checklist items are interactive checkboxes (both subsections' items).
+    expect(
+      await screen.findByRole('checkbox', { name: 'Read the walkthrough' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Implement a counter' })).toBeInTheDocument()
+    // Bars only at roadmap (1) + section (1) level: never per subsection/item.
+    expect(screen.getAllByRole('progressbar')).toHaveLength(2)
+  })
+
+  it('persists a check via progress_update and advances the overall bar', async () => {
+    let posted: unknown
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(publishedRoadmap())),
+      http.get(PROGRESS_URL, () => HttpResponse.json(buildProgress())),
+      http.post(PROGRESS_URL, async ({ request }) => {
+        posted = await request.json()
+        return HttpResponse.json(buildUpdateResult(['chk_read']))
+      }),
+    )
+    renderView()
+
+    const overall = await screen.findByRole('progressbar', { name: /overall progress/i })
+    expect(overall).toHaveAttribute('aria-valuenow', '0')
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Read the walkthrough' }))
+
+    // Explicit-set complete for exactly the toggled item.
+    await waitFor(() =>
+      expect(posted).toEqual({ item_ids: ['chk_read'], state: 'complete' }),
+    )
+    // One of two items checked -> overall bar reads 50%.
+    await waitFor(() =>
+      expect(
+        screen.getByRole('progressbar', { name: /overall progress/i }),
+      ).toHaveAttribute('aria-valuenow', '50'),
+    )
+  })
+
+  it('sends state=incomplete when unchecking an already-checked item', async () => {
+    let posted: unknown
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(publishedRoadmap())),
+      http.get(PROGRESS_URL, () => HttpResponse.json(buildProgress(['chk_read']))),
+      http.post(PROGRESS_URL, async ({ request }) => {
+        posted = await request.json()
+        return HttpResponse.json(buildUpdateResult([]))
+      }),
+    )
+    renderView()
+
+    const checkbox = await screen.findByRole('checkbox', { name: 'Read the walkthrough' })
+    // The detailed snapshot hydrates the checked state asynchronously on mount.
+    await waitFor(() => expect(checkbox).toBeChecked())
+    fireEvent.click(checkbox)
+
+    await waitFor(() =>
+      expect(posted).toEqual({ item_ids: ['chk_read'], state: 'incomplete' }),
+    )
+  })
+
+  it('derives subsection done-state (olive check) when all its items are checked', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(publishedRoadmap())),
+      // sub_arrays has one item (chk_read); checking it marks the subsection done.
+      http.get(PROGRESS_URL, () => HttpResponse.json(buildProgress(['chk_read']))),
+    )
+    renderView()
+
+    // The done label appears once (for sub_arrays), not for the unfinished node.
+    expect(await screen.findAllByText('done')).toHaveLength(1)
+  })
+})
+

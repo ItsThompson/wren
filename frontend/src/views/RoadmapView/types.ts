@@ -13,6 +13,25 @@ export type ChecklistItem = components['schemas']['ChecklistItem']
 export type Violation = components['schemas']['Violation']
 
 /**
+ * Progress read types, also from the generated client. The published list view
+ * fetches the detailed snapshot (for `checked_ids`) and posts explicit-set
+ * updates (section 06/07).
+ */
+export type ProgressSnapshot = components['schemas']['ProgressSnapshot']
+export type ProgressUpdateResult = components['schemas']['ProgressUpdateResult']
+
+/**
+ * The progress binding threaded from the list view down to each checklist row:
+ * the derived done-state reads `checkedIds` and each toggle calls `onToggle`
+ * (which persists via `progress_update`). Absent in draft preview mode, where
+ * progress does not persist (section 10 "Preview mode").
+ */
+export interface ProgressBinding {
+  checkedIds: Set<string>
+  onToggle: (itemId: string, checked: boolean) => void
+}
+
+/**
  * The roadmap-view fetch state as a single discriminated union so the impossible
  * "loaded with an error" combinations cannot arise (frontend state-structure
  * rule). `error.status` is the HTTP status (404/403 = unreachable) or null when
