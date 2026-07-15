@@ -896,6 +896,69 @@
         }
       }
     },
+    "/me/dashboard": {
+      "get": {
+        "tags": [
+          "listing"
+        ],
+        "summary": "Get Dashboard",
+        "operationId": "get_dashboard_me_dashboard_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{handle}": {
+      "get": {
+        "tags": [
+          "listing"
+        ],
+        "summary": "Get Profile",
+        "operationId": "get_profile_users__handle__get",
+        "parameters": [
+          {
+            "name": "handle",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Handle"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Profile"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/roadmaps/{roadmap_id}/follow": {
       "post": {
         "tags": [
@@ -2185,6 +2248,27 @@
         "title": "ConnectedClient",
         "description": "One authorized agent in the user's connected-clients list."
       },
+      "Dashboard": {
+        "properties": {
+          "authored": {
+            "items": {
+              "$ref": "#/components/schemas/RoadmapCard"
+            },
+            "type": "array",
+            "title": "Authored"
+          },
+          "followed": {
+            "items": {
+              "$ref": "#/components/schemas/RoadmapCard"
+            },
+            "type": "array",
+            "title": "Followed"
+          }
+        },
+        "type": "object",
+        "title": "Dashboard",
+        "description": "The ``GET /me/dashboard`` body: the caller's private home (spec section 02\nUS-ACCT-03).\n\n``authored`` is everything the caller owns at any status (draft / private /\npublic), rendered in the \"Yours\" section; ``followed`` is every roadmap the\ncaller follows, rendered in the \"Following\" section (spec section 09 \u00a77.9). A\nroadmap the caller both authored and follows appears in both lists. Scoped to\nthe caller: another user's dashboard is never returned."
+      },
       "DeadlineRequest": {
         "properties": {
           "deadline": {
@@ -2684,6 +2768,32 @@
         ],
         "title": "PrereqRef",
         "description": "A resolved prerequisite: its id, title, and the caller's done state.\n\n``done`` is ``True`` when the caller has completed every checklist item of the\nprerequisite subsection (so an agent can see at a glance whether this node is\nunlocked)."
+      },
+      "Profile": {
+        "properties": {
+          "handle": {
+            "type": "string",
+            "title": "Handle"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "roadmaps": {
+            "items": {
+              "$ref": "#/components/schemas/RoadmapCard"
+            },
+            "type": "array",
+            "title": "Roadmaps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "handle",
+          "display_name"
+        ],
+        "title": "Profile",
+        "description": "The ``GET /users/{handle}`` body: a user's public profile (spec section 02\nUS-ACCT-03).\n\n``roadmaps`` is only that user's **published, public** roadmaps; drafts,\nprivate, and archived roadmaps never appear, and following is never exposed\n(no social graph). Public and viewer-agnostic: the same body regardless of who\n(if anyone) is signed in."
       },
       "Progress": {
         "properties": {
@@ -3198,6 +3308,40 @@
         ],
         "title": "Roadmap",
         "description": "A roadmap definition owned by one user. ``owner`` is resolved from the\nsession, never trusted from client input."
+      },
+      "RoadmapCard": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RoadmapStatus"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility"
+          },
+          "subject_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subject Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "status",
+          "visibility"
+        ],
+        "title": "RoadmapCard",
+        "description": "A roadmap summarized for a list/grid card (spec sections 06/09).\n\n``status`` drives the Draft/Published/Archived badge and ``visibility`` the\nlock/globe badge (spec section 09 \u00a77.9). Content (sections, items, progress)\nis never inlined: a card links to the full roadmap view for that."
       },
       "RoadmapCreated": {
         "properties": {

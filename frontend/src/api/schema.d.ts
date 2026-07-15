@@ -279,6 +279,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Dashboard */
+        get: operations["get_dashboard_me_dashboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{handle}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Profile */
+        get: operations["get_profile_users__handle__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/roadmaps/{roadmap_id}/follow": {
         parameters: {
             query?: never;
@@ -754,6 +788,23 @@ export interface components {
             last_authorized: string;
         };
         /**
+         * Dashboard
+         * @description The ``GET /me/dashboard`` body: the caller's private home (spec section 02
+         *     US-ACCT-03).
+         *
+         *     ``authored`` is everything the caller owns at any status (draft / private /
+         *     public), rendered in the "Yours" section; ``followed`` is every roadmap the
+         *     caller follows, rendered in the "Following" section (spec section 09 §7.9). A
+         *     roadmap the caller both authored and follows appears in both lists. Scoped to
+         *     the caller: another user's dashboard is never returned.
+         */
+        Dashboard: {
+            /** Authored */
+            authored?: components["schemas"]["RoadmapCard"][];
+            /** Followed */
+            followed?: components["schemas"]["RoadmapCard"][];
+        };
+        /**
          * DeadlineRequest
          * @description The ``PUT /roadmaps/{id}/deadline`` body: set or clear the per-user deadline.
          *
@@ -993,6 +1044,24 @@ export interface components {
             title: string;
             /** Done */
             done: boolean;
+        };
+        /**
+         * Profile
+         * @description The ``GET /users/{handle}`` body: a user's public profile (spec section 02
+         *     US-ACCT-03).
+         *
+         *     ``roadmaps`` is only that user's **published, public** roadmaps; drafts,
+         *     private, and archived roadmaps never appear, and following is never exposed
+         *     (no social graph). Public and viewer-agnostic: the same body regardless of who
+         *     (if anyone) is signed in.
+         */
+        Profile: {
+            /** Handle */
+            handle: string;
+            /** Display Name */
+            display_name: string;
+            /** Roadmaps */
+            roadmaps?: components["schemas"]["RoadmapCard"][];
         };
         /**
          * Progress
@@ -1245,6 +1314,24 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * RoadmapCard
+         * @description A roadmap summarized for a list/grid card (spec sections 06/09).
+         *
+         *     ``status`` drives the Draft/Published/Archived badge and ``visibility`` the
+         *     lock/globe badge (spec section 09 §7.9). Content (sections, items, progress)
+         *     is never inlined: a card links to the full roadmap view for that.
+         */
+        RoadmapCard: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            status: components["schemas"]["RoadmapStatus"];
+            visibility: components["schemas"]["Visibility"];
+            /** Subject Tags */
+            subject_tags?: string[];
         };
         /**
          * RoadmapCreated
@@ -2276,6 +2363,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Roadmap"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_dashboard_me_dashboard_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+        };
+    };
+    get_profile_users__handle__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                handle: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Profile"];
                 };
             };
             /** @description Validation Error */
