@@ -1,0 +1,3047 @@
+[
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": null,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+      "title": "Create roadmap draft"
+    },
+    "inputSchema": {
+      "$defs": {
+        "ChecklistItemInput": {
+          "properties": {
+            "proposed_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Proposed Id"
+            },
+            "text": {
+              "title": "Text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "title": "ChecklistItemInput",
+          "type": "object"
+        },
+        "ResourceInput": {
+          "description": "An external link on a subsection; the body is never inlined (spec 07).",
+          "properties": {
+            "proposed_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Proposed Id"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            },
+            "type": {
+              "$ref": "#/$defs/ResourceType"
+            },
+            "url": {
+              "title": "Url",
+              "type": "string"
+            }
+          },
+          "required": [
+            "title",
+            "url",
+            "type"
+          ],
+          "title": "ResourceInput",
+          "type": "object"
+        },
+        "ResourceType": {
+          "enum": [
+            "article",
+            "video",
+            "book",
+            "course",
+            "docs",
+            "other"
+          ],
+          "title": "ResourceType",
+          "type": "string"
+        },
+        "RoadmapDraftInput": {
+          "description": "The full-document payload for ``create_roadmap_draft`` and\n``replace_roadmap_draft`` (spec section 04 ``RoadmapInput``).",
+          "properties": {
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Description"
+            },
+            "proposed_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Proposed Id"
+            },
+            "sections": {
+              "items": {
+                "$ref": "#/$defs/SectionInput"
+              },
+              "title": "Sections",
+              "type": "array"
+            },
+            "subject_tags": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Subject Tags",
+              "type": "array"
+            },
+            "suggested_path": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Suggested Path",
+              "type": "array"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          "required": [
+            "title"
+          ],
+          "title": "RoadmapDraftInput",
+          "type": "object"
+        },
+        "SectionInput": {
+          "properties": {
+            "proposed_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Proposed Id"
+            },
+            "subsections": {
+              "items": {
+                "$ref": "#/$defs/SubsectionInput"
+              },
+              "title": "Subsections",
+              "type": "array"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          "required": [
+            "title"
+          ],
+          "title": "SectionInput",
+          "type": "object"
+        },
+        "SubsectionInput": {
+          "description": "A DAG node. Child collections are ordered arrays because IDs are\nserver-minted; ``prereq_ids`` may reference sibling ``proposed_id``s.",
+          "properties": {
+            "checklist_items": {
+              "items": {
+                "$ref": "#/$defs/ChecklistItemInput"
+              },
+              "title": "Checklist Items",
+              "type": "array"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Description"
+            },
+            "effort_estimate": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Effort Estimate"
+            },
+            "prereq_ids": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Prereq Ids",
+              "type": "array"
+            },
+            "proposed_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Proposed Id"
+            },
+            "resources": {
+              "items": {
+                "$ref": "#/$defs/ResourceInput"
+              },
+              "title": "Resources",
+              "type": "array"
+            },
+            "tags": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Tags",
+              "type": "array"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          "required": [
+            "title"
+          ],
+          "title": "SubsectionInput",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "roadmap": {
+          "$ref": "#/$defs/RoadmapDraftInput"
+        }
+      },
+      "required": [
+        "roadmap"
+      ],
+      "title": "create_roadmap_draftArguments",
+      "type": "object"
+    },
+    "name": "create_roadmap_draft",
+    "outputSchema": {
+      "$defs": {
+        "RoadmapStatus": {
+          "enum": [
+            "draft",
+            "published",
+            "archived"
+          ],
+          "title": "RoadmapStatus",
+          "type": "string"
+        }
+      },
+      "description": "``create_roadmap_draft`` result: the minted ``roadmap_id`` plus the\n``proposed_id -> minted_id`` remap for any de-duped proposal. Supply\n``proposed_id`` on the nodes you intend to reference; preserved IDs need no\nremap entry, so this stays lean.",
+      "properties": {
+        "remap": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Remap",
+          "type": "object"
+        },
+        "revision": {
+          "title": "Revision",
+          "type": "integer"
+        },
+        "roadmap_id": {
+          "title": "Roadmap Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/RoadmapStatus"
+        }
+      },
+      "required": [
+        "roadmap_id",
+        "revision",
+        "status"
+      ],
+      "title": "CreatedRoadmap",
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+      "title": "Edit roadmap metadata"
+    },
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "roadmap_id": {
+          "title": "Roadmap Id",
+          "type": "string"
+        },
+        "subject_tags": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Subject Tags"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        }
+      },
+      "required": [
+        "roadmap_id"
+      ],
+      "title": "edit_roadmap_metadataArguments",
+      "type": "object"
+    },
+    "name": "edit_roadmap_metadata",
+    "outputSchema": {
+      "description": "``edit_roadmap_metadata`` result: the presentation fields after the edit\n(allowed on published roadmaps; never touches structure or ``revision``).",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "roadmap_id": {
+          "title": "Roadmap Id",
+          "type": "string"
+        },
+        "subject_tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Subject Tags",
+          "type": "array"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "roadmap_id",
+        "title"
+      ],
+      "title": "MetadataResult",
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": null,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+      "title": "Fork roadmap"
+    },
+    "inputSchema": {
+      "properties": {
+        "source_roadmap_id": {
+          "title": "Source Roadmap Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_roadmap_id"
+      ],
+      "title": "fork_roadmapArguments",
+      "type": "object"
+    },
+    "name": "fork_roadmap",
+    "outputSchema": {
+      "$defs": {
+        "RoadmapStatus": {
+          "enum": [
+            "draft",
+            "published",
+            "archived"
+          ],
+          "title": "RoadmapStatus",
+          "type": "string"
+        }
+      },
+      "description": "``fork_roadmap`` result: a fresh draft seeded from the source with new IDs\nand fresh progress; ``source_roadmap_id`` echoes what was forked.",
+      "properties": {
+        "revision": {
+          "title": "Revision",
+          "type": "integer"
+        },
+        "roadmap_id": {
+          "title": "Roadmap Id",
+          "type": "string"
+        },
+        "source_roadmap_id": {
+          "title": "Source Roadmap Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/RoadmapStatus"
+        }
+      },
+      "required": [
+        "roadmap_id",
+        "revision",
+        "status",
+        "source_roadmap_id"
+      ],
+      "title": "ForkResult",
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+      "title": "Patch roadmap draft"
+    },
+    "inputSchema": {
+      "$defs": {
+        "AddEdgeOp": {
+          "description": "``to_id`` gains ``from_id`` as a prerequisite (spec section 07).",
+          "properties": {
+            "from_id": {
+              "title": "From Id",
+              "type": "string"
+            },
+            "op": {
+              "const": "add_edge",
+              "title": "Op",
+              "type": "string"
+            },
+            "to_id": {
+              "title": "To Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "from_id",
+            "to_id"
+          ],
+          "title": "AddEdgeOp",
+          "type": "object"
+        },
+        "AddItemOp": {
+          "properties": {
+            "after_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "After Id"
+            },
+            "before_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Before Id"
+            },
+            "op": {
+              "const": "add_item",
+              "title": "Op",
+              "type": "string"
+            },
+            "proposed_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Proposed Id"
+            },
+            "subsection_id": {
+              "title": "Subsection Id",
+              "type": "string"
+            },
+            "text": {
+              "title": "Text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "subsection_id",
+            "text"
+          ],
+          "title": "AddItemOp",
+          "type": "object"
+        },
+        "AddSectionOp": {
+          "properties": {
+            "after_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "After Id"
+            },
+            "before_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Before Id"
+            },
+            "op": {
+              "const": "add_section",
+              "title": "Op",
+              "type": "string"
+            },
+            "proposed_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Proposed Id"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "title"
+          ],
+          "title": "AddSectionOp",
+          "type": "object"
+        },
+        "AddSubsectionOp": {
+          "properties": {
+            "after_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "After Id"
+            },
+            "before_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Before Id"
+            },
+            "op": {
+              "const": "add_subsection",
+              "title": "Op",
+              "type": "string"
+            },
+            "section_id": {
+              "title": "Section Id",
+              "type": "string"
+            },
+            "subsection": {
+              "$ref": "#/$defs/SubsectionInput"
+            }
+          },
+          "required": [
+            "op",
+            "section_id",
+            "subsection"
+          ],
+          "title": "AddSubsectionOp",
+          "type": "object"
+        },
+        "ChecklistItemInput": {
+          "properties": {
+            "proposed_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Proposed Id"
+            },
+            "text": {
+              "title": "Text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "title": "ChecklistItemInput",
+          "type": "object"
+        },
+        "RemoveEdgeOp": {
+          "properties": {
+            "from_id": {
+              "title": "From Id",
+              "type": "string"
+            },
+            "op": {
+              "const": "remove_edge",
+              "title": "Op",
+              "type": "string"
+            },
+            "to_id": {
+              "title": "To Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "from_id",
+            "to_id"
+          ],
+          "title": "RemoveEdgeOp",
+          "type": "object"
+        },
+        "RemoveItemOp": {
+          "properties": {
+            "item_id": {
+              "title": "Item Id",
+              "type": "string"
+            },
+            "op": {
+              "const": "remove_item",
+              "title": "Op",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "item_id"
+          ],
+          "title": "RemoveItemOp",
+          "type": "object"
+        },
+        "RemoveSectionOp": {
+          "properties": {
+            "op": {
+              "const": "remove_section",
+              "title": "Op",
+              "type": "string"
+            },
+            "section_id": {
+              "title": "Section Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "section_id"
+          ],
+          "title": "RemoveSectionOp",
+          "type": "object"
+        },
+        "RemoveSubsectionOp": {
+          "properties": {
+            "op": {
+              "const": "remove_subsection",
+              "title": "Op",
+              "type": "string"
+            },
+            "subsection_id": {
+              "title": "Subsection Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "subsection_id"
+          ],
+          "title": "RemoveSubsectionOp",
+          "type": "object"
+        },
+        "ReorderOp": {
+          "description": "Move any node (section / subsection / item) within its sibling order.",
+          "properties": {
+            "after_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "After Id"
+            },
+            "before_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Before Id"
+            },
+            "op": {
+              "const": "reorder",
+              "title": "Op",
+              "type": "string"
+            },
+            "target_id": {
+              "title": "Target Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "target_id"
+          ],
+          "title": "ReorderOp",
+          "type": "object"
+        },
+        "ResourceInput": {
+          "description": "An external link on a subsection; the body is never inlined (spec 07).",
+          "properties": {
+            "proposed_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Proposed Id"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            },
+            "type": {
+              "$ref": "#/$defs/ResourceType"
+            },
+            "url": {
+              "title": "Url",
+              "type": "string"
+            }
+          },
+          "required": [
+            "title",
+            "url",
+            "type"
+          ],
+          "title": "ResourceInput",
+          "type": "object"
+        },
+        "ResourceType": {
+          "enum": [
+            "article",
+            "video",
+            "book",
+            "course",
+            "docs",
+            "other"
+          ],
+          "title": "ResourceType",
+          "type": "string"
+        },
+        "SetEffortOp": {
+          "properties": {
+            "effort_estimate": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Effort Estimate"
+            },
+            "op": {
+              "const": "set_effort",
+              "title": "Op",
+              "type": "string"
+            },
+            "subsection_id": {
+              "title": "Subsection Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "subsection_id"
+          ],
+          "title": "SetEffortOp",
+          "type": "object"
+        },
+        "SetResourcesOp": {
+          "properties": {
+            "op": {
+              "const": "set_resources",
+              "title": "Op",
+              "type": "string"
+            },
+            "resources": {
+              "items": {
+                "$ref": "#/$defs/ResourceInput"
+              },
+              "title": "Resources",
+              "type": "array"
+            },
+            "subsection_id": {
+              "title": "Subsection Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "subsection_id"
+          ],
+          "title": "SetResourcesOp",
+          "type": "object"
+        },
+        "SetSuggestedPathOp": {
+          "properties": {
+            "op": {
+              "const": "set_suggested_path",
+              "title": "Op",
+              "type": "string"
+            },
+            "path": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Path",
+              "type": "array"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "SetSuggestedPathOp",
+          "type": "object"
+        },
+        "SetTagsOp": {
+          "properties": {
+            "op": {
+              "const": "set_tags",
+              "title": "Op",
+              "type": "string"
+            },
+            "subsection_id": {
+              "title": "Subsection Id",
+              "type": "string"
+            },
+            "tags": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Tags",
+              "type": "array"
+            }
+          },
+          "required": [
+            "op",
+            "subsection_id"
+          ],
+          "title": "SetTagsOp",
+          "type": "object"
+        },
+        "SubsectionInput": {
+          "description": "A DAG node. Child collections are ordered arrays because IDs are\nserver-minted; ``prereq_ids`` may reference sibling ``proposed_id``s.",
+          "properties": {
+            "checklist_items": {
+              "items": {
+                "$ref": "#/$defs/ChecklistItemInput"
+              },
+              "title": "Checklist Items",
+              "type": "array"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Description"
+            },
+            "effort_estimate": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Effort Estimate"
+            },
+            "prereq_ids": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Prereq Ids",
+              "type": "array"
+            },
+            "proposed_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Proposed Id"
+            },
+            "resources": {
+              "items": {
+                "$ref": "#/$defs/ResourceInput"
+              },
+              "title": "Resources",
+              "type": "array"
+            },
+            "tags": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Tags",
+              "type": "array"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          "required": [
+            "title"
+          ],
+          "title": "SubsectionInput",
+          "type": "object"
+        },
+        "UpdateItemOp": {
+          "properties": {
+            "item_id": {
+              "title": "Item Id",
+              "type": "string"
+            },
+            "op": {
+              "const": "update_item",
+              "title": "Op",
+              "type": "string"
+            },
+            "text": {
+              "title": "Text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "item_id",
+            "text"
+          ],
+          "title": "UpdateItemOp",
+          "type": "object"
+        },
+        "UpdateSectionOp": {
+          "properties": {
+            "op": {
+              "const": "update_section",
+              "title": "Op",
+              "type": "string"
+            },
+            "section_id": {
+              "title": "Section Id",
+              "type": "string"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "section_id",
+            "title"
+          ],
+          "title": "UpdateSectionOp",
+          "type": "object"
+        },
+        "UpdateSubsectionOp": {
+          "properties": {
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Description"
+            },
+            "effort_estimate": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Effort Estimate"
+            },
+            "op": {
+              "const": "update_subsection",
+              "title": "Op",
+              "type": "string"
+            },
+            "subsection_id": {
+              "title": "Subsection Id",
+              "type": "string"
+            },
+            "title": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Title"
+            }
+          },
+          "required": [
+            "op",
+            "subsection_id"
+          ],
+          "title": "UpdateSubsectionOp",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "operations": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "add_edge": "#/$defs/AddEdgeOp",
+                "add_item": "#/$defs/AddItemOp",
+                "add_section": "#/$defs/AddSectionOp",
+                "add_subsection": "#/$defs/AddSubsectionOp",
+                "remove_edge": "#/$defs/RemoveEdgeOp",
+                "remove_item": "#/$defs/RemoveItemOp",
+                "remove_section": "#/$defs/RemoveSectionOp",
+                "remove_subsection": "#/$defs/RemoveSubsectionOp",
+                "reorder": "#/$defs/ReorderOp",
+                "set_effort": "#/$defs/SetEffortOp",
+                "set_resources": "#/$defs/SetResourcesOp",
+                "set_suggested_path": "#/$defs/SetSuggestedPathOp",
+                "set_tags": "#/$defs/SetTagsOp",
+                "update_item": "#/$defs/UpdateItemOp",
+                "update_section": "#/$defs/UpdateSectionOp",
+                "update_subsection": "#/$defs/UpdateSubsectionOp"
+              },
+              "propertyName": "op"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/AddSubsectionOp"
+              },
+              {
+                "$ref": "#/$defs/UpdateSubsectionOp"
+              },
+              {
+                "$ref": "#/$defs/RemoveSubsectionOp"
+              },
+              {
+                "$ref": "#/$defs/AddEdgeOp"
+              },
+              {
+                "$ref": "#/$defs/RemoveEdgeOp"
+              },
+              {
+                "$ref": "#/$defs/SetTagsOp"
+              },
+              {
+                "$ref": "#/$defs/SetResourcesOp"
+              },
+              {
+                "$ref": "#/$defs/SetEffortOp"
+              },
+              {
+                "$ref": "#/$defs/AddItemOp"
+              },
+              {
+                "$ref": "#/$defs/UpdateItemOp"
+              },
+              {
+                "$ref": "#/$defs/RemoveItemOp"
+              },
+              {
+                "$ref": "#/$defs/ReorderOp"
+              },
+              {
+                "$ref": "#/$defs/SetSuggestedPathOp"
+              },
+              {
+                "$ref": "#/$defs/AddSectionOp"
+              },
+              {
+                "$ref": "#/$defs/UpdateSectionOp"
+              },
+              {
+                "$ref": "#/$defs/RemoveSectionOp"
+              }
+            ]
+          },
+          "title": "Operations",
+          "type": "array"
+        },
+        "revision": {
+          "title": "Revision",
+          "type": "integer"
+        },
+        "roadmap_id": {
+          "title": "Roadmap Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "roadmap_id",
+        "revision",
+        "operations"
+      ],
+      "title": "patch_roadmap_draftArguments",
+      "type": "object"
+    },
+    "name": "patch_roadmap_draft",
+    "outputSchema": {
+      "$defs": {
+        "ChangeType": {
+          "enum": [
+            "added",
+            "updated",
+            "removed"
+          ],
+          "title": "ChangeType",
+          "type": "string"
+        },
+        "ChangedNode": {
+          "description": "One node a patch touched, echoed back so the agent knows what changed\nwithout re-reading the whole roadmap (spec section 07: summary-first).",
+          "properties": {
+            "change": {
+              "$ref": "#/$defs/ChangeType"
+            },
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "kind": {
+              "$ref": "#/$defs/ChangedNodeKind"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "change"
+          ],
+          "title": "ChangedNode",
+          "type": "object"
+        },
+        "ChangedNodeKind": {
+          "enum": [
+            "roadmap",
+            "section",
+            "subsection",
+            "item"
+          ],
+          "title": "ChangedNodeKind",
+          "type": "string"
+        }
+      },
+      "description": "``patch_roadmap_draft`` result: the post-batch ``revision`` (pass it as the\nnext call's ``revision``), the changed nodes, and the ``proposed_id ->\nminted_id`` remap for any de-duped ``add_*`` proposal.",
+      "properties": {
+        "changed_nodes": {
+          "items": {
+            "$ref": "#/$defs/ChangedNode"
+          },
+          "title": "Changed Nodes",
+          "type": "array"
+        },
+        "remap": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Remap",
+          "type": "object"
+        },
+        "revision": {
+          "title": "Revision",
+          "type": "integer"
+        },
+        "roadmap_id": {
+          "title": "Roadmap Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "roadmap_id",
+        "revision"
+      ],
+      "title": "PatchResult",
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": null,
+      "idempotentHint": null,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "Get progress"
+    },
+    "inputSchema": {
+      "properties": {
+        "detailed": {
+          "default": false,
+          "title": "Detailed",
+          "type": "boolean"
+        },
+        "roadmap_id": {
+          "title": "Roadmap Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "roadmap_id"
+      ],
+      "title": "progress_getArguments",
+      "type": "object"
+    },
+    "name": "progress_get",
+    "outputSchema": {
+      "$defs": {
+        "SectionProgress": {
+          "description": "Per-section completion counts, derived from progress + roadmap.",
+          "properties": {
+            "checked_items": {
+              "title": "Checked Items",
+              "type": "integer"
+            },
+            "percent": {
+              "title": "Percent",
+              "type": "integer"
+            },
+            "section_id": {
+              "title": "Section Id",
+              "type": "string"
+            },
+            "total_items": {
+              "title": "Total Items",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "section_id",
+            "total_items",
+            "checked_items",
+            "percent"
+          ],
+          "title": "SectionProgress",
+          "type": "object"
+        }
+      },
+      "description": "``progress_get`` result: roadmap-wide + per-section completion.\n\n``checked_ids`` is populated only under ``detailed`` (keeping the default\nconcise and small while still letting the agent reconcile the exact checked\nset when it asks). ``deadline`` is the per-user countdown date, if set.",
+      "properties": {
+        "checked_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Checked Ids"
+        },
+        "checked_items": {
+          "title": "Checked Items",
+          "type": "integer"
+        },
+        "deadline": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deadline"
+        },
+        "percent": {
+          "title": "Percent",
+          "type": "integer"
+        },
+        "roadmap_id": {
+          "title": "Roadmap Id",
+          "type": "string"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/SectionProgress"
+          },
+          "title": "Sections",
+          "type": "array"
+        },
+        "total_items": {
+          "title": "Total Items",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "roadmap_id",
+        "total_items",
+        "checked_items",
+        "percent"
+      ],
+      "title": "ProgressSnapshot",
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+      "title": "Update progress"
+    },
+    "inputSchema": {
+      "$defs": {
+        "CompletionState": {
+          "description": "The explicit target state ``progress_update`` sets its items to.\n\nExplicit set, never toggle (spec section 07): the client states the desired\nend state so a retry is idempotent.",
+          "enum": [
+            "complete",
+            "incomplete"
+          ],
+          "title": "CompletionState",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "item_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Item Ids",
+          "type": "array"
+        },
+        "roadmap_id": {
+          "title": "Roadmap Id",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/CompletionState"
+        }
+      },
+      "required": [
+        "roadmap_id",
+        "item_ids",
+        "state"
+      ],
+      "title": "progress_updateArguments",
+      "type": "object"
+    },
+    "name": "progress_update",
+    "outputSchema": {
+      "$defs": {
+        "NextItem": {
+          "description": "One unchecked, prereq-satisfied checklist item to work on next.\n\n``why_now`` is a STRUCTURAL rationale only (spec section 07): the mechanical\nfacts the app owns (next unchecked in ``suggested_path``; named prerequisites\ncomplete), never pedagogical / ZPD judgement. ``path_position`` (the 1-based\nindex of the item's subsection in ``suggested_path``) is present only in\n``detailed`` mode.",
+          "properties": {
+            "item_id": {
+              "title": "Item Id",
+              "type": "string"
+            },
+            "path_position": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Path Position"
+            },
+            "resources": {
+              "items": {
+                "$ref": "#/$defs/ResourceLink"
+              },
+              "title": "Resources",
+              "type": "array"
+            },
+            "subsection_id": {
+              "title": "Subsection Id",
+              "type": "string"
+            },
+            "text": {
+              "title": "Text",
+              "type": "string"
+            },
+            "why_now": {
+              "title": "Why Now",
+              "type": "string"
+            }
+          },
+          "required": [
+            "subsection_id",
+            "item_id",
+            "text",
+            "why_now"
+          ],
+          "title": "NextItem",
+          "type": "object"
+        },
+        "NextResult": {
+          "description": "``roadmap_get_next`` result: the next unchecked items in ``suggested_path``\norder whose prerequisites are all complete (server-computed; spec section 07).\n\n``remaining_in_path`` counts the path subsections still to do; ``complete`` is\n``True`` when nothing remains.",
+          "properties": {
+            "complete": {
+              "default": false,
+              "title": "Complete",
+              "type": "boolean"
+            },
+            "items": {
+              "items": {
+                "$ref": "#/$defs/NextItem"
+              },
+              "title": "Items",
+              "type": "array"
+            },
+            "remaining_in_path": {
+              "default": 0,
+              "title": "Remaining In Path",
+              "type": "integer"
+            }
+          },
+          "title": "NextResult",
+          "type": "object"
+        },
+        "ProgressSnapshot": {
+          "description": "``progress_get`` result: roadmap-wide + per-section completion.\n\n``checked_ids`` is populated only under ``detailed`` (keeping the default\nconcise and small while still letting the agent reconcile the exact checked\nset when it asks). ``deadline`` is the per-user countdown date, if set.",
+          "properties": {
+            "checked_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Checked Ids"
+            },
+            "checked_items": {
+              "title": "Checked Items",
+              "type": "integer"
+            },
+            "deadline": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Deadline"
+            },
+            "percent": {
+              "title": "Percent",
+              "type": "integer"
+            },
+            "roadmap_id": {
+              "title": "Roadmap Id",
+              "type": "string"
+            },
+            "sections": {
+              "items": {
+                "$ref": "#/$defs/SectionProgress"
+              },
+              "title": "Sections",
+              "type": "array"
+            },
+            "total_items": {
+              "title": "Total Items",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "roadmap_id",
+            "total_items",
+            "checked_items",
+            "percent"
+          ],
+          "title": "ProgressSnapshot",
+          "type": "object"
+        },
+        "ResourceLink": {
+          "description": "A resource on a next item: a link, never an inlined body (no id needed).",
+          "properties": {
+            "title": {
+              "title": "Title",
+              "type": "string"
+            },
+            "type": {
+              "$ref": "#/$defs/ResourceType"
+            },
+            "url": {
+              "title": "Url",
+              "type": "string"
+            }
+          },
+          "required": [
+            "title",
+            "url",
+            "type"
+          ],
+          "title": "ResourceLink",
+          "type": "object"
+        },
+        "ResourceType": {
+          "enum": [
+            "article",
+            "video",
+            "book",
+            "course",
+            "docs",
+            "other"
+          ],
+          "title": "ResourceType",
+          "type": "string"
+        },
+        "SectionProgress": {
+          "description": "Per-section completion counts, derived from progress + roadmap.",
+          "properties": {
+            "checked_items": {
+              "title": "Checked Items",
+              "type": "integer"
+            },
+            "percent": {
+              "title": "Percent",
+              "type": "integer"
+            },
+            "section_id": {
+              "title": "Section Id",
+              "type": "string"
+            },
+            "total_items": {
+              "title": "Total Items",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "section_id",
+            "total_items",
+            "checked_items",
+            "percent"
+          ],
+          "title": "SectionProgress",
+          "type": "object"
+        }
+      },
+      "description": "``progress_update`` result: the fresh snapshot after the explicit set plus\nthe next suggestion (spec sections 04/07). The snapshot is detailed so the\nagent can reconcile its checkbox state to the server truth.",
+      "properties": {
+        "next": {
+          "$ref": "#/$defs/NextResult"
+        },
+        "progress": {
+          "$ref": "#/$defs/ProgressSnapshot"
+        }
+      },
+      "required": [
+        "progress",
+        "next"
+      ],
+      "title": "ProgressUpdateResult",
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": null,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+      "title": "Publish roadmap"
+    },
+    "inputSchema": {
+      "properties": {
+        "roadmap_id": {
+          "title": "Roadmap Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "roadmap_id"
+      ],
+      "title": "publish_roadmapArguments",
+      "type": "object"
+    },
+    "name": "publish_roadmap",
+    "outputSchema": {
+      "$defs": {
+        "RoadmapStatus": {
+          "enum": [
+            "draft",
+            "published",
+            "archived"
+          ],
+          "title": "RoadmapStatus",
+          "type": "string"
+        }
+      },
+      "description": "``publish_roadmap`` result: the roadmap after the one-way draft->published\ntransition.",
+      "properties": {
+        "revision": {
+          "title": "Revision",
+          "type": "integer"
+        },
+        "roadmap_id": {
+          "title": "Roadmap Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/RoadmapStatus"
+        }
+      },
+      "required": [
+        "roadmap_id",
+        "revision",
+        "status"
+      ],
+      "title": "PublishResult",
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": null,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+      "title": "Replace roadmap draft (import)"
+    },
+    "inputSchema": {
+      "$defs": {
+        "ChecklistItemInput": {
+          "properties": {
+            "proposed_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Proposed Id"
+            },
+            "text": {
+              "title": "Text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "title": "ChecklistItemInput",
+          "type": "object"
+        },
+        "ResourceInput": {
+          "description": "An external link on a subsection; the body is never inlined (spec 07).",
+          "properties": {
+            "proposed_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Proposed Id"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            },
+            "type": {
+              "$ref": "#/$defs/ResourceType"
+            },
+            "url": {
+              "title": "Url",
+              "type": "string"
+            }
+          },
+          "required": [
+            "title",
+            "url",
+            "type"
+          ],
+          "title": "ResourceInput",
+          "type": "object"
+        },
+        "ResourceType": {
+          "enum": [
+            "article",
+            "video",
+            "book",
+            "course",
+            "docs",
+            "other"
+          ],
+          "title": "ResourceType",
+          "type": "string"
+        },
+        "RoadmapDraftInput": {
+          "description": "The full-document payload for ``create_roadmap_draft`` and\n``replace_roadmap_draft`` (spec section 04 ``RoadmapInput``).",
+          "properties": {
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Description"
+            },
+            "proposed_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Proposed Id"
+            },
+            "sections": {
+              "items": {
+                "$ref": "#/$defs/SectionInput"
+              },
+              "title": "Sections",
+              "type": "array"
+            },
+            "subject_tags": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Subject Tags",
+              "type": "array"
+            },
+            "suggested_path": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Suggested Path",
+              "type": "array"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          "required": [
+            "title"
+          ],
+          "title": "RoadmapDraftInput",
+          "type": "object"
+        },
+        "SectionInput": {
+          "properties": {
+            "proposed_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Proposed Id"
+            },
+            "subsections": {
+              "items": {
+                "$ref": "#/$defs/SubsectionInput"
+              },
+              "title": "Subsections",
+              "type": "array"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          "required": [
+            "title"
+          ],
+          "title": "SectionInput",
+          "type": "object"
+        },
+        "SubsectionInput": {
+          "description": "A DAG node. Child collections are ordered arrays because IDs are\nserver-minted; ``prereq_ids`` may reference sibling ``proposed_id``s.",
+          "properties": {
+            "checklist_items": {
+              "items": {
+                "$ref": "#/$defs/ChecklistItemInput"
+              },
+              "title": "Checklist Items",
+              "type": "array"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Description"
+            },
+            "effort_estimate": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Effort Estimate"
+            },
+            "prereq_ids": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Prereq Ids",
+              "type": "array"
+            },
+            "proposed_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Proposed Id"
+            },
+            "resources": {
+              "items": {
+                "$ref": "#/$defs/ResourceInput"
+              },
+              "title": "Resources",
+              "type": "array"
+            },
+            "tags": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Tags",
+              "type": "array"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          "required": [
+            "title"
+          ],
+          "title": "SubsectionInput",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "full_document": {
+          "$ref": "#/$defs/RoadmapDraftInput"
+        },
+        "roadmap_id": {
+          "title": "Roadmap Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "roadmap_id",
+        "full_document"
+      ],
+      "title": "replace_roadmap_draftArguments",
+      "type": "object"
+    },
+    "name": "replace_roadmap_draft",
+    "outputSchema": {
+      "$defs": {
+        "RoadmapStatus": {
+          "enum": [
+            "draft",
+            "published",
+            "archived"
+          ],
+          "title": "RoadmapStatus",
+          "type": "string"
+        }
+      },
+      "description": "``replace_roadmap_draft`` result: the roadmap ID is unchanged; every node\nwithout a preserved ``proposed_id`` is re-minted, echoed via ``remap``.",
+      "properties": {
+        "remap": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Remap",
+          "type": "object"
+        },
+        "revision": {
+          "title": "Revision",
+          "type": "integer"
+        },
+        "roadmap_id": {
+          "title": "Roadmap Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/RoadmapStatus"
+        }
+      },
+      "required": [
+        "roadmap_id",
+        "revision",
+        "status"
+      ],
+      "title": "ReplacedRoadmap",
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": null,
+      "idempotentHint": null,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "Get next steps"
+    },
+    "inputSchema": {
+      "$defs": {
+        "ResponseFormat": {
+          "description": "The ``concise | detailed`` switch on the read tools (spec section 07).\n\nConcise (default) is roughly one-third the tokens and still carries every\nfollow-up ID; detailed adds the explanatory free-text (a node ``description``\non ``roadmap_get_node``, ``path_position`` on ``roadmap_get_next``).",
+          "enum": [
+            "concise",
+            "detailed"
+          ],
+          "title": "ResponseFormat",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "format": {
+          "$ref": "#/$defs/ResponseFormat",
+          "default": "concise"
+        },
+        "roadmap_id": {
+          "title": "Roadmap Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "roadmap_id"
+      ],
+      "title": "roadmap_get_nextArguments",
+      "type": "object"
+    },
+    "name": "roadmap_get_next",
+    "outputSchema": {
+      "$defs": {
+        "NextItem": {
+          "description": "One unchecked, prereq-satisfied checklist item to work on next.\n\n``why_now`` is a STRUCTURAL rationale only (spec section 07): the mechanical\nfacts the app owns (next unchecked in ``suggested_path``; named prerequisites\ncomplete), never pedagogical / ZPD judgement. ``path_position`` (the 1-based\nindex of the item's subsection in ``suggested_path``) is present only in\n``detailed`` mode.",
+          "properties": {
+            "item_id": {
+              "title": "Item Id",
+              "type": "string"
+            },
+            "path_position": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Path Position"
+            },
+            "resources": {
+              "items": {
+                "$ref": "#/$defs/ResourceLink"
+              },
+              "title": "Resources",
+              "type": "array"
+            },
+            "subsection_id": {
+              "title": "Subsection Id",
+              "type": "string"
+            },
+            "text": {
+              "title": "Text",
+              "type": "string"
+            },
+            "why_now": {
+              "title": "Why Now",
+              "type": "string"
+            }
+          },
+          "required": [
+            "subsection_id",
+            "item_id",
+            "text",
+            "why_now"
+          ],
+          "title": "NextItem",
+          "type": "object"
+        },
+        "ResourceLink": {
+          "description": "A resource on a next item: a link, never an inlined body (no id needed).",
+          "properties": {
+            "title": {
+              "title": "Title",
+              "type": "string"
+            },
+            "type": {
+              "$ref": "#/$defs/ResourceType"
+            },
+            "url": {
+              "title": "Url",
+              "type": "string"
+            }
+          },
+          "required": [
+            "title",
+            "url",
+            "type"
+          ],
+          "title": "ResourceLink",
+          "type": "object"
+        },
+        "ResourceType": {
+          "enum": [
+            "article",
+            "video",
+            "book",
+            "course",
+            "docs",
+            "other"
+          ],
+          "title": "ResourceType",
+          "type": "string"
+        }
+      },
+      "description": "``roadmap_get_next`` result: the next unchecked items in ``suggested_path``\norder whose prerequisites are all complete (server-computed; spec section 07).\n\n``remaining_in_path`` counts the path subsections still to do; ``complete`` is\n``True`` when nothing remains.",
+      "properties": {
+        "complete": {
+          "default": false,
+          "title": "Complete",
+          "type": "boolean"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/NextItem"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "remaining_in_path": {
+          "default": 0,
+          "title": "Remaining In Path",
+          "type": "integer"
+        }
+      },
+      "title": "NextResult",
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": null,
+      "idempotentHint": null,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "Get subsection detail"
+    },
+    "inputSchema": {
+      "$defs": {
+        "ResponseFormat": {
+          "description": "The ``concise | detailed`` switch on the read tools (spec section 07).\n\nConcise (default) is roughly one-third the tokens and still carries every\nfollow-up ID; detailed adds the explanatory free-text (a node ``description``\non ``roadmap_get_node``, ``path_position`` on ``roadmap_get_next``).",
+          "enum": [
+            "concise",
+            "detailed"
+          ],
+          "title": "ResponseFormat",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "format": {
+          "$ref": "#/$defs/ResponseFormat",
+          "default": "concise"
+        },
+        "roadmap_id": {
+          "title": "Roadmap Id",
+          "type": "string"
+        },
+        "subsection_id": {
+          "title": "Subsection Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "roadmap_id",
+        "subsection_id"
+      ],
+      "title": "roadmap_get_nodeArguments",
+      "type": "object"
+    },
+    "name": "roadmap_get_node",
+    "outputSchema": {
+      "$defs": {
+        "ItemState": {
+          "description": "A checklist item with the caller's done state (``done`` = checked).",
+          "properties": {
+            "done": {
+              "title": "Done",
+              "type": "boolean"
+            },
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "text": {
+              "title": "Text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "text",
+            "done"
+          ],
+          "title": "ItemState",
+          "type": "object"
+        },
+        "PrereqRef": {
+          "description": "A resolved prerequisite: its id, title, and the caller's done state\n(``done`` = every checklist item of the prerequisite subsection is checked).",
+          "properties": {
+            "done": {
+              "title": "Done",
+              "type": "boolean"
+            },
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "done"
+          ],
+          "title": "PrereqRef",
+          "type": "object"
+        },
+        "ResourceRef": {
+          "description": "A subsection resource as a link, never an inlined body (spec section 07).",
+          "properties": {
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            },
+            "type": {
+              "$ref": "#/$defs/ResourceType"
+            },
+            "url": {
+              "title": "Url",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "url",
+            "type"
+          ],
+          "title": "ResourceRef",
+          "type": "object"
+        },
+        "ResourceType": {
+          "enum": [
+            "article",
+            "video",
+            "book",
+            "course",
+            "docs",
+            "other"
+          ],
+          "title": "ResourceType",
+          "type": "string"
+        }
+      },
+      "description": "One subsection resolved for study (``roadmap_get_node`` + section pages).\n\n``description`` is populated only in ``detailed`` mode; concise leaves it\n``None`` while still carrying every follow-up ID (subsection, resources,\nresolved prereqs, items). External bodies are never inlined: ``resources`` are\nlinks only.",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "effort_estimate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effort Estimate"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/ItemState"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "prereqs": {
+          "items": {
+            "$ref": "#/$defs/PrereqRef"
+          },
+          "title": "Prereqs",
+          "type": "array"
+        },
+        "resources": {
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          },
+          "title": "Resources",
+          "type": "array"
+        },
+        "subsection_id": {
+          "title": "Subsection Id",
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "subsection_id",
+        "title"
+      ],
+      "title": "NodeDetail",
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": null,
+      "idempotentHint": null,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "Get roadmap overview"
+    },
+    "inputSchema": {
+      "$defs": {
+        "ResponseFormat": {
+          "description": "The ``concise | detailed`` switch on the read tools (spec section 07).\n\nConcise (default) is roughly one-third the tokens and still carries every\nfollow-up ID; detailed adds the explanatory free-text (a node ``description``\non ``roadmap_get_node``, ``path_position`` on ``roadmap_get_next``).",
+          "enum": [
+            "concise",
+            "detailed"
+          ],
+          "title": "ResponseFormat",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "format": {
+          "$ref": "#/$defs/ResponseFormat",
+          "default": "concise"
+        },
+        "roadmap_id": {
+          "title": "Roadmap Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "roadmap_id"
+      ],
+      "title": "roadmap_get_overviewArguments",
+      "type": "object"
+    },
+    "name": "roadmap_get_overview",
+    "outputSchema": {
+      "$defs": {
+        "OverallProgress": {
+          "description": "Roadmap-wide completion totals (derived, never stored).",
+          "properties": {
+            "checked_items": {
+              "title": "Checked Items",
+              "type": "integer"
+            },
+            "percent": {
+              "title": "Percent",
+              "type": "integer"
+            },
+            "total_items": {
+              "title": "Total Items",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "total_items",
+            "checked_items",
+            "percent"
+          ],
+          "title": "OverallProgress",
+          "type": "object"
+        },
+        "RoadmapStatus": {
+          "enum": [
+            "draft",
+            "published",
+            "archived"
+          ],
+          "title": "RoadmapStatus",
+          "type": "string"
+        },
+        "SectionOverview": {
+          "description": "Per-section completion counts, no checklist-item bodies (spec section 04).",
+          "properties": {
+            "checked_items": {
+              "title": "Checked Items",
+              "type": "integer"
+            },
+            "percent": {
+              "title": "Percent",
+              "type": "integer"
+            },
+            "section_id": {
+              "title": "Section Id",
+              "type": "string"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            },
+            "total_items": {
+              "title": "Total Items",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "section_id",
+            "title",
+            "total_items",
+            "checked_items",
+            "percent"
+          ],
+          "title": "SectionOverview",
+          "type": "object"
+        }
+      },
+      "description": "``roadmap_get_overview`` result: the orientation call.\n\nSections in ``section_order`` with per-section + overall completion and no\nchecklist-item bodies; ``checked_items`` / ``percent`` reflect the caller's\nown progress. Drill in with ``roadmap_get_node`` or ``roadmap_get_section``.",
+      "properties": {
+        "overall": {
+          "$ref": "#/$defs/OverallProgress"
+        },
+        "revision": {
+          "title": "Revision",
+          "type": "integer"
+        },
+        "roadmap_id": {
+          "title": "Roadmap Id",
+          "type": "string"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/SectionOverview"
+          },
+          "title": "Sections",
+          "type": "array"
+        },
+        "status": {
+          "$ref": "#/$defs/RoadmapStatus"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "roadmap_id",
+        "title",
+        "status",
+        "revision",
+        "overall"
+      ],
+      "title": "Overview",
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": null,
+      "idempotentHint": null,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "Get section page"
+    },
+    "inputSchema": {
+      "$defs": {
+        "SectionInclude": {
+          "description": "Which parts of each node a ``roadmap_get_section`` page populates.",
+          "enum": [
+            "subsections",
+            "items",
+            "both"
+          ],
+          "title": "SectionInclude",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cursor"
+        },
+        "include": {
+          "$ref": "#/$defs/SectionInclude",
+          "default": "both"
+        },
+        "roadmap_id": {
+          "title": "Roadmap Id",
+          "type": "string"
+        },
+        "section_id": {
+          "title": "Section Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "roadmap_id",
+        "section_id"
+      ],
+      "title": "roadmap_get_sectionArguments",
+      "type": "object"
+    },
+    "name": "roadmap_get_section",
+    "outputSchema": {
+      "$defs": {
+        "ItemState": {
+          "description": "A checklist item with the caller's done state (``done`` = checked).",
+          "properties": {
+            "done": {
+              "title": "Done",
+              "type": "boolean"
+            },
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "text": {
+              "title": "Text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "text",
+            "done"
+          ],
+          "title": "ItemState",
+          "type": "object"
+        },
+        "NodeDetail": {
+          "description": "One subsection resolved for study (``roadmap_get_node`` + section pages).\n\n``description`` is populated only in ``detailed`` mode; concise leaves it\n``None`` while still carrying every follow-up ID (subsection, resources,\nresolved prereqs, items). External bodies are never inlined: ``resources`` are\nlinks only.",
+          "properties": {
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Description"
+            },
+            "effort_estimate": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Effort Estimate"
+            },
+            "items": {
+              "items": {
+                "$ref": "#/$defs/ItemState"
+              },
+              "title": "Items",
+              "type": "array"
+            },
+            "prereqs": {
+              "items": {
+                "$ref": "#/$defs/PrereqRef"
+              },
+              "title": "Prereqs",
+              "type": "array"
+            },
+            "resources": {
+              "items": {
+                "$ref": "#/$defs/ResourceRef"
+              },
+              "title": "Resources",
+              "type": "array"
+            },
+            "subsection_id": {
+              "title": "Subsection Id",
+              "type": "string"
+            },
+            "tags": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Tags",
+              "type": "array"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          "required": [
+            "subsection_id",
+            "title"
+          ],
+          "title": "NodeDetail",
+          "type": "object"
+        },
+        "PrereqRef": {
+          "description": "A resolved prerequisite: its id, title, and the caller's done state\n(``done`` = every checklist item of the prerequisite subsection is checked).",
+          "properties": {
+            "done": {
+              "title": "Done",
+              "type": "boolean"
+            },
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "done"
+          ],
+          "title": "PrereqRef",
+          "type": "object"
+        },
+        "ResourceRef": {
+          "description": "A subsection resource as a link, never an inlined body (spec section 07).",
+          "properties": {
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            },
+            "type": {
+              "$ref": "#/$defs/ResourceType"
+            },
+            "url": {
+              "title": "Url",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "url",
+            "type"
+          ],
+          "title": "ResourceRef",
+          "type": "object"
+        },
+        "ResourceType": {
+          "enum": [
+            "article",
+            "video",
+            "book",
+            "course",
+            "docs",
+            "other"
+          ],
+          "title": "ResourceType",
+          "type": "string"
+        },
+        "SectionInclude": {
+          "description": "Which parts of each node a ``roadmap_get_section`` page populates.",
+          "enum": [
+            "subsections",
+            "items",
+            "both"
+          ],
+          "title": "SectionInclude",
+          "type": "string"
+        }
+      },
+      "description": "``roadmap_get_section`` result: a paginated section drill-down.\n\n``include`` selects which parts of each node are populated. ``next_cursor`` is\nan **opaque** token for the next page (absent on the last page); ``steering``\nis present only when the response was truncated (\"showing N of M; pass\ncursor=...\"). Pass ``next_cursor`` back as ``cursor`` to page forward.",
+      "properties": {
+        "include": {
+          "$ref": "#/$defs/SectionInclude"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Cursor"
+        },
+        "section_id": {
+          "title": "Section Id",
+          "type": "string"
+        },
+        "steering": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Steering"
+        },
+        "subsections": {
+          "items": {
+            "$ref": "#/$defs/NodeDetail"
+          },
+          "title": "Subsections",
+          "type": "array"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "section_id",
+        "title",
+        "include"
+      ],
+      "title": "SectionPage",
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": null,
+      "idempotentHint": null,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "Search roadmap"
+    },
+    "inputSchema": {
+      "properties": {
+        "query": {
+          "title": "Query",
+          "type": "string"
+        },
+        "roadmap_id": {
+          "title": "Roadmap Id",
+          "type": "string"
+        },
+        "tags": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tags"
+        }
+      },
+      "required": [
+        "roadmap_id",
+        "query"
+      ],
+      "title": "roadmap_searchArguments",
+      "type": "object"
+    },
+    "name": "roadmap_search",
+    "outputSchema": {
+      "$defs": {
+        "SearchHit": {
+          "description": "One search match carrying the IDs needed to drill down (spec section 04).\n\n``item_id`` is present only when ``kind == item``; ``matched_tags`` names the\nsubsection tags that matched a tag filter (absent for a keyword-only match).",
+          "properties": {
+            "item_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Item Id"
+            },
+            "kind": {
+              "$ref": "#/$defs/SearchHitKind"
+            },
+            "matched_tags": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Matched Tags"
+            },
+            "subsection_id": {
+              "title": "Subsection Id",
+              "type": "string"
+            },
+            "title_or_text": {
+              "title": "Title Or Text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "subsection_id",
+            "title_or_text"
+          ],
+          "title": "SearchHit",
+          "type": "object"
+        },
+        "SearchHitKind": {
+          "description": "Whether a search hit is a subsection (DAG node) or a checklist item.",
+          "enum": [
+            "subsection",
+            "item"
+          ],
+          "title": "SearchHitKind",
+          "type": "string"
+        }
+      },
+      "description": "``roadmap_search`` result: the matching hits (search, not list-all).\n\nA thin object wrapper around the hit list so the tool returns a structured\n``outputSchema`` object like every other tool (rather than a bare array).",
+      "properties": {
+        "hits": {
+          "items": {
+            "$ref": "#/$defs/SearchHit"
+          },
+          "title": "Hits",
+          "type": "array"
+        }
+      },
+      "title": "SearchResults",
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": null,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "Validate roadmap draft"
+    },
+    "inputSchema": {
+      "properties": {
+        "roadmap_id": {
+          "title": "Roadmap Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "roadmap_id"
+      ],
+      "title": "validate_roadmap_draftArguments",
+      "type": "object"
+    },
+    "name": "validate_roadmap_draft",
+    "outputSchema": {
+      "$defs": {
+        "Violation": {
+          "description": "One structural rule failure, model-recoverable by naming the rule + IDs.",
+          "properties": {
+            "ids": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Ids",
+              "type": "array"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            },
+            "rule": {
+              "title": "Rule",
+              "type": "string"
+            }
+          },
+          "required": [
+            "rule",
+            "message"
+          ],
+          "title": "Violation",
+          "type": "object"
+        }
+      },
+      "description": "``validate_roadmap_draft`` result: every structural violation in one pass.\n``publishable`` is true exactly when ``violations`` is empty (spec 06/07).",
+      "properties": {
+        "publishable": {
+          "title": "Publishable",
+          "type": "boolean"
+        },
+        "violations": {
+          "items": {
+            "$ref": "#/$defs/Violation"
+          },
+          "title": "Violations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "publishable"
+      ],
+      "title": "ValidationResult",
+      "type": "object"
+    }
+  }
+]

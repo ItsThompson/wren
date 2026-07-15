@@ -8,8 +8,9 @@ production graph (httpx-backed JWKS discovery + internal client) and manages the
 lifecycle.
 
 The MCP tool transport that sits behind the bearer boundary is mounted here: the
-write tools (Ticket 21) via :func:`register_write_tools`, with the read tools
-(Ticket 22) registered alongside onto the same server.
+write tools (Ticket 21) via :func:`register_write_tools` and the read tools
+(Ticket 22) via :func:`register_read_tools`, registered alongside onto the same
+server.
 """
 
 from __future__ import annotations
@@ -35,6 +36,7 @@ from wren_mcp.metrics import instrument
 from wren_mcp.prm import build_prm_document
 from wren_mcp.settings import RsSettings, build_rs_settings
 from wren_mcp.tokens import AgentTokenVerifier
+from wren_mcp.tools_read import register_read_tools
 from wren_mcp.tools_write import register_write_tools
 
 # Bound so a hung AS cannot pin the discovery/readiness call indefinitely.
@@ -90,12 +92,13 @@ def create_rs_app(
 
     verifier = AgentTokenVerifier(key_provider, issuer=settings.issuer, resource=settings.resource)
 
-    # The MCP tool surface: register the write tools (Ticket 22 adds the read
-    # tools alongside) onto the shared server, then mount its Streamable HTTP
-    # transport under the bearer-guarded MCP prefix. Building the ASGI app up
-    # front lets the app lifespan drive the session manager it requires.
+    # The MCP tool surface: register the write + read tools onto the shared server,
+    # then mount its Streamable HTTP transport under the bearer-guarded MCP prefix.
+    # Building the ASGI app up front lets the app lifespan drive the session
+    # manager it requires.
     mcp = create_mcp_server(settings)
     register_write_tools(mcp, internal_client)
+    register_read_tools(mcp, internal_client)
     mcp_transport = mcp.streamable_http_app()
 
     app = FastAPI(
