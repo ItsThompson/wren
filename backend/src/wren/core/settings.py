@@ -40,6 +40,14 @@ class EnvSettings(BaseSettings):
     # 08); defense-in-depth behind compute-net isolation. Empty by default so an
     # unconfigured internal app fail-safe denies (`require_internal_user`).
     internal_api_token: str = ""
+    # HS256 secret for human session JWTs (spec section 08), separate from the
+    # agent OAuth keypair. Empty by default so an unconfigured external app
+    # fail-safe denies every session (no cookie resolves).
+    session_jwt_secret: str = ""
+    # Cookie Domain for the session cookie. Prod pins `.usewren.com` so the SPA
+    # (usewren.com) and API (api.usewren.com) share it; empty in dev makes the
+    # cookie host-only (localhost).
+    cookie_domain: str = ""
 
 
 class AppSettings(BaseModel):
@@ -52,6 +60,8 @@ class AppSettings(BaseModel):
     host: str
     database_url: str
     internal_api_token: str
+    session_jwt_secret: str
+    cookie_domain: str
 
     @property
     def is_dev(self) -> bool:
@@ -69,4 +79,6 @@ def build_app_settings(*, service: str, port: int, env: EnvSettings | None = Non
         host=env.host,
         database_url=env.database_url,
         internal_api_token=env.internal_api_token,
+        session_jwt_secret=env.session_jwt_secret,
+        cookie_domain=env.cookie_domain,
     )
