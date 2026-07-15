@@ -121,6 +121,89 @@
           }
         }
       }
+    },
+    "/roadmaps": {
+      "post": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Create Roadmap",
+        "operationId": "create_roadmap_roadmaps_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoadmapInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoadmapCreated"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}": {
+      "get": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Get Roadmap",
+        "operationId": "get_roadmap_roadmaps__roadmap_id__get",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Roadmap"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -154,6 +237,49 @@
         ],
         "title": "AuthenticatedUser",
         "description": "The authenticated user's own view, returned by register/login/refresh.\n\nCarries the private ``email`` (the caller is the account owner) but never the\npassword hash. The public, cross-user projection lives in ``PublicProfile``."
+      },
+      "ChecklistItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "text"
+        ],
+        "title": "ChecklistItem",
+        "description": "The only checkable unit."
+      },
+      "ChecklistItemInput": {
+        "properties": {
+          "proposed_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "ChecklistItemInput"
       },
       "HTTPValidationError": {
         "properties": {
@@ -212,6 +338,553 @@
         "title": "RegisterRequest",
         "description": "Registration input. Structural typing only; domain rules (password\nstrength, handle charset) are enforced in the service for specific messages."
       },
+      "Resource": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ResourceType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "url",
+          "type"
+        ],
+        "title": "Resource",
+        "description": "An external link on a subsection; the body is never inlined."
+      },
+      "ResourceInput": {
+        "properties": {
+          "proposed_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ResourceType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "url",
+          "type"
+        ],
+        "title": "ResourceInput"
+      },
+      "ResourceType": {
+        "type": "string",
+        "enum": [
+          "article",
+          "video",
+          "book",
+          "course",
+          "docs",
+          "other"
+        ],
+        "title": "ResourceType"
+      },
+      "Roadmap": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "owner": {
+            "type": "string",
+            "title": "Owner"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "subject_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subject Tags"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility",
+            "default": "private"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RoadmapStatus",
+            "default": "draft"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "default": 1
+          },
+          "sections": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Section"
+            },
+            "type": "object",
+            "title": "Sections"
+          },
+          "section_order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Section Order"
+          },
+          "suggested_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggested Path"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "owner",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Roadmap",
+        "description": "A roadmap definition owned by one user. ``owner`` is resolved from the\nsession, never trusted from client input."
+      },
+      "RoadmapCreated": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "owner": {
+            "type": "string",
+            "title": "Owner"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "subject_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subject Tags"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility",
+            "default": "private"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RoadmapStatus",
+            "default": "draft"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "default": 1
+          },
+          "sections": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Section"
+            },
+            "type": "object",
+            "title": "Sections"
+          },
+          "section_order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Section Order"
+          },
+          "suggested_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggested Path"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "remap": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Remap"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "owner",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "RoadmapCreated",
+        "description": "The ``POST /roadmaps`` body: the full minted roadmap plus a ``remap`` of\nevery de-duped ``proposed_id -> minted_id`` so the author can reconcile the\nreferences it sent (spec section 04). ``remap`` is empty when no proposed ID\nhad to be changed."
+      },
+      "RoadmapInput": {
+        "properties": {
+          "proposed_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "subject_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subject Tags"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility",
+            "default": "private"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/SectionInput"
+            },
+            "type": "array",
+            "title": "Sections"
+          },
+          "suggested_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggested Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "RoadmapInput",
+        "description": "The ``create_roadmap_draft`` / ``replace_roadmap_draft`` payload."
+      },
+      "RoadmapStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "published",
+          "archived"
+        ],
+        "title": "RoadmapStatus"
+      },
+      "Section": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "subsections": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Subsection"
+            },
+            "type": "object",
+            "title": "Subsections"
+          },
+          "subsection_order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subsection Order"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "Section",
+        "description": "An ordered phase grouping DAG-node subsections."
+      },
+      "SectionInput": {
+        "properties": {
+          "proposed_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "subsections": {
+            "items": {
+              "$ref": "#/components/schemas/SubsectionInput"
+            },
+            "type": "array",
+            "title": "Subsections"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "SectionInput"
+      },
+      "Subsection": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "effort_estimate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort Estimate"
+          },
+          "prereq_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Prereq Ids"
+          },
+          "resources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Resource"
+            },
+            "type": "object",
+            "title": "Resources"
+          },
+          "resource_order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Resource Order"
+          },
+          "checklist_items": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ChecklistItem"
+            },
+            "type": "object",
+            "title": "Checklist Items"
+          },
+          "item_order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Item Order"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "Subsection",
+        "description": "The DAG node: track tags, resources, checklist items, prereq edges."
+      },
+      "SubsectionInput": {
+        "properties": {
+          "proposed_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "effort_estimate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort Estimate"
+          },
+          "prereq_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Prereq Ids"
+          },
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceInput"
+            },
+            "type": "array",
+            "title": "Resources"
+          },
+          "checklist_items": {
+            "items": {
+              "$ref": "#/components/schemas/ChecklistItemInput"
+            },
+            "type": "array",
+            "title": "Checklist Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "SubsectionInput"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -251,6 +924,14 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "Visibility": {
+        "type": "string",
+        "enum": [
+          "public",
+          "private"
+        ],
+        "title": "Visibility"
       }
     }
   }

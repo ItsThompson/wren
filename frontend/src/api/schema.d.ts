@@ -72,6 +72,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/roadmaps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Roadmap */
+        post: operations["create_roadmap_roadmaps_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/roadmaps/{roadmap_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Roadmap */
+        get: operations["get_roadmap_roadmaps__roadmap_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -95,6 +129,23 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /**
+         * ChecklistItem
+         * @description The only checkable unit.
+         */
+        ChecklistItem: {
+            /** Id */
+            id: string;
+            /** Text */
+            text: string;
+        };
+        /** ChecklistItemInput */
+        ChecklistItemInput: {
+            /** Proposed Id */
+            proposed_id?: string | null;
+            /** Text */
+            text: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -129,6 +180,227 @@ export interface components {
             /** Password */
             password: string;
         };
+        /**
+         * Resource
+         * @description An external link on a subsection; the body is never inlined.
+         */
+        Resource: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
+            type: components["schemas"]["ResourceType"];
+        };
+        /** ResourceInput */
+        ResourceInput: {
+            /** Proposed Id */
+            proposed_id?: string | null;
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
+            type: components["schemas"]["ResourceType"];
+        };
+        /**
+         * ResourceType
+         * @enum {string}
+         */
+        ResourceType: "article" | "video" | "book" | "course" | "docs" | "other";
+        /**
+         * Roadmap
+         * @description A roadmap definition owned by one user. ``owner`` is resolved from the
+         *     session, never trusted from client input.
+         */
+        Roadmap: {
+            /** Id */
+            id: string;
+            /** Owner */
+            owner: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /** Subject Tags */
+            subject_tags?: string[];
+            /** @default private */
+            visibility: components["schemas"]["Visibility"];
+            /** @default draft */
+            status: components["schemas"]["RoadmapStatus"];
+            /**
+             * Revision
+             * @default 1
+             */
+            revision: number;
+            /** Sections */
+            sections?: {
+                [key: string]: components["schemas"]["Section"];
+            };
+            /** Section Order */
+            section_order?: string[];
+            /** Suggested Path */
+            suggested_path?: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * RoadmapCreated
+         * @description The ``POST /roadmaps`` body: the full minted roadmap plus a ``remap`` of
+         *     every de-duped ``proposed_id -> minted_id`` so the author can reconcile the
+         *     references it sent (spec section 04). ``remap`` is empty when no proposed ID
+         *     had to be changed.
+         */
+        RoadmapCreated: {
+            /** Id */
+            id: string;
+            /** Owner */
+            owner: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /** Subject Tags */
+            subject_tags?: string[];
+            /** @default private */
+            visibility: components["schemas"]["Visibility"];
+            /** @default draft */
+            status: components["schemas"]["RoadmapStatus"];
+            /**
+             * Revision
+             * @default 1
+             */
+            revision: number;
+            /** Sections */
+            sections?: {
+                [key: string]: components["schemas"]["Section"];
+            };
+            /** Section Order */
+            section_order?: string[];
+            /** Suggested Path */
+            suggested_path?: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Remap */
+            remap?: {
+                [key: string]: string;
+            };
+        };
+        /**
+         * RoadmapInput
+         * @description The ``create_roadmap_draft`` / ``replace_roadmap_draft`` payload.
+         */
+        RoadmapInput: {
+            /** Proposed Id */
+            proposed_id?: string | null;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /** Subject Tags */
+            subject_tags?: string[];
+            /** @default private */
+            visibility: components["schemas"]["Visibility"];
+            /** Sections */
+            sections?: components["schemas"]["SectionInput"][];
+            /** Suggested Path */
+            suggested_path?: string[];
+        };
+        /**
+         * RoadmapStatus
+         * @enum {string}
+         */
+        RoadmapStatus: "draft" | "published" | "archived";
+        /**
+         * Section
+         * @description An ordered phase grouping DAG-node subsections.
+         */
+        Section: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Subsections */
+            subsections?: {
+                [key: string]: components["schemas"]["Subsection"];
+            };
+            /** Subsection Order */
+            subsection_order?: string[];
+        };
+        /** SectionInput */
+        SectionInput: {
+            /** Proposed Id */
+            proposed_id?: string | null;
+            /** Title */
+            title: string;
+            /** Subsections */
+            subsections?: components["schemas"]["SubsectionInput"][];
+        };
+        /**
+         * Subsection
+         * @description The DAG node: track tags, resources, checklist items, prereq edges.
+         */
+        Subsection: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /** Tags */
+            tags?: string[];
+            /** Effort Estimate */
+            effort_estimate?: string | null;
+            /** Prereq Ids */
+            prereq_ids?: string[];
+            /** Resources */
+            resources?: {
+                [key: string]: components["schemas"]["Resource"];
+            };
+            /** Resource Order */
+            resource_order?: string[];
+            /** Checklist Items */
+            checklist_items?: {
+                [key: string]: components["schemas"]["ChecklistItem"];
+            };
+            /** Item Order */
+            item_order?: string[];
+        };
+        /** SubsectionInput */
+        SubsectionInput: {
+            /** Proposed Id */
+            proposed_id?: string | null;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /** Tags */
+            tags?: string[];
+            /** Effort Estimate */
+            effort_estimate?: string | null;
+            /** Prereq Ids */
+            prereq_ids?: string[];
+            /** Resources */
+            resources?: components["schemas"]["ResourceInput"][];
+            /** Checklist Items */
+            checklist_items?: components["schemas"]["ChecklistItemInput"][];
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -142,6 +414,11 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /**
+         * Visibility
+         * @enum {string}
+         */
+        Visibility: "public" | "private";
     };
     responses: never;
     parameters: never;
@@ -252,6 +529,70 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    create_roadmap_roadmaps_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoadmapInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoadmapCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_roadmap_roadmaps__roadmap_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                roadmap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Roadmap"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };
