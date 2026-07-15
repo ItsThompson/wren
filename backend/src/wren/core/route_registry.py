@@ -73,6 +73,14 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     # transition; both resolve the human session via require_user.
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:validate"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:publish"): AccessLevel.EXTERNAL_COOKIE,
+    # Fork + presentation-only metadata edit (#14), both agent+web callable
+    # (spec section 07). Fork seeds a new draft from any readable roadmap (own or
+    # public); the metadata PATCH edits title/description/subject_tags and stays
+    # allowed post-publish (not If-Match-guarded). Both resolve the human session
+    # via require_user and are owner-scoped in the service (fork's source read is
+    # readability-scoped, not owner-scoped).
+    RouteKey(method="POST", path="/roadmaps/{roadmap_id}:fork"): AccessLevel.EXTERNAL_COOKIE,
+    RouteKey(method="PATCH", path="/roadmaps/{roadmap_id}/metadata"): AccessLevel.EXTERNAL_COOKIE,
     # Follow, progress, and server-computed next (#9): the study-time surface over
     # the progress service. All resolve the human session via require_user and are
     # scoped to that user (another user's progress is never returned).
@@ -107,6 +115,11 @@ INTERNAL_ROUTE_ACCESS: RouteRegistry = {
     RouteKey(method="PUT", path="/roadmaps/{roadmap_id}"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:validate"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:publish"): AccessLevel.INTERNAL_TRUSTED,
+    # Fork + metadata edit (#14) mirrored on the internal app so the MCP tools
+    # (Ticket 21) call them: both resolve the trusted X-User-ID and are scoped in
+    # the service the same way as the external routes.
+    RouteKey(method="POST", path="/roadmaps/{roadmap_id}:fork"): AccessLevel.INTERNAL_TRUSTED,
+    RouteKey(method="PATCH", path="/roadmaps/{roadmap_id}/metadata"): AccessLevel.INTERNAL_TRUSTED,
     # Progress surface (#9), mirrored on the internal app so the MCP progress
     # tools (Ticket 22) call it: follow / snapshot / explicit-set / next, each
     # resolving the trusted X-User-ID and scoped to that user.

@@ -579,3 +579,170 @@ def test_replace_against_a_published_roadmap_is_a_409_immutable(
     body = response.json()
     assert body["code"] == "IMMUTABLE"
     assert "fork" in body["detail"].lower()
+
+
+# --- fork (#14) --------------------------------------------------------------
+
+
+def _make_public(repo: InMemoryRoadmapRepository, roadmap_id: str) -> None:
+    """Force a stored roadmap to published + public (no visibility endpoint yet,
+    #15), so a non-owner readability path can be exercised over HTTP."""
+    record = repo._by_id[roadmap_id]
+    record.status = "published"
+    record.visibility = "public"
+    record.document = {**record.document, "status": "published", "visibility": "public"}
+
+
+def test_fork_returns_201_with_a_fresh_draft(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k", "9x2b"])
+    _login(client)
+    source_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+
+    response = client.post(f"/roadmaps/{source_id}:fork")
+    assert response.status_code == 201, response.text
+    body = response.json()
+    # A brand-new roadmap ID, a fresh private draft owned by the forking user.
+    assert body["id"] == "grokking-dsa-9x2b"
+    assert body["id"] != source_id
+    assert body["status"] == "draft"
+    assert body["visibility"] == "private"
+    assert body["revision"] == 1
+    # Content copied verbatim (same child IDs, uniqueness is within-roadmap).
+    assert "sub_arrays" in body["sections"]["sec_foundations"]["subsections"]
+    assert body["suggested_path"] == ["sub_arrays"]
+    # The source is untouched and still owned by its creator.
+    assert client.get(f"/roadmaps/{source_id}").json()["id"] == source_id
+
+
+def test_fork_of_a_public_roadmap_by_a_non_owner_succeeds(make_settings: MakeSettings) -> None:
+    client, repo = _build_client(make_settings, tokens=["7f3k", "9x2b"])
+    _login(client, username="author", email="author@example.com")
+    source_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+    _make_public(repo, source_id)
+
+    # A different user forks the public roadmap and owns the fresh draft.
+    client.cookies.clear()
+    _login(client, username="forker", email="forker@example.com")
+    response = client.post(f"/roadmaps/{source_id}:fork")
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["status"] == "draft"
+    assert body["visibility"] == "private"
+    # The forker can now read their own fork.
+    assert client.get(f"/roadmaps/{body['id']}").status_code == 200
+
+
+def test_fork_of_a_private_roadmap_i_do_not_own_is_404(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k", "9x2b"])
+    _login(client, username="owner", email="owner@example.com")
+    source_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+
+    client.cookies.clear()
+    _login(client, username="intruder", email="intruder@example.com")
+    response = client.post(f"/roadmaps/{source_id}:fork")
+    assert response.status_code == 404
+    assert response.json()["code"] == "NOT_FOUND"
+
+
+def test_fork_requires_authentication(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings)
+    response = client.post("/roadmaps/anything-0000:fork")
+    assert response.status_code == 401
+
+
+# --- edit_metadata (#14, presentation-only, published-mutable) ---------------
+
+
+def test_edit_metadata_updates_presentation_fields_without_bumping_revision(
+    make_settings: MakeSettings,
+) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    source_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+
+    response = client.patch(
+        f"/roadmaps/{source_id}/metadata",
+        json={"title": "Renamed", "description": "New blurb", "subject_tags": ["cs"]},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["title"] == "Renamed"
+    assert body["description"] == "New blurb"
+    assert body["subject_tags"] == ["cs"]
+    # Presentation edit is last-write-wins: no If-Match, revision unchanged.
+    assert body["revision"] == 1
+    assert client.get(f"/roadmaps/{source_id}").json()["revision"] == 1
+
+
+def test_edit_metadata_is_allowed_on_a_published_roadmap(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    published_id = _publish(client)
+
+    response = client.patch(f"/roadmaps/{published_id}/metadata", json={"title": "Renamed live"})
+    assert response.status_code == 200, response.text
+    assert response.json()["title"] == "Renamed live"
+    # A presentation edit is not a lifecycle change: still published.
+    assert client.get(f"/roadmaps/{published_id}").json()["status"] == "published"
+
+
+def test_edit_metadata_smuggled_structural_field_is_a_409_immutable(
+    make_settings: MakeSettings,
+) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    source_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+
+    # A caller cannot smuggle a visibility/structural change through the metadata
+    # endpoint: it is rejected as immutable rather than silently applied/ignored.
+    response = client.patch(
+        f"/roadmaps/{source_id}/metadata",
+        json={"title": "Renamed", "visibility": "public", "sections": []},
+    )
+    assert response.status_code == 409
+    assert response.headers["content-type"] == "application/problem+json"
+    body = response.json()
+    assert body["code"] == "IMMUTABLE"
+    assert "visibility" in body["detail"] and "sections" in body["detail"]
+    # Nothing was applied: the title is unchanged.
+    assert client.get(f"/roadmaps/{source_id}").json()["title"] == "Grokking DSA"
+
+
+def test_edit_metadata_is_404_to_a_non_owner(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client, username="owner", email="owner@example.com")
+    source_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+
+    client.cookies.clear()
+    _login(client, username="intruder", email="intruder@example.com")
+    response = client.patch(f"/roadmaps/{source_id}/metadata", json={"title": "Hijack"})
+    assert response.status_code == 404
+    assert response.json()["code"] == "NOT_FOUND"
+
+
+def test_edit_metadata_requires_authentication(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings)
+    response = client.patch("/roadmaps/anything-0000/metadata", json={"title": "x"})
+    assert response.status_code == 401
+
+
+def test_published_rejects_structural_write_but_allows_metadata_edit(
+    make_settings: MakeSettings,
+) -> None:
+    # Closes #13 AC#4 end-to-end: on a published roadmap a structural write (PATCH)
+    # is a 409 IMMUTABLE while the presentation-only metadata edit succeeds.
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    published_id = _publish(client)
+
+    structural = client.patch(
+        f"/roadmaps/{published_id}",
+        headers={"If-Match": "1"},
+        json={"operations": [{"op": "set_tags", "subsection_id": "sub_arrays", "tags": ["x"]}]},
+    )
+    assert structural.status_code == 409
+    assert structural.json()["code"] == "IMMUTABLE"
+
+    metadata = client.patch(f"/roadmaps/{published_id}/metadata", json={"title": "Renamed live"})
+    assert metadata.status_code == 200, metadata.text
+    assert metadata.json()["title"] == "Renamed live"

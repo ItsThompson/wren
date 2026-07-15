@@ -10,7 +10,9 @@ MCP server on ``compute-net``; the trusted identity is taken on trust here, neve
 re-validated.
 
 The MCP write/read tools (Tickets 21/22) are thin clients of these endpoints: one
-tool call becomes one internal HTTP call carrying the resolved ``X-User-ID``.
+tool call becomes one internal HTTP call carrying the resolved ``X-User-ID``. This
+includes the fork and presentation-only metadata-edit tools, both agent-callable
+(spec section 07).
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ from fastapi import APIRouter, Depends, Header
 from wren.core.identity import require_internal_user
 from wren.roadmaps.config import ROADMAPS_PATH
 from wren.roadmaps.schemas import (
+    MetadataEditRequest,
     PatchRequest,
     PatchResult,
     Roadmap,
@@ -104,5 +107,31 @@ def create_internal_roadmaps_router(service_provider: RoadmapServiceProvider) ->
         service: RoadmapService = Depends(service_provider),
     ) -> Roadmap:
         return await service.publish(user_id, roadmap_id)
+
+    @router.post("/{roadmap_id}:fork", status_code=201)
+    async def fork_roadmap(
+        roadmap_id: str,
+        user_id: str = Depends(require_internal_user),
+        service: RoadmapService = Depends(service_provider),
+    ) -> Roadmap:
+        # Backs the fork MCP tool (Ticket 21): forks any roadmap the trusted user
+        # can read into a fresh draft with a new roadmap ID and no progress
+        # carry-over; an unreadable source is a 404 (no existence leak).
+        return await service.fork(user_id, roadmap_id)
+
+    @router.patch("/{roadmap_id}/metadata")
+    async def edit_roadmap_metadata(
+        roadmap_id: str,
+        body: MetadataEditRequest,
+        user_id: str = Depends(require_internal_user),
+        service: RoadmapService = Depends(service_provider),
+    ) -> Roadmap:
+        # Backs the edit_metadata MCP tool (Ticket 21): presentation-only, allowed
+        # post-publish, not If-Match-guarded; a smuggled structural field is a 409
+        # IMMUTABLE at the wire boundary.
+        body.reject_structural_fields()
+        return await service.edit_metadata(
+            user_id, roadmap_id, body.title, body.description, body.subject_tags
+        )
 
     return router

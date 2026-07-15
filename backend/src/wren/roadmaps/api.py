@@ -1,5 +1,6 @@
 """External REST adapter for roadmaps: create, read, iterative-edit (patch),
-full-document import (replace), validate, and publish.
+full-document import (replace), validate, publish, fork, and presentation-only
+metadata edit.
 
 Thin handlers (spec sections 05/06): each resolves the caller via ``require_user``
 (the cookie session; a spoofed ``X-User-ID`` is stripped upstream), calls one
@@ -9,9 +10,11 @@ Thin handlers (spec sections 05/06): each resolves the caller via ``require_user
 substitute an in-memory-backed service.
 
 The lifecycle commands use the ``:verb`` action sub-resource form
-(``POST /roadmaps/{id}:validate`` / ``:publish``); ``publish`` hard-blocks with a
-422 carrying the ``Violation`` list, while ``validate`` always returns 200 with a
-(possibly empty) list.
+(``POST /roadmaps/{id}:validate`` / ``:publish`` / ``:fork``); ``publish``
+hard-blocks with a 422 carrying the ``Violation`` list, while ``validate`` always
+returns 200 with a (possibly empty) list and ``fork`` returns 201 with the new
+draft. ``PATCH /roadmaps/{id}/metadata`` is the presentation-only edit that stays
+allowed post-publish (not ``If-Match``-guarded).
 """
 
 from __future__ import annotations
@@ -23,6 +26,7 @@ from fastapi import APIRouter, Depends, Header
 from wren.core.identity import require_user
 from wren.roadmaps.config import ROADMAPS_PATH
 from wren.roadmaps.schemas import (
+    MetadataEditRequest,
     PatchRequest,
     PatchResult,
     Roadmap,
@@ -101,5 +105,31 @@ def create_roadmaps_router(service_provider: RoadmapServiceProvider) -> APIRoute
         service: RoadmapService = Depends(service_provider),
     ) -> Roadmap:
         return await service.publish(user_id, roadmap_id)
+
+    @router.post("/{roadmap_id}:fork", status_code=201)
+    async def fork_roadmap(
+        roadmap_id: str,
+        user_id: str = Depends(require_user),
+        service: RoadmapService = Depends(service_provider),
+    ) -> Roadmap:
+        # Fork any roadmap the caller can read (own, or public): a new draft with a
+        # freshly-minted roadmap ID and no progress carry-over (spec sections 04/05).
+        # An unreadable source is a 404 (no existence leak) via the service.
+        return await service.fork(user_id, roadmap_id)
+
+    @router.patch("/{roadmap_id}/metadata")
+    async def edit_roadmap_metadata(
+        roadmap_id: str,
+        body: MetadataEditRequest,
+        user_id: str = Depends(require_user),
+        service: RoadmapService = Depends(service_provider),
+    ) -> Roadmap:
+        # Presentation-only edit, allowed even when published (spec section 06): not
+        # If-Match-guarded and never bumps the structural revision. A smuggled
+        # structural/lifecycle field is rejected 409 IMMUTABLE at the wire boundary.
+        body.reject_structural_fields()
+        return await service.edit_metadata(
+            user_id, roadmap_id, body.title, body.description, body.subject_tags
+        )
 
     return router

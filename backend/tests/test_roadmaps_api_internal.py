@@ -254,3 +254,56 @@ def test_publish_is_404_for_a_different_trusted_user(make_settings: MakeSettings
 
     response = client.post(f"/roadmaps/{created_id}:publish", headers=_trusted(_OTHER_USER))
     assert response.status_code == 404
+
+
+# --- fork + metadata edit over the trusted identity (#14, MCP-facing) --------
+
+
+def test_fork_returns_201_with_a_fresh_draft(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k", "9x2b"])
+    source_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP, headers=_trusted()).json()["id"]
+
+    response = client.post(f"/roadmaps/{source_id}:fork", headers=_trusted())
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["id"] != source_id
+    assert body["owner"] == _USER
+    assert body["status"] == "draft"
+
+
+def test_fork_of_another_users_private_roadmap_is_404(make_settings: MakeSettings) -> None:
+    # Per-user scoping holds on the trusted surface: a different trusted user
+    # cannot fork another user's private roadmap (404, no existence leak).
+    client, _ = _build_client(make_settings, tokens=["7f3k", "9x2b"])
+    source_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP, headers=_trusted()).json()["id"]
+
+    response = client.post(f"/roadmaps/{source_id}:fork", headers=_trusted(_OTHER_USER))
+    assert response.status_code == 404
+
+
+def test_edit_metadata_updates_presentation_fields(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    source_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP, headers=_trusted()).json()["id"]
+
+    response = client.patch(
+        f"/roadmaps/{source_id}/metadata", headers=_trusted(), json={"title": "Renamed"}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["title"] == "Renamed"
+    # Not If-Match-guarded, no revision bump.
+    assert response.json()["revision"] == 1
+
+
+def test_edit_metadata_smuggled_structural_field_is_a_409_immutable(
+    make_settings: MakeSettings,
+) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    source_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP, headers=_trusted()).json()["id"]
+
+    response = client.patch(
+        f"/roadmaps/{source_id}/metadata",
+        headers=_trusted(),
+        json={"title": "Renamed", "status": "published"},
+    )
+    assert response.status_code == 409
+    assert response.json()["code"] == "IMMUTABLE"

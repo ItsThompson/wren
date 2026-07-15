@@ -30,6 +30,8 @@ from wren.core.db import create_database
 from wren.core.errors import build_exception_handlers
 from wren.core.identity import StripInboundIdentityMiddleware
 from wren.core.settings import AppSettings
+from wren.progress.api import create_progress_router
+from wren.progress.wiring import build_progress_service_provider
 from wren.roadmaps.api import create_roadmaps_router
 from wren.roadmaps.wiring import build_roadmap_service_provider
 
@@ -125,9 +127,10 @@ def _external_app(database_url: str, settings: AppSettings) -> FastAPI:
         cookie_config=CookieConfig(secure=False, domain=None),
     )
     roadmaps_router = create_roadmaps_router(build_roadmap_service_provider())
+    progress_router = create_progress_router(build_progress_service_provider())
     app = create_app(
         settings,
-        routers=[accounts_router, roadmaps_router],
+        routers=[accounts_router, roadmaps_router, progress_router],
         exception_handlers=build_exception_handlers(),
     )
     app.state.db = database
@@ -316,3 +319,95 @@ def test_replace_import_and_immutability_end_to_end_over_http(
         )
         assert immutable.status_code == 409
         assert immutable.json()["code"] == "IMMUTABLE"
+
+
+def test_fork_with_fresh_progress_end_to_end_over_http(
+    migrated_url: str, make_settings: MakeSettings
+) -> None:
+    app = _external_app(migrated_url, make_settings(database_url=migrated_url))
+    with TestClient(app) as client:
+        register = client.post(
+            "/auth/register",
+            json={
+                "username": "e2eforker",
+                "email": "e2e-forker@example.com",
+                "password": _PASSWORD,
+            },
+        )
+        assert register.status_code == 201, register.text
+
+        source_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+        assert client.post(f"/roadmaps/{source_id}:publish").status_code == 200
+
+        # The author checks an item on the source (source progress = 1 checked).
+        item_id = client.get(f"/roadmaps/{source_id}").json()["sections"]["sec_foundations"][
+            "subsections"
+        ]["sub_arrays"]["item_order"][0]
+        checked = client.post(
+            f"/roadmaps/{source_id}/progress",
+            json={"item_ids": [item_id], "state": "complete"},
+        )
+        assert checked.status_code == 200, checked.text
+
+        # Fork the (owned, published) roadmap: a fresh draft with a new ID.
+        fork = client.post(f"/roadmaps/{source_id}:fork")
+        assert fork.status_code == 201, fork.text
+        fork_id = fork.json()["id"]
+        assert fork_id != source_id
+        # The fork copied the same item ID verbatim.
+        assert (
+            item_id
+            in fork.json()["sections"]["sec_foundations"]["subsections"]["sub_arrays"][
+                "checklist_items"
+            ]
+        )
+
+        # Publish the fork, then its progress is empty: no carry-over across the fork.
+        assert client.post(f"/roadmaps/{fork_id}:publish").status_code == 200
+        fork_progress = client.get(f"/roadmaps/{fork_id}/progress?detailed=true").json()
+        assert fork_progress["checked_items"] == 0
+        # The source progress is untouched (still one item checked).
+        source_progress = client.get(f"/roadmaps/{source_id}/progress?detailed=true").json()
+        assert source_progress["checked_items"] == 1
+
+
+def test_edit_metadata_on_published_end_to_end_over_http(
+    migrated_url: str, make_settings: MakeSettings
+) -> None:
+    app = _external_app(migrated_url, make_settings(database_url=migrated_url))
+    with TestClient(app) as client:
+        register = client.post(
+            "/auth/register",
+            json={
+                "username": "e2emeta",
+                "email": "e2e-meta@example.com",
+                "password": _PASSWORD,
+            },
+        )
+        assert register.status_code == 201, register.text
+
+        roadmap_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+        assert client.post(f"/roadmaps/{roadmap_id}:publish").status_code == 200
+
+        # A structural write is refused on published content...
+        structural = client.patch(
+            f"/roadmaps/{roadmap_id}",
+            headers={"If-Match": "1"},
+            json={"operations": [{"op": "set_tags", "subsection_id": "sub_arrays", "tags": ["x"]}]},
+        )
+        assert structural.status_code == 409
+        assert structural.json()["code"] == "IMMUTABLE"
+
+        # ...while the presentation-only metadata edit succeeds and persists,
+        # without bumping the structural revision.
+        edited = client.patch(
+            f"/roadmaps/{roadmap_id}/metadata",
+            json={"title": "Renamed live", "subject_tags": ["cs"]},
+        )
+        assert edited.status_code == 200, edited.text
+        assert edited.json()["title"] == "Renamed live"
+        fetched = client.get(f"/roadmaps/{roadmap_id}").json()
+        assert fetched["title"] == "Renamed live"
+        assert fetched["subject_tags"] == ["cs"]
+        assert fetched["status"] == "published"
+        assert fetched["revision"] == 1
