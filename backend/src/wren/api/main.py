@@ -10,7 +10,11 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from wren.accounts.api import create_accounts_router
-from wren.accounts.config import build_cookie_config, build_session_config
+from wren.accounts.config import (
+    build_cookie_config,
+    build_session_config,
+    validate_session_secret,
+)
 from wren.accounts.passwords import BcryptPasswordHasher
 from wren.accounts.session import build_revocation_lookup, create_session_verifier
 from wren.accounts.tokens import SessionTokenCodec
@@ -27,6 +31,9 @@ db = create_database(settings.database_url)
 # Human session cookies (spec section 08): HS256 codec + bcrypt hasher wired into
 # the /auth router and the real cookie verifier behind require_user.
 session_config = build_session_config(settings)
+# Fail fast on a missing/weak secret outside development (dev stays lenient and
+# fail-safe denies), so a prod misconfig cannot silently mint unusable tokens.
+validate_session_secret(session_config, is_dev=settings.is_dev)
 cookie_config = build_cookie_config(settings)
 codec = SessionTokenCodec(session_config)
 service_provider = build_account_service_provider(BcryptPasswordHasher(), codec)

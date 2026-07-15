@@ -26,6 +26,11 @@ AUTH_PATH = "/auth"
 DEFAULT_ACCESS_TTL = timedelta(minutes=15)
 DEFAULT_REFRESH_TTL = timedelta(days=14)
 
+# HS256 needs a high-entropy key; RFC 7518 recommends >= the hash output (32 bytes
+# for SHA-256). Enforced outside development so a weak/empty prod secret fails
+# fast rather than minting tokens that never resolve.
+MIN_SESSION_SECRET_BYTES = 32
+
 
 @dataclass(frozen=True)
 class SessionConfig:
@@ -56,6 +61,23 @@ class CookieConfig:
 def build_session_config(settings: AppSettings) -> SessionConfig:
     """Compose the token-signing config from deployment settings."""
     return SessionConfig(secret=settings.session_jwt_secret)
+
+
+def validate_session_secret(config: SessionConfig, *, is_dev: bool) -> None:
+    """Fail fast when the signing secret is too weak to sign real sessions.
+
+    Enforced only outside development: in dev an empty/short secret is tolerated
+    (sessions fail-safe deny via ``deny_all_sessions``) so the app can boot with
+    auth unconfigured. In any other environment a missing or under-32-byte secret
+    raises at startup rather than minting HS256 tokens that never resolve.
+    """
+    if is_dev:
+        return
+    if len(config.secret.encode("utf-8")) < MIN_SESSION_SECRET_BYTES:
+        raise RuntimeError(
+            f"SESSION_JWT_SECRET must be at least {MIN_SESSION_SECRET_BYTES} bytes "
+            "outside development."
+        )
 
 
 def build_cookie_config(settings: AppSettings) -> CookieConfig:
