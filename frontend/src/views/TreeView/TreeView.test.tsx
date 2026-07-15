@@ -208,6 +208,19 @@ describe('TreeView', () => {
     expect(await screen.findByText('Roadmap not found')).toBeInTheDocument()
   })
 
+  it('offers a Tree->List entry point in the header (List links to the list view)', async () => {
+    renderTree()
+    await screen.findByRole('link', { name: /^Arrays \(/ })
+
+    const tabs = screen.getByRole('navigation', { name: 'Roadmap views' })
+    expect(within(tabs).getByRole('link', { name: 'List' })).toHaveAttribute(
+      'href',
+      `/roadmaps/${ROADMAP_ID}`,
+    )
+    // Tree is the active view, announced (not a link) so it never self-links.
+    expect(within(tabs).queryByRole('link', { name: 'Tree' })).not.toBeInTheDocument()
+  })
+
   it('shows an empty-state message when the roadmap has no subsections', async () => {
     server.use(
       http.get('*/roadmaps/:id', () =>

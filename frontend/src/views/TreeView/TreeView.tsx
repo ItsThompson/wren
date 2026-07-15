@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import { Link, useParams } from 'react-router'
 
+import { EmptyState, ErrorState } from '@/components/states'
 import { TreeCanvas } from './components/TreeCanvas'
 import { TreeHeader } from './components/TreeHeader'
-import { TreeMessage } from './components/TreeMessage'
 import { TreeSkeleton } from './components/TreeSkeleton'
 import { useTreeData } from './hooks/useTreeData'
 import { layoutTree } from './layout'
@@ -26,7 +26,9 @@ interface TreeViewProps {
  * Node soft-state (done / available / locked) is derived from progress + prereqs
  * and shown by color + icon; clicking a node navigates to that subsection in the
  * list view. It owns its own roadmap + progress fetch and renders standalone at
- * `/roadmaps/{id}/tree` (a sibling route to the list view).
+ * `/roadmaps/{id}/tree` (a sibling route to the list view). Loading / empty /
+ * error use the shared state surfaces so the tree reads like the rest of the app
+ * (ticket 26).
  */
 export function TreeView({ baseUrl = API_BASE_URL }: TreeViewProps) {
   const { roadmapId } = useParams()
@@ -42,18 +44,18 @@ export function TreeView({ baseUrl = API_BASE_URL }: TreeViewProps) {
   if (state.phase === 'loading') return <TreeSkeleton />
 
   if (state.phase === 'error') {
+    // A 404/403 is indistinguishable by design (no-existence-leak convention,
+    // section 10); a network failure lands here too. One calm dedicated view.
     return (
-      <section className="mx-auto max-w-[1120px] px-4 py-8">
-        <TreeMessage
-          title="Roadmap not found"
-          description="This roadmap does not exist or is not shared with you."
-          action={
-            <Link to="/dashboard" className="text-primary underline-offset-4 hover:underline">
-              Back to your dashboard
-            </Link>
-          }
-        />
-      </section>
+      <ErrorState
+        title="Roadmap not found"
+        description="This roadmap does not exist or is not shared with you."
+        action={
+          <Link to="/dashboard" className="text-primary underline-offset-4 hover:underline">
+            Back to your dashboard
+          </Link>
+        }
+      />
     )
   }
 
@@ -63,17 +65,9 @@ export function TreeView({ baseUrl = API_BASE_URL }: TreeViewProps) {
       {graph && graph.nodes.length > 0 ? (
         <TreeCanvas graph={graph} />
       ) : (
-        <TreeMessage
+        <EmptyState
           title="No nodes yet"
-          description="This roadmap doesn't have any subsections to map."
-          action={
-            <Link
-              to={`/roadmaps/${id}`}
-              className="text-primary underline-offset-4 hover:underline"
-            >
-              Open the list view
-            </Link>
-          }
+          description="This roadmap doesn’t have any subsections to map. Open the list view to add some."
         />
       )}
     </section>
