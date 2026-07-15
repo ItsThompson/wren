@@ -706,7 +706,7 @@ export interface components {
         /**
          * ChangedNode
          * @description One node the batch touched, echoed back so the agent knows what changed
-         *     without re-reading the whole roadmap (spec section 07: summary-first). Lean
+         *     without re-reading the whole roadmap (summary-first). Lean
          *     on purpose (kind + id + change), keeping a small edit's response near the
          *     ~50-token target; the agent re-reads a specific node for its new body.
          */
@@ -806,8 +806,7 @@ export interface components {
         };
         /**
          * Dashboard
-         * @description The ``GET /me/dashboard`` body: the caller's private home (spec section 02
-         *     US-ACCT-03).
+         * @description The ``GET /me/dashboard`` body: the caller's private home.
          *
          *     ``authored`` is everything the caller owns at any status (draft / private /
          *     public), rendered in the "Yours" section; ``followed`` is every roadmap the
@@ -827,7 +826,7 @@ export interface components {
          *
          *     A ``date`` sets the deadline; ``null`` clears it. The deadline is editable and
          *     clearable at any time. A date in the past is allowed (the countdown shows
-         *     elapsed / overdue with no pacing signal; spec sections 04/10/15).
+         *     elapsed / overdue with no pacing signal).
          */
         DeadlineRequest: {
             /** Deadline */
@@ -958,7 +957,7 @@ export interface components {
         };
         /**
          * NodeDetail
-         * @description One subsection resolved for study (spec section 04 ``NodeDetail``).
+         * @description One subsection resolved for study.
          *
          *     ``description`` is populated only in ``detailed`` mode; the concise projection
          *     leaves it ``None`` while still carrying every follow-up ID (the subsection id,
@@ -1064,8 +1063,7 @@ export interface components {
         };
         /**
          * Profile
-         * @description The ``GET /users/{handle}`` body: a user's public profile (spec section 02
-         *     US-ACCT-03).
+         * @description The ``GET /users/{handle}`` body: a user's public profile.
          *
          *     ``roadmaps`` is only that user's **published, public** roadmaps; drafts,
          *     private, and archived roadmaps never appear, and following is never exposed
@@ -1134,7 +1132,7 @@ export interface components {
         /**
          * ProgressUpdateRequest
          * @description The ``POST /progress`` body: set ``item_ids`` to ``state`` (explicit set,
-         *     not toggle; spec section 07). At least one id is required so an update is
+         *     not toggle). At least one id is required so an update is
          *     never a silent no-op.
          */
         ProgressUpdateRequest: {
@@ -1423,7 +1421,7 @@ export interface components {
         /**
          * RoadmapReplaced
          * @description The ``PUT /roadmaps/{id}`` body: the full rebuilt draft after a full-document
-         *     import (the escape hatch, spec section 07) plus the ``proposed_id -> minted_id``
+         *     import (the escape hatch) plus the ``proposed_id -> minted_id``
          *     remap. Mirrors :class:`RoadmapCreated` because replace reuses the same
          *     mint-then-resolve assembly: ``proposed_id``s are preserved, every other node is
          *     re-minted, and the roadmap's own ID is unchanged. ``remap`` is
@@ -1554,8 +1552,7 @@ export interface components {
         };
         /**
          * SectionPage
-         * @description The ``GET /sections/{sid}`` body: a paginated section drill-down (spec
-         *     sections 04/07).
+         * @description The ``GET /sections/{sid}`` body: a paginated section drill-down.
          *
          *     ``include`` selects which parts of each node are populated. The page holds a
          *     server-set number of subsections in ``subsection_order``; ``next_cursor`` is
@@ -1752,8 +1749,8 @@ export interface components {
          * Violation
          * @description One structural rule failure, model-recoverable by naming the rule and IDs.
          *
-         *     Produced by the structural validator (spec section 05 ``validation.py``, a
-         *     later slice) and carried in a ``Validation`` error's problem+json body. Lives
+         *     Produced by the structural validator (``validation.py``) and carried in a
+         *     ``Validation`` error's problem+json body. Lives
          *     in the error contract because it is part of the wire shape every client reads.
          */
         Violation: {
@@ -1771,8 +1768,7 @@ export interface components {
         Visibility: "public" | "private";
         /**
          * VisibilityRequest
-         * @description The ``PUT /roadmaps/{id}/visibility`` body: toggle public/private (web-only,
-         *     spec sections 04/06).
+         * @description The ``PUT /roadmaps/{id}/visibility`` body: toggle public/private (web-only).
          *
          *     Visibility is a lifecycle/presentation field, editable by the owner on a
          *     roadmap of any status (draft or published): a public roadmap is reachable by

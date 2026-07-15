@@ -2035,7 +2035,7 @@
           "change"
         ],
         "title": "ChangedNode",
-        "description": "One node the batch touched, echoed back so the agent knows what changed\nwithout re-reading the whole roadmap (spec section 07: summary-first). Lean\non purpose (kind + id + change), keeping a small edit's response near the\n~50-token target; the agent re-reads a specific node for its new body."
+        "description": "One node the batch touched, echoed back so the agent knows what changed\nwithout re-reading the whole roadmap (summary-first). Lean\non purpose (kind + id + change), keeping a small edit's response near the\n~50-token target; the agent re-reads a specific node for its new body."
       },
       "ChangedNodeKind": {
         "type": "string",
@@ -2288,7 +2288,7 @@
         },
         "type": "object",
         "title": "Dashboard",
-        "description": "The ``GET /me/dashboard`` body: the caller's private home (spec section 02\nUS-ACCT-03).\n\n``authored`` is everything the caller owns at any status (draft / private /\npublic), rendered in the \"Yours\" section; ``followed`` is every roadmap the\ncaller follows, rendered in the \"Following\" section. A\nroadmap the caller both authored and follows appears in both lists. Scoped to\nthe caller: another user's dashboard is never returned."
+        "description": "The ``GET /me/dashboard`` body: the caller's private home.\n\n``authored`` is everything the caller owns at any status (draft / private /\npublic), rendered in the \"Yours\" section; ``followed`` is every roadmap the\ncaller follows, rendered in the \"Following\" section. A\nroadmap the caller both authored and follows appears in both lists. Scoped to\nthe caller: another user's dashboard is never returned."
       },
       "DeadlineRequest": {
         "properties": {
@@ -2307,7 +2307,7 @@
         },
         "type": "object",
         "title": "DeadlineRequest",
-        "description": "The ``PUT /roadmaps/{id}/deadline`` body: set or clear the per-user deadline.\n\nA ``date`` sets the deadline; ``null`` clears it. The deadline is editable and\nclearable at any time. A date in the past is allowed (the countdown shows\nelapsed / overdue with no pacing signal; spec sections 04/10/15)."
+        "description": "The ``PUT /roadmaps/{id}/deadline`` body: set or clear the per-user deadline.\n\nA ``date`` sets the deadline; ``null`` clears it. The deadline is editable and\nclearable at any time. A date in the past is allowed (the countdown shows\nelapsed / overdue with no pacing signal)."
       },
       "DecisionRequest": {
         "properties": {
@@ -2580,7 +2580,7 @@
           "title"
         ],
         "title": "NodeDetail",
-        "description": "One subsection resolved for study (spec section 04 ``NodeDetail``).\n\n``description`` is populated only in ``detailed`` mode; the concise projection\nleaves it ``None`` while still carrying every follow-up ID (the subsection id,\nthe resource links, the resolved prereq ids, and the item ids). External\nbodies are never inlined: ``resources`` are links only."
+        "description": "One subsection resolved for study.\n\n``description`` is populated only in ``detailed`` mode; the concise projection\nleaves it ``None`` while still carrying every follow-up ID (the subsection id,\nthe resource links, the resolved prereq ids, and the item ids). External\nbodies are never inlined: ``resources`` are links only."
       },
       "OverallProgress": {
         "properties": {
@@ -2814,7 +2814,7 @@
           "display_name"
         ],
         "title": "Profile",
-        "description": "The ``GET /users/{handle}`` body: a user's public profile (spec section 02\nUS-ACCT-03).\n\n``roadmaps`` is only that user's **published, public** roadmaps; drafts,\nprivate, and archived roadmaps never appear, and following is never exposed\n(no social graph). Public and viewer-agnostic: the same body regardless of who\n(if anyone) is signed in."
+        "description": "The ``GET /users/{handle}`` body: a user's public profile.\n\n``roadmaps`` is only that user's **published, public** roadmaps; drafts,\nprivate, and archived roadmaps never appear, and following is never exposed\n(no social graph). Public and viewer-agnostic: the same body regardless of who\n(if anyone) is signed in."
       },
       "Progress": {
         "properties": {
@@ -2942,7 +2942,7 @@
           "state"
         ],
         "title": "ProgressUpdateRequest",
-        "description": "The ``POST /progress`` body: set ``item_ids`` to ``state`` (explicit set,\nnot toggle; spec section 07). At least one id is required so an update is\nnever a silent no-op."
+        "description": "The ``POST /progress`` body: set ``item_ids`` to ``state`` (explicit set,\nnot toggle). At least one id is required so an update is\nnever a silent no-op."
       },
       "ProgressUpdateResult": {
         "properties": {
@@ -3613,7 +3613,7 @@
           "updated_at"
         ],
         "title": "RoadmapReplaced",
-        "description": "The ``PUT /roadmaps/{id}`` body: the full rebuilt draft after a full-document\nimport (the escape hatch, spec section 07) plus the ``proposed_id -> minted_id``\nremap. Mirrors :class:`RoadmapCreated` because replace reuses the same\nmint-then-resolve assembly: ``proposed_id``s are preserved, every other node is\nre-minted, and the roadmap's own ID is unchanged. ``remap`` is\nempty when no proposed ID had to be de-duped."
+        "description": "The ``PUT /roadmaps/{id}`` body: the full rebuilt draft after a full-document\nimport (the escape hatch) plus the ``proposed_id -> minted_id``\nremap. Mirrors :class:`RoadmapCreated` because replace reuses the same\nmint-then-resolve assembly: ``proposed_id``s are preserved, every other node is\nre-minted, and the roadmap's own ID is unchanged. ``remap`` is\nempty when no proposed ID had to be de-duped."
       },
       "RoadmapStatus": {
         "type": "string",
@@ -3839,7 +3839,7 @@
           "include"
         ],
         "title": "SectionPage",
-        "description": "The ``GET /sections/{sid}`` body: a paginated section drill-down (spec\nsections 04/07).\n\n``include`` selects which parts of each node are populated. The page holds a\nserver-set number of subsections in ``subsection_order``; ``next_cursor`` is\nan **opaque** token for the next page (absent on the last page) and\n``steering`` is present only when the response was truncated."
+        "description": "The ``GET /sections/{sid}`` body: a paginated section drill-down.\n\n``include`` selects which parts of each node are populated. The page holds a\nserver-set number of subsections in ``subsection_order``; ``next_cursor`` is\nan **opaque** token for the next page (absent on the last page) and\n``steering`` is present only when the response was truncated."
       },
       "SectionProgress": {
         "properties": {
@@ -4309,7 +4309,7 @@
           "message"
         ],
         "title": "Violation",
-        "description": "One structural rule failure, model-recoverable by naming the rule and IDs.\n\nProduced by the structural validator (spec section 05 ``validation.py``, a\nlater slice) and carried in a ``Validation`` error's problem+json body. Lives\nin the error contract because it is part of the wire shape every client reads."
+        "description": "One structural rule failure, model-recoverable by naming the rule and IDs.\n\nProduced by the structural validator (``validation.py``) and carried in a\n``Validation`` error's problem+json body. Lives\nin the error contract because it is part of the wire shape every client reads."
       },
       "Visibility": {
         "type": "string",
@@ -4330,7 +4330,7 @@
           "visibility"
         ],
         "title": "VisibilityRequest",
-        "description": "The ``PUT /roadmaps/{id}/visibility`` body: toggle public/private (web-only,\nspec sections 04/06).\n\nVisibility is a lifecycle/presentation field, editable by the owner on a\nroadmap of any status (draft or published): a public roadmap is reachable by\nlink and appears on the owner's profile, a private one is owner-only. The\ntoggle is last-write-wins (never ``If-Match``-guarded) and touches no\nfollower-visible structure, so it never bumps the structural ``revision``."
+        "description": "The ``PUT /roadmaps/{id}/visibility`` body: toggle public/private (web-only).\n\nVisibility is a lifecycle/presentation field, editable by the owner on a\nroadmap of any status (draft or published): a public roadmap is reachable by\nlink and appears on the owner's profile, a private one is owner-only. The\ntoggle is last-write-wins (never ``If-Match``-guarded) and touches no\nfollower-visible structure, so it never bumps the structural ``revision``."
       }
     }
   }
