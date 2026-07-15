@@ -73,6 +73,31 @@ _PUBLISHABLE_ROADMAP = {
     ],
 }
 
+_REPLACE_ROADMAP = {
+    "title": "Grokking DSA v2",
+    "suggested_path": ["sub_arrays", "sub_graphs"],
+    "sections": [
+        {
+            "proposed_id": "sec_core",
+            "title": "Core",
+            "subsections": [
+                {
+                    "proposed_id": "sub_arrays",
+                    "title": "Arrays",
+                    "resources": [{"title": "Guide", "url": "https://x.test", "type": "article"}],
+                    "checklist_items": [{"text": "Read it"}],
+                },
+                {
+                    "title": "Graphs",
+                    "prereq_ids": ["sub_arrays"],
+                    "resources": [{"title": "G", "url": "https://x.test", "type": "article"}],
+                    "checklist_items": [{"text": "Do it"}],
+                },
+            ],
+        }
+    ],
+}
+
 
 @pytest.fixture(scope="session")
 def migrated_url(postgres_url: str) -> Iterator[str]:
@@ -253,3 +278,41 @@ def test_patch_draft_end_to_end_over_http(migrated_url: str, make_settings: Make
         )
         assert stale.status_code == 409
         assert stale.json()["code"] == "STALE_REVISION"
+
+
+def test_replace_import_and_immutability_end_to_end_over_http(
+    migrated_url: str, make_settings: MakeSettings
+) -> None:
+    app = _external_app(migrated_url, make_settings(database_url=migrated_url))
+    with TestClient(app) as client:
+        register = client.post(
+            "/auth/register",
+            json={
+                "username": "e2eimporter",
+                "email": "e2e-importer@example.com",
+                "password": _PASSWORD,
+            },
+        )
+        assert register.status_code == 201, register.text
+
+        roadmap_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+
+        # PUT replaces the entire draft under If-Match: the roadmap ID is unchanged,
+        # proposed_ids are preserved, the rest re-minted, and the revision bumps.
+        replaced = client.put(
+            f"/roadmaps/{roadmap_id}", headers={"If-Match": "1"}, json=_REPLACE_ROADMAP
+        )
+        assert replaced.status_code == 200, replaced.text
+        body = replaced.json()
+        assert body["id"] == roadmap_id
+        assert body["revision"] == 2
+        assert body["sections"]["sec_core"]["subsection_order"] == ["sub_arrays", "sub_graphs"]
+
+        # Publish, then a structural write (PUT import) is refused: published content
+        # is immutable (409 IMMUTABLE, fork-to-change).
+        assert client.post(f"/roadmaps/{roadmap_id}:publish").status_code == 200
+        immutable = client.put(
+            f"/roadmaps/{roadmap_id}", headers={"If-Match": "2"}, json=_REPLACE_ROADMAP
+        )
+        assert immutable.status_code == 409
+        assert immutable.json()["code"] == "IMMUTABLE"

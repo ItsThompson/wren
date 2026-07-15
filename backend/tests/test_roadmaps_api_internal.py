@@ -65,6 +65,25 @@ _PUBLISHABLE_ROADMAP = {
     ],
 }
 
+_REPLACE_ROADMAP = {
+    "title": "Grokking DSA v2",
+    "suggested_path": ["sub_arrays"],
+    "sections": [
+        {
+            "proposed_id": "sec_core",
+            "title": "Core",
+            "subsections": [
+                {
+                    "proposed_id": "sub_arrays",
+                    "title": "Arrays",
+                    "resources": [{"title": "Guide", "url": "https://x.test", "type": "article"}],
+                    "checklist_items": [{"text": "Read it"}],
+                }
+            ],
+        }
+    ],
+}
+
 
 def _build_client(
     make_settings: MakeSettings, *, tokens: list[str] | None = None
@@ -189,6 +208,22 @@ def test_patch_with_a_stale_if_match_is_a_409(make_settings: MakeSettings) -> No
     )
     assert response.status_code == 409
     assert response.json()["code"] == "STALE_REVISION"
+
+
+def test_replace_imports_the_full_document_under_if_match(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    created_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP, headers=_trusted()).json()[
+        "id"
+    ]
+
+    response = client.put(
+        f"/roadmaps/{created_id}", headers={**_trusted(), "If-Match": "1"}, json=_REPLACE_ROADMAP
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["id"] == created_id
+    assert body["title"] == "Grokking DSA v2"
+    assert body["revision"] == 2
 
 
 def test_validate_returns_200_with_violations(make_settings: MakeSettings) -> None:

@@ -68,6 +68,33 @@ _PUBLISHABLE_ROADMAP = {
     ],
 }
 
+# A full-document import (PUT body): one subsection keeps its proposed_id, the
+# other omits it and is re-minted from its title (sub_graphs).
+_REPLACE_ROADMAP = {
+    "title": "Grokking DSA v2",
+    "suggested_path": ["sub_arrays", "sub_graphs"],
+    "sections": [
+        {
+            "proposed_id": "sec_core",
+            "title": "Core",
+            "subsections": [
+                {
+                    "proposed_id": "sub_arrays",
+                    "title": "Arrays",
+                    "resources": [{"title": "Guide", "url": "https://x.test", "type": "article"}],
+                    "checklist_items": [{"text": "Read it"}],
+                },
+                {
+                    "title": "Graphs",
+                    "prereq_ids": ["sub_arrays"],
+                    "resources": [{"title": "G", "url": "https://x.test", "type": "article"}],
+                    "checklist_items": [{"text": "Do it"}],
+                },
+            ],
+        }
+    ],
+}
+
 
 def _build_client(
     make_settings: MakeSettings, *, tokens: list[str] | None = None
@@ -427,3 +454,128 @@ def test_patch_is_404_to_a_non_owner(make_settings: MakeSettings) -> None:
         json={"operations": [{"op": "set_tags", "subsection_id": "sub_arrays", "tags": ["x"]}]},
     )
     assert response.status_code == 404
+
+
+# --- replace (full-document import escape hatch) -----------------------------
+
+
+def test_replace_imports_the_full_document_and_bumps_the_revision(
+    make_settings: MakeSettings,
+) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created_id = _create_publishable(client)
+
+    response = client.put(
+        f"/roadmaps/{created_id}", headers={"If-Match": "1"}, json=_REPLACE_ROADMAP
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    # The roadmap ID (route param) is unchanged; the whole document is rebuilt.
+    assert body["id"] == created_id
+    assert body["title"] == "Grokking DSA v2"
+    assert body["revision"] == 2
+    assert body["remap"] == {}
+    core = body["sections"]["sec_core"]
+    # proposed_ids preserved; the node without one is re-minted from its title.
+    assert core["subsection_order"] == ["sub_arrays", "sub_graphs"]
+    assert core["subsections"]["sub_graphs"]["prereq_ids"] == ["sub_arrays"]
+    # Persisted: a fresh read reflects the imported content and the bumped revision.
+    fetched = client.get(f"/roadmaps/{created_id}").json()
+    assert fetched["revision"] == 2
+    assert "sub_graphs" in fetched["sections"]["sec_core"]["subsections"]
+
+
+def test_replace_with_a_stale_if_match_is_a_409(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created_id = _create_publishable(client)
+
+    response = client.put(
+        f"/roadmaps/{created_id}", headers={"If-Match": "99"}, json=_REPLACE_ROADMAP
+    )
+    assert response.status_code == 409
+    assert response.headers["content-type"] == "application/problem+json"
+    body = response.json()
+    assert body["code"] == "STALE_REVISION"
+    assert "re-read" in body["detail"].lower()
+
+
+def test_replace_missing_if_match_header_is_a_422(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created_id = _create_publishable(client)
+
+    response = client.put(f"/roadmaps/{created_id}", json=_REPLACE_ROADMAP)
+    assert response.status_code == 422
+    assert response.headers["content-type"] == "application/problem+json"
+
+
+def test_replace_requires_authentication(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings)
+    response = client.put(
+        "/roadmaps/anything-0000", headers={"If-Match": "1"}, json=_REPLACE_ROADMAP
+    )
+    assert response.status_code == 401
+
+
+def test_replace_is_404_to_a_non_owner(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client, username="owner", email="owner@example.com")
+    created_id = _create_publishable(client)
+
+    client.cookies.clear()
+    _login(client, username="intruder", email="intruder@example.com")
+    response = client.put(
+        f"/roadmaps/{created_id}", headers={"If-Match": "1"}, json=_REPLACE_ROADMAP
+    )
+    assert response.status_code == 404
+
+
+# --- immutability boundary (structural writes reject published; #13) ---------
+#
+# Every content-mutating write (patch, replace) rejects a published roadmap with a
+# 409 IMMUTABLE pointing to fork-to-change (spec sections 05/07). The sanctioned
+# presentation-only path (edit_metadata, Ticket 14) is NOT routed through the
+# content-write guard, which is what keeps it allowed post-publish.
+
+
+def _publish(client: TestClient) -> str:
+    created_id = _create_publishable(client)
+    assert client.post(f"/roadmaps/{created_id}:publish").status_code == 200
+    return created_id
+
+
+def test_patch_against_a_published_roadmap_is_a_409_immutable(
+    make_settings: MakeSettings,
+) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    published_id = _publish(client)
+
+    response = client.patch(
+        f"/roadmaps/{published_id}",
+        headers={"If-Match": "1"},
+        json={"operations": [{"op": "set_tags", "subsection_id": "sub_arrays", "tags": ["x"]}]},
+    )
+    assert response.status_code == 409
+    assert response.headers["content-type"] == "application/problem+json"
+    body = response.json()
+    assert body["code"] == "IMMUTABLE"
+    assert "fork" in body["detail"].lower()
+
+
+def test_replace_against_a_published_roadmap_is_a_409_immutable(
+    make_settings: MakeSettings,
+) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    published_id = _publish(client)
+
+    response = client.put(
+        f"/roadmaps/{published_id}", headers={"If-Match": "1"}, json=_REPLACE_ROADMAP
+    )
+    assert response.status_code == 409
+    body = response.json()
+    assert body["code"] == "IMMUTABLE"
+    assert "fork" in body["detail"].lower()

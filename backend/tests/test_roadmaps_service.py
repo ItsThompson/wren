@@ -73,6 +73,43 @@ def _publishable_doc(title: str = "Grokking DSA") -> RoadmapInput:
     return doc
 
 
+def _replace_doc(title: str = "Grokking DSA v2") -> RoadmapInput:
+    """A full-document import: one subsection carries a ``proposed_id`` (preserved),
+    a second omits it (re-minted from its title)."""
+    return RoadmapInput(
+        title=title,
+        sections=[
+            SectionInput(
+                proposed_id="sec_core",
+                title="Core",
+                subsections=[
+                    SubsectionInput(
+                        proposed_id="sub_arrays",
+                        title="Arrays",
+                        resources=[
+                            ResourceInput(
+                                title="Guide", url="https://x.test", type=ResourceType.ARTICLE
+                            )
+                        ],
+                        checklist_items=[ChecklistItemInput(text="Read it")],
+                    ),
+                    SubsectionInput(
+                        title="Graphs",  # no proposed_id -> re-minted to sub_graphs
+                        prereq_ids=["sub_arrays"],
+                        resources=[
+                            ResourceInput(
+                                title="G", url="https://x.test", type=ResourceType.ARTICLE
+                            )
+                        ],
+                        checklist_items=[ChecklistItemInput(text="Do it")],
+                    ),
+                ],
+            )
+        ],
+        suggested_path=["sub_arrays", "sub_graphs"],
+    )
+
+
 async def test_create_draft_mints_a_title_slug_random_id() -> None:
     service, repo = _service(tokens=["7f3k"])
     created = await service.create_draft("user-1", _minimal_doc())
@@ -394,17 +431,21 @@ async def test_patch_is_404_for_a_non_owner() -> None:
         )
 
 
-async def test_patch_on_a_published_roadmap_is_a_conflict() -> None:
+async def test_patch_on_a_published_roadmap_is_an_immutability_conflict() -> None:
     service, _ = _service()
     created = await service.create_draft("user-1", _publishable_doc())
     await service.publish("user-1", created.id)
-    with pytest.raises(Conflict):
+    with pytest.raises(Conflict) as excinfo:
         await service.patch_draft(
             "user-1",
             created.id,
             created.revision,
             [SetTagsOp(op="set_tags", subsection_id="sub_arrays", tags=["x"])],
         )
+    # A structural write against published content is the immutability boundary
+    # (spec section 05): a distinct 409 IMMUTABLE pointing to fork-to-change.
+    assert excinfo.value.code is ErrorCode.IMMUTABLE
+    assert "fork" in excinfo.value.detail.lower()
 
 
 async def test_patch_with_an_invalid_op_is_a_field_level_validation_error() -> None:
@@ -441,4 +482,124 @@ async def test_patch_rolls_back_when_persistence_fails() -> None:
             created.revision,
             [SetTagsOp(op="set_tags", subsection_id="sub_arrays", tags=["x"])],
         )
+    assert repo.rollbacks == 1
+
+
+# --- replace (full-document import escape hatch) -----------------------------
+
+
+async def test_replace_rebuilds_the_draft_preserving_proposed_ids_and_reminting_rest() -> None:
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+
+    replaced = await service.replace_draft("user-1", created.id, created.revision, _replace_doc())
+
+    # The roadmap ID (route param) is unchanged; the title comes from the import.
+    assert replaced.id == created.id
+    assert replaced.title == "Grokking DSA v2"
+    core = replaced.sections["sec_core"]
+    # proposed_ids preserved; the node without one is re-minted from its title.
+    assert core.subsection_order == ["sub_arrays", "sub_graphs"]
+    # References resolve to the final IDs, and the whole document was rebuilt.
+    assert core.subsections["sub_graphs"].prereq_ids == ["sub_arrays"]
+    assert replaced.suggested_path == ["sub_arrays", "sub_graphs"]
+    assert replaced.remap == {}
+
+
+async def test_replace_keeps_the_roadmap_id_and_bumps_the_revision() -> None:
+    service, repo = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+
+    replaced = await service.replace_draft("user-1", created.id, created.revision, _replace_doc())
+
+    assert replaced.revision == created.revision + 1
+    # Persisted: a fresh read reflects the imported content and the bumped revision.
+    fetched = await service.get("user-1", created.id)
+    assert fetched.revision == created.revision + 1
+    assert fetched.title == "Grokking DSA v2"
+    assert "sub_graphs" in fetched.sections["sec_core"].subsections
+    assert repo.commits == 2
+
+
+async def test_replace_preserves_created_at_and_stays_a_draft() -> None:
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    original_created_at = (await service.get("user-1", created.id)).created_at
+
+    replaced = await service.replace_draft("user-1", created.id, created.revision, _replace_doc())
+
+    assert replaced.created_at == original_created_at
+    assert replaced.status is RoadmapStatus.DRAFT
+    assert replaced.owner == "user-1"
+
+
+async def test_replace_returns_a_remap_for_a_deduped_proposed_id() -> None:
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    doc = _replace_doc()
+    # Re-slugified/bare proposal: "arrays" normalizes to the prefixed "sub_arrays".
+    doc.sections[0].subsections[0].proposed_id = "arrays"
+    doc.sections[0].subsections[1].prereq_ids = ["arrays"]
+    doc.suggested_path = ["arrays", "sub_graphs"]
+
+    replaced = await service.replace_draft("user-1", created.id, created.revision, doc)
+
+    assert replaced.remap == {"arrays": "sub_arrays"}
+    # The de-duped reference was reconciled to the final minted ID.
+    assert replaced.sections["sec_core"].subsections["sub_graphs"].prereq_ids == ["sub_arrays"]
+    assert replaced.suggested_path == ["sub_arrays", "sub_graphs"]
+
+
+async def test_replace_on_a_published_roadmap_is_an_immutability_conflict() -> None:
+    service, repo = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    await service.publish("user-1", created.id)
+    commits_before = repo.commits
+    with pytest.raises(Conflict) as excinfo:
+        await service.replace_draft("user-1", created.id, created.revision, _replace_doc())
+    assert excinfo.value.code is ErrorCode.IMMUTABLE
+    assert "fork" in excinfo.value.detail.lower()
+    # Rejected before any write: nothing persisted.
+    assert repo.commits == commits_before
+
+
+async def test_replace_on_an_archived_roadmap_is_an_immutability_conflict() -> None:
+    service, repo = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    # No archive path yet (#15); simulate the persisted archived state via the repo.
+    await repo.save(created.model_copy(update={"status": RoadmapStatus.ARCHIVED}))
+    with pytest.raises(Conflict) as excinfo:
+        await service.replace_draft("user-1", created.id, created.revision, _replace_doc())
+    assert excinfo.value.code is ErrorCode.IMMUTABLE
+
+
+async def test_replace_is_404_for_a_non_owner() -> None:
+    service, _ = _service()
+    created = await service.create_draft("owner", _publishable_doc())
+    with pytest.raises(NotFound):
+        await service.replace_draft("intruder", created.id, created.revision, _replace_doc())
+
+
+async def test_replace_with_a_stale_revision_is_a_stale_revision_conflict() -> None:
+    service, repo = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    with pytest.raises(Conflict) as excinfo:
+        await service.replace_draft("user-1", created.id, created.revision + 5, _replace_doc())
+    assert excinfo.value.code is ErrorCode.STALE_REVISION
+    assert "re-read" in excinfo.value.detail.lower()
+    # Nothing persisted on the stale import.
+    assert repo.commits == 1
+    assert (await service.get("user-1", created.id)).revision == created.revision
+
+
+async def test_replace_rolls_back_when_persistence_fails() -> None:
+    service, repo = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+
+    async def failing_save(_roadmap: object) -> None:
+        raise RuntimeError("db down")
+
+    repo.save = failing_save  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError):
+        await service.replace_draft("user-1", created.id, created.revision, _replace_doc())
     assert repo.rollbacks == 1
