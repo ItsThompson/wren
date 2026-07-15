@@ -14,6 +14,9 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0.36",
     "asyncpg>=0.30.0",
     "alembic>=1.14.0",
+    "pyjwt>=2.9.0",
+    "bcrypt>=4.2.0",
+    "email-validator>=2.2.0",
 ]
 
 [project.scripts]
@@ -46,6 +49,18 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
 
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency-injection idiom calls Depends()/Query()/... in argument
+# defaults by design; these are immutable markers, not mutable-default bugs.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Header",
+    "fastapi.Cookie",
+    "fastapi.Body",
+]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
@@ -72,4 +87,8 @@ show_missing = true
 exclude_lines = [
     "pragma: no cover",
     "if __name__ == .__main__.:",
+    # Protocol / abstract method stubs and typing-only blocks are never executed.
+    "^\\s*\\.\\.\\.\\s*$",
+    ": \\.\\.\\.$",
+    "if TYPE_CHECKING:",
 ]
