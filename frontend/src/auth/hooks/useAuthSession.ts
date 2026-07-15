@@ -65,9 +65,14 @@ export function useAuthSession(baseUrl: string): SessionState & {
   )
 
   const logout = useCallback(async () => {
-    // Best-effort server revocation; the client session is cleared regardless.
-    await client.POST('/auth/logout')
-    setSession(ANONYMOUS)
+    // Best-effort server revocation; the client session is cleared regardless of
+    // whether the logout request succeeds (try/finally), so a failed POST never
+    // strands the user in a stale authenticated state.
+    try {
+      await client.POST('/auth/logout')
+    } finally {
+      setSession(ANONYMOUS)
+    }
   }, [client])
 
   return { ...session, register, login, logout }

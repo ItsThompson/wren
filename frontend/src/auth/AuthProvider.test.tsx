@@ -144,4 +144,19 @@ describe('AuthProvider', () => {
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('anonymous'))
     expect(screen.getByTestId('user')).toHaveTextContent('none')
   })
+
+  it('clears the local session even when the logout request fails', async () => {
+    server.use(
+      http.post('*/auth/refresh', () => HttpResponse.json(mockAuthUser)),
+      http.post('*/auth/logout', () => HttpResponse.error()),
+    )
+    const user = userEvent.setup()
+    renderProbe()
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('authenticated'))
+
+    await user.click(screen.getByRole('button', { name: 'logout' }))
+
+    // A rejected logout POST must still drop the client to anonymous (try/finally).
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('anonymous'))
+  })
 })
