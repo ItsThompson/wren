@@ -133,3 +133,24 @@ lint-frontend:
 codegen:
     cd backend && LOG_LEVEL=critical uv run python -c "import json; from wren.api.main import app; print(json.dumps(app.openapi(), indent=2))" > ../frontend/openapi.json
     cd frontend && npm run codegen
+
+# --- Deploy / ops -----------------------------------------------------------
+
+# Deploy to a VPS over push-based SSH; DEPLOY_SHA optional (defaults to synced HEAD).
+# Match DEPLOY_SHA to the CD-built image tags: DEPLOY_SHA=$(git rev-parse HEAD) just deploy 203.0.113.10
+deploy ip user='deploy':
+    ./scripts/deploy.sh {{ip}} {{user}}
+
+# Print the full deploy phase plan (every ssh/scp) without touching a server.
+deploy-plan ip user='deploy':
+    DRY_RUN=1 ./scripts/deploy.sh {{ip}} {{user}}
+
+# Run the deploy-script test harness (pure helpers, dry-run plan, rollback).
+test-deploy:
+    bash scripts/tests/deploy_test.sh
+
+# Preview the rendered Cloudflare tunnel ingress config from the local .env.
+render-tunnel:
+    set -a; . ./.env; set +a; \
+    envsubst '$CF_TUNNEL_ID $CF_APP_HOSTNAME $CF_API_HOSTNAME $CF_MCP_HOSTNAME' \
+      < deployments/cloudflare/config.yml
