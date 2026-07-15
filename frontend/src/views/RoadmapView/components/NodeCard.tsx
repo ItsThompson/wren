@@ -1,9 +1,9 @@
 import { Check } from 'lucide-react'
 
-import { colorForTag } from '@/lib/tag-color'
 import { isSubsectionDone } from '../progress-derive'
 import type { ProgressBinding, Subsection } from '../types'
 import { ChecklistRow } from './ChecklistRow'
+import { TagPill } from './TagPill'
 
 interface NodeCardProps {
   subsection: Subsection
@@ -13,6 +13,12 @@ interface NodeCardProps {
    * mode, where the checklist is read-only (a draft is not startable).
    */
   progress?: ProgressBinding
+  /**
+   * The current "next" node (from `GET /next`, section 07/Ticket 17). The one
+   * next subsection gets the accent-tinted highlight (§7.2): an accent-tint
+   * surface, a loud terracotta left border, and the reserved faint shadow.
+   */
+  isNext?: boolean
 }
 
 /**
@@ -21,18 +27,27 @@ interface NodeCardProps {
  * `<a href>` links, and the checklist. When a progress binding is passed the
  * checklist rows are interactive and the subsection shows its derived done-state
  * (olive check + border tint, no bar); without one the checklist is read-only.
+ * The current-"next" subsection is highlighted with the accent tint (§7.2).
  */
-export function NodeCard({ subsection, progress }: NodeCardProps) {
+export function NodeCard({ subsection, progress, isNext = false }: NodeCardProps) {
   const resourceIds = subsection.resource_order ?? []
   const itemIds = subsection.item_order ?? []
   const resources = subsection.resources ?? {}
   const items = subsection.checklist_items ?? {}
   const tags = subsection.tags ?? []
   const done = progress ? isSubsectionDone(subsection, progress.checkedIds) : false
+  const borderClass = done ? 'border-success/50' : 'border-border'
+  // §7.2 "next" card: accent-tint surface + loud terracotta left border + the
+  // reserved faint shadow. `aria-current="step"` announces it as the current
+  // step (meaning is never carried by color alone).
+  const nextClass = isNext
+    ? 'border-l-4 border-l-primary bg-accent shadow-[0_1px_2px_rgba(33,26,21,0.06),0_4px_16px_rgba(33,26,21,0.04)]'
+    : 'bg-card'
 
   return (
     <article
-      className={`rounded-lg border bg-card p-5 ${done ? 'border-success/50' : 'border-border'}`}
+      aria-current={isNext ? 'step' : undefined}
+      className={`rounded-lg border p-5 ${borderClass} ${nextClass}`}
     >
       <div className="flex items-baseline justify-between gap-3">
         <div className="flex items-baseline gap-2">
@@ -54,12 +69,8 @@ export function NodeCard({ subsection, progress }: NodeCardProps) {
       {tags.length > 0 ? (
         <ul className="mt-2 flex flex-wrap gap-1.5">
           {tags.map((tag) => (
-            <li
-              key={tag}
-              className="rounded-full border px-2 py-0.5 text-xs font-medium"
-              style={{ color: colorForTag(tag), borderColor: colorForTag(tag) }}
-            >
-              {tag}
+            <li key={tag}>
+              <TagPill tag={tag} />
             </li>
           ))}
         </ul>
