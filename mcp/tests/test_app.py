@@ -1,0 +1,173 @@
+"""App-assembly tests: PRM, health/readiness, metrics, and the 401 boundary.
+
+Boots the real RS app (:func:`create_rs_app`) with an injected key provider
+(faked JWKS) and internal client, and asserts the acceptance-criteria surface end
+to end: PRM served from pinned config, /readyz gated on JWKS reachability,
+/metrics exposed, and an unauthenticated tool call rejected with 401 +
+WWW-Authenticate pointing at the PRM.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+
+import httpx
+import pytest
+from fastapi.testclient import TestClient
+
+from token_factory import ISSUER, RESOURCE, make_fetch, mint, new_key, public_jwks
+from wren_mcp.app import build_app, create_json_fetch, create_rs_app
+from wren_mcp.client import InternalApiClient
+from wren_mcp.config import MCP_PATH, PRM_PATH
+from wren_mcp.keys import RemoteKeyProvider
+from wren_mcp.settings import RsSettings
+
+MakeSettings = Callable[..., RsSettings]
+
+
+class _FailingKeyProvider:
+    """A key provider whose discovery always fails (AS unreachable)."""
+
+    async def key_set_for(self, kid: str | None) -> object:
+        raise RuntimeError("AS unreachable")
+
+    async def load(self) -> object:
+        raise RuntimeError("AS unreachable")
+
+
+def _internal_client() -> InternalApiClient:
+    http = httpx.AsyncClient(
+        base_url="http://backend:8001",
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200)),
+    )
+    return InternalApiClient(http, api_token="tok")
+
+
+def _build(make_settings: MakeSettings, *, key=None, key_provider=None) -> TestClient:
+    provider = key_provider or RemoteKeyProvider(ISSUER, make_fetch(public_jwks(key or new_key())))
+    app = create_rs_app(make_settings(), key_provider=provider, internal_client=_internal_client())
+    return TestClient(app)
+
+
+def test_prm_is_served_from_pinned_config(make_settings: MakeSettings) -> None:
+    client = _build(make_settings)
+
+    response = client.get(PRM_PATH)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["resource"] == RESOURCE
+    assert body["authorization_servers"] == [ISSUER]
+
+
+def test_prm_urls_ignore_the_request_host(make_settings: MakeSettings) -> None:
+    # The Site-URL gotcha: even if a client reaches the origin under a different
+    # Host, the PRM advertises the pinned resource/issuer.
+    client = _build(make_settings)
+
+    response = client.get(PRM_PATH, headers={"Host": "backend:9000"})
+
+    assert response.json()["resource"] == RESOURCE
+
+
+def test_healthz_is_ok(make_settings: MakeSettings) -> None:
+    client = _build(make_settings)
+    assert client.get("/healthz").status_code == 200
+
+
+def test_readyz_is_ready_when_jwks_loads(make_settings: MakeSettings) -> None:
+    client = _build(make_settings)
+
+    response = client.get("/readyz")
+
+    assert response.status_code == 200
+    assert response.json()["checks"]["as_jwks"]["ok"] is True
+
+
+def test_readyz_is_503_when_jwks_is_unreachable(make_settings: MakeSettings) -> None:
+    client = _build(make_settings, key_provider=_FailingKeyProvider())
+
+    response = client.get("/readyz")
+
+    assert response.status_code == 503
+    assert response.json()["checks"]["as_jwks"]["ok"] is False
+
+
+def test_metrics_are_exposed(make_settings: MakeSettings) -> None:
+    client = _build(make_settings)
+
+    response = client.get("/metrics")
+
+    assert response.status_code == 200
+    assert "http_requests_total" in response.text
+    assert "http_request_duration_seconds" in response.text
+
+
+def test_unauthenticated_tool_call_is_401_pointing_at_the_prm(make_settings: MakeSettings) -> None:
+    client = _build(make_settings)
+
+    response = client.get(MCP_PATH)
+
+    assert response.status_code == 401
+    challenge = response.headers["WWW-Authenticate"]
+    assert challenge == f'Bearer resource_metadata="{RESOURCE}{PRM_PATH}"'
+
+
+def test_valid_bearer_passes_the_boundary(make_settings: MakeSettings) -> None:
+    # A valid token clears the auth boundary; there is no tool route yet
+    # (Tickets 21/22), so it 404s rather than 401s: proof the token was accepted.
+    key = new_key()
+    client = _build(make_settings, key=key)
+
+    response = client.get(MCP_PATH, headers={"Authorization": f"Bearer {mint(key)}"})
+
+    assert response.status_code == 404
+
+
+def test_app_exposes_the_tool_layer_seams(make_settings: MakeSettings) -> None:
+    provider = RemoteKeyProvider(ISSUER, make_fetch(public_jwks(new_key())))
+    internal_client = _internal_client()
+    app = create_rs_app(make_settings(), key_provider=provider, internal_client=internal_client)
+
+    # The seams Tickets 21/22 build the tool dispatch on: the verified-identity
+    # verifier and the internal client the tools call.
+    assert app.state.internal_client is internal_client
+    assert app.state.token_verifier is not None
+    assert app.state.key_provider is provider
+
+
+async def test_create_json_fetch_parses_json() -> None:
+    http = httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda _r: httpx.Response(200, json={"jwks_uri": "u"}))
+    )
+    fetch = create_json_fetch(http)
+
+    assert await fetch("https://api.usewren.com/.well-known/oauth-authorization-server") == {
+        "jwks_uri": "u"
+    }
+    await http.aclose()
+
+
+async def test_create_json_fetch_raises_on_error_status() -> None:
+    http = httpx.AsyncClient(transport=httpx.MockTransport(lambda _r: httpx.Response(503)))
+    fetch = create_json_fetch(http)
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await fetch("https://api.usewren.com/jwks")
+    await http.aclose()
+
+
+def test_build_app_boots_and_cleans_up_its_clients(make_settings: MakeSettings) -> None:
+    # Exercises the production wiring graph (httpx-backed discovery + internal
+    # client) and the lifespan that closes both clients on shutdown. The context
+    # manager runs startup + shutdown; JWKS is lazy, so no network is hit.
+    app = build_app(make_settings())
+    with TestClient(app) as client:
+        assert client.get(PRM_PATH).status_code == 200
+
+
+def test_main_module_builds_the_app() -> None:
+    import wren_mcp.main as main_module
+
+    with TestClient(main_module.app) as client:
+        assert client.get(PRM_PATH).status_code == 200

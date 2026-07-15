@@ -1,0 +1,80 @@
+"""MCP Resource Server settings.
+
+Config is sourced from the environment once (:class:`EnvSettings`) and composed
+into the immutable :class:`RsSettings` the app wires from. Like the backend AS,
+every externally-visible URL (the token ``iss`` the RS validates against, the
+``aud`` it binds to, the AS discovery base) is built from **pinned** config, never
+a request host: the RS sits behind the same Cloudflare tunnel, so a
+request-derived issuer/audience would break token validation (the "Site-URL
+gotcha", spec sections 08/11).
+"""
+
+from __future__ import annotations
+
+from pydantic import BaseModel
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+SERVICE = "wren-mcp"
+DEFAULT_PORT = 9000
+
+
+class EnvSettings(BaseSettings):
+    """Deployment config for the MCP server, sourced from the environment.
+
+    Field names mirror the shared ``.env`` keys (spec section 11). Unknown keys
+    are ignored so the single sectioned root ``.env`` can carry vars for other
+    consumers.
+    """
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    environment: str = "development"
+    log_level: str = "info"
+    host: str = "0.0.0.0"  # noqa: S104 - container binds all interfaces; ingress is tunnel-only
+    port: int = DEFAULT_PORT
+    # AS origin (api.usewren.com): the expected token ``iss`` and the base the RS
+    # discovers AS metadata + JWKS from. Pinned, never request-derived.
+    public_base_url: str = "http://localhost:8000"
+    # This RS's own public URL (mcp.usewren.com): the expected token ``aud`` and
+    # the PRM ``resource`` value. Agent tokens are audience-bound to it.
+    mcp_public_url: str = "http://localhost:9000"
+    # Backend internal app base (compute-net only, e.g. http://backend:8001). Tool
+    # calls are forwarded here with the resolved X-User-ID.
+    backend_internal_url: str = "http://localhost:8001"
+    # Shared secret the internal app requires (defense-in-depth behind compute-net
+    # isolation). Empty by default; the internal app fail-safe denies without it.
+    internal_api_token: str = ""
+
+
+class RsSettings(BaseModel):
+    """Full settings for the MCP Resource Server."""
+
+    service: str
+    environment: str
+    log_level: str
+    host: str
+    port: int
+    issuer: str  # expected token ``iss`` + AS discovery base (pinned)
+    resource: str  # expected token ``aud`` + PRM ``resource`` (pinned)
+    backend_internal_url: str
+    internal_api_token: str
+
+    @property
+    def is_dev(self) -> bool:
+        return self.environment.lower() == "development"
+
+
+def build_rs_settings(env: EnvSettings | None = None) -> RsSettings:
+    """Compose the RS settings from pinned deployment config."""
+    env = env or EnvSettings()
+    return RsSettings(
+        service=SERVICE,
+        environment=env.environment,
+        log_level=env.log_level,
+        host=env.host,
+        port=env.port,
+        issuer=env.public_base_url,
+        resource=env.mcp_public_url,
+        backend_internal_url=env.backend_internal_url,
+        internal_api_token=env.internal_api_token,
+    )

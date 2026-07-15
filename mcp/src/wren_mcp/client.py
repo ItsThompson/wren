@@ -1,0 +1,88 @@
+"""Thin client of the backend internal API (:8001) (spec sections 03/07/08).
+
+Each MCP tool call (Tickets 21/22) becomes one HTTP call to the backend internal
+app over ``compute-net``. This client owns the one security-critical invariant of
+that hop: **every** request carries the resolved ``X-User-ID`` plus the shared
+``INTERNAL_API_TOKEN``, and the agent's bearer token is **never** forwarded
+(confused-deputy defense, spec section 08). The trusted headers are set last so a
+caller cannot override them.
+
+The named methods mirror the internal roadmap router op-for-op; the tool layer
+maps their responses to tool outputs. The ``httpx.AsyncClient`` is injected (bound
+to ``BACKEND_INTERNAL_URL``) so tests substitute a transport without a live
+backend.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+import httpx
+
+from wren_mcp.config import INTERNAL_TOKEN_HEADER, USER_ID_HEADER
+from wren_mcp.settings import RsSettings
+
+# Bound so a hung internal call cannot pin an MCP worker indefinitely.
+_DEFAULT_TIMEOUT_SECONDS = 10.0
+
+
+class InternalApiClient:
+    """Forwards user-scoped calls to the backend internal app."""
+
+    def __init__(self, http_client: httpx.AsyncClient, *, api_token: str) -> None:
+        self._http = http_client
+        self._api_token = api_token
+
+    async def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        user_id: str,
+        json: Any | None = None,
+        params: dict[str, Any] | None = None,
+        extra_headers: dict[str, str] | None = None,
+    ) -> httpx.Response:
+        """One internal call scoped to ``user_id``.
+
+        The trusted identity + shared-secret headers are applied last, so they
+        can never be overridden by ``extra_headers`` and the agent token is never
+        propagated (only ``user_id`` crosses this boundary).
+        """
+        headers = dict(extra_headers or {})
+        headers[USER_ID_HEADER] = user_id
+        headers[INTERNAL_TOKEN_HEADER] = self._api_token
+        return await self._http.request(method, path, json=json, params=params, headers=headers)
+
+    async def create_draft(self, user_id: str, document: Any) -> httpx.Response:
+        return await self.request("POST", "/roadmaps", user_id=user_id, json=document)
+
+    async def get_roadmap(self, user_id: str, roadmap_id: str) -> httpx.Response:
+        return await self.request("GET", f"/roadmaps/{roadmap_id}", user_id=user_id)
+
+    async def patch_draft(
+        self, user_id: str, roadmap_id: str, revision: int, operations: list[Any]
+    ) -> httpx.Response:
+        # The target revision travels in If-Match (spec section 06), matching the
+        # internal router's PATCH contract.
+        return await self.request(
+            "PATCH",
+            f"/roadmaps/{roadmap_id}",
+            user_id=user_id,
+            json={"operations": operations},
+            extra_headers={"If-Match": str(revision)},
+        )
+
+    async def validate_draft(self, user_id: str, roadmap_id: str) -> httpx.Response:
+        return await self.request("POST", f"/roadmaps/{roadmap_id}:validate", user_id=user_id)
+
+    async def publish(self, user_id: str, roadmap_id: str) -> httpx.Response:
+        return await self.request("POST", f"/roadmaps/{roadmap_id}:publish", user_id=user_id)
+
+
+def create_internal_http_client(settings: RsSettings) -> httpx.AsyncClient:
+    """Build the ``httpx.AsyncClient`` bound to the backend internal base URL."""
+    return httpx.AsyncClient(
+        base_url=settings.backend_internal_url,
+        timeout=_DEFAULT_TIMEOUT_SECONDS,
+    )
