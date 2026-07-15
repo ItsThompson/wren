@@ -14,12 +14,14 @@ the engine does not require a reachable database; the ``/readyz`` check
 
 from __future__ import annotations
 
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import Any
 
 from fastapi import FastAPI
-from sqlalchemy import Select, text
+from sqlalchemy import Select, event, text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -30,6 +32,7 @@ from starlette.requests import Request
 from starlette.types import Lifespan
 
 from wren.core.health import CheckResult, ReadinessCheck
+from wren.core.observability import ACTIVE_CONNECTIONS, DB_QUERY_DURATION
 
 # Pool sized for one backend instance (spec section 11). `pool_pre_ping` discards
 # connections severed by a Postgres restart or idle timeout before they are handed
@@ -74,7 +77,75 @@ class Database:
 def create_database(database_url: str) -> Database:
     """Compose the engine and session factory for one app."""
     engine = create_db_engine(database_url)
+    instrument_pool(engine)
     return Database(engine=engine, sessionmaker=create_sessionmaker(engine))
+
+
+# Perf-counter start times are stashed here per connection so a nested/executemany
+# statement pops its own start rather than a shared global.
+_QUERY_START_KEY = "wren_query_start"
+_SQL_VERBS = frozenset({"select", "insert", "update", "delete"})
+
+
+def _query_name(statement: str, execution_options: dict[str, Any]) -> str:
+    """Resolve a low-cardinality ``query_name`` label for a statement.
+
+    A repository may tag a statement via ``execution_options(query_name=...)``;
+    absent that, the label collapses to the SQL verb (``select``/``insert``/
+    ``update``/``delete``) or ``other``, so the label set stays bounded.
+    """
+    named = execution_options.get("query_name")
+    if isinstance(named, str) and named:
+        return named
+    head = statement.lstrip().split(None, 1)
+    verb = head[0].lower() if head else ""
+    return verb if verb in _SQL_VERBS else "other"
+
+
+def instrument_pool(engine: AsyncEngine) -> None:
+    """Wire SQLAlchemy engine events into the DB-pool metric families.
+
+    Emits ``db_query_duration_seconds{query_name}`` around every statement and
+    tracks ``active_connections`` as connections are checked out of and back into
+    the pool. Attached to the async engine's underlying sync engine, which is
+    where the pool and cursor events fire (spec section 11).
+    """
+    sync_engine = engine.sync_engine
+
+    @event.listens_for(sync_engine, "before_cursor_execute")
+    def _before(
+        conn: Any,
+        cursor: Any,
+        statement: str,
+        parameters: Any,
+        context: Any,
+        executemany: bool,
+    ) -> None:
+        conn.info.setdefault(_QUERY_START_KEY, []).append(time.perf_counter())
+
+    @event.listens_for(sync_engine, "after_cursor_execute")
+    def _after(
+        conn: Any,
+        cursor: Any,
+        statement: str,
+        parameters: Any,
+        context: Any,
+        executemany: bool,
+    ) -> None:
+        starts: list[float] = conn.info.get(_QUERY_START_KEY) or []
+        if not starts:
+            return
+        elapsed = time.perf_counter() - starts.pop()
+        options = dict(getattr(context, "execution_options", {}) or {})
+        DB_QUERY_DURATION.labels(query_name=_query_name(statement, options)).observe(elapsed)
+
+    @event.listens_for(sync_engine, "checkout")
+    def _checkout(dbapi_connection: Any, connection_record: Any, connection_proxy: Any) -> None:
+        ACTIVE_CONNECTIONS.inc()
+
+    @event.listens_for(sync_engine, "checkin")
+    def _checkin(dbapi_connection: Any, connection_record: Any) -> None:
+        ACTIVE_CONNECTIONS.dec()
 
 
 async def get_session(request: Request) -> AsyncIterator[AsyncSession]:

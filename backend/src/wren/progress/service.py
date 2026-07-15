@@ -24,6 +24,7 @@ from datetime import UTC, date, datetime
 
 from wren.core.errors import Conflict, NotFound, Validation
 from wren.core.logging import get_logger
+from wren.core.observability import track_failures
 from wren.progress.models import ProgressRecord
 from wren.progress.next import compute as compute_next
 from wren.progress.repository import ProgressRepository
@@ -49,6 +50,7 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+@track_failures("progress")
 class ProgressService:
     """Business rules for following roadmaps and tracking progress."""
 

@@ -23,6 +23,7 @@ from oauth_fakes import (
     make_pkce_pair,
 )
 from wren.core.errors import NotFound
+from wren.core.observability import WREN_REGISTRY
 from wren.oauth.authorization import AuthorizationService
 from wren.oauth.config import OAuthConfig
 from wren.oauth.errors import OAuthError, OAuthErrorCode
@@ -530,6 +531,30 @@ async def test_refresh_rotates_and_issues_a_new_pair() -> None:
     assert rotated.refresh_token != first.refresh_token
     assert h.codec.verify(rotated.access_token) is not None
     assert any(e.event == OAuthEvent.REFRESHED.value for e in h.repo.audit)
+
+
+def _issued_count(grant_type: str) -> float:
+    value = WREN_REGISTRY.get_sample_value("oauth_tokens_issued_total", {"grant_type": grant_type})
+    return value or 0.0
+
+
+async def test_issuance_and_refresh_increment_the_domain_counter() -> None:
+    h = _harness()
+    client_id = await _register(h.auth)
+    code_before = _issued_count("authorization_code")
+    refresh_before = _issued_count("refresh_token")
+
+    first = await _issue_tokens(h, client_id)
+    await h.tokens.exchange(
+        TokenRequest(
+            grant_type="refresh_token", client_id=client_id, refresh_token=first.refresh_token
+        )
+    )
+
+    # A code exchange is one authorization_code issuance; the rotation is one
+    # refresh_token issuance.
+    assert _issued_count("authorization_code") == code_before + 1
+    assert _issued_count("refresh_token") == refresh_before + 1
 
 
 async def test_rotated_refresh_token_replay_is_rejected_and_revokes_chain() -> None:

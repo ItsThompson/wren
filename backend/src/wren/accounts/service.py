@@ -28,6 +28,7 @@ from wren.accounts.tokens import SessionTokenCodec
 from wren.core.db import is_unique_violation
 from wren.core.errors import Conflict, NotFound, Unauthorized, Validation
 from wren.core.logging import get_logger
+from wren.core.observability import track_failures
 
 # A public handle: 3..32 chars, lowercase letters/digits/underscore/hyphen. Kept
 # conservative because it appears in public profile URLs (Ticket 25).
@@ -42,6 +43,7 @@ _INVALID_CREDENTIALS = "Invalid email or password."
 _log = get_logger("wren-accounts")
 
 
+@track_failures("accounts")
 class AccountService:
     """Business rules for human accounts and sessions."""
 

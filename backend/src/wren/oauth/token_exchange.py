@@ -18,6 +18,7 @@ from datetime import UTC, datetime, timedelta
 
 from wren.core.errors import NotFound
 from wren.core.logging import get_logger
+from wren.core.observability import OAUTH_TOKENS_ISSUED, track_failures
 from wren.oauth.config import (
     GRANT_TYPE_AUTHORIZATION_CODE,
     GRANT_TYPE_REFRESH_TOKEN,
@@ -34,6 +35,7 @@ _log = get_logger("wren-oauth")
 _BEARER = "Bearer"
 
 
+@track_failures("oauth")
 class TokenService:
     """Token issuance, refresh rotation, revocation, and connected-client grants."""
 
@@ -83,6 +85,7 @@ class TokenService:
             event=OAuthEvent.TOKEN_ISSUED,
         )
         await self._repo.commit()
+        OAUTH_TOKENS_ISSUED.labels(grant_type=GRANT_TYPE_AUTHORIZATION_CODE).inc()
         _log.info("oauth_token_issued", client_id=code.client_id, user_id=code.user_id)
         return tokens
 
@@ -114,6 +117,7 @@ class TokenService:
             event=OAuthEvent.REFRESHED,
         )
         await self._repo.commit()
+        OAUTH_TOKENS_ISSUED.labels(grant_type=GRANT_TYPE_REFRESH_TOKEN).inc()
         _log.info("oauth_token_refreshed", client_id=existing.client_id, user_id=existing.user_id)
         return tokens
 

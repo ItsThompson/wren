@@ -25,6 +25,7 @@ from datetime import UTC, datetime
 
 from wren.core.errors import Conflict, ErrorCode, NotFound, Validation, Violation
 from wren.core.logging import get_logger
+from wren.core.observability import track_failures
 from wren.roadmaps import patch, projections, slugs
 from wren.roadmaps.assembly import assemble_draft, assemble_fork
 from wren.roadmaps.config import MAX_ID_MINT_ATTEMPTS, SECTION_PAGE_SIZE
@@ -79,6 +80,7 @@ async def _no_checked_items(_user_id: str, _roadmap_id: str) -> frozenset[str]:
     return frozenset()
 
 
+@track_failures("roadmaps")
 class RoadmapService:
     """Business rules for authoring roadmap drafts."""
 

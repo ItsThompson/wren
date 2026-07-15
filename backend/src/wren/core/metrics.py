@@ -10,8 +10,11 @@ dashboards drop in later:
 cardinality; untemplated paths group to ``none``. ``/metrics`` is excluded from
 its own counters to avoid self-referential scrape noise.
 
-Each app owns a private ``CollectorRegistry`` so the external and internal apps
-can run in one process (the smoke test does) without duplicate-timeseries errors.
+Each app owns a private ``CollectorRegistry`` for its HTTP families so the
+external and internal apps can run in one process (the smoke test does) without
+duplicate-timeseries errors. ``/metrics`` serves that private registry
+concatenated with the shared :data:`~wren.core.observability.WREN_REGISTRY`
+(domain, service, and DB-pool families), so one scrape sees the whole picture.
 """
 
 from __future__ import annotations
@@ -19,9 +22,18 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from fastapi import FastAPI
-from prometheus_client import CollectorRegistry, Counter, Histogram
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Counter,
+    Histogram,
+    generate_latest,
+)
 from prometheus_fastapi_instrumentator import Instrumentator
 from prometheus_fastapi_instrumentator.metrics import Info
+from starlette.responses import Response
+
+from wren.core.observability import WREN_REGISTRY
 
 # An instrumentation function receives one request's Info and records to a metric.
 Instrumentation = Callable[[Info], None]
@@ -64,10 +76,21 @@ def _request_duration(registry: CollectorRegistry) -> Instrumentation:
     return instrumentation
 
 
+def _expose_combined(app: FastAPI, http_registry: CollectorRegistry) -> None:
+    """Serve ``/metrics`` as the app's private HTTP registry followed by the shared
+    custom-metrics registry. Both are text exposition with disjoint metric names,
+    so concatenation is a valid single scrape response."""
+
+    @app.get(METRICS_ENDPOINT, include_in_schema=False)
+    async def metrics() -> Response:
+        payload = generate_latest(http_registry) + generate_latest(WREN_REGISTRY)
+        return Response(content=payload, media_type=CONTENT_TYPE_LATEST)
+
+
 def instrument(app: FastAPI) -> CollectorRegistry:
     """Wire request metrics and expose ``/metrics`` on ``app``.
 
-    Returns the app's private registry (useful for tests).
+    Returns the app's private HTTP registry (useful for tests).
     """
     registry = CollectorRegistry()
     instrumentator = Instrumentator(
@@ -78,5 +101,6 @@ def instrument(app: FastAPI) -> CollectorRegistry:
     )
     instrumentator.add(_requests_total(registry))
     instrumentator.add(_request_duration(registry))
-    instrumentator.instrument(app).expose(app, endpoint=METRICS_ENDPOINT, include_in_schema=False)
+    instrumentator.instrument(app)
+    _expose_combined(app, registry)
     return registry

@@ -20,6 +20,7 @@ from urllib.parse import urlencode, urlsplit
 
 from wren.core.errors import NotFound
 from wren.core.logging import get_logger
+from wren.core.observability import track_failures
 from wren.oauth.config import (
     CODE_CHALLENGE_METHOD_S256,
     GRANT_TYPE_AUTHORIZATION_CODE,
@@ -64,6 +65,7 @@ def _is_expired(expires_at: datetime) -> bool:
     return expires_at <= datetime.now(UTC)
 
 
+@track_failures("oauth")
 class AuthorizationService:
     """Client registration, request parking, consent context, and decision."""
 
