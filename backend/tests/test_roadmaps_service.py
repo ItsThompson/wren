@@ -448,6 +448,24 @@ async def test_patch_on_a_published_roadmap_is_an_immutability_conflict() -> Non
     assert "fork" in excinfo.value.detail.lower()
 
 
+async def test_patch_on_published_prefers_immutable_over_stale_revision() -> None:
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    await service.publish("user-1", created.id)
+    # Publish does not bump revision, so a published roadmap can still be targeted
+    # with a stale If-Match: the immutability guard must win over the stale-revision
+    # check (guard-before-revision precedence, since the guard loads before the
+    # revision comparison).
+    with pytest.raises(Conflict) as excinfo:
+        await service.patch_draft(
+            "user-1",
+            created.id,
+            created.revision + 5,  # stale, but immutability is checked first
+            [SetTagsOp(op="set_tags", subsection_id="sub_arrays", tags=["x"])],
+        )
+    assert excinfo.value.code is ErrorCode.IMMUTABLE
+
+
 async def test_patch_with_an_invalid_op_is_a_field_level_validation_error() -> None:
     service, repo = _service()
     created = await service.create_draft("user-1", _publishable_doc())
@@ -570,6 +588,18 @@ async def test_replace_on_an_archived_roadmap_is_an_immutability_conflict() -> N
     await repo.save(created.model_copy(update={"status": RoadmapStatus.ARCHIVED}))
     with pytest.raises(Conflict) as excinfo:
         await service.replace_draft("user-1", created.id, created.revision, _replace_doc())
+    assert excinfo.value.code is ErrorCode.IMMUTABLE
+
+
+async def test_replace_on_published_prefers_immutable_over_stale_revision() -> None:
+    service, _ = _service()
+    created = await service.create_draft("user-1", _publishable_doc())
+    await service.publish("user-1", created.id)
+    # Publish does not bump revision, so a published roadmap can still be targeted
+    # with a stale If-Match: the immutability guard (loaded first) must win over the
+    # stale-revision check, so this is 409 IMMUTABLE, never STALE_REVISION.
+    with pytest.raises(Conflict) as excinfo:
+        await service.replace_draft("user-1", created.id, created.revision + 5, _replace_doc())
     assert excinfo.value.code is ErrorCode.IMMUTABLE
 
 
