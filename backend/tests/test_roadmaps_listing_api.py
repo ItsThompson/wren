@@ -62,9 +62,7 @@ class _Harness:
         self.client.post("/auth/logout")
 
     def login(self, email: str) -> None:
-        response = self.client.post(
-            "/auth/login", json={"email": email, "password": _PASSWORD}
-        )
+        response = self.client.post("/auth/login", json={"email": email, "password": _PASSWORD})
         assert response.status_code == 200, response.text
 
     def seed(

@@ -66,9 +66,7 @@ class InMemoryRoadmapRepository:
     async def list_owned(self, owner_id: str) -> list[RoadmapRecord]:
         # Mirror the real query: the owner's roadmaps at any status, newest-touched
         # first (updated_at desc, id asc tiebreak).
-        return self._sorted(
-            record for record in self._by_id.values() if record.owner == owner_id
-        )
+        return self._sorted(record for record in self._by_id.values() if record.owner == owner_id)
 
     async def list_published_public(self, owner_id: str) -> list[RoadmapRecord]:
         # Mirror the real query: only the owner's published + public roadmaps.
