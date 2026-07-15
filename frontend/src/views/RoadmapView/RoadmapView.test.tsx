@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll } from 'vitest'
@@ -177,5 +177,92 @@ describe('RoadmapView', () => {
     expect(screen.getByText('Only item')).toBeInTheDocument()
     // No resource links exist for a resource-less node.
     expect(screen.queryByRole('link')).not.toBeInTheDocument()
+  })
+})
+
+describe('RoadmapView publish', () => {
+  const PUBLISH_URL = `${BASE}/roadmaps/${ROADMAP_ID}:publish`
+
+  it('offers a Publish action on an owned draft', async () => {
+    server.use(http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())))
+    renderView()
+    await screen.findByText('Grokking DSA')
+
+    expect(screen.getByRole('button', { name: /^publish$/i })).toBeInTheDocument()
+  })
+
+  it('renders the returned violations inline when publish is hard-blocked (422)', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
+      http.post(PUBLISH_URL, () =>
+        HttpResponse.json(
+          {
+            type: 'x',
+            title: 'Draft cannot be published',
+            status: 422,
+            code: 'VALIDATION',
+            violations: [
+              {
+                rule: 'V7_RESOURCE_REQUIRED',
+                ids: ['sub_hashing'],
+                message: 'subsection sub_hashing has no resources',
+              },
+            ],
+          },
+          { status: 422, headers: { 'content-type': 'application/problem+json' } },
+        ),
+      ),
+    )
+    renderView()
+    await screen.findByText('Grokking DSA')
+
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }))
+
+    // The offending rule + message are surfaced inline for the author to fix.
+    expect(await screen.findByText('subsection sub_hashing has no resources')).toBeInTheDocument()
+    expect(screen.getByText('V7_RESOURCE_REQUIRED')).toBeInTheDocument()
+    // Hard-block: the roadmap stays a draft.
+    expect(screen.getByText(/draft · preview/i)).toBeInTheDocument()
+  })
+
+  it('shows the published confirmation after a successful publish (200)', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
+      http.post(PUBLISH_URL, () => HttpResponse.json(buildDraft({ status: 'published' }))),
+    )
+    renderView()
+    await screen.findByText('Grokking DSA')
+
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }))
+
+    expect(await screen.findByText('Published')).toBeInTheDocument()
+    // Publish is one-way: the action and the draft badge are gone afterwards.
+    expect(screen.queryByRole('button', { name: /^publish$/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(/draft · preview/i)).not.toBeInTheDocument()
+  })
+
+  it('shows the immutable-published confirmation and no Publish action on a published roadmap', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
+    )
+    renderView()
+
+    expect(await screen.findByText('Published')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^publish$/i })).not.toBeInTheDocument()
+  })
+
+  it('surfaces a retry message when publish fails unexpectedly (500)', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
+      http.post(PUBLISH_URL, () => new HttpResponse(null, { status: 500 })),
+    )
+    renderView()
+    await screen.findByText('Grokking DSA')
+
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }))
+
+    expect(await screen.findByText(/couldn.t publish this roadmap/i)).toBeInTheDocument()
+    // Still a draft, and the action remains available to retry.
+    expect(screen.getByRole('button', { name: /^publish$/i })).toBeInTheDocument()
   })
 })

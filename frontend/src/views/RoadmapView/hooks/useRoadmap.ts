@@ -1,24 +1,43 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { createSessionClient } from '@/auth/createSessionClient'
-import type { RoadmapViewState } from '../types'
+import type { PublishState, RoadmapViewState, Violation } from '../types'
 
 /**
- * Fetch one roadmap by ID for the owner (section 10 "RoadmapView owns roadmap
- * fetch"). Uses the session-aware client (credentials + transparent refresh), so
- * a private draft resolves for its owner and returns 404/403 to anyone else. The
- * result is a single discriminated `RoadmapViewState`.
+ * The 422 publish hard-block body is RFC 9457 problem+json carrying `violations`
+ * (section 06), which the generated client types only as the default validation
+ * error. This narrow shape is the boundary type used to read the violations back.
+ */
+interface PublishProblem {
+  violations?: Violation[]
+}
+
+/**
+ * Fetch one roadmap by ID for the owner and drive its publish action (section 10
+ * "RoadmapView owns roadmap fetch"; section 06 `:publish`). Uses the
+ * session-aware client (credentials + transparent refresh), so a private draft
+ * resolves for its owner and returns 404/403 to anyone else.
+ *
+ * `state` is the fetch state; `publishState` is the publish sub-state (kept
+ * separate so a blocked/failed publish never conflicts with the loaded roadmap).
+ * A successful publish replaces the loaded roadmap with the returned published
+ * one, so the view reflects the immutable published state without a refetch.
  *
  * `baseUrl` is injected (defaulting at the view) so tests can point the client at
  * an MSW server without touching global config.
  */
-export function useRoadmap(roadmapId: string, baseUrl: string): { state: RoadmapViewState } {
+export function useRoadmap(
+  roadmapId: string,
+  baseUrl: string,
+): { state: RoadmapViewState; publishState: PublishState; publish: () => Promise<void> } {
   const client = useMemo(() => createSessionClient(baseUrl), [baseUrl])
   const [state, setState] = useState<RoadmapViewState>({ phase: 'loading' })
+  const [publishState, setPublishState] = useState<PublishState>({ phase: 'idle' })
 
   useEffect(() => {
     let active = true
     setState({ phase: 'loading' })
+    setPublishState({ phase: 'idle' })
 
     void (async () => {
       try {
@@ -41,5 +60,28 @@ export function useRoadmap(roadmapId: string, baseUrl: string): { state: Roadmap
     }
   }, [client, roadmapId])
 
-  return { state }
+  const publish = useCallback(async () => {
+    setPublishState({ phase: 'publishing' })
+    try {
+      const { data, error, response } = await client.POST('/roadmaps/{roadmap_id}:publish', {
+        params: { path: { roadmap_id: roadmapId } },
+      })
+      if (data) {
+        // Published: reflect the immutable transition in the loaded roadmap.
+        setState({ phase: 'loaded', roadmap: data })
+        setPublishState({ phase: 'idle' })
+        return
+      }
+      if (response.status === 422) {
+        const violations = (error as PublishProblem | undefined)?.violations ?? []
+        setPublishState({ phase: 'blocked', violations })
+        return
+      }
+      setPublishState({ phase: 'failed', status: response.status })
+    } catch {
+      setPublishState({ phase: 'failed', status: null })
+    }
+  }, [client, roadmapId])
+
+  return { state, publishState, publish }
 }

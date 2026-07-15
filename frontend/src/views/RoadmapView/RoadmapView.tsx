@@ -24,7 +24,7 @@ interface RoadmapViewProps {
  */
 export function RoadmapView({ baseUrl = API_BASE_URL }: RoadmapViewProps) {
   const { roadmapId } = useParams()
-  const { state } = useRoadmap(roadmapId ?? '', baseUrl)
+  const { state, publishState, publish } = useRoadmap(roadmapId ?? '', baseUrl)
 
   if (state.phase === 'loading') {
     return <RoadmapSkeleton />
@@ -32,5 +32,5 @@ export function RoadmapView({ baseUrl = API_BASE_URL }: RoadmapViewProps) {
   if (state.phase === 'error') {
     return <RoadmapErrorState status={state.status} />
   }
-  return <DraftPreview roadmap={state.roadmap} />
+  return <DraftPreview roadmap={state.roadmap} publishState={publishState} onPublish={publish} />
 }

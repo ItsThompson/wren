@@ -1,17 +1,22 @@
-import type { Roadmap } from '../types'
+import type { PublishState, Roadmap } from '../types'
+import { PublishPanel } from './PublishPanel'
 import { SectionBlock } from './SectionBlock'
 
 interface DraftPreviewProps {
   roadmap: Roadmap
+  publishState: PublishState
+  onPublish: () => void
 }
 
 /**
- * The owned-draft list preview (section 10 "Preview mode"): a header with the
+ * The owned-roadmap list preview (section 10 "Preview mode"): a header with the
  * title, subject-tag chips, and a clear draft badge, then the sections in
  * `section_order`. Preview is read-only: no follow action and no persisting
- * checkboxes, because a draft is not startable.
+ * checkboxes, because a draft is not startable. The owner publishes from here
+ * (section 06 `:publish`); publish is one-way, so after it the badge and
+ * preview notice give way to the published confirmation.
  */
-export function DraftPreview({ roadmap }: DraftPreviewProps) {
+export function DraftPreview({ roadmap, publishState, onPublish }: DraftPreviewProps) {
   const sectionOrder = roadmap.section_order ?? []
   const sections = roadmap.sections ?? {}
   const subjectTags = roadmap.subject_tags ?? []
@@ -63,6 +68,8 @@ export function DraftPreview({ roadmap }: DraftPreviewProps) {
           ) : null
         })}
       </div>
+
+      <PublishPanel status={roadmap.status} publishState={publishState} onPublish={onPublish} />
     </section>
   )
 }
