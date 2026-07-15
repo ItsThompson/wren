@@ -12,6 +12,7 @@ import type {
   MockDashboard,
   MockNext,
   MockProfile,
+  MockProgressUpdateResult,
   MockRoadmap,
 } from './types'
 
@@ -33,7 +34,7 @@ describe('mock handlers', () => {
     expect(response.status).toBe(200)
     const body = (await response.json()) as MockDashboard
     expect(body).toEqual(mockDashboard)
-    expect(body.authored.length).toBeGreaterThan(0)
+    expect(body.authored?.length ?? 0).toBeGreaterThan(0)
   })
 
   it('serves the full roadmap for a known id', async () => {
@@ -41,7 +42,8 @@ describe('mock handlers', () => {
     expect(response.status).toBe(200)
     const body = (await response.json()) as MockRoadmap
     expect(body.id).toBe(mockRoadmap.id)
-    expect(body.sections).toHaveLength(mockRoadmap.sections.length)
+    // Sections are an ID-keyed map (section 04), not an array.
+    expect(Object.keys(body.sections ?? {})).toEqual(Object.keys(mockRoadmap.sections ?? {}))
   })
 
   it('serves the next item in path order', async () => {
@@ -72,14 +74,11 @@ describe('mock handlers', () => {
     const response = await fetch(`${base}/roadmaps/${mockRoadmap.id}/progress`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ checked_item_ids: ['item_hashing_drill'] }),
+      body: JSON.stringify({ item_ids: ['item_hashing_drill'], state: 'complete' }),
     })
     expect(response.status).toBe(200)
-    const body = (await response.json()) as {
-      progress: { roadmap_id: string }
-      next: MockNext
-    }
+    const body = (await response.json()) as MockProgressUpdateResult
     expect(body.progress.roadmap_id).toBe(mockRoadmap.id)
-    expect(body.next.roadmap_id).toBe(mockRoadmap.id)
+    expect(body.next.complete).toBe(false)
   })
 })
