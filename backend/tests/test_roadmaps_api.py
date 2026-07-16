@@ -202,6 +202,71 @@ def test_create_malformed_body_is_a_422_problem_json(make_settings: MakeSettings
     assert any("title" in field for field in body["fields"])
 
 
+# --- create: agent-input hardening (extra="forbid" + non-empty title) --------
+#
+# Authoring inputs forbid unknown fields so a misspelled agent field yields a
+# recoverable 422 naming it (not a silent drop), and reject an empty title.
+
+
+def test_create_with_an_unknown_field_is_a_422_naming_it(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings)
+    _login(client)
+    # A misspelled top-level field ("titel") is rejected, not silently dropped,
+    # so the agent can self-correct from the named field.
+    response = client.post("/roadmaps", json={**_MINIMAL_ROADMAP, "titel": "typo"})
+    assert response.status_code == 422
+    body = response.json()
+    assert response.headers["content-type"] == "application/problem+json"
+    assert body["code"] == "VALIDATION"
+    assert any("titel" in field for field in body["fields"])
+
+
+def test_create_with_an_unknown_nested_field_names_the_dotted_path(
+    make_settings: MakeSettings,
+) -> None:
+    client, _ = _build_client(make_settings)
+    _login(client)
+    # An unknown field nested inside a resource is named by its full dotted path.
+    payload = {
+        "title": "Grokking DSA",
+        "sections": [
+            {
+                "title": "Foundations",
+                "subsections": [
+                    {
+                        "title": "Arrays",
+                        "resources": [
+                            {
+                                "title": "Guide",
+                                "url": "https://x.test",
+                                "type": "article",
+                                "hyperlink": "https://x.test",
+                            }
+                        ],
+                        "checklist_items": [{"text": "Read it"}],
+                    }
+                ],
+            }
+        ],
+    }
+    response = client.post("/roadmaps", json=payload)
+    assert response.status_code == 422
+    body = response.json()
+    offending = [field for field in body["fields"] if "hyperlink" in field]
+    assert offending == ["body.sections.0.subsections.0.resources.0.hyperlink"]
+
+
+def test_create_with_an_empty_title_is_a_422_naming_title(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings)
+    _login(client)
+    response = client.post("/roadmaps", json={**_MINIMAL_ROADMAP, "title": ""})
+    assert response.status_code == 422
+    body = response.json()
+    assert response.headers["content-type"] == "application/problem+json"
+    assert body["code"] == "VALIDATION"
+    assert any(field.endswith("title") for field in body["fields"])
+
+
 # --- get: owner-scoped, no existence leak -----------------------------------
 
 
@@ -415,6 +480,27 @@ def test_patch_with_an_invalid_op_is_a_422_naming_valid_ids(make_settings: MakeS
     field, message = next(iter(body["fields"].items()))
     assert field == "operations[0].subsection_id"
     assert "sub_arrays" in message
+
+
+def test_patch_op_with_an_unknown_field_is_a_422_naming_it(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created_id = _create_publishable(client)
+    # A misspelled op field ("bogus") is rejected, not silently dropped.
+    response = client.patch(
+        f"/roadmaps/{created_id}",
+        headers={"If-Match": "1"},
+        json={
+            "operations": [
+                {"op": "set_tags", "subsection_id": "sub_arrays", "tags": ["x"], "bogus": 1}
+            ]
+        },
+    )
+    assert response.status_code == 422
+    body = response.json()
+    assert response.headers["content-type"] == "application/problem+json"
+    assert body["code"] == "VALIDATION"
+    assert any("bogus" in field for field in body["fields"])
 
 
 def test_patch_cycle_creating_edge_is_a_422_explaining_the_cycle(
