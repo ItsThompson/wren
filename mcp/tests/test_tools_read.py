@@ -276,7 +276,7 @@ def test_section_forwards_cursor_and_include_and_returns_steering() -> None:
 
 
 def test_section_omits_the_cursor_on_the_first_page() -> None:
-    page = {
+    page: dict[str, object] = {
         "section_id": "sec_found",
         "title": "Foundations",
         "include": "both",

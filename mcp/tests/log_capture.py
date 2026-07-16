@@ -17,18 +17,18 @@ from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterator, MutableMapping
 
 
 @contextmanager
-def capture_correlated_logs() -> Iterator[list[dict[str, object]]]:
+def capture_correlated_logs() -> Iterator[list[MutableMapping[str, Any]]]:
     """Yield captured log entries with ``merge_contextvars`` applied, bypassing
     the process-wide ``critical`` level filter for the duration of the block."""
     old_wrapper = structlog.get_config()["wrapper_class"]

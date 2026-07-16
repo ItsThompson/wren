@@ -12,6 +12,7 @@ import base64
 import json
 import time
 import warnings
+from typing import TYPE_CHECKING
 
 import pytest
 from joserfc import jwt
@@ -21,18 +22,21 @@ from token_factory import ISSUER, RESOURCE, make_fetch, mint, new_key, public_jw
 from wren_mcp.keys import RemoteKeyProvider
 from wren_mcp.tokens import AgentTokenVerifier
 
+if TYPE_CHECKING:
+    from wren_mcp.keys import JsonFetch
 
-def _verifier(jwks_keys: list, fetch=None) -> AgentTokenVerifier:
+
+def _verifier(jwks_keys: list[RSAKey], fetch: JsonFetch | None = None) -> AgentTokenVerifier:
     key_provider = RemoteKeyProvider(ISSUER, fetch or make_fetch(public_jwks(*jwks_keys)))
     return AgentTokenVerifier(key_provider, issuer=ISSUER, resource=RESOURCE)
 
 
-def _b64url(payload: dict) -> str:
+def _b64url(payload: dict[str, object]) -> str:
     raw = json.dumps(payload).encode("utf-8")
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
 
 
-def _valid_claims() -> dict:
+def _valid_claims() -> dict[str, object]:
     # Legitimate iss/aud/sub/exp, so the ONLY illegitimate thing about the attack
     # tokens below is the algorithm: rejection must come from the RS256 pin.
     now = int(time.time())
@@ -136,7 +140,7 @@ async def test_rotated_kid_is_accepted_after_a_refetch() -> None:
     # Prime the cache with the old key set, then rotate the served JWKS.
     assert await verifier.verify(mint(old_key)) is not None
     fetch_after_rotation = make_fetch(public_jwks(old_key, new_signing))
-    key_provider._fetch_json = fetch_after_rotation  # type: ignore[attr-defined]
+    key_provider._fetch_json = fetch_after_rotation
 
     principal = await verifier.verify(mint(new_signing))
 

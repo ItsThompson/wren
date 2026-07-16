@@ -67,14 +67,22 @@ src = ["src", "tests"]
 python_version = "3.12"
 strict = true
 mypy_path = "src"
-# Type-check the package plus the Alembic env module (which imports wren and is
-# otherwise unchecked); packages= alone only covers src/wren.
-files = ["src/wren", "alembic/env.py"]
+# Type-check the package, the Alembic env module, and the test suite. The test
+# suite is packaged (``tests/__init__.py`` + ``pythonpath = ["src", "."]``), so
+# ``tests.support.fakes.*`` resolves and the hand-written fakes are held to the
+# protocols they implement (a diverged fake signature fails ``mypy --strict``).
+files = ["src/wren", "alembic/env.py", "tests"]
 
 [[tool.mypy.overrides]]
 # Authlib ships no type stubs; only its OAuth RFC helpers are used (PKCE), and
 # the JOSE crypto goes through the typed joserfc package.
 module = ["authlib.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# testcontainers ships no py.typed marker; it is imported only by the
+# Docker-gated integration tests (skipped when Docker is unavailable).
+module = ["testcontainers.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

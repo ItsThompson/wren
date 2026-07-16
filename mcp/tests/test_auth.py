@@ -9,6 +9,8 @@ principal onto ``request.state`` (read via the live
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
@@ -21,8 +23,11 @@ from wren_mcp.keys import RemoteKeyProvider
 from wren_mcp.state import get_request_agent
 from wren_mcp.tokens import AgentTokenVerifier
 
+if TYPE_CHECKING:
+    from joserfc.jwk import RSAKey
 
-def _build_app(key) -> FastAPI:
+
+def _build_app(key: RSAKey) -> FastAPI:
     fetch = make_fetch(public_jwks(key))
     verifier = AgentTokenVerifier(
         RemoteKeyProvider(ISSUER, fetch), issuer=ISSUER, resource=RESOURCE

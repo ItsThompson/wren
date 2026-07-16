@@ -38,6 +38,8 @@ if TYPE_CHECKING:
 
     from tests.conftest import MakeSettings
     from wren.core.settings import AppSettings
+    from wren.oauth.config import OAuthConfig
+    from wren.oauth.tokens import AccessTokenCodec
 
 _USER = "user-ada"
 _SESSION_COOKIE = "session-ada"
@@ -45,7 +47,13 @@ _REDIRECT = "http://127.0.0.1:8765/callback"
 
 
 class _Fixture:
-    def __init__(self, client: TestClient, repo: InMemoryOAuthRepository, codec, config) -> None:
+    def __init__(
+        self,
+        client: TestClient,
+        repo: InMemoryOAuthRepository,
+        codec: AccessTokenCodec,
+        config: OAuthConfig,
+    ) -> None:
         self.client = client
         self.repo = repo
         self.codec = codec
@@ -97,7 +105,8 @@ def _register(client: TestClient) -> str:
         "/register", json={"redirect_uris": [_REDIRECT], "client_name": "Test Agent"}
     )
     assert response.status_code == 201, response.text
-    return response.json()["client_id"]
+    client_id: str = response.json()["client_id"]
+    return client_id
 
 
 def _query(url: str) -> dict[str, str]:

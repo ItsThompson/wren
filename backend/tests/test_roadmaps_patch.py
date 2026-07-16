@@ -32,6 +32,7 @@ from wren.roadmaps.schemas import (
     ChangedNodeKind,
     ChangeType,
     ChecklistItemInput,
+    PatchOp,
     RemoveEdgeOp,
     RemoveItemOp,
     RemoveSectionOp,
@@ -41,11 +42,13 @@ from wren.roadmaps.schemas import (
     ResourceType,
     Roadmap,
     RoadmapInput,
+    Section,
     SectionInput,
     SetEffortOp,
     SetResourcesOp,
     SetSuggestedPathOp,
     SetTagsOp,
+    Subsection,
     SubsectionInput,
     UpdateItemOp,
     UpdateSectionOp,
@@ -99,11 +102,11 @@ def _draft() -> Roadmap:
     return assemble_draft(doc, "grokking-dsa-7f3k", owner="user-1", now=_NOW).roadmap
 
 
-def _basics(roadmap: Roadmap):
+def _basics(roadmap: Roadmap) -> Section:
     return roadmap.sections["sec_basics"]
 
 
-def _arrays(roadmap: Roadmap):
+def _arrays(roadmap: Roadmap) -> Subsection:
     return roadmap.sections["sec_basics"].subsections["sub_arrays"]
 
 
@@ -127,7 +130,7 @@ def test_apply_does_not_bump_revision_that_is_the_services_job() -> None:
 def test_a_batch_with_one_invalid_op_applies_nothing() -> None:
     draft = _draft()
     snapshot = draft.model_dump()
-    ops = [
+    ops: list[PatchOp] = [
         SetTagsOp(op="set_tags", subsection_id="sub_arrays", tags=["core"]),
         AddItemOp(op="add_item", subsection_id="sub_hashing", text="new"),
         SetTagsOp(op="set_tags", subsection_id="sub_ghost", tags=["boom"]),  # invalid
@@ -140,7 +143,7 @@ def test_a_batch_with_one_invalid_op_applies_nothing() -> None:
 
 
 def test_patch_error_is_scoped_to_the_failing_ops_index() -> None:
-    ops = [
+    ops: list[PatchOp] = [
         SetTagsOp(op="set_tags", subsection_id="sub_arrays", tags=["core"]),
         UpdateItemOp(op="update_item", item_id="chk_ghost", text="x"),  # invalid, index 1
     ]
@@ -516,7 +519,7 @@ def test_set_suggested_path_replaces_the_path() -> None:
 
 
 def test_batch_can_reference_a_freshly_added_subsection_by_proposed_id() -> None:
-    ops = [
+    ops: list[PatchOp] = [
         AddSubsectionOp(
             op="add_subsection",
             section_id="sec_advanced",
@@ -533,7 +536,7 @@ def test_batch_resolves_a_deduped_proposed_id_in_a_later_op() -> None:
     # Adding a subsection proposing an existing ID de-dupes to sub_arrays-2; a
     # later op referencing sub_arrays-2 must resolve (the remap is applied to
     # references too).
-    ops = [
+    ops: list[PatchOp] = [
         AddSubsectionOp(
             op="add_subsection",
             section_id="sec_advanced",
@@ -547,7 +550,7 @@ def test_batch_resolves_a_deduped_proposed_id_in_a_later_op() -> None:
 
 
 def test_changed_nodes_collapse_repeated_touches_to_one_entry() -> None:
-    ops = [
+    ops: list[PatchOp] = [
         SetTagsOp(op="set_tags", subsection_id="sub_arrays", tags=["a"]),
         SetEffortOp(op="set_effort", subsection_id="sub_arrays", effort_estimate="1h"),
     ]
@@ -564,7 +567,7 @@ def test_changed_nodes_collapse_repeated_touches_to_one_entry() -> None:
 def test_add_then_remove_items_round_trips_to_the_original(texts: list[str]) -> None:
     draft = _draft()
     snapshot = draft.model_dump()
-    add_ops = [
+    add_ops: list[PatchOp] = [
         AddItemOp(op="add_item", subsection_id="sub_arrays", text=text, proposed_id=f"chk_rt-{i}")
         for i, text in enumerate(texts)
     ]
@@ -592,7 +595,7 @@ def test_set_tags_is_idempotent(tags: list[str]) -> None:
 def test_one_invalid_op_anywhere_leaves_the_draft_unchanged(position: int) -> None:
     draft = _draft()
     snapshot = draft.model_dump()
-    valid: list = [
+    valid: list[PatchOp] = [
         SetTagsOp(op="set_tags", subsection_id="sub_arrays", tags=["core"]),
         AddItemOp(op="add_item", subsection_id="sub_hashing", text="x"),
         SetEffortOp(op="set_effort", subsection_id="sub_graphs", effort_estimate="2h"),

@@ -63,7 +63,8 @@ class _Harness:
             json={"username": username, "email": email, "password": _PASSWORD},
         )
         assert response.status_code == 201, response.text
-        return response.json()["id"]
+        user_id: str = response.json()["id"]
+        return user_id
 
     def logout(self) -> None:
         self.client.post("/auth/logout")

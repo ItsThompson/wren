@@ -54,7 +54,10 @@ src = ["src", "tests"]
 python_version = "3.12"
 strict = true
 mypy_path = "src"
-files = ["src/wren_mcp"]
+# Type-check the package plus the test suite so the hand-written token/harness
+# fakes are held to the shapes they stand in for (a diverged fake fails
+# ``mypy --strict``). The flat ``tests`` layout resolves as top-level modules.
+files = ["src/wren_mcp", "tests"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

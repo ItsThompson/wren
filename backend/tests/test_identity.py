@@ -5,7 +5,7 @@ behavior is asserted on an external-shaped app and an internal-shaped app."""
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from fastapi import APIRouter, Depends, FastAPI, Request
@@ -19,7 +19,6 @@ from wren.core.identity import (
     INTERNAL_TOKEN_HEADER,
     SESSION_COOKIE_NAME,
     USER_ID_HEADER,
-    SessionVerifier,
     StripInboundIdentityMiddleware,
     require_internal_user,
     require_user,
@@ -27,7 +26,11 @@ from wren.core.identity import (
 from wren.core.settings import AppSettings
 
 if TYPE_CHECKING:
+    from collections.abc import MutableMapping
+
     import pytest
+
+    from wren.core.state import SessionVerifier
 
 MakeSettings = Callable[..., AppSettings]
 
@@ -140,7 +143,7 @@ async def test_strip_middleware_passes_non_http_scopes_through_untouched() -> No
     async def inner(scope: object, receive: object, send: object) -> None:
         seen["scope"] = scope
 
-    middleware = StripInboundIdentityMiddleware(inner)  # type: ignore[arg-type]
+    middleware = StripInboundIdentityMiddleware(inner)
     scope = {"type": "lifespan"}
 
     async def receive() -> dict[str, str]:
@@ -149,7 +152,7 @@ async def test_strip_middleware_passes_non_http_scopes_through_untouched() -> No
     async def send(_message: object) -> None:
         return None
 
-    await middleware(scope, receive, send)  # type: ignore[arg-type]
+    await middleware(scope, receive, send)
     assert seen["scope"] is scope
 
 
@@ -252,7 +255,7 @@ def _internal_probe_client(make_settings: MakeSettings) -> TestClient:
     return TestClient(app)
 
 
-def _events(logs: list[dict[str, object]], event: str) -> list[dict[str, object]]:
+def _events(logs: list[MutableMapping[str, Any]], event: str) -> list[MutableMapping[str, Any]]:
     return [entry for entry in logs if entry.get("event") == event]
 
 

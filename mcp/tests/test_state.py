@@ -8,6 +8,8 @@ Starlette app/request state (the datastructures :mod:`wren_mcp.app` and
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, cast
+
 import pytest
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -20,13 +22,22 @@ from wren_mcp.state import (
     set_request_agent,
     set_rs_deps,
 )
+
+if TYPE_CHECKING:
+    from wren_mcp.client import InternalApiClient
+    from wren_mcp.keys import KeyProvider
+    from wren_mcp.tokens import AgentTokenVerifier
 from wren_mcp.tokens import VerifiedAgentToken
 
 
 def _deps() -> RsDeps:
     # The accessor only checks the façade's identity/type, not the field types, so
     # opaque sentinels stand in for the three injected seams here.
-    return RsDeps(key_provider=object(), token_verifier=object(), internal_client=object())
+    return RsDeps(
+        key_provider=cast("KeyProvider", object()),
+        token_verifier=cast("AgentTokenVerifier", object()),
+        internal_client=cast("InternalApiClient", object()),
+    )
 
 
 def _request() -> Request:

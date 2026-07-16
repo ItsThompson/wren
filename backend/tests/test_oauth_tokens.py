@@ -9,6 +9,7 @@ covered here too.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 from tests.oauth_fakes import (
     MutableClock,
@@ -21,8 +22,14 @@ from wren.oauth.injection import Clock, utcnow
 from wren.oauth.pkce import is_valid_s256
 from wren.oauth.tokens import hash_token, mint_refresh_token
 
+if TYPE_CHECKING:
+    from wren.oauth.config import OAuthConfig
+    from wren.oauth.tokens import AccessTokenCodec
 
-def _codec(*, clock: Clock = utcnow, **config_overrides: object):
+
+def _codec(
+    *, clock: Clock = utcnow, **config_overrides: object
+) -> tuple[AccessTokenCodec, OAuthConfig]:
     config = build_test_config(**config_overrides)  # type: ignore[arg-type]
     return build_test_codec(config, build_test_keyset(config), clock=clock), config
 

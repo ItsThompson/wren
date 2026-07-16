@@ -61,6 +61,7 @@ from wren.roadmaps.service import RoadmapService
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
+    from httpx import Response
 
 MakeSettings = Callable[..., AppSettings]
 
@@ -212,20 +213,26 @@ class _Harness:
         self._auth = auth_headers
         self._login = login
 
-    def anon_create(self):
-        return self.client.post("/roadmaps", json=_MINIMAL_ROADMAP)
+    def anon_create(self) -> Response:
+        response: Response = self.client.post("/roadmaps", json=_MINIMAL_ROADMAP)
+        return response
 
-    def anon_follow(self):
-        return self.client.post("/roadmaps/any-roadmap-0000/follow")
+    def anon_follow(self) -> Response:
+        response: Response = self.client.post("/roadmaps/any-roadmap-0000/follow")
+        return response
 
     def login(self) -> None:
         self._login()
 
-    def create(self):
-        return self.client.post("/roadmaps", json=_MINIMAL_ROADMAP, headers=self._auth)
+    def create(self) -> Response:
+        response: Response = self.client.post(
+            "/roadmaps", json=_MINIMAL_ROADMAP, headers=self._auth
+        )
+        return response
 
-    def get(self, roadmap_id: str):
-        return self.client.get(f"/roadmaps/{roadmap_id}", headers=self._auth)
+    def get(self, roadmap_id: str) -> Response:
+        response: Response = self.client.get(f"/roadmaps/{roadmap_id}", headers=self._auth)
+        return response
 
 
 def _external_harness(make_settings: MakeSettings) -> _Harness:

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 import pytest
 import structlog
@@ -29,6 +30,9 @@ from wren.core.correlation import REQUEST_ID_HEADER, CorrelationMiddleware
 from wren.core.errors import build_exception_handlers
 from wren.core.identity import StripInboundIdentityMiddleware
 from wren.core.settings import AppSettings
+
+if TYPE_CHECKING:
+    from collections.abc import MutableMapping
 
 MakeSettings = Callable[..., AppSettings]
 
@@ -67,11 +71,11 @@ def _app(make_settings: MakeSettings, *, service: str = "wren-test") -> FastAPI:
     )
 
 
-def _entries(logs: list[dict[str, object]], event: str) -> list[dict[str, object]]:
+def _entries(logs: list[MutableMapping[str, Any]], event: str) -> list[MutableMapping[str, Any]]:
     return [entry for entry in logs if entry.get("event") == event]
 
 
-def _one(logs: list[dict[str, object]], event: str) -> dict[str, object]:
+def _one(logs: list[MutableMapping[str, Any]], event: str) -> MutableMapping[str, Any]:
     matches = _entries(logs, event)
     assert len(matches) == 1
     return matches[0]
@@ -183,7 +187,7 @@ async def test_non_http_scopes_pass_through_untouched() -> None:
     async def inner(scope: object, receive: object, send: object) -> None:
         seen["scope"] = scope
 
-    middleware = CorrelationMiddleware(inner, service="wren-test")  # type: ignore[arg-type]
+    middleware = CorrelationMiddleware(inner, service="wren-test")
     scope = {"type": "lifespan"}
 
     async def receive() -> dict[str, str]:
@@ -192,6 +196,6 @@ async def test_non_http_scopes_pass_through_untouched() -> None:
     async def send(_message: object) -> None:
         return None
 
-    await middleware(scope, receive, send)  # type: ignore[arg-type]
+    await middleware(scope, receive, send)
     assert seen["scope"] is scope
     assert "request_id" not in structlog.contextvars.get_contextvars()

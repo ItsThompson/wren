@@ -10,6 +10,7 @@ transport, mirroring the fast identity-guard checks the tool tests can't isolate
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 import structlog
@@ -22,9 +23,17 @@ from wren_mcp.scopes import require_scope
 from wren_mcp.state import set_request_agent
 from wren_mcp.tokens import VerifiedAgentToken
 
+if TYPE_CHECKING:
+    from collections.abc import MutableMapping
 
-def _ctx_with(request: Request | None) -> SimpleNamespace:
-    return SimpleNamespace(request_context=SimpleNamespace(request=request))
+    from wren_mcp.scopes import AgentContext
+
+
+def _ctx_with(request: Request | None) -> AgentContext:
+    return cast(
+        "AgentContext",
+        SimpleNamespace(request_context=SimpleNamespace(request=request)),
+    )
 
 
 def _request_with_agent(principal: VerifiedAgentToken) -> Request:
@@ -87,7 +96,7 @@ def test_require_scope_fails_closed_without_a_request() -> None:
 # reason and never the raw token.
 
 
-def _events(logs: list[dict[str, object]], event: str) -> list[dict[str, object]]:
+def _events(logs: list[MutableMapping[str, Any]], event: str) -> list[MutableMapping[str, Any]]:
     return [entry for entry in logs if entry.get("event") == event]
 
 

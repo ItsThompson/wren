@@ -14,7 +14,7 @@ inside the capture block, mirroring the backend correlation tests.
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import structlog
@@ -24,6 +24,8 @@ from mcp_harness import AgentHarness, json_error
 from wren_mcp.client import REQUEST_ID_HEADER
 
 if TYPE_CHECKING:
+    from collections.abc import MutableMapping
+
     import pytest
 
 _ROADMAP_ID = "grokking-dsa-7f3k"
@@ -35,11 +37,11 @@ _MCP_HEADERS = {"Accept": "application/json, text/event-stream", "Content-Type":
 _BACKEND_HONORS_RE = re.compile(r"[A-Za-z0-9._-]{1,128}")
 
 
-def _events(logs: list[dict[str, object]], event: str) -> list[dict[str, object]]:
+def _events(logs: list[MutableMapping[str, Any]], event: str) -> list[MutableMapping[str, Any]]:
     return [entry for entry in logs if entry.get("event") == event]
 
 
-def _one(logs: list[dict[str, object]], event: str) -> dict[str, object]:
+def _one(logs: list[MutableMapping[str, Any]], event: str) -> MutableMapping[str, Any]:
     matches = _events(logs, event)
     assert len(matches) == 1, f"expected exactly one {event!r}, got {len(matches)}"
     return matches[0]

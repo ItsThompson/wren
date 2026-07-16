@@ -310,7 +310,7 @@ async def test_progress_is_scoped_per_user() -> None:
 class _FailingProgressRepository(InMemoryProgressRepository):
     """Upsert always fails, to exercise the service's rollback path."""
 
-    async def upsert(self, progress: object) -> None:  # type: ignore[override]
+    async def upsert(self, progress: object) -> None:
         raise RuntimeError("boom")
 
 

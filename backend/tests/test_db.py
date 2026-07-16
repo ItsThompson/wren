@@ -7,7 +7,7 @@ test_db_integration.py via testcontainers.
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated, cast
 
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
@@ -25,6 +25,9 @@ from wren.core.db import (
     get_session,
     is_unique_violation,
 )
+
+if TYPE_CHECKING:
+    from sqlalchemy.pool import QueuePool
 
 # An unroutable target so connect fails fast (ECONNREFUSED on loopback).
 UNREACHABLE_URL = "postgresql+asyncpg://wren:wren@127.0.0.1:1/wren"
@@ -77,7 +80,8 @@ def test_is_unique_violation_false_for_unrelated_exception() -> None:
 def test_create_db_engine_uses_a_bounded_pool() -> None:
     engine = create_db_engine(UNREACHABLE_URL)
     assert isinstance(engine, AsyncEngine)
-    assert engine.pool.size() == POOL_SIZE
+    pool = cast("QueuePool", engine.pool)
+    assert pool.size() == POOL_SIZE
     assert engine.url.drivername == "postgresql+asyncpg"
     assert POOL_SIZE > 0
     assert MAX_OVERFLOW >= 0

@@ -33,6 +33,7 @@ from wren.oauth.schemas import (
     ClientRegistrationRequest,
     OAuthEvent,
     TokenRequest,
+    TokenResponse,
 )
 from wren.oauth.token_exchange import TokenService
 
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from wren.oauth.config import OAuthConfig
+    from wren.oauth.models import OAuthClient
     from wren.oauth.tokens import AccessTokenCodec
 
 _USER = "user-ada"
@@ -89,7 +91,9 @@ def _query(url: str) -> dict[str, str]:
     return {key: values[0] for key, values in parse_qs(urlsplit(url).query).items()}
 
 
-async def _park(auth: AuthorizationService, client_id: str, challenge: str, **overrides: object):
+async def _park(
+    auth: AuthorizationService, client_id: str, challenge: str, **overrides: object
+) -> str:
     fields: dict[str, object] = {
         "client_id": client_id,
         "redirect_uri": _REDIRECT,
@@ -527,7 +531,7 @@ async def test_code_exchange_requires_code_verifier_and_client_id() -> None:
 # --- refresh rotation + replay ----------------------------------------------
 
 
-async def _issue_tokens(h: Harness, client_id: str):
+async def _issue_tokens(h: Harness, client_id: str) -> TokenResponse:
     verifier, challenge = make_pkce_pair()
     code = await _authorize_to_code(h, client_id, challenge)
     return await h.tokens.exchange(
@@ -795,7 +799,7 @@ async def test_list_connected_clients_issues_one_batch_query() -> None:
         calls["get_clients"] += 1
         return await original_batch(client_ids)  # type: ignore[arg-type]
 
-    async def counting_single(client_id: str) -> object:
+    async def counting_single(client_id: str) -> OAuthClient | None:
         calls["get_client"] += 1
         return await original_single(client_id)
 

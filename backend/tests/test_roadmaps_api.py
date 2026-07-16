@@ -451,7 +451,8 @@ def test_publish_is_404_to_a_non_owner(make_settings: MakeSettings) -> None:
 
 
 def _create_publishable(client: TestClient) -> str:
-    return client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+    roadmap_id: str = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+    return roadmap_id
 
 
 def test_patch_applies_ops_and_returns_the_bumped_revision(make_settings: MakeSettings) -> None:

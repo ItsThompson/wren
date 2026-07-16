@@ -10,6 +10,7 @@ WWW-Authenticate pointing at the PRM.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import httpx
 import pytest
@@ -23,16 +24,21 @@ from wren_mcp.keys import RemoteKeyProvider
 from wren_mcp.settings import RsSettings
 from wren_mcp.state import get_rs_deps
 
+if TYPE_CHECKING:
+    from joserfc.jwk import KeySet, RSAKey
+
+    from wren_mcp.keys import KeyProvider
+
 MakeSettings = Callable[..., RsSettings]
 
 
 class _FailingKeyProvider:
     """A key provider whose discovery always fails (AS unreachable)."""
 
-    async def key_set_for(self, kid: str | None) -> object:
+    async def key_set_for(self, kid: str | None) -> KeySet:
         raise RuntimeError("AS unreachable")
 
-    async def load(self) -> object:
+    async def load(self) -> KeySet:
         raise RuntimeError("AS unreachable")
 
 
@@ -44,7 +50,12 @@ def _internal_client() -> InternalApiClient:
     return InternalApiClient(http, api_token="tok")
 
 
-def _build(make_settings: MakeSettings, *, key=None, key_provider=None) -> TestClient:
+def _build(
+    make_settings: MakeSettings,
+    *,
+    key: RSAKey | None = None,
+    key_provider: KeyProvider | None = None,
+) -> TestClient:
     provider = key_provider or RemoteKeyProvider(ISSUER, make_fetch(public_jwks(key or new_key())))
     app = create_rs_app(make_settings(), key_provider=provider, internal_client=_internal_client())
     return TestClient(app)
