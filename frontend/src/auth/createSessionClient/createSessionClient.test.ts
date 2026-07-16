@@ -1,22 +1,12 @@
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll } from 'vitest'
-import type { Client } from 'openapi-fetch'
+
+import { mockDashboard } from '@/mocks/data'
 
 import { createSessionClient } from './createSessionClient'
 
 const BASE = 'https://api.test'
-
-/**
- * A stand-in protected path. The generated `paths` only holds /auth routes, so
- * the client is cast to this minimal shape to exercise the refresh middleware
- * against a product-style read.
- */
-interface TestPaths {
-  '/protected': {
-    get: { responses: { 200: { content: { 'application/json': { ok: boolean } } } } }
-  }
-}
 
 const server = setupServer()
 
@@ -24,21 +14,17 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
-function testClient() {
-  return createSessionClient(BASE) as unknown as Client<TestPaths>
-}
-
 describe('createSessionClient transparent refresh', () => {
   it('refreshes once and retries the original request on a 401', async () => {
-    let protectedCalls = 0
+    let dashboardCalls = 0
     let refreshCalls = 0
     server.use(
-      http.get('*/protected', () => {
-        protectedCalls += 1
+      http.get('*/me/dashboard', () => {
+        dashboardCalls += 1
         // Expired session on first hit; the rotated cookie succeeds on retry.
-        return protectedCalls === 1
+        return dashboardCalls === 1
           ? new HttpResponse(null, { status: 401 })
-          : HttpResponse.json({ ok: true })
+          : HttpResponse.json(mockDashboard)
       }),
       http.post('*/auth/refresh', () => {
         refreshCalls += 1
@@ -46,28 +32,28 @@ describe('createSessionClient transparent refresh', () => {
       }),
     )
 
-    const { data, response } = await testClient().GET('/protected')
+    const { data, response } = await createSessionClient(BASE).GET('/me/dashboard')
 
     expect(response.status).toBe(200)
-    expect(data).toEqual({ ok: true })
+    expect(data).toEqual(mockDashboard)
     expect(refreshCalls).toBe(1)
-    expect(protectedCalls).toBe(2)
+    expect(dashboardCalls).toBe(2)
   })
 
   it('does not retry when the refresh itself fails', async () => {
-    let protectedCalls = 0
+    let dashboardCalls = 0
     server.use(
-      http.get('*/protected', () => {
-        protectedCalls += 1
+      http.get('*/me/dashboard', () => {
+        dashboardCalls += 1
         return new HttpResponse(null, { status: 401 })
       }),
       http.post('*/auth/refresh', () => new HttpResponse(null, { status: 401 })),
     )
 
-    const { response } = await testClient().GET('/protected')
+    const { response } = await createSessionClient(BASE).GET('/me/dashboard')
 
     // The original 401 is returned; the refresh 401 does not recurse.
     expect(response.status).toBe(401)
-    expect(protectedCalls).toBe(1)
+    expect(dashboardCalls).toBe(1)
   })
 })
