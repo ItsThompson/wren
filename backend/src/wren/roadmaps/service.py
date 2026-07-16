@@ -123,7 +123,7 @@ class RoadmapService:
         except Exception:
             await self._repo.rollback()
             raise
-        _log.info("roadmap_draft_created", roadmap_id=roadmap_id, owner=user_id)
+        _log.info("roadmap_draft_created", roadmap_id=roadmap_id, user_id=user_id)
         return RoadmapCreated.model_validate(
             {**assembled.roadmap.model_dump(), "remap": assembled.remap}
         )
@@ -171,7 +171,7 @@ class RoadmapService:
         _log.info(
             "roadmap_patched",
             roadmap_id=roadmap_id,
-            owner=user_id,
+            user_id=user_id,
             revision=patched.revision,
             ops=len(operations),
         )
@@ -235,7 +235,7 @@ class RoadmapService:
         _log.info(
             "roadmap_replaced",
             roadmap_id=roadmap_id,
-            owner=user_id,
+            user_id=user_id,
             revision=replaced.revision,
         )
         return RoadmapReplaced.model_validate({**replaced.model_dump(), "remap": assembled.remap})
@@ -363,7 +363,7 @@ class RoadmapService:
         except Exception:
             await self._repo.rollback()
             raise
-        _log.info("roadmap_published", roadmap_id=roadmap_id, owner=user_id)
+        _log.info("roadmap_published", roadmap_id=roadmap_id, user_id=user_id)
         return published
 
     async def fork(self, user_id: str, source_roadmap_id: str) -> Roadmap:
@@ -391,7 +391,7 @@ class RoadmapService:
             "roadmap_forked",
             roadmap_id=new_id,
             source_roadmap_id=source_roadmap_id,
-            owner=user_id,
+            user_id=user_id,
         )
         return forked
 
@@ -430,7 +430,7 @@ class RoadmapService:
         except Exception:
             await self._repo.rollback()
             raise
-        _log.info("roadmap_metadata_edited", roadmap_id=roadmap_id, owner=user_id)
+        _log.info("roadmap_metadata_edited", roadmap_id=roadmap_id, user_id=user_id)
         return edited
 
     async def set_visibility(
@@ -457,7 +457,7 @@ class RoadmapService:
         _log.info(
             "roadmap_visibility_set",
             roadmap_id=roadmap_id,
-            owner=user_id,
+            user_id=user_id,
             visibility=visibility.value,
         )
         return updated
@@ -489,7 +489,7 @@ class RoadmapService:
         except Exception:
             await self._repo.rollback()
             raise
-        _log.info("roadmap_archived", roadmap_id=roadmap_id, owner=user_id)
+        _log.info("roadmap_archived", roadmap_id=roadmap_id, user_id=user_id)
         return archived
 
     async def delete(self, user_id: str, roadmap_id: str) -> None:
@@ -521,7 +521,7 @@ class RoadmapService:
         except Exception:
             await self._repo.rollback()
             raise
-        _log.info("roadmap_deleted", roadmap_id=roadmap_id, owner=user_id)
+        _log.info("roadmap_deleted", roadmap_id=roadmap_id, user_id=user_id)
 
     async def _load_owned(self, user_id: str, roadmap_id: str) -> Roadmap:
         """Load the caller's own roadmap or raise ``NotFound``.
