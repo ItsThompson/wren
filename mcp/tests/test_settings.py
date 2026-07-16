@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from wren_mcp.settings import SERVICE, EnvSettings, build_rs_settings
+from pathlib import Path
+
+from wren_mcp.settings import ROOT_ENV_FILE, SERVICE, EnvSettings, build_rs_settings
 
 
 def test_build_rs_settings_maps_pinned_config() -> None:
@@ -27,3 +29,20 @@ def test_build_rs_settings_maps_pinned_config() -> None:
 
 def test_is_dev_true_in_development() -> None:
     assert build_rs_settings(EnvSettings(environment="development")).is_dev is True
+
+
+def test_env_file_anchors_to_repo_root() -> None:
+    """`just dev-mcp` cd's into mcp/ before launching uvicorn, so env_file must
+    resolve to the canonical repo-root .env, not an mcp-relative path that
+    silently misses it (F27). Compose/CD inject real env vars, which win over
+    env_file regardless."""
+    env_file = EnvSettings.model_config["env_file"]
+
+    assert env_file == ROOT_ENV_FILE
+    assert isinstance(env_file, Path)
+    assert env_file.is_absolute()
+    assert env_file.name == ".env"
+    # The parent is the repo root `just` runs from: it holds the justfile and the
+    # mcp/ package dir, so it is the root, not the mcp/ package itself.
+    assert (env_file.parent / "justfile").exists()
+    assert (env_file.parent / "mcp").is_dir()

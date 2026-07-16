@@ -8,8 +8,17 @@ their injected settings, per the two-app split.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# `just dev-api`/`dev-api-internal` cd into backend/ before launching uvicorn, so
+# a package-relative ".env" silently misses the canonical repo-root .env (F27).
+# Anchor it to the repo root from this file's location so the host inner loop
+# loads it regardless of CWD. Compose/CD inject real env vars, which always win
+# over env_file, so this affects only the host-run inner loop.
+ROOT_ENV_FILE = Path(__file__).resolve().parents[4] / ".env"
 
 # Per-app identity. Service names are bound onto every structlog line so external
 # and internal traffic is distinguishable in aggregated logs.
@@ -27,7 +36,7 @@ class EnvSettings(BaseSettings):
     can carry vars for other consumers.
     """
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=ROOT_ENV_FILE, extra="ignore")
 
     environment: str = "development"
     log_level: str = "info"

@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from wren.core.settings import (
     EXTERNAL_PORT,
     EXTERNAL_SERVICE,
     INTERNAL_PORT,
     INTERNAL_SERVICE,
+    ROOT_ENV_FILE,
     EnvSettings,
     build_app_settings,
 )
@@ -38,3 +41,20 @@ def test_internal_and_external_differ_only_by_identity() -> None:
 def test_is_dev_true_for_development() -> None:
     settings = build_app_settings(service="x", port=1, env=EnvSettings(environment="development"))
     assert settings.is_dev is True
+
+
+def test_env_file_anchors_to_repo_root() -> None:
+    """`just dev-api`/`dev-api-internal` cd into backend/ before launching
+    uvicorn, so env_file must resolve to the canonical repo-root .env, not a
+    backend-relative path that silently misses it (F27). Compose/CD inject real
+    env vars, which win over env_file regardless."""
+    env_file = EnvSettings.model_config["env_file"]
+
+    assert env_file == ROOT_ENV_FILE
+    assert isinstance(env_file, Path)
+    assert env_file.is_absolute()
+    assert env_file.name == ".env"
+    # The parent is the repo root `just` runs from: it holds the justfile and the
+    # backend/ package dir, so it is the root, not the backend/ package itself.
+    assert (env_file.parent / "justfile").exists()
+    assert (env_file.parent / "backend").is_dir()
