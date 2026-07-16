@@ -23,12 +23,15 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from wren.core.app_factory import ExceptionHandler, ExceptionKey
+from wren.core.logging import get_logger
 
 PROBLEM_JSON_MEDIA_TYPE = "application/problem+json"
 
 # Stable identifier base for the ``type`` member. RFC 9457 ``type`` URIs need not
 # be dereferenceable; they are stable identifiers keyed off the error code.
 ERROR_TYPE_BASE = "https://usewren.com/errors/"
+
+_log = get_logger("wren-core")
 
 
 class ErrorCode(StrEnum):
@@ -47,6 +50,7 @@ class ErrorCode(StrEnum):
     UNAUTHORIZED = "UNAUTHORIZED"
     VALIDATION = "VALIDATION"
     CONFLICT = "CONFLICT"
+    INTERNAL = "INTERNAL"
     STALE_REVISION = "STALE_REVISION"
     IMMUTABLE = "IMMUTABLE"
     DELETE_HAS_FOLLOWERS = "DELETE_HAS_FOLLOWERS"
@@ -70,7 +74,18 @@ class Violation(BaseModel):
     message: str
 
 
-class WrenError(Exception):
+class ExpectedError(Exception):
+    """Marker for a model-recoverable domain/protocol error, not an operational fault.
+
+    Concrete subclasses expose an HTTP ``status``; the failure classifier
+    (:func:`wren.core.observability._is_unexpected`) reads it via ``getattr`` so it
+    works whether ``status`` is a class attribute (:class:`WrenError`) or set
+    per-instance (:class:`wren.oauth.errors.OAuthError`). An ``ExpectedError`` with
+    ``status < 500`` is not counted as a service-method failure.
+    """
+
+
+class WrenError(ExpectedError):
     """Base of the service-layer error hierarchy mapped to problem+json.
 
     Subclasses fix the HTTP ``status``, default ``code``, and human ``title``.
@@ -105,6 +120,10 @@ class NotFound(WrenError):
 
 
 class Forbidden(WrenError):
+    # Reserved, not raised in production: the service applies a 404-over-403 policy
+    # (``service.py`` "no existence leak") so a caller never learns a resource
+    # exists but is off-limits. Kept for a future case where 403 is the correct
+    # answer (a resource the caller CAN legitimately see but not act on).
     status = 403
     title = "Access forbidden"
     default_code = ErrorCode.FORBIDDEN
@@ -212,15 +231,40 @@ async def handle_request_validation_error(request: Request, exc: Exception) -> R
     return _render(_problem_from_request_validation(exc, request.url.path))
 
 
+async def handle_unexpected(request: Request, exc: Exception) -> Response:
+    """Render any unhandled exception as a generic 500 problem+json.
+
+    This is the single structured-fault log site: it emits exactly one ``error``
+    event carrying ``exc_info`` (revives ``format_exc_info`` in the log chain) and
+    the request path. The response body is generic so no stack trace or original
+    exception message leaks to the client. ``request_id`` is added later by the
+    §05 correlation contextvars binding, which the log chain merges automatically.
+    """
+    _log.error("unhandled_exception", exc_info=exc, path=request.url.path)
+    return _render(
+        ProblemDetail(
+            type=_type_uri(ErrorCode.INTERNAL),
+            title="Internal server error",
+            status=500,
+            code=ErrorCode.INTERNAL,
+            detail="An unexpected error occurred.",
+            instance=request.url.path,
+        )
+    )
+
+
 def build_exception_handlers() -> dict[ExceptionKey, ExceptionHandler]:
     """The exception-handler map both apps wire through ``create_app``.
 
     One handler for the whole ``WrenError`` hierarchy (Starlette dispatches by
-    MRO) plus the ``RequestValidationError`` override, so every error path renders
-    the one RFC 9457 contract.
+    MRO), the ``RequestValidationError`` override, and a catch-all ``Exception``
+    handler so any unhandled fault renders as a generic 500 problem+json (and is
+    logged once) instead of leaking. The three keys are MRO-disjoint, so
+    registration order is irrelevant.
     """
     handlers: dict[ExceptionKey, ExceptionHandler] = {
         WrenError: handle_wren_error,
         RequestValidationError: handle_request_validation_error,
+        Exception: handle_unexpected,
     }
     return handlers

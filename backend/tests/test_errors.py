@@ -1,13 +1,19 @@
 """Error contract: WrenError hierarchy + RequestValidationError -> one RFC 9457
-problem+json shape, rendered by the single injected handler pair."""
+problem+json shape, rendered by the single injected handler pair; plus the
+catch-all 500 handler and its single structured fault log."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pytest
+import structlog
 from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
+from structlog.processors import format_exc_info
 
+from wren.core.app_factory import ExceptionHandler, ExceptionKey, create_app
 from wren.core.errors import (
     Conflict,
     ErrorCode,
@@ -18,6 +24,23 @@ from wren.core.errors import (
     Violation,
     build_exception_handlers,
 )
+from wren.core.logging import _build_processors
+from wren.core.settings import AppSettings
+from wren.oauth.errors import build_oauth_exception_handlers
+
+MakeSettings = Callable[..., AppSettings]
+MakeHandlers = Callable[[], dict[ExceptionKey, ExceptionHandler]]
+
+# The exception-handler maps the two real apps wire: the internal app mounts the
+# shared handlers, the external app merges the OAuth handler on top. Both must
+# render an unhandled fault as the generic 500 problem+json.
+_HANDLER_MAPS = [
+    pytest.param(build_exception_handlers, id="internal-app"),
+    pytest.param(
+        lambda: {**build_exception_handlers(), **build_oauth_exception_handlers()},
+        id="external-app",
+    ),
+]
 
 
 class _Item(BaseModel):
@@ -69,6 +92,20 @@ def _client() -> TestClient:
 
     app.include_router(router)
     return TestClient(app)
+
+
+_LEAKY_DETAIL = "secret internal detail: db dsn postgres://admin:hunter2@host"
+
+
+def _boom_router() -> APIRouter:
+    """A router whose handler raises a non-WrenError with a sensitive message."""
+    router = APIRouter()
+
+    @router.get("/boom")
+    async def boom() -> None:
+        raise RuntimeError(_LEAKY_DETAIL)
+
+    return router
 
 
 @pytest.mark.parametrize(
@@ -131,3 +168,107 @@ def test_request_validation_error_uses_the_same_field_map_shape() -> None:
     assert "body.title" in body["fields"]
     # RequestValidationError maps to fields, not the structural violations array.
     assert "violations" not in body
+
+
+# --- catch-all 500 handler (F2) ---------------------------------------------
+
+
+@pytest.mark.parametrize("make_handlers", _HANDLER_MAPS)
+def test_unhandled_exception_renders_generic_500_problem_json(
+    make_settings: MakeSettings, make_handlers: MakeHandlers
+) -> None:
+    app = create_app(
+        make_settings(),
+        routers=[_boom_router()],
+        exception_handlers=make_handlers(),
+    )
+    # raise_server_exceptions=False so the client returns the handler's 500 rather
+    # than re-raising the RuntimeError into the test.
+    response = TestClient(app, raise_server_exceptions=False).get("/boom")
+
+    assert response.status_code == 500
+    assert response.headers["content-type"] == "application/problem+json"
+    body = response.json()
+    assert body == {
+        "type": "https://usewren.com/errors/internal",
+        "title": "Internal server error",
+        "status": 500,
+        "code": "INTERNAL",
+        "detail": "An unexpected error occurred.",
+        "instance": "/boom",
+    }
+
+
+@pytest.mark.parametrize("make_handlers", _HANDLER_MAPS)
+def test_unhandled_exception_leaks_no_internal_detail(
+    make_settings: MakeSettings, make_handlers: MakeHandlers
+) -> None:
+    app = create_app(
+        make_settings(),
+        routers=[_boom_router()],
+        exception_handlers=make_handlers(),
+    )
+    raw = TestClient(app, raise_server_exceptions=False).get("/boom").text
+
+    # Neither the original exception message nor a rendered stack trace reaches
+    # the client.
+    assert "hunter2" not in raw
+    assert _LEAKY_DETAIL not in raw
+    assert "RuntimeError" not in raw
+    assert "Traceback" not in raw
+
+
+# --- single structured fault log (F3) ---------------------------------------
+
+
+def _bare_boom_client() -> TestClient:
+    app = FastAPI()
+    for key, handler in build_exception_handlers().items():
+        app.add_exception_handler(key, handler)
+    app.include_router(_boom_router())
+    return TestClient(app, raise_server_exceptions=False)
+
+
+def test_unhandled_exception_emits_exactly_one_error_log_with_exc_info_and_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Capture at the logging boundary: the configured logger caches its processor
+    # chain on first use, so a double is more reliable here than capture_logs.
+    cap = structlog.testing.CapturingLogger()
+    monkeypatch.setattr("wren.core.errors._log", cap)
+
+    _bare_boom_client().get("/boom")
+
+    error_calls = [call for call in cap.calls if call.method_name == "error"]
+    assert len(error_calls) == 1
+    assert error_calls[0].args == ("unhandled_exception",)
+    assert error_calls[0].kwargs["path"] == "/boom"
+    # exc_info carries the actual exception so the log chain can render its stack.
+    assert isinstance(error_calls[0].kwargs["exc_info"], RuntimeError)
+
+
+def test_routine_4xx_does_not_hit_the_fault_logger(monkeypatch: pytest.MonkeyPatch) -> None:
+    cap = structlog.testing.CapturingLogger()
+    monkeypatch.setattr("wren.core.errors._log", cap)
+
+    _client().get("/not-found")
+
+    # A routine 4xx renders via handle_wren_error and never reaches the fault log.
+    assert cap.calls == []
+
+
+def test_format_exc_info_is_wired_and_renders_the_fault_traceback() -> None:
+    # format_exc_info was dead until the catch-all handler started feeding exc_info;
+    # assert it is in the chain and turns an exc_info field into a rendered stack.
+    assert format_exc_info in _build_processors(is_dev=False)
+
+    try:
+        raise RuntimeError("boom detail")
+    except RuntimeError as exc:
+        rendered = format_exc_info(None, "error", {"event": "unhandled_exception", "exc_info": exc})
+
+    assert isinstance(rendered, dict)
+    exception_text = rendered["exception"]
+    assert isinstance(exception_text, str)
+    assert "RuntimeError: boom detail" in exception_text
+    assert "Traceback" in exception_text
