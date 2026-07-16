@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/auth'
+import type { SubmitStatus } from '../types'
 
 interface Credentials {
   email: string
@@ -19,25 +20,22 @@ const EMPTY: Credentials = { email: '', password: '' }
 export function LoginForm() {
   const { login } = useAuth()
   const [values, setValues] = useState<Credentials>(EMPTY)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [submit, setSubmit] = useState<SubmitStatus>({ phase: 'idle' })
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
-    setError(null)
-    setFieldErrors({})
+    setSubmit({ phase: 'idle' })
     if (!values.email || !values.password) {
-      setError('Enter your email and password.')
+      setSubmit({ phase: 'error', message: 'Enter your email and password.', fields: {} })
       return
     }
-    setSubmitting(true)
+    setSubmit({ phase: 'submitting' })
     const result = await login(values)
-    setSubmitting(false)
-    if (!result.ok) {
-      setError(result.message)
-      if (result.fields) setFieldErrors(result.fields)
+    if (result.ok) {
+      setSubmit({ phase: 'idle' })
+      return
     }
+    setSubmit({ phase: 'error', message: result.message, fields: result.fields ?? {} })
   }
 
   return (
@@ -51,7 +49,9 @@ export function LoginForm() {
           value={values.email}
           onChange={(event) => setValues((prev) => ({ ...prev, email: event.target.value }))}
         />
-        {fieldErrors.email && <span className="text-sm text-destructive">{fieldErrors.email}</span>}
+        {submit.phase === 'error' && submit.fields.email && (
+          <span className="text-sm text-destructive">{submit.fields.email}</span>
+        )}
       </label>
       <label className="flex flex-col gap-1.5 text-sm">
         <span className="font-medium text-foreground">Password</span>
@@ -62,17 +62,17 @@ export function LoginForm() {
           value={values.password}
           onChange={(event) => setValues((prev) => ({ ...prev, password: event.target.value }))}
         />
-        {fieldErrors.password && (
-          <span className="text-sm text-destructive">{fieldErrors.password}</span>
+        {submit.phase === 'error' && submit.fields.password && (
+          <span className="text-sm text-destructive">{submit.fields.password}</span>
         )}
       </label>
-      {error && (
+      {submit.phase === 'error' && (
         <p role="alert" className="text-sm text-destructive">
-          {error}
+          {submit.message}
         </p>
       )}
-      <Button type="submit" disabled={submitting}>
-        {submitting ? 'Logging in...' : 'Log in'}
+      <Button type="submit" disabled={submit.phase === 'submitting'}>
+        {submit.phase === 'submitting' ? 'Logging in...' : 'Log in'}
       </Button>
     </form>
   )
