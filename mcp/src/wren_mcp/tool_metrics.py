@@ -22,6 +22,7 @@ from prometheus_client import CollectorRegistry, Counter
 
 from wren_mcp.logging import get_logger
 from wren_mcp.settings import SERVICE
+from wren_mcp.tool_errors import BackendToolError
 
 _log = get_logger(SERVICE)
 
@@ -55,12 +56,15 @@ def count_invocations[F: Callable[..., Awaitable[Any]]](fn: F) -> F:
             result = await fn(*args, **kwargs)
         except Exception as exc:
             TOOL_INVOCATIONS.labels(tool=fn.__name__, outcome="error").inc()
+            # Backend HTTP status/code are available only for backend-hop failures;
+            # other exceptions log the tool + error_type with no backend fields.
+            backend = exc if isinstance(exc, BackendToolError) else None
             _log.warning(
                 "tool_failed",
                 tool=fn.__name__,
                 error_type=type(exc).__name__,
-                status=getattr(exc, "status_code", None),
-                code=getattr(exc, "code", None),
+                status=backend.status_code if backend is not None else None,
+                code=backend.code if backend is not None else None,
             )
             raise
         TOOL_INVOCATIONS.labels(tool=fn.__name__, outcome="ok").inc()
