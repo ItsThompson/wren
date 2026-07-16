@@ -267,6 +267,33 @@ def test_create_with_an_empty_title_is_a_422_naming_title(make_settings: MakeSet
     assert any(field.endswith("title") for field in body["fields"])
 
 
+def test_create_with_a_non_url_resource_is_a_422_naming_url(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings)
+    _login(client)
+    payload = {
+        "title": "Grokking DSA",
+        "sections": [
+            {
+                "title": "Foundations",
+                "subsections": [
+                    {
+                        "title": "Arrays",
+                        "resources": [{"title": "Guide", "url": "not-a-url", "type": "article"}],
+                        "checklist_items": [{"text": "Read it"}],
+                    }
+                ],
+            }
+        ],
+    }
+    response = client.post("/roadmaps", json=payload)
+    assert response.status_code == 422
+    body = response.json()
+    assert response.headers["content-type"] == "application/problem+json"
+    assert body["code"] == "VALIDATION"
+    offending = [field for field in body["fields"] if field.endswith("url")]
+    assert offending == ["body.sections.0.subsections.0.resources.0.url"]
+
+
 # --- get: owner-scoped, no existence leak -----------------------------------
 
 
