@@ -13,6 +13,8 @@ inside the capture block, mirroring the backend correlation tests.
 
 from __future__ import annotations
 
+import re
+
 import httpx
 import pytest
 import structlog
@@ -23,6 +25,11 @@ from wren_mcp.client import REQUEST_ID_HEADER
 
 _ROADMAP_ID = "grokking-dsa-7f3k"
 _MCP_HEADERS = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
+
+# The backend's inbound X-Request-ID honoring guard
+# (backend/src/wren/core/correlation.py ``_REQUEST_ID_RE``): an id matching this
+# in full is honored rather than re-minted, keeping the hop continuous.
+_BACKEND_HONORS_RE = re.compile(r"[A-Za-z0-9._-]{1,128}")
 
 
 def _events(logs: list[dict[str, object]], event: str) -> list[dict[str, object]]:
@@ -38,7 +45,7 @@ def _one(logs: list[dict[str, object]], event: str) -> dict[str, object]:
 # ---------- request-id propagation across the MCP -> backend hop (F4) ----------
 
 
-def test_client_request_id_is_the_correlated_id_and_reaches_a_backend_log_line(
+def test_client_request_id_is_the_correlated_id_and_backend_honorable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     harness = AgentHarness(lambda _r: json_error(404, "NOT_FOUND", "no such roadmap"))
@@ -51,17 +58,15 @@ def test_client_request_id_is_the_correlated_id_and_reaches_a_backend_log_line(
     # the client sets on the backend hop: one id for the whole agent action.
     mcp_request_id = _one(mcp_logs, "tool_invoked")["request_id"]
     assert mcp_request_id
-    assert harness.captured[0].headers[REQUEST_ID_HEADER] == mcp_request_id
+    sent = harness.captured[0].headers[REQUEST_ID_HEADER]
+    assert sent == mcp_request_id
 
-    # The backend honors that inbound id (mirrors wren.core.correlation, verified
-    # in the backend suite): a backend request context binds it, so every backend
-    # log line for the same action carries the id the MCP client set.
-    structlog.contextvars.clear_contextvars()
-    with capture_correlated_logs() as backend_logs:
-        structlog.contextvars.bind_contextvars(request_id=mcp_request_id, service="wren-internal")
-        structlog.get_logger().info("service_method")
-    structlog.contextvars.clear_contextvars()
-    assert _one(backend_logs, "service_method")["request_id"] == mcp_request_id
+    # Cross-package invariant this suite CAN own: the minted id satisfies the
+    # backend's documented X-Request-ID wire constraint, so the backend
+    # CorrelationMiddleware HONORS it (rather than re-minting) and the same id
+    # lands in the backend's log lines. The backend-side honoring itself is
+    # exercised by Item 5's test_inbound_request_id_is_honored (separate image).
+    assert _BACKEND_HONORS_RE.fullmatch(sent)
 
 
 # ---------- tool-layer logging (F12) ----------
@@ -81,14 +86,15 @@ def test_tool_invoked_and_tool_failed_carry_tool_and_correlation(
     invoked = _one(logs, "tool_invoked")
     assert invoked["log_level"] == "info"
     assert invoked["tool"] == "roadmap_get_overview"
-    # request_id is bound at the boundary, before the counted call runs.
+    # Both correlation keys ride the entry line: request_id and user_id are bound
+    # at the bearer boundary, before the counted call runs.
     assert invoked["request_id"]
+    assert invoked["user_id"] == "user-ada"
 
     failed = _one(logs, "tool_failed")
     assert failed["log_level"] == "warning"
     assert failed["tool"] == "roadmap_get_overview"
     assert failed["request_id"] == invoked["request_id"]
-    # user_id is bound by require_scope before the backend error, so it rides here.
     assert failed["user_id"] == "user-ada"
     # The backend HTTP status + problem code surface on the failure line.
     assert failed["status"] == 409

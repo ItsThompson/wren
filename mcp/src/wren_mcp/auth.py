@@ -90,6 +90,11 @@ class BearerAuthMiddleware:
         # Boundary guarantee: the handler receives a resolved identity, never the
         # raw token. The token is exchanged for X-User-ID by the internal client.
         request.state.agent = principal
+        # Identity is already resolved here, so bind the actor onto the correlation
+        # context now: this puts user_id on the tool-entry line (tool_invoked) too.
+        # require_scope re-binds the same value (idempotent) as the canonical
+        # tool-layer site, so the off-transport gate path stays covered.
+        structlog.contextvars.bind_contextvars(user_id=principal.user_id)
         await self.app(scope, receive, send)
 
     def _is_protected(self, path: str) -> bool:
