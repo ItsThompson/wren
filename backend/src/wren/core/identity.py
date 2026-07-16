@@ -21,7 +21,6 @@ These are FastAPI dependencies; later route slices declare
 from __future__ import annotations
 
 import secrets
-from collections.abc import Awaitable, Callable
 
 import structlog
 from starlette.requests import Request
@@ -29,25 +28,13 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from wren.core.errors import Unauthorized
 from wren.core.logging import get_logger
+from wren.core.state import SessionVerifier, get_internal_token, get_session_verifier
 
 _log = get_logger("wren-core")
 
 USER_ID_HEADER = "X-User-ID"
 INTERNAL_TOKEN_HEADER = "X-Internal-Api-Token"
 SESSION_COOKIE_NAME = "wren_session"
-
-# A SessionVerifier turns a raw session-cookie value into a resolved user_id, or
-# None if the cookie is missing/invalid/expired. It is async so a per-request
-# jti-blacklist lookup (an I/O call) can run behind this same contract without
-# reworking require_user.
-SessionVerifier = Callable[[str], Awaitable[str | None]]
-
-
-async def deny_all_sessions(_cookie: str) -> str | None:
-    """Default deny-all verifier: every cookie fails to resolve, so
-    :func:`require_user` fail-safe denies. Replaced by injecting a real
-    ``SessionVerifier`` on ``app.state.session_verifier``."""
-    return None
 
 
 class StripInboundIdentityMiddleware:
@@ -81,7 +68,7 @@ async def require_user(request: Request) -> str:
     upstream by :class:`StripInboundIdentityMiddleware`). Raises ``Unauthorized``
     when no valid session resolves.
     """
-    verify: SessionVerifier = getattr(request.app.state, "session_verifier", deny_all_sessions)
+    verify: SessionVerifier = get_session_verifier(request.app)
     cookie = request.cookies.get(SESSION_COOKIE_NAME)
     if cookie is None:
         _log.warning("session_invalid", reason="missing_cookie")
@@ -103,7 +90,7 @@ async def require_internal_user(request: Request) -> str:
     unconfigured token fail-safe denies. Only then is the trusted ``X-User-ID``
     taken as the resolved identity.
     """
-    expected: str = getattr(request.app.state, "internal_api_token", "")
+    expected = get_internal_token(request.app)
     supplied = request.headers.get(INTERNAL_TOKEN_HEADER)
     # Compare on encoded bytes: secrets.compare_digest raises TypeError on a
     # non-ASCII str, which would surface as a 500 instead of a clean 401.

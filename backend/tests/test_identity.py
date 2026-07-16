@@ -21,7 +21,6 @@ from wren.core.identity import (
     USER_ID_HEADER,
     SessionVerifier,
     StripInboundIdentityMiddleware,
-    deny_all_sessions,
     require_internal_user,
     require_user,
 )
@@ -128,10 +127,6 @@ def test_external_default_verifier_denies_all_sessions(make_settings: MakeSettin
     client = _external_client(make_settings, verifier=None)
     response = client.get("/whoami", headers={"Cookie": f"{SESSION_COOKIE_NAME}={_VALID_COOKIE}"})
     assert response.status_code == 401
-
-
-async def test_deny_all_sessions_returns_none() -> None:
-    assert await deny_all_sessions("anything") is None
 
 
 async def test_strip_middleware_passes_non_http_scopes_through_untouched() -> None:

@@ -25,10 +25,10 @@ from wren.core.db import create_database, create_db_lifespan, db_readiness_check
 from wren.core.errors import build_exception_handlers
 from wren.core.identity import (
     StripInboundIdentityMiddleware,
-    deny_all_sessions,
     require_user,
 )
 from wren.core.settings import EXTERNAL_PORT, EXTERNAL_SERVICE, build_app_settings
+from wren.core.state import deny_all_sessions
 from wren.oauth.api import create_oauth_router
 from wren.oauth.config import build_oauth_config
 from wren.oauth.errors import build_oauth_exception_handlers

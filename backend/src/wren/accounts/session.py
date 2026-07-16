@@ -19,7 +19,7 @@ from collections.abc import Awaitable, Callable
 from wren.accounts.repository import SqlAlchemyAccountRepository
 from wren.accounts.tokens import SessionTokenCodec
 from wren.core.db import Database
-from wren.core.identity import SessionVerifier
+from wren.core.state import SessionVerifier
 
 # Resolves whether a session id has been revoked (blacklisted).
 RevocationLookup = Callable[[str], Awaitable[bool]]
