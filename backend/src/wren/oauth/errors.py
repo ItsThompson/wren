@@ -17,6 +17,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from wren.core.app_factory import ExceptionHandler, ExceptionKey
+from wren.core.errors import ExpectedError
 
 
 class OAuthErrorCode(StrEnum):
@@ -34,8 +35,15 @@ class OAuthErrorCode(StrEnum):
     SERVER_ERROR = "server_error"
 
 
-class OAuthError(Exception):
-    """An OAuth protocol error rendered as RFC 6749 ``error`` JSON."""
+class OAuthError(ExpectedError):
+    """An OAuth protocol error rendered as RFC 6749 ``error`` JSON.
+
+    Subclasses :class:`wren.core.errors.ExpectedError` so the failure classifier
+    treats a routine 4xx (``invalid_grant``, ``invalid_client``) as
+    model-recoverable and leaves ``service_method_failures_total`` untouched, while
+    a ``server_error`` (``status=500``) is still counted as an operational fault.
+    ``status`` is set per-instance (default 400).
+    """
 
     def __init__(self, error: OAuthErrorCode, description: str, *, status: int = 400) -> None:
         self.error = error
