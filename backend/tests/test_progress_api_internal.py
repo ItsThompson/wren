@@ -21,9 +21,13 @@ from progress_fakes import InMemoryProgressRepository
 from roadmaps_fakes import InMemoryRoadmapRepository
 from wren.core.app_factory import create_app
 from wren.core.errors import build_exception_handlers
-from wren.core.identity import INTERNAL_TOKEN_HEADER, USER_ID_HEADER
+from wren.core.identity import (
+    INTERNAL_TOKEN_HEADER,
+    USER_ID_HEADER,
+    require_internal_user,
+)
 from wren.core.settings import AppSettings
-from wren.progress.api_internal import create_internal_progress_router
+from wren.progress.router import create_progress_router
 from wren.progress.service import ProgressService
 
 MakeSettings = Callable[..., AppSettings]
@@ -45,7 +49,7 @@ def _build_client(make_settings: MakeSettings) -> TestClient:
 
     app: FastAPI = create_app(
         make_settings(),
-        routers=[create_internal_progress_router(progress_provider)],
+        routers=[create_progress_router(progress_provider, identity=require_internal_user)],
         exception_handlers=build_exception_handlers(),
     )
     app.state.internal_api_token = _INTERNAL_TOKEN

@@ -23,7 +23,11 @@ from wren.accounts.wiring import build_account_service_provider
 from wren.core.app_factory import create_app
 from wren.core.db import create_database, create_db_lifespan, db_readiness_check
 from wren.core.errors import build_exception_handlers
-from wren.core.identity import StripInboundIdentityMiddleware, deny_all_sessions
+from wren.core.identity import (
+    StripInboundIdentityMiddleware,
+    deny_all_sessions,
+    require_user,
+)
 from wren.core.settings import EXTERNAL_PORT, EXTERNAL_SERVICE, build_app_settings
 from wren.oauth.api import create_oauth_router
 from wren.oauth.config import build_oauth_config
@@ -34,10 +38,10 @@ from wren.oauth.wiring import (
     build_authorization_service_provider,
     build_token_service_provider,
 )
-from wren.progress.api import create_progress_router
+from wren.progress.router import create_progress_router
 from wren.progress.wiring import build_progress_service_provider
-from wren.roadmaps.api import create_roadmaps_router
 from wren.roadmaps.listing_api import create_listing_router
+from wren.roadmaps.router import create_roadmaps_router
 from wren.roadmaps.wiring import (
     build_listing_service_provider,
     build_roadmap_read_service_provider,
@@ -59,10 +63,15 @@ codec = SessionTokenCodec(session_config)
 service_provider = build_account_service_provider(BcryptPasswordHasher(), codec)
 accounts_router = create_accounts_router(service_provider, cookie_config=cookie_config)
 
-# Roadmap authoring: create-draft + owner-scoped read over the same service
-# layer, resolving identity via the human session cookie (require_user).
+# Roadmap authoring + reads over the same service layer, resolving identity via
+# the human session cookie (require_user). The external app mounts the three
+# web-only lifecycle routes (visibility / archive / delete) via
+# include_web_lifecycle; the internal app never does.
 roadmaps_router = create_roadmaps_router(
-    build_roadmap_service_provider(), build_roadmap_read_service_provider()
+    build_roadmap_service_provider(),
+    build_roadmap_read_service_provider(),
+    identity=require_user,
+    include_web_lifecycle=True,
 )
 
 # Dashboard + public profile: the private
@@ -74,7 +83,7 @@ listing_router = create_listing_router(build_listing_service_provider())
 # Follow + progress + server-computed next: the study-time surface over the
 # progress service, resolving the human session via require_user and scoped to
 # that user (another user's progress is never returned).
-progress_router = create_progress_router(build_progress_service_provider())
+progress_router = create_progress_router(build_progress_service_provider(), identity=require_user)
 
 # Shipped SKILL.md authoring guidance: the public,
 # unauthenticated GET /skill an agent fetches (referenced from the MCP tool

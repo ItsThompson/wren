@@ -5,11 +5,12 @@ Never tunnel-routed and never host-published: reachable only by containers on
 the shared factory with the internal service identity injected, differing from the
 external app only by these settings.
 
-Mounts the roadmap routers as thin adapters over the same service layer the
-external app uses (:mod:`wren.roadmaps.api_internal`), resolving identity from the
-trusted header instead of the cookie. These are the endpoints
-the MCP write/read tools call, one HTTP call per tool. The
-progress routers attach here the same way once the progress service lands.
+Mounts the roadmap + progress routers as thin adapters over the same service
+layer the external app uses (:mod:`wren.roadmaps.router`,
+:mod:`wren.progress.router`), differing only in that ``identity`` resolves the
+trusted ``X-User-ID`` header (``require_internal_user``) instead of the cookie and
+the web-only lifecycle routes are never mounted. These are the endpoints the MCP
+write/read tools call, one HTTP call per tool.
 """
 
 from __future__ import annotations
@@ -19,10 +20,11 @@ from fastapi import FastAPI
 from wren.core.app_factory import create_app
 from wren.core.db import create_database, create_db_lifespan, db_readiness_check
 from wren.core.errors import build_exception_handlers
+from wren.core.identity import require_internal_user
 from wren.core.settings import INTERNAL_PORT, INTERNAL_SERVICE, build_app_settings
-from wren.progress.api_internal import create_internal_progress_router
+from wren.progress.router import create_progress_router
 from wren.progress.wiring import build_progress_service_provider
-from wren.roadmaps.api_internal import create_internal_roadmaps_router
+from wren.roadmaps.router import create_roadmaps_router
 from wren.roadmaps.wiring import (
     build_roadmap_read_service_provider,
     build_roadmap_service_provider,
@@ -31,16 +33,21 @@ from wren.roadmaps.wiring import (
 settings = build_app_settings(service=INTERNAL_SERVICE, port=INTERNAL_PORT)
 db = create_database(settings.database_url)
 
-# Roadmap authoring/reading over the trusted identity: the same RoadmapService and
-# request-scoped DB session the external app binds, differing only in that
-# require_internal_user resolves the user from the trusted X-User-ID header.
-internal_roadmaps_router = create_internal_roadmaps_router(
-    build_roadmap_service_provider(), build_roadmap_read_service_provider()
+# Roadmap authoring/reading over the trusted identity: the same factories the
+# external app binds, differing only in that require_internal_user resolves the
+# user from the trusted X-User-ID header and include_web_lifecycle stays False, so
+# the web-only visibility / archive / delete routes are never mounted here.
+internal_roadmaps_router = create_roadmaps_router(
+    build_roadmap_service_provider(),
+    build_roadmap_read_service_provider(),
+    identity=require_internal_user,
 )
 
 # Progress surface over the trusted identity: follow / snapshot /
 # explicit-set / next, the endpoints the MCP progress tools call.
-internal_progress_router = create_internal_progress_router(build_progress_service_provider())
+internal_progress_router = create_progress_router(
+    build_progress_service_provider(), identity=require_internal_user
+)
 
 app: FastAPI = create_app(
     settings,

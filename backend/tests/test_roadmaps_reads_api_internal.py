@@ -29,12 +29,16 @@ from roadmaps_read_builders import (
 )
 from wren.core.app_factory import create_app
 from wren.core.errors import build_exception_handlers
-from wren.core.identity import INTERNAL_TOKEN_HEADER, USER_ID_HEADER
+from wren.core.identity import (
+    INTERNAL_TOKEN_HEADER,
+    USER_ID_HEADER,
+    require_internal_user,
+)
 from wren.core.settings import AppSettings
-from wren.progress.api_internal import create_internal_progress_router
+from wren.progress.router import create_progress_router
 from wren.progress.service import ProgressService
-from wren.roadmaps.api_internal import create_internal_roadmaps_router
 from wren.roadmaps.read_service import RoadmapReadService
+from wren.roadmaps.router import create_roadmaps_router
 from wren.roadmaps.schemas import Roadmap
 from wren.roadmaps.service import RoadmapService
 
@@ -74,8 +78,8 @@ def _build_client(
     app: FastAPI = create_app(
         make_settings(),
         routers=[
-            create_internal_roadmaps_router(roadmap_provider, read_provider),
-            create_internal_progress_router(progress_provider),
+            create_roadmaps_router(roadmap_provider, read_provider, identity=require_internal_user),
+            create_progress_router(progress_provider, identity=require_internal_user),
         ],
         exception_handlers=build_exception_handlers(),
     )

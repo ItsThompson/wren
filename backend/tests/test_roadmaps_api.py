@@ -27,10 +27,10 @@ from wren.accounts.service import AccountService
 from wren.accounts.session import create_session_verifier
 from wren.core.app_factory import create_app
 from wren.core.errors import build_exception_handlers
-from wren.core.identity import USER_ID_HEADER, StripInboundIdentityMiddleware
+from wren.core.identity import USER_ID_HEADER, StripInboundIdentityMiddleware, require_user
 from wren.core.settings import AppSettings
-from wren.roadmaps.api import create_roadmaps_router
 from wren.roadmaps.read_service import RoadmapReadService
+from wren.roadmaps.router import create_roadmaps_router
 from wren.roadmaps.service import RoadmapService
 
 MakeSettings = Callable[..., AppSettings]
@@ -129,7 +129,9 @@ def _build_client(
     accounts_router = create_accounts_router(
         account_provider, cookie_config=CookieConfig(secure=False, domain=None)
     )
-    roadmaps_router = create_roadmaps_router(roadmap_provider, read_provider)
+    roadmaps_router = create_roadmaps_router(
+        roadmap_provider, read_provider, identity=require_user, include_web_lifecycle=True
+    )
 
     app: FastAPI = create_app(
         make_settings(),

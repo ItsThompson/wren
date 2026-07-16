@@ -28,12 +28,12 @@ from wren.accounts.wiring import build_account_service_provider
 from wren.core.app_factory import create_app
 from wren.core.db import create_database
 from wren.core.errors import build_exception_handlers
-from wren.core.identity import StripInboundIdentityMiddleware
+from wren.core.identity import StripInboundIdentityMiddleware, require_user
 from wren.core.settings import AppSettings
-from wren.progress.api import create_progress_router
+from wren.progress.router import create_progress_router
 from wren.progress.wiring import build_progress_service_provider
-from wren.roadmaps.api import create_roadmaps_router
 from wren.roadmaps.listing_api import create_listing_router
+from wren.roadmaps.router import create_roadmaps_router
 from wren.roadmaps.wiring import (
     build_listing_service_provider,
     build_roadmap_read_service_provider,
@@ -132,9 +132,14 @@ def _external_app(database_url: str, settings: AppSettings) -> FastAPI:
         cookie_config=CookieConfig(secure=False, domain=None),
     )
     roadmaps_router = create_roadmaps_router(
-        build_roadmap_service_provider(), build_roadmap_read_service_provider()
+        build_roadmap_service_provider(),
+        build_roadmap_read_service_provider(),
+        identity=require_user,
+        include_web_lifecycle=True,
     )
-    progress_router = create_progress_router(build_progress_service_provider())
+    progress_router = create_progress_router(
+        build_progress_service_provider(), identity=require_user
+    )
     listing_router = create_listing_router(build_listing_service_provider())
     app = create_app(
         settings,
