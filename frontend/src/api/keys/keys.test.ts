@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { keys, type ApiKey } from '../keys'
+import { keys, type ApiKey } from './keys'
 
 describe('keys', () => {
   it('produces structurally equal tuples for the same inputs', () => {

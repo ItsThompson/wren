@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, expectTypeOf, it, vi 
 import type { Client } from 'openapi-fetch'
 
 import { createApiClient } from '../client'
-import { runQuery, type OpenApiResult } from '../fetcher'
+import { runQuery, type OpenApiResult } from './fetcher'
 
 const BASE = 'https://api.test'
 

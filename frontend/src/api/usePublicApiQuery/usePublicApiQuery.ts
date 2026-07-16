@@ -2,10 +2,10 @@ import useSWR, { type SWRConfiguration, type SWRResponse } from 'swr'
 
 import type { Problem } from '@/lib/problem'
 
-import { usePublicClient } from './ApiClientContext'
-import type { ApiClient } from './client'
-import { runQuery, type OpenApiResultBase, type SuccessData } from './fetcher'
-import type { ApiKey } from './keys'
+import { usePublicClient } from '../ApiClientContext'
+import type { ApiClient } from '../client'
+import { runQuery, type OpenApiResultBase, type SuccessData } from '../fetcher'
+import type { ApiKey } from '../keys'
 
 /** A typed `openapi-fetch` call bound to the public (credential-free) client. */
 type PublicApiCall<R extends OpenApiResultBase> = (client: ApiClient) => Promise<R>

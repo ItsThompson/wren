@@ -2,10 +2,10 @@ import useSWR, { type SWRConfiguration, type SWRResponse } from 'swr'
 
 import type { Problem } from '@/lib/problem'
 
-import { useSessionClient } from './ApiClientContext'
-import type { SessionClient } from './client'
-import { runQuery, type OpenApiResultBase, type SuccessData } from './fetcher'
-import type { ApiKey } from './keys'
+import { useSessionClient } from '../ApiClientContext'
+import type { SessionClient } from '../client'
+import { runQuery, type OpenApiResultBase, type SuccessData } from '../fetcher'
+import type { ApiKey } from '../keys'
 
 /** A typed `openapi-fetch` call bound to the session client. */
 type ApiCall<R extends OpenApiResultBase> = (client: SessionClient) => Promise<R>

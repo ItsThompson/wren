@@ -2,7 +2,7 @@ import { createContext, useContext, useMemo, type ReactNode } from 'react'
 
 import { createSessionClient } from '@/auth/createSessionClient'
 
-import { createApiClient, type ApiClient, type SessionClient } from './client'
+import { createApiClient, type ApiClient, type SessionClient } from '../client'
 
 interface ApiClients {
   /** Credentialed client with the 401→refresh→retry middleware. */

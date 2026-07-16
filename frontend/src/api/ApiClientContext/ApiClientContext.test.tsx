@@ -1,6 +1,6 @@
 import { render, renderHook } from '@testing-library/react'
 
-import { ApiClientProvider, usePublicClient, useSessionClient } from '../ApiClientContext'
+import { ApiClientProvider, usePublicClient, useSessionClient } from './ApiClientContext'
 import type { ApiClient, SessionClient } from '../client'
 
 interface CapturedClients {
