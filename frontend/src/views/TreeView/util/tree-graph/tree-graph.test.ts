@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { buildTreeGraph, flattenSubsections } from './tree-graph'
-import { DAG_NODE_TYPE, NODE_STATE, type Roadmap } from './types'
+import { DAG_NODE_TYPE, NODE_STATE, type Roadmap } from '../../types'
 
 const ROADMAP_ID = 'grokking-dsa-7f3k'
 

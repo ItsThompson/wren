@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { layoutTree } from './layout'
-import { DAG_NODE_TYPE, type TreeNode } from './types'
+import { DAG_NODE_TYPE, type TreeNode } from '../../types'
 
 function buildNode(id: string): TreeNode {
   return {

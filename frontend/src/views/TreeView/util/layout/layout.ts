@@ -2,8 +2,8 @@ import dagre from 'dagre'
 
 import type { Edge } from '@xyflow/react'
 
-import { NODE_HEIGHT, NODE_WIDTH } from './constants'
-import type { TreeNode } from './types'
+import { NODE_HEIGHT, NODE_WIDTH } from '../../constants'
+import type { TreeNode } from '../../types'
 
 /**
  * Compute a layered top-down layout for the tree with dagre. Pure and DOM-free:

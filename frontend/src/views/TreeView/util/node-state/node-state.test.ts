@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { deriveNodeState } from './node-state'
-import { NODE_STATE, type Subsection } from './types'
+import { NODE_STATE, type Subsection } from '../../types'
 
 /** A minimal subsection; `item_order` drives the derived done-state. */
 function buildSubsection(overrides: Partial<Subsection> = {}): Subsection {

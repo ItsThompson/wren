@@ -1,6 +1,6 @@
-import { isSubsectionDone } from '@/views/RoadmapView/progress-derive'
+import { isSubsectionDone } from '@/views/RoadmapView/util/progress-derive'
 
-import { NODE_STATE, type NodeState, type Subsection } from './types'
+import { NODE_STATE, type NodeState, type Subsection } from '../../types'
 
 /**
  * Derive a tree node's soft state from the caller's progress:

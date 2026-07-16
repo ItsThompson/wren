@@ -1,7 +1,7 @@
 import type { Edge } from '@xyflow/react'
 
-import { deriveNodeState } from './node-state'
-import { DAG_NODE_TYPE, type Roadmap, type Subsection, type TreeGraph, type TreeNode } from './types'
+import { deriveNodeState } from '../node-state'
+import { DAG_NODE_TYPE, type Roadmap, type Subsection, type TreeGraph, type TreeNode } from '../../types'
 
 /**
  * Every subsection across all sections in a stable render order
