@@ -82,6 +82,13 @@ class CompletionState(StrEnum):
     INCOMPLETE = "incomplete"
 
 
+# A resource link constrained to an http(s) URL: rejects non-URLs (and empty
+# strings) without normalizing the stored value. A plain ``str`` (not
+# ``AnyUrl``) on purpose, mirroring the backend ``ResourceUrl`` so the frozen
+# contract and the cross-package drift test stay in lockstep.
+ResourceUrl = Annotated[str, Field(pattern=r"^https?://")]
+
+
 # ---------- Authoring inputs (ordered arrays + optional proposed_id) ----------
 
 
@@ -92,7 +99,7 @@ class ResourceInput(BaseModel):
 
     proposed_id: str | None = None
     title: str = Field(min_length=1)
-    url: str
+    url: ResourceUrl
     type: ResourceType
 
 

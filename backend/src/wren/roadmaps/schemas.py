@@ -42,6 +42,14 @@ class ResourceType(StrEnum):
     OTHER = "other"
 
 
+# A resource link constrained to an http(s) URL: rejects non-URLs (and empty
+# strings) at the wire boundary without normalizing the stored value. A plain
+# ``str`` (not ``AnyUrl``) on purpose, so an already-stored URL round-trips
+# through ``model_validate`` and is echoed back verbatim (no trailing-slash or
+# host-casing rewrite of persisted roadmaps).
+ResourceUrl = Annotated[str, Field(pattern=r"^https?://")]
+
+
 # ---------- Roadmap (definition) ----------
 
 
@@ -50,7 +58,7 @@ class Resource(BaseModel):
 
     id: str
     title: str
-    url: str
+    url: ResourceUrl
     type: ResourceType
 
 
@@ -112,7 +120,7 @@ class ResourceInput(BaseModel):
 
     proposed_id: str | None = None
     title: str = Field(min_length=1)
-    url: str
+    url: ResourceUrl
     type: ResourceType
 
 

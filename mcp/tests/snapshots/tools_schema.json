@@ -60,6 +60,7 @@
               "$ref": "#/$defs/ResourceType"
             },
             "url": {
+              "pattern": "^https?://",
               "title": "Url",
               "type": "string"
             }
@@ -859,6 +860,7 @@
               "$ref": "#/$defs/ResourceType"
             },
             "url": {
+              "pattern": "^https?://",
               "title": "Url",
               "type": "string"
             }
@@ -1859,6 +1861,7 @@
               "$ref": "#/$defs/ResourceType"
             },
             "url": {
+              "pattern": "^https?://",
               "title": "Url",
               "type": "string"
             }
