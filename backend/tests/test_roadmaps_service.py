@@ -16,6 +16,7 @@ from roadmaps_fakes import (
 from wren.core.errors import Conflict, ErrorCode, NotFound, Validation
 from wren.progress.schemas import CompletionState
 from wren.progress.service import ProgressService
+from wren.roadmaps.repository import transaction
 from wren.roadmaps.schemas import (
     AddItemOp,
     AddSubsectionOp,
@@ -239,24 +240,27 @@ async def test_get_is_404_for_an_unknown_id() -> None:
         await service.get("user-1", "does-not-exist-0000")
 
 
-async def test_create_rolls_back_when_persistence_fails() -> None:
-    # A PK collision at insert (the fake mirrors the real unique violation) must
-    # roll back and propagate rather than commit a half-written row.
-    service, repo = _service(tokens=["7f3k", "7f3k"])
-    await service.create_draft("user-1", _minimal_doc())
+# --- transaction boundary (the single-sourced commit/rollback invariant) ----
 
-    # Force the pre-check to miss so add() is reached with a colliding id: reuse
-    # the same token but bypass the existence check by clearing it.
-    from sqlalchemy.exc import IntegrityError
 
-    async def always_absent(_roadmap_id: str) -> bool:
-        return False
+async def test_transaction_commits_on_a_clean_exit() -> None:
+    repo = InMemoryRoadmapRepository()
+    async with transaction(repo):
+        pass
+    assert repo.commits == 1
+    assert repo.rollbacks == 0
 
-    repo.roadmap_id_exists = always_absent  # type: ignore[method-assign]
-    service2 = _service(repo, tokens=["7f3k"])[0]
-    with pytest.raises(IntegrityError):
-        await service2.create_draft("user-1", _minimal_doc())
+
+async def test_transaction_rolls_back_and_re_raises_on_a_mutate_error() -> None:
+    # Every roadmaps write method routes its mutate through this one helper: on an
+    # error it rolls back and propagates rather than committing a partial write.
+    # This one test replaces the nine former per-method commit/rollback tests.
+    repo = InMemoryRoadmapRepository()
+    with pytest.raises(RuntimeError):
+        async with transaction(repo):
+            raise RuntimeError("db down")
     assert repo.rollbacks == 1
+    assert repo.commits == 0
 
 
 # --- validate ---------------------------------------------------------------
@@ -335,19 +339,6 @@ async def test_publish_is_one_way_republish_is_a_conflict() -> None:
     # A published roadmap is immutable: re-publishing is refused (draft-only guard).
     with pytest.raises(Conflict):
         await service.publish("user-1", created.id)
-
-
-async def test_publish_rolls_back_when_the_transition_fails_to_persist() -> None:
-    service, repo = _service()
-    created = await service.create_draft("user-1", _publishable_doc())
-
-    async def failing_save(_roadmap: object) -> None:
-        raise RuntimeError("db down")
-
-    repo.save = failing_save  # type: ignore[method-assign]
-    with pytest.raises(RuntimeError):
-        await service.publish("user-1", created.id)
-    assert repo.rollbacks == 1
 
 
 async def test_publish_hard_block_message_is_singular_for_one_violation() -> None:
@@ -496,24 +487,6 @@ async def test_patch_with_an_invalid_op_is_a_field_level_validation_error() -> N
     assert (await service.get("user-1", created.id)).revision == created.revision
 
 
-async def test_patch_rolls_back_when_persistence_fails() -> None:
-    service, repo = _service()
-    created = await service.create_draft("user-1", _publishable_doc())
-
-    async def failing_save(_roadmap: object) -> None:
-        raise RuntimeError("db down")
-
-    repo.save = failing_save  # type: ignore[method-assign]
-    with pytest.raises(RuntimeError):
-        await service.patch_draft(
-            "user-1",
-            created.id,
-            created.revision,
-            [SetTagsOp(op="set_tags", subsection_id="sub_arrays", tags=["x"])],
-        )
-    assert repo.rollbacks == 1
-
-
 # --- replace (full-document import escape hatch) -----------------------------
 
 
@@ -633,19 +606,6 @@ async def test_replace_with_a_stale_revision_is_a_stale_revision_conflict() -> N
     assert (await service.get("user-1", created.id)).revision == created.revision
 
 
-async def test_replace_rolls_back_when_persistence_fails() -> None:
-    service, repo = _service()
-    created = await service.create_draft("user-1", _publishable_doc())
-
-    async def failing_save(_roadmap: object) -> None:
-        raise RuntimeError("db down")
-
-    repo.save = failing_save  # type: ignore[method-assign]
-    with pytest.raises(RuntimeError):
-        await service.replace_draft("user-1", created.id, created.revision, _replace_doc())
-    assert repo.rollbacks == 1
-
-
 # --- fork -------------------------------------------------------------------
 
 
@@ -730,19 +690,6 @@ async def test_fork_of_an_unknown_id_is_404() -> None:
         await service.fork("user-1", "does-not-exist-0000")
 
 
-async def test_fork_rolls_back_when_persistence_fails() -> None:
-    service, repo = _service(tokens=["7f3k", "9x2b"])
-    source = await service.create_draft("owner", _publishable_doc())
-
-    async def failing_add(_record: object) -> None:
-        raise RuntimeError("db down")
-
-    repo.add = failing_add  # type: ignore[method-assign]
-    with pytest.raises(RuntimeError):
-        await service.fork("owner", source.id)
-    assert repo.rollbacks == 1
-
-
 async def test_fork_starts_with_fresh_progress_no_carry_over() -> None:
     # The gold no-carry-over proof: even though the fork copies checklist item IDs
     # verbatim, progress is keyed by (user, roadmap_id), so the forker's progress
@@ -781,7 +728,7 @@ async def test_fork_starts_with_fresh_progress_no_carry_over() -> None:
 
 
 async def test_edit_metadata_changes_only_the_three_presentation_fields() -> None:
-    service, _ = _service()
+    service, repo = _service()
     created = await service.create_draft("user-1", _publishable_doc())
     edited = await service.edit_metadata(
         "user-1",
@@ -799,6 +746,8 @@ async def test_edit_metadata_changes_only_the_three_presentation_fields() -> Non
     assert edited.suggested_path == created.suggested_path
     assert edited.visibility is created.visibility
     assert edited.status is RoadmapStatus.DRAFT
+    # Committed once through the shared transaction helper (create + this edit).
+    assert repo.commits == 2
 
 
 async def test_edit_metadata_works_on_a_published_roadmap() -> None:
@@ -859,21 +808,6 @@ async def test_edit_metadata_is_404_for_a_non_owner() -> None:
         )
 
 
-async def test_edit_metadata_rolls_back_when_persistence_fails() -> None:
-    service, repo = _service()
-    created = await service.create_draft("user-1", _publishable_doc())
-
-    async def failing_save(_roadmap: object) -> None:
-        raise RuntimeError("db down")
-
-    repo.save = failing_save  # type: ignore[method-assign]
-    with pytest.raises(RuntimeError):
-        await service.edit_metadata(
-            "user-1", created.id, title="Renamed", description=None, subject_tags=None
-        )
-    assert repo.rollbacks == 1
-
-
 # --- replace preserves the stored visibility -------------------------------
 
 
@@ -896,7 +830,7 @@ async def test_replace_preserves_the_stored_drafts_visibility() -> None:
 
 
 async def test_set_visibility_toggles_public_and_back_to_private() -> None:
-    service, _ = _service()
+    service, repo = _service()
     created = await service.create_draft("user-1", _publishable_doc())
     assert created.visibility is Visibility.PRIVATE
 
@@ -907,6 +841,8 @@ async def test_set_visibility_toggles_public_and_back_to_private() -> None:
     made_private = await service.set_visibility("user-1", created.id, Visibility.PRIVATE)
     assert made_private.visibility is Visibility.PRIVATE
     assert (await service.get("user-1", created.id)).visibility is Visibility.PRIVATE
+    # Each toggle commits through the shared transaction helper (create + 2 sets).
+    assert repo.commits == 3
 
 
 async def test_set_visibility_does_not_alter_content_or_the_revision() -> None:
@@ -939,29 +875,18 @@ async def test_set_visibility_is_404_for_a_non_owner() -> None:
         await service.set_visibility("intruder", created.id, Visibility.PUBLIC)
 
 
-async def test_set_visibility_rolls_back_when_persistence_fails() -> None:
-    service, repo = _service()
-    created = await service.create_draft("user-1", _publishable_doc())
-
-    async def failing_save(_roadmap: object) -> None:
-        raise RuntimeError("db down")
-
-    repo.save = failing_save  # type: ignore[method-assign]
-    with pytest.raises(RuntimeError):
-        await service.set_visibility("user-1", created.id, Visibility.PUBLIC)
-    assert repo.rollbacks == 1
-
-
 # --- web-only lifecycle: archive --------------------------------------------
 
 
 async def test_archive_transitions_a_published_roadmap_to_archived() -> None:
-    service, _ = _service()
+    service, repo = _service()
     created = await service.create_draft("user-1", _publishable_doc())
     await service.publish("user-1", created.id)
     archived = await service.archive("user-1", created.id)
     assert archived.status is RoadmapStatus.ARCHIVED
     assert (await service.get("user-1", created.id)).status is RoadmapStatus.ARCHIVED
+    # Committed through the shared transaction helper (create + publish + archive).
+    assert repo.commits == 3
 
 
 async def test_archive_a_draft_is_a_conflict() -> None:
@@ -991,20 +916,6 @@ async def test_archive_is_404_for_a_non_owner() -> None:
         await service.archive("intruder", created.id)
 
 
-async def test_archive_rolls_back_when_persistence_fails() -> None:
-    service, repo = _service()
-    created = await service.create_draft("user-1", _publishable_doc())
-    await service.publish("user-1", created.id)
-
-    async def failing_save(_roadmap: object) -> None:
-        raise RuntimeError("db down")
-
-    repo.save = failing_save  # type: ignore[method-assign]
-    with pytest.raises(RuntimeError):
-        await service.archive("user-1", created.id)
-    assert repo.rollbacks == 1
-
-
 # --- web-only lifecycle: delete (zero-followers guard) ----------------------
 
 
@@ -1016,6 +927,8 @@ async def test_delete_removes_a_roadmap_with_zero_followers() -> None:
     assert await repo.get(created.id) is None
     with pytest.raises(NotFound):
         await service.get("user-1", created.id)
+    # Committed through the shared transaction helper (create + delete).
+    assert repo.commits == 2
 
 
 async def test_delete_with_followers_is_a_409_and_keeps_the_roadmap() -> None:
@@ -1037,19 +950,6 @@ async def test_delete_is_404_for_a_non_owner() -> None:
         await service.delete("intruder", created.id)
     # A non-owner delete never removes the row (owner-scoped, no existence leak).
     assert await repo.get(created.id) is not None
-
-
-async def test_delete_rolls_back_when_persistence_fails() -> None:
-    service, repo = _service(followers=0)
-    created = await service.create_draft("user-1", _publishable_doc())
-
-    async def failing_delete(_roadmap_id: str) -> None:
-        raise RuntimeError("db down")
-
-    repo.delete = failing_delete  # type: ignore[method-assign]
-    with pytest.raises(RuntimeError):
-        await service.delete("user-1", created.id)
-    assert repo.rollbacks == 1
 
 
 async def test_delete_guard_reads_a_real_follower_count() -> None:

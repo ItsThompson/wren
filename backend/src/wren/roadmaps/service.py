@@ -37,7 +37,7 @@ from wren.roadmaps.read_schemas import (
     SectionInclude,
     SectionPage,
 )
-from wren.roadmaps.repository import RoadmapRepository
+from wren.roadmaps.repository import RoadmapRepository, transaction
 from wren.roadmaps.schemas import (
     PatchOp,
     PatchResult,
@@ -117,12 +117,8 @@ class RoadmapService:
         """
         roadmap_id = await self._mint_unique_roadmap_id(doc.proposed_id or doc.title)
         assembled = assemble_draft(doc, roadmap_id, owner=user_id, now=self._clock())
-        try:
+        async with transaction(self._repo):
             await self._repo.add(_to_record(assembled.roadmap))
-            await self._repo.commit()
-        except Exception:
-            await self._repo.rollback()
-            raise
         _log.info("roadmap_draft_created", roadmap_id=roadmap_id, user_id=user_id)
         return RoadmapCreated.model_validate(
             {**assembled.roadmap.model_dump(), "remap": assembled.remap}
@@ -162,12 +158,8 @@ class RoadmapService:
         patched = outcome.roadmap.model_copy(
             update={"revision": draft.revision + 1, "updated_at": self._clock()}
         )
-        try:
+        async with transaction(self._repo):
             await self._repo.save(patched)
-            await self._repo.commit()
-        except Exception:
-            await self._repo.rollback()
-            raise
         _log.info(
             "roadmap_patched",
             roadmap_id=roadmap_id,
@@ -226,12 +218,8 @@ class RoadmapService:
                 "visibility": draft.visibility,
             }
         )
-        try:
+        async with transaction(self._repo):
             await self._repo.save(replaced)
-            await self._repo.commit()
-        except Exception:
-            await self._repo.rollback()
-            raise
         _log.info(
             "roadmap_replaced",
             roadmap_id=roadmap_id,
@@ -357,12 +345,8 @@ class RoadmapService:
         published = draft.model_copy(
             update={"status": RoadmapStatus.PUBLISHED, "updated_at": self._clock()}
         )
-        try:
+        async with transaction(self._repo):
             await self._repo.save(published)
-            await self._repo.commit()
-        except Exception:
-            await self._repo.rollback()
-            raise
         _log.info("roadmap_published", roadmap_id=roadmap_id, user_id=user_id)
         return published
 
@@ -381,12 +365,8 @@ class RoadmapService:
         source = await self._load_readable(user_id, source_roadmap_id)
         new_id = await self._mint_unique_roadmap_id(source.title)
         forked = assemble_fork(source, new_id, owner=user_id, now=self._clock())
-        try:
+        async with transaction(self._repo):
             await self._repo.add(_to_record(forked))
-            await self._repo.commit()
-        except Exception:
-            await self._repo.rollback()
-            raise
         _log.info(
             "roadmap_forked",
             roadmap_id=new_id,
@@ -424,12 +404,8 @@ class RoadmapService:
         if subject_tags is not None:
             updates["subject_tags"] = list(subject_tags)
         edited = roadmap.model_copy(update=updates)
-        try:
+        async with transaction(self._repo):
             await self._repo.save(edited)
-            await self._repo.commit()
-        except Exception:
-            await self._repo.rollback()
-            raise
         _log.info("roadmap_metadata_edited", roadmap_id=roadmap_id, user_id=user_id)
         return edited
 
@@ -448,12 +424,8 @@ class RoadmapService:
         """
         roadmap = await self._load_owned(user_id, roadmap_id)
         updated = roadmap.model_copy(update={"visibility": visibility, "updated_at": self._clock()})
-        try:
+        async with transaction(self._repo):
             await self._repo.save(updated)
-            await self._repo.commit()
-        except Exception:
-            await self._repo.rollback()
-            raise
         _log.info(
             "roadmap_visibility_set",
             roadmap_id=roadmap_id,
@@ -483,12 +455,8 @@ class RoadmapService:
         archived = roadmap.model_copy(
             update={"status": RoadmapStatus.ARCHIVED, "updated_at": self._clock()}
         )
-        try:
+        async with transaction(self._repo):
             await self._repo.save(archived)
-            await self._repo.commit()
-        except Exception:
-            await self._repo.rollback()
-            raise
         _log.info("roadmap_archived", roadmap_id=roadmap_id, user_id=user_id)
         return archived
 
@@ -515,12 +483,8 @@ class RoadmapService:
                 code=ErrorCode.DELETE_HAS_FOLLOWERS,
                 instance=f"/roadmaps/{roadmap_id}",
             )
-        try:
+        async with transaction(self._repo):
             await self._repo.delete(roadmap_id)
-            await self._repo.commit()
-        except Exception:
-            await self._repo.rollback()
-            raise
         _log.info("roadmap_deleted", roadmap_id=roadmap_id, user_id=user_id)
 
     async def _load_owned(self, user_id: str, roadmap_id: str) -> Roadmap:
