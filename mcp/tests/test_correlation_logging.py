@@ -14,14 +14,17 @@ inside the capture block, mirroring the backend correlation tests.
 from __future__ import annotations
 
 import re
+from typing import TYPE_CHECKING
 
 import httpx
-import pytest
 import structlog
 
 from log_capture import capture_correlated_logs
 from mcp_harness import AgentHarness, json_error
 from wren_mcp.client import REQUEST_ID_HEADER
+
+if TYPE_CHECKING:
+    import pytest
 
 _ROADMAP_ID = "grokking-dsa-7f3k"
 _MCP_HEADERS = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}

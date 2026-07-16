@@ -16,10 +16,10 @@ visibility, archive, or delete tool: those are web-only.
 
 from __future__ import annotations
 
-from mcp.server.fastmcp import FastMCP
+from typing import TYPE_CHECKING
+
 from mcp.types import ToolAnnotations
 
-from wren_mcp.client import InternalApiClient
 from wren_mcp.config import SCOPE_ROADMAPS_WRITE
 from wren_mcp.schemas import (
     CreatedRoadmap,
@@ -35,6 +35,11 @@ from wren_mcp.schemas import (
 from wren_mcp.scopes import AgentContext, require_scope
 from wren_mcp.tool_errors import raise_for_problem
 from wren_mcp.tool_registry import counted_tool_registrar
+
+if TYPE_CHECKING:
+    from mcp.server.fastmcp import FastMCP
+
+    from wren_mcp.client import InternalApiClient
 
 _CREATE = ToolAnnotations(
     title="Create roadmap draft", readOnlyHint=False, destructiveHint=False, openWorldHint=False

@@ -16,12 +16,15 @@ permissive wrapper installed here.
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import TYPE_CHECKING
 
 import structlog
 from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 @contextmanager

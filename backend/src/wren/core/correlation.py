@@ -23,10 +23,13 @@ before use. When absent or malformed, a fresh id is minted.
 from __future__ import annotations
 
 import re
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import structlog
-from starlette.types import ASGIApp, Receive, Scope, Send
+
+if TYPE_CHECKING:
+    from starlette.types import ASGIApp, Receive, Scope, Send
 
 REQUEST_ID_HEADER = "X-Request-ID"
 

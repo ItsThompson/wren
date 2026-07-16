@@ -10,14 +10,13 @@ route is hidden from the OpenAPI surface.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.testclient import TestClient
 
-from tests.conftest import MakeSettings
 from tests.oauth_fakes import (
     InMemoryOAuthRepository,
     build_test_codec,
@@ -29,11 +28,16 @@ from wren.api.main import app as external_app
 from wren.core.app_factory import create_app
 from wren.core.errors import build_exception_handlers
 from wren.core.identity import SESSION_COOKIE_NAME, StripInboundIdentityMiddleware
-from wren.core.settings import AppSettings
 from wren.oauth.api import create_oauth_router
 from wren.oauth.authorization import AuthorizationService
 from wren.oauth.errors import build_oauth_exception_handlers
 from wren.oauth.token_exchange import TokenService
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
+
+    from tests.conftest import MakeSettings
+    from wren.core.settings import AppSettings
 
 _USER = "user-ada"
 _SESSION_COOKIE = "session-ada"

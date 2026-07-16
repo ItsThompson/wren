@@ -22,10 +22,13 @@ layer. Being pure-ASGI, the bindings live in the request's own context.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import structlog
-from starlette.types import ASGIApp, Receive, Scope, Send
+
+if TYPE_CHECKING:
+    from starlette.types import ASGIApp, Receive, Scope, Send
 
 
 class CorrelationMiddleware:

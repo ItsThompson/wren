@@ -12,10 +12,9 @@ boundary: the backend internal API.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from token_factory import ISSUER, RESOURCE, make_fetch, mint, new_key, public_jwks
@@ -23,6 +22,9 @@ from wren_mcp.app import create_rs_app
 from wren_mcp.client import InternalApiClient
 from wren_mcp.keys import RemoteKeyProvider
 from wren_mcp.settings import SERVICE, RsSettings
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 BackendHandler = Callable[[httpx.Request], httpx.Response]
 _INTERNAL_BASE = "http://backend:8001"

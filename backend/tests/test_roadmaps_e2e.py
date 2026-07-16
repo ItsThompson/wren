@@ -13,11 +13,11 @@ from __future__ import annotations
 import os
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from alembic import command
 from alembic.config import Config
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from tests.support.fakes.accounts_fakes import build_test_codec, build_test_hasher
@@ -39,6 +39,9 @@ from wren.roadmaps.wiring import (
     build_roadmap_read_service_provider,
     build_roadmap_service_provider,
 )
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 pytestmark = pytest.mark.integration
 

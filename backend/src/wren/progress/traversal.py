@@ -9,8 +9,11 @@ re-derived divergently per projection.
 
 from __future__ import annotations
 
-from wren.progress.schemas import Progress
-from wren.roadmaps import Roadmap, Subsection
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from wren.progress.schemas import Progress
+    from wren.roadmaps import Roadmap, Subsection
 
 
 def index_subsections(roadmap: Roadmap) -> dict[str, Subsection]:

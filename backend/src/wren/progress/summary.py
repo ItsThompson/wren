@@ -9,10 +9,14 @@ framework-free, sharing the traversal helpers with ``next``.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from wren.core.section_counts import count_section, percent
 from wren.progress.schemas import Progress, ProgressSnapshot, SectionProgress
 from wren.progress.traversal import checked_item_ids
-from wren.roadmaps import Roadmap
+
+if TYPE_CHECKING:
+    from wren.roadmaps import Roadmap
 
 
 def summarize(roadmap: Roadmap, progress: Progress, *, detailed: bool) -> ProgressSnapshot:

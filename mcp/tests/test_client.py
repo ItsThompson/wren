@@ -9,7 +9,7 @@ to capture the outgoing request without a live backend.
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import httpx
 import pytest
@@ -18,6 +18,9 @@ from mcp.server.fastmcp.exceptions import ToolError
 
 from wren_mcp.client import REQUEST_ID_HEADER, InternalApiClient
 from wren_mcp.config import INTERNAL_TOKEN_HEADER, USER_ID_HEADER
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 _API_TOKEN = "shared-internal-token"
 

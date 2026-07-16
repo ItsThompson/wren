@@ -22,21 +22,24 @@ forks any *readable* source) without duplicating a guard into both services.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING
 
 from wren.core.errors import NotFound, Validation
 from wren.core.observability import track_failures
-from wren.core.read_contract import ResponseFormat
 from wren.roadmaps import projections
 from wren.roadmaps.config import SECTION_PAGE_SIZE
-from wren.roadmaps.read_schemas import (
-    NodeDetail,
-    Overview,
-    SearchHit,
-    SectionInclude,
-    SectionPage,
-)
-from wren.roadmaps.repository import RoadmapRepository
 from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
+
+if TYPE_CHECKING:
+    from wren.core.read_contract import ResponseFormat
+    from wren.roadmaps.read_schemas import (
+        NodeDetail,
+        Overview,
+        SearchHit,
+        SectionInclude,
+        SectionPage,
+    )
+    from wren.roadmaps.repository import RoadmapRepository
 
 # How a read learns the caller's checked checklist-item ids for the progress-aware
 # projections (Overview counts, NodeDetail done-state). A narrow injected callable

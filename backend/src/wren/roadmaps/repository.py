@@ -16,17 +16,20 @@ returns only a boolean, never another user's data.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from wren.core.db import fetch_optional
 from wren.roadmaps.models import RoadmapRecord
 from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Sequence
+
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class RoadmapRepository(Protocol):

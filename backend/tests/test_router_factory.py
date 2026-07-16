@@ -20,9 +20,9 @@ introduced, complementing the per-app contract suites (``test_roadmaps_api*`` /
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import pytest
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from tests.support.fakes.accounts_fakes import (
@@ -58,6 +58,9 @@ from wren.progress.service import ProgressService
 from wren.roadmaps.read_service import RoadmapReadService
 from wren.roadmaps.router import create_roadmaps_router
 from wren.roadmaps.service import RoadmapService
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 MakeSettings = Callable[..., AppSettings]
 

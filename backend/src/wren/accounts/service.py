@@ -16,19 +16,22 @@ from __future__ import annotations
 
 import asyncio
 import re
+from typing import TYPE_CHECKING
 
 from sqlalchemy.exc import IntegrityError
 
 from wren.accounts.injection import Clock, OpaqueIdFactory, new_hex_id, utcnow
 from wren.accounts.models import User
 from wren.accounts.passwords import PasswordHasher, validate_password_strength
-from wren.accounts.repository import AccountRepository
 from wren.accounts.schemas import AuthenticatedUser, PublicProfile, Session
-from wren.accounts.tokens import SessionTokenCodec
 from wren.core.db import is_unique_violation
 from wren.core.errors import Conflict, NotFound, Unauthorized, Validation
 from wren.core.logging import get_logger
 from wren.core.observability import track_failures
+
+if TYPE_CHECKING:
+    from wren.accounts.repository import AccountRepository
+    from wren.accounts.tokens import SessionTokenCodec
 
 # A public handle: 3..32 chars, lowercase letters/digits/underscore/hyphen. Kept
 # conservative because it appears in public profile URLs.

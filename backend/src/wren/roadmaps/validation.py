@@ -23,8 +23,8 @@ whole ``violations`` array.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from wren.core.errors import Violation
 from wren.roadmaps.dag import (
@@ -35,7 +35,11 @@ from wren.roadmaps.dag import (
     find_dangling_prereqs,
     validate_suggested_path,
 )
-from wren.roadmaps.schemas import Roadmap, Section, Subsection
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
+
+    from wren.roadmaps.schemas import Roadmap, Section, Subsection
 
 
 class StructuralRule(StrEnum):

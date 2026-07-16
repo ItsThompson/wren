@@ -15,14 +15,16 @@ backend.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import structlog
 from mcp.server.fastmcp.exceptions import ToolError
 
 from wren_mcp.config import INTERNAL_TOKEN_HEADER, USER_ID_HEADER
-from wren_mcp.settings import RsSettings
+
+if TYPE_CHECKING:
+    from wren_mcp.settings import RsSettings
 
 # Bound so a hung internal call cannot pin an MCP worker indefinitely.
 _DEFAULT_TIMEOUT_SECONDS = 10.0

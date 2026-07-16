@@ -21,11 +21,13 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from wren_mcp.keys import KeyProvider
+if TYPE_CHECKING:
+    from wren_mcp.keys import KeyProvider
 
 HEALTHZ_ENDPOINT = "/healthz"
 READYZ_ENDPOINT = "/readyz"

@@ -16,14 +16,17 @@ from __future__ import annotations
 import hashlib
 import secrets
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from joserfc import jwt
 from joserfc.errors import JoseError
 from joserfc.jwt import JWTClaimsRegistry
 
-from wren.oauth.config import OAuthConfig
 from wren.oauth.injection import Clock, OpaqueIdFactory, new_hex_id, utcnow
-from wren.oauth.keys import SigningKeySet
+
+if TYPE_CHECKING:
+    from wren.oauth.config import OAuthConfig
+    from wren.oauth.keys import SigningKeySet
 
 _ALGORITHMS = ["RS256"]
 # Opaque refresh-token entropy (bytes -> ~43 char urlsafe string).

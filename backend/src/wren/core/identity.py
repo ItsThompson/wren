@@ -21,14 +21,22 @@ These are FastAPI dependencies; later route slices declare
 from __future__ import annotations
 
 import secrets
+from typing import TYPE_CHECKING
 
 import structlog
-from starlette.requests import Request
-from starlette.types import ASGIApp, Receive, Scope, Send
+
+# ``require_user`` / ``require_internal_user`` are FastAPI dependencies (not
+# decorated route handlers, so runtime-evaluated-decorators does not reach them);
+# FastAPI resolves their ``Request`` annotation at runtime, so it must stay a
+# runtime import or FastAPI mistakes ``request`` for a query field.
+from starlette.requests import Request  # noqa: TC002
 
 from wren.core.errors import Unauthorized
 from wren.core.logging import get_logger
 from wren.core.state import SessionVerifier, get_internal_token, get_session_verifier
+
+if TYPE_CHECKING:
+    from starlette.types import ASGIApp, Receive, Scope, Send
 
 _log = get_logger("wren-core")
 

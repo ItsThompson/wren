@@ -15,9 +15,10 @@ accessors without a circular import.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
-from starlette.applications import Starlette
+if TYPE_CHECKING:
+    from starlette.applications import Starlette
 
 # The app.state attributes the two identity boundaries resolve from.
 SESSION_VERIFIER_ATTR = "session_verifier"

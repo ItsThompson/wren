@@ -15,12 +15,10 @@ the engine does not require a reachable database; the ``/readyz`` check
 from __future__ import annotations
 
 import time
-from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from fastapi import FastAPI
 from sqlalchemy import Select, event, text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -28,11 +26,20 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from starlette.requests import Request
-from starlette.types import Lifespan
+
+# ``get_session`` is a FastAPI dependency (not a decorated route handler), so
+# FastAPI resolves its ``Request`` annotation at runtime; it must stay a runtime
+# import or FastAPI mistakes ``request`` for a query field.
+from starlette.requests import Request  # noqa: TC002
 
 from wren.core.health import CheckResult, ReadinessCheck
 from wren.core.observability import ACTIVE_CONNECTIONS, DB_QUERY_DURATION
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
+    from fastapi import FastAPI
+    from starlette.types import Lifespan
 
 # Pool sized for one backend instance. `pool_pre_ping` discards
 # connections severed by a Postgres restart or idle timeout before they are handed

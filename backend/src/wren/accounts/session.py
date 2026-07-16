@@ -15,11 +15,14 @@ short-lived session (it runs outside a request-scoped ``get_session``).
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING
 
 from wren.accounts.repository import SqlAlchemyAccountRepository
-from wren.accounts.tokens import SessionTokenCodec
-from wren.core.db import Database
-from wren.core.state import SessionVerifier
+
+if TYPE_CHECKING:
+    from wren.accounts.tokens import SessionTokenCodec
+    from wren.core.db import Database
+    from wren.core.state import SessionVerifier
 
 # Resolves whether a session id has been revoked (blacklisted).
 RevocationLookup = Callable[[str], Awaitable[bool]]

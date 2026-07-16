@@ -12,8 +12,8 @@ progress store so a trusted POST /progress feeds the read projections.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from tests.roadmaps_read_builders import (
@@ -39,8 +39,12 @@ from wren.progress.router import create_progress_router
 from wren.progress.service import ProgressService
 from wren.roadmaps.read_service import RoadmapReadService
 from wren.roadmaps.router import create_roadmaps_router
-from wren.roadmaps.schemas import Roadmap
 from wren.roadmaps.service import RoadmapService
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
+
+    from wren.roadmaps.schemas import Roadmap
 
 MakeSettings = Callable[..., AppSettings]
 

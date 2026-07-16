@@ -15,12 +15,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import jwt
 
-from wren.accounts.config import SessionConfig
 from wren.accounts.injection import Clock, OpaqueIdFactory, new_hex_id, utcnow
+
+if TYPE_CHECKING:
+    from wren.accounts.config import SessionConfig
 
 _ALGORITHM = "HS256"
 _ACCESS_TYPE = "access"

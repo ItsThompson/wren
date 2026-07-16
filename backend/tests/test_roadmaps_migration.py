@@ -9,8 +9,8 @@ real asyncpg driver. Skipped automatically when Docker is unavailable.
 from __future__ import annotations
 
 import os
-from collections.abc import Iterator
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from alembic import command
@@ -32,6 +32,9 @@ from wren.roadmaps.schemas import (
     SubsectionInput,
 )
 from wren.roadmaps.service import RoadmapService
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 pytestmark = pytest.mark.integration
 

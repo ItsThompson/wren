@@ -13,15 +13,18 @@ in-memory-backed service. These routes are mounted on the external app only.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, Request, Response
 
 from wren.accounts.config import AUTH_PATH, REFRESH_COOKIE_NAME, CookieConfig
 from wren.accounts.schemas import AuthenticatedUser, LoginRequest, RegisterRequest
 from wren.accounts.service import AccountService
-from wren.accounts.tokens import TokenPair
 from wren.core.errors import Unauthorized
 from wren.core.identity import SESSION_COOKIE_NAME
+
+if TYPE_CHECKING:
+    from wren.accounts.tokens import TokenPair
 
 # A FastAPI dependency that yields an AccountService for the request.
 AccountServiceProvider = Callable[..., object]

@@ -15,7 +15,7 @@ write/read tools call, one HTTP call per tool.
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+from typing import TYPE_CHECKING
 
 from wren.core.app_factory import create_app
 from wren.core.db import create_database, create_db_lifespan, db_readiness_check
@@ -29,6 +29,9 @@ from wren.roadmaps.wiring import (
     build_roadmap_read_service_provider,
     build_roadmap_service_provider,
 )
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 settings = build_app_settings(service=INTERNAL_SERVICE, port=INTERNAL_PORT)
 db = create_database(settings.database_url)

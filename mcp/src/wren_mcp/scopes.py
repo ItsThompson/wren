@@ -16,6 +16,8 @@ the missing scope, not a crash, so the agent can re-authorize and retry.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import structlog
 from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.exceptions import ToolError
@@ -25,7 +27,9 @@ from starlette.requests import Request
 from wren_mcp.logging import get_logger
 from wren_mcp.settings import SERVICE
 from wren_mcp.state import get_request_agent
-from wren_mcp.tokens import VerifiedAgentToken
+
+if TYPE_CHECKING:
+    from wren_mcp.tokens import VerifiedAgentToken
 
 _log = get_logger(SERVICE)
 

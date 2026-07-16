@@ -13,8 +13,8 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
-from tests.support.fakes.progress_fakes import InMemoryProgressRepository
 from wren.roadmaps.schemas import (
     ChecklistItem,
     Resource,
@@ -25,6 +25,9 @@ from wren.roadmaps.schemas import (
     Subsection,
     Visibility,
 )
+
+if TYPE_CHECKING:
+    from tests.support.fakes.progress_fakes import InMemoryProgressRepository
 
 _NOW = datetime(2026, 7, 15, tzinfo=UTC)
 

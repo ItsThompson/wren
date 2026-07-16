@@ -13,9 +13,9 @@ from __future__ import annotations
 
 import asyncio
 from logging.config import fileConfig
+from typing import TYPE_CHECKING
 
 from alembic import context
-from sqlalchemy.engine import Connection
 
 # Import every domain's models for their side effect of registering tables on
 # Base.metadata. Add new domain model modules here as slices land.
@@ -26,6 +26,9 @@ import wren.roadmaps.models as _roadmaps_models  # noqa: F401 (registers the roa
 from wren.core.db import create_db_engine
 from wren.core.orm import Base
 from wren.core.settings import EnvSettings
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Connection
 
 config = context.config
 

@@ -13,17 +13,21 @@ human (a stale-revision 409 says "re-read", a 422 names the offending IDs).
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from enum import StrEnum
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
-from starlette.requests import Request
 from starlette.responses import Response
 
-from wren.core.app_factory import ExceptionHandler, ExceptionKey
 from wren.core.logging import get_logger
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from starlette.requests import Request
+
+    from wren.core.app_factory import ExceptionHandler, ExceptionKey
 
 PROBLEM_JSON_MEDIA_TYPE = "application/problem+json"
 

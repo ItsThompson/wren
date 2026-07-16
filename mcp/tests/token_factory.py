@@ -9,13 +9,15 @@ RS would fetch, and :func:`make_fetch` fakes the two discovery hops (AS metadata
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from joserfc import jwt
 from joserfc.jwk import KeySet, RSAKey
 
 from wren_mcp.config import AS_METADATA_PATH
-from wren_mcp.keys import JsonFetch
+
+if TYPE_CHECKING:
+    from wren_mcp.keys import JsonFetch
 
 ISSUER = "https://api.usewren.com"
 RESOURCE = "https://mcp.usewren.com"

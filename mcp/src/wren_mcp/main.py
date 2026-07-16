@@ -7,10 +7,13 @@ calls to the backend internal app. Built from:func:`build_app`.
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+from typing import TYPE_CHECKING
 
 from wren_mcp.app import build_app
 from wren_mcp.settings import build_rs_settings
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 settings = build_rs_settings()
 app: FastAPI = build_app(settings)

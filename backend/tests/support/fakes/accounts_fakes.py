@@ -10,14 +10,17 @@ path is exercised without a database.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
 from sqlalchemy.exc import IntegrityError
 
 from wren.accounts.config import SessionConfig
 from wren.accounts.injection import Clock, utcnow
-from wren.accounts.models import User
 from wren.accounts.passwords import BcryptPasswordHasher
 from wren.accounts.tokens import RefreshClaims, SessionTokenCodec
+
+if TYPE_CHECKING:
+    from wren.accounts.models import User
 
 # Cheap bcrypt cost for tests: real hashing + verification path, fast. Cost 12 is
 # asserted directly in test_accounts_passwords.

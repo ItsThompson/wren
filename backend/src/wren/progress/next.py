@@ -17,6 +17,8 @@ guards the load-bearing thesis that the app is not the brain.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from wren.core.read_contract import ResponseFormat
 from wren.progress.schemas import NextItem, NextResult, Progress, ResourceLink
 from wren.progress.traversal import (
@@ -25,7 +27,9 @@ from wren.progress.traversal import (
     index_subsections,
     is_subsection_done,
 )
-from wren.roadmaps import Roadmap, Subsection
+
+if TYPE_CHECKING:
+    from wren.roadmaps import Roadmap, Subsection
 
 
 def compute(

@@ -13,15 +13,18 @@ None" reads and the commit policy in one place.
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from wren.accounts.models import RevokedSession, User
-from wren.accounts.tokens import RefreshClaims
 from wren.core.db import fetch_optional
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from wren.accounts.tokens import RefreshClaims
 
 
 class AccountRepository(Protocol):

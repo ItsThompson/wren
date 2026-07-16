@@ -16,6 +16,7 @@ builds the ``ProgressSnapshot`` wire type in the progress domain)."""
 from __future__ import annotations
 
 import base64
+from typing import TYPE_CHECKING
 
 from wren.core.read_contract import ResponseFormat
 from wren.core.section_counts import count_section, percent
@@ -32,7 +33,9 @@ from wren.roadmaps.read_schemas import (
     SectionOverview,
     SectionPage,
 )
-from wren.roadmaps.schemas import Roadmap, Section, Subsection
+
+if TYPE_CHECKING:
+    from wren.roadmaps.schemas import Roadmap, Section, Subsection
 
 
 class CursorError(ValueError):

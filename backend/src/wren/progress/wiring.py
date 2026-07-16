@@ -10,10 +10,9 @@ process-wide default.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from wren.core.db import get_session
 from wren.progress.repository import SqlAlchemyProgressRepository
@@ -23,6 +22,11 @@ from wren.progress.service import ProgressService
 # its read access. Genuine coupling, not a missing re-export; a shared read-port
 # abstraction is a known follow-up.
 from wren.roadmaps.repository import SqlAlchemyRoadmapRepository
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 def build_progress_service_provider() -> Callable[[AsyncSession], ProgressService]:

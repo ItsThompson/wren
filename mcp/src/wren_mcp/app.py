@@ -16,15 +16,12 @@ server.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 from fastapi import APIRouter, FastAPI
 from fastapi.responses import JSONResponse
-from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
-from starlette.types import Lifespan
 
 from wren_mcp.auth import BearerAuthMiddleware
 from wren_mcp.client import InternalApiClient, create_internal_http_client
@@ -41,6 +38,12 @@ from wren_mcp.state import RsDeps, set_rs_deps
 from wren_mcp.tokens import AgentTokenVerifier
 from wren_mcp.tools_read import register_read_tools
 from wren_mcp.tools_write import register_write_tools
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
+    from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+    from starlette.types import Lifespan
 
 # Bound so a hung AS cannot pin the discovery/readiness call indefinitely.
 _DISCOVERY_TIMEOUT_SECONDS = 10.0

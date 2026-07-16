@@ -7,7 +7,8 @@ the shared factory with the external service identity injected.
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+from typing import TYPE_CHECKING
+
 from fastapi.middleware.cors import CORSMiddleware
 
 from wren.accounts.api import create_accounts_router
@@ -48,6 +49,9 @@ from wren.roadmaps.wiring import (
     build_roadmap_service_provider,
 )
 from wren.skill.api import create_skill_router
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 settings = build_app_settings(service=EXTERNAL_SERVICE, port=EXTERNAL_PORT)
 db = create_database(settings.database_url)

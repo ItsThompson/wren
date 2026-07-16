@@ -8,8 +8,8 @@ its access level is declared PUBLIC in the route registry.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from wren.core.app_factory import create_app
@@ -17,6 +17,9 @@ from wren.core.route_registry import EXTERNAL_ROUTE_ACCESS, AccessLevel, RouteKe
 from wren.core.settings import AppSettings
 from wren.skill.api import create_skill_router
 from wren.skill.content import read_skill_markdown
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 MakeSettings = Callable[..., AppSettings]
 

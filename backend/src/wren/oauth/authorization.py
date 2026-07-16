@@ -14,7 +14,7 @@ Protocol errors on the agent-facing ``/register`` and ``/authorize`` paths are
 
 from __future__ import annotations
 
-from datetime import datetime
+from typing import TYPE_CHECKING
 from urllib.parse import urlencode, urlsplit
 
 from wren.core.errors import NotFound
@@ -33,7 +33,6 @@ from wren.oauth.errors import OAuthError
 from wren.oauth.injection import Clock, OpaqueIdFactory, new_hex_id, new_urlsafe_id, utcnow
 from wren.oauth.models import OAuthAuthorizationCode, OAuthAuthRequest, OAuthClient
 from wren.oauth.redirects import is_allowed_redirect, is_loopback
-from wren.oauth.repository import OAuthRepository
 from wren.oauth.schemas import (
     AuthorizationContext,
     AuthorizeParams,
@@ -41,6 +40,11 @@ from wren.oauth.schemas import (
     ClientRegistrationResponse,
     OAuthEvent,
 )
+
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    from wren.oauth.repository import OAuthRepository
 
 _log = get_logger("wren-oauth")
 

@@ -12,8 +12,8 @@ published roadmap; no database is required.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from tests.support.fakes.progress_builders import CHK_ARRAYS_READ, build_roadmap, make_record
@@ -29,6 +29,9 @@ from wren.core.identity import (
 from wren.core.settings import AppSettings
 from wren.progress.router import create_progress_router
 from wren.progress.service import ProgressService
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 MakeSettings = Callable[..., AppSettings]
 

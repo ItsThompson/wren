@@ -19,9 +19,8 @@ names its valid siblings, and a cycle-creating edge explains the cycle (reusing
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
-from typing import assert_never
+from typing import TYPE_CHECKING, assert_never
 
 from wren.roadmaps import dag
 from wren.roadmaps.assembly import IdMinter
@@ -59,6 +58,9 @@ from wren.roadmaps.schemas import (
     UpdateSectionOp,
     UpdateSubsectionOp,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
 
 
 class PatchError(Exception):

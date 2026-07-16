@@ -18,10 +18,12 @@ HTTP ``status_code`` and problem ``code`` so the tool-metrics wrapper
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import httpx
 from mcp.server.fastmcp.exceptions import ToolError
+
+if TYPE_CHECKING:
+    import httpx
 
 
 class BackendToolError(ToolError):

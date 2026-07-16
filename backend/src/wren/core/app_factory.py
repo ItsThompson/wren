@@ -12,17 +12,21 @@ Wiring only. Do not import domain packages here.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Mapping, Sequence
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, FastAPI
 from starlette.requests import Request
 from starlette.responses import Response
-from starlette.types import Lifespan
 
 from wren.core.correlation import CorrelationMiddleware
 from wren.core.health import ReadinessCheck, create_health_router
 from wren.core.logging import configure_logging, get_logger
 from wren.core.metrics import instrument
-from wren.core.settings import AppSettings
+
+if TYPE_CHECKING:
+    from starlette.types import Lifespan
+
+    from wren.core.settings import AppSettings
 
 # FastAPI keys handlers by exception type or status code.
 ExceptionKey = type[Exception] | int

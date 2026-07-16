@@ -26,8 +26,8 @@ instrumentator wiring here MUST be mirrored there. See
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
     CollectorRegistry,
@@ -40,6 +40,9 @@ from prometheus_fastapi_instrumentator.metrics import Info
 from starlette.responses import Response
 
 from wren.core.observability import WREN_REGISTRY
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 # An instrumentation function receives one request's Info and records to a metric.
 Instrumentation = Callable[[Info], None]

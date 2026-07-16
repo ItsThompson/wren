@@ -13,12 +13,13 @@ frozen schema snapshot is unaffected.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import Any
-
-from mcp.server.fastmcp import FastMCP
-from mcp.types import ToolAnnotations
+from typing import TYPE_CHECKING, Any
 
 from wren_mcp.tool_metrics import count_invocations
+
+if TYPE_CHECKING:
+    from mcp.server.fastmcp import FastMCP
+    from mcp.types import ToolAnnotations
 
 
 def counted_tool_registrar[ToolFn: Callable[..., Awaitable[Any]]](

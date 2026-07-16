@@ -8,10 +8,9 @@ service's token factory and clock keep their process-wide defaults.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from wren.accounts.repository import SqlAlchemyAccountRepository
 from wren.core.db import get_session
@@ -20,6 +19,11 @@ from wren.roadmaps.listing import HandleResolver, ListingService, ProfileOwner
 from wren.roadmaps.read_service import CheckedReader, RoadmapReadService
 from wren.roadmaps.repository import SqlAlchemyRoadmapRepository
 from wren.roadmaps.service import RoadmapService
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 def build_roadmap_service_provider() -> Callable[[AsyncSession], RoadmapService]:

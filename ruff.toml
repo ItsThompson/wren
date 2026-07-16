@@ -34,6 +34,7 @@ select = [
     "C4",   # comprehension hygiene
     "RET",  # return hygiene
     "TID",  # tidy imports
+    "TC",   # flake8-type-checking: type-only imports live under TYPE_CHECKING
 ]
 # S105 (hardcoded-password-string) is a name-based heuristic: every hit in this
 # repo is a protocol constant (GRANT_TYPE_REFRESH_TOKEN, TOKEN_ALPHABET,
@@ -53,4 +54,35 @@ extend-immutable-calls = [
     "fastapi.Header",
     "fastapi.Cookie",
     "fastapi.Body",
+]
+
+[lint.flake8-type-checking]
+# TC moves type-only imports into `if TYPE_CHECKING:`. Some framework seams read
+# annotations at RUNTIME, so their imports must stay runtime-visible or the app
+# fails to construct:
+#   - Pydantic builds validators from field annotations at class-creation time.
+#   - SQLAlchemy resolves `Mapped[...]` annotations when it maps a model.
+#   - FastAPI evaluates a route handler's parameter/return annotations (via
+#     get_type_hints) to build validation and the response model.
+# Marking these base classes / decorators keeps TC from flagging the imports they
+# consume, while every other type-only import is still ratcheted. (Genuine
+# runtime-annotation seams that fit none of these categories, e.g. a FastAPI
+# dependency-provider's own parameter, carry a targeted per-line `# noqa: TC00x`
+# with a rationale rather than a blanket per-file ignore.)
+runtime-evaluated-base-classes = [
+    "pydantic.BaseModel",
+    "sqlalchemy.orm.DeclarativeBase",
+    "wren.core.orm.Base",
+]
+runtime-evaluated-decorators = [
+    "fastapi.APIRouter.get",
+    "fastapi.APIRouter.post",
+    "fastapi.APIRouter.put",
+    "fastapi.APIRouter.patch",
+    "fastapi.APIRouter.delete",
+    "fastapi.FastAPI.get",
+    "fastapi.FastAPI.post",
+    "fastapi.FastAPI.put",
+    "fastapi.FastAPI.patch",
+    "fastapi.FastAPI.delete",
 ]

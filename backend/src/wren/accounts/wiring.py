@@ -8,16 +8,21 @@ hasher and codec are process-wide singletons.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from wren.accounts.passwords import PasswordHasher
 from wren.accounts.repository import SqlAlchemyAccountRepository
 from wren.accounts.service import AccountService
-from wren.accounts.tokens import SessionTokenCodec
 from wren.core.db import get_session
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from wren.accounts.passwords import PasswordHasher
+    from wren.accounts.tokens import SessionTokenCodec
 
 
 def build_account_service_provider(

@@ -8,12 +8,16 @@ is wired into both apps; its up/down state is covered by the DB readiness tests.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from wren.api.main import app as external_app
 from wren.api_internal.main import app as internal_app
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 
 @pytest.mark.parametrize(

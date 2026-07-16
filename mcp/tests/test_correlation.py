@@ -17,11 +17,14 @@ covered by ``test_correlation_logging``.
 from __future__ import annotations
 
 import re
+from typing import TYPE_CHECKING
 
 import structlog
-from starlette.types import Receive, Scope, Send
 
 from wren_mcp.correlation import CorrelationMiddleware
+
+if TYPE_CHECKING:
+    from starlette.types import Receive, Scope, Send
 
 _MINTED_ID = re.compile(r"[0-9a-f]{32}")
 

@@ -11,8 +11,8 @@ repositories seeded with a published roadmap; no database is required.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from tests.support.fakes.accounts_fakes import (
@@ -41,6 +41,9 @@ from wren.core.settings import AppSettings
 from wren.progress.router import create_progress_router
 from wren.progress.service import ProgressService
 from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 MakeSettings = Callable[..., AppSettings]
 

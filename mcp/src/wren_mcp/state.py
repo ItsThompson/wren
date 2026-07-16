@@ -18,13 +18,16 @@ is the one typed place those seams are read and written:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from starlette.applications import Starlette
-from starlette.requests import Request
-
-from wren_mcp.client import InternalApiClient
-from wren_mcp.keys import KeyProvider
 from wren_mcp.tokens import AgentTokenVerifier, VerifiedAgentToken
+
+if TYPE_CHECKING:
+    from starlette.applications import Starlette
+    from starlette.requests import Request
+
+    from wren_mcp.client import InternalApiClient
+    from wren_mcp.keys import KeyProvider
 
 # One app.state key holds the whole dependency façade; one request.state key holds
 # the per-request resolved principal.

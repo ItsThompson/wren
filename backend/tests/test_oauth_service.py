@@ -8,9 +8,9 @@ downgrade/mismatch/replay/expiry failure paths.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -26,7 +26,6 @@ from tests.oauth_fakes import (
 from wren.core.errors import NotFound
 from wren.core.observability import WREN_REGISTRY
 from wren.oauth.authorization import AuthorizationService
-from wren.oauth.config import OAuthConfig
 from wren.oauth.errors import OAuthError, OAuthErrorCode
 from wren.oauth.injection import Clock, utcnow
 from wren.oauth.schemas import (
@@ -36,7 +35,12 @@ from wren.oauth.schemas import (
     TokenRequest,
 )
 from wren.oauth.token_exchange import TokenService
-from wren.oauth.tokens import AccessTokenCodec
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from wren.oauth.config import OAuthConfig
+    from wren.oauth.tokens import AccessTokenCodec
 
 _USER = "user-ada"
 _REDIRECT = "http://127.0.0.1:8765/callback"

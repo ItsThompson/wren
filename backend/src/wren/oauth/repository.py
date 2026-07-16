@@ -10,13 +10,10 @@ successful write and :meth:`rollback` on failure.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from datetime import datetime
-from typing import Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from sqlalchemy import CursorResult, delete, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from wren.core.db import fetch_optional
 from wren.oauth.models import (
@@ -27,6 +24,12 @@ from wren.oauth.models import (
     OAuthGrant,
     OAuthRefreshToken,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from datetime import datetime
+
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class OAuthRepository(Protocol):

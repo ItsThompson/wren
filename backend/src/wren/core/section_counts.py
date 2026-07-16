@@ -12,13 +12,14 @@ carried.
 
 from __future__ import annotations
 
-from collections.abc import Set as AbstractSet
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     # Typing-only import: the counting loop is duck-typed over the roadmap
     # hierarchy, so this shared kit carries no runtime dependency on the
     # roadmaps domain (the arrow stays domains -> core, never the reverse).
+    from collections.abc import Set as AbstractSet
+
     from wren.roadmaps.schemas import Section
 
 

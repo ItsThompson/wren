@@ -13,8 +13,8 @@ required.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from tests.support.fakes.roadmaps_fakes import (
@@ -33,6 +33,9 @@ from wren.core.settings import AppSettings
 from wren.roadmaps.read_service import RoadmapReadService
 from wren.roadmaps.router import create_roadmaps_router
 from wren.roadmaps.service import RoadmapService
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 MakeSettings = Callable[..., AppSettings]
 

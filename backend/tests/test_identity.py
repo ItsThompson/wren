@@ -5,8 +5,8 @@ behavior is asserted on an external-shaped app and an internal-shaped app."""
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-import pytest
 import structlog
 from fastapi import APIRouter, Depends, FastAPI, Request
 from fastapi.testclient import TestClient
@@ -25,6 +25,9 @@ from wren.core.identity import (
     require_user,
 )
 from wren.core.settings import AppSettings
+
+if TYPE_CHECKING:
+    import pytest
 
 MakeSettings = Callable[..., AppSettings]
 

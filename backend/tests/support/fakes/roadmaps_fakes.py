@@ -9,12 +9,16 @@ without a database.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Iterator, Sequence
+from typing import TYPE_CHECKING
 
 from sqlalchemy.exc import IntegrityError
 
-from wren.roadmaps.models import RoadmapRecord
 from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable, Iterator, Sequence
+
+    from wren.roadmaps.models import RoadmapRecord
 
 
 class _PkViolation(Exception):

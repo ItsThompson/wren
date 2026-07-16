@@ -11,9 +11,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-from wren.core.settings import AppSettings
+if TYPE_CHECKING:
+    from wren.core.settings import AppSettings
 
 # The access cookie is the session cookie the shared identity seam reads
 # (``wren_session``); the refresh cookie is scoped to the /auth path so it is

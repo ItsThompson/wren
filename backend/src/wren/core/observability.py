@@ -35,10 +35,12 @@ from __future__ import annotations
 
 import functools
 import inspect
-from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
 
 # The custom-metrics registry. Kept separate from each app's private HTTP
 # registry so both the external and internal apps can be built in one process
@@ -72,6 +74,7 @@ ACTIVE_CONNECTIONS = Gauge(
     "Connections currently checked out of the SQLAlchemy pool.",
     registry=WREN_REGISTRY,
 )
+
 
 def track_failures[ServiceT](service: str) -> Callable[[type[ServiceT]], type[ServiceT]]:
     """Class decorator: count each public async method's *unexpected* failures.

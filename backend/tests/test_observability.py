@@ -10,11 +10,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine import Engine
 
 from wren.core.app_factory import create_app
 from wren.core.db import _query_name, instrument_pool
@@ -25,6 +25,9 @@ from wren.core.observability import (
 )
 from wren.core.settings import AppSettings
 from wren.oauth.errors import OAuthError, OAuthErrorCode
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Engine
 
 MakeSettings = Callable[..., AppSettings]
 

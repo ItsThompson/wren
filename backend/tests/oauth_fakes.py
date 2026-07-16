@@ -10,8 +10,8 @@ revocation, one-time codes).
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
 from authlib.oauth2.rfc7636 import create_s256_code_challenge
 
@@ -26,6 +26,9 @@ from wren.oauth.models import (
     OAuthRefreshToken,
 )
 from wren.oauth.tokens import AccessTokenCodec
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 TEST_ISSUER = "https://api.usewren.com"
 TEST_APP_URL = "https://usewren.com"

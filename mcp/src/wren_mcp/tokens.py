@@ -19,12 +19,14 @@ joserfc; this module owns only the claim contract.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from joserfc import jws, jwt
 from joserfc.errors import JoseError
 from joserfc.jwt import JWTClaimsRegistry
 
-from wren_mcp.keys import KeyProvider
+if TYPE_CHECKING:
+    from wren_mcp.keys import KeyProvider
 
 _ALGORITHMS = ["RS256"]
 

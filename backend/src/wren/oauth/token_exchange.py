@@ -15,7 +15,7 @@ tokens are short-lived and revocation takes effect within the access-token TTL.
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
 from wren.core.errors import NotFound
 from wren.core.logging import get_logger
@@ -29,9 +29,13 @@ from wren.oauth.errors import OAuthError
 from wren.oauth.injection import Clock, OpaqueIdFactory, new_hex_id, utcnow
 from wren.oauth.models import OAuthRefreshToken
 from wren.oauth.pkce import is_valid_s256
-from wren.oauth.repository import OAuthRepository
 from wren.oauth.schemas import ConnectedClient, OAuthEvent, TokenRequest, TokenResponse
 from wren.oauth.tokens import AccessTokenCodec, hash_token, mint_refresh_token
+
+if TYPE_CHECKING:
+    from datetime import datetime, timedelta
+
+    from wren.oauth.repository import OAuthRepository
 
 _log = get_logger("wren-oauth")
 _BEARER = "Bearer"

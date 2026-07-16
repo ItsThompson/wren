@@ -9,10 +9,10 @@ the in-memory fake). Skipped automatically when Docker is unavailable.
 from __future__ import annotations
 
 import os
-from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -28,6 +28,9 @@ from wren.oauth.errors import OAuthError
 from wren.oauth.repository import SqlAlchemyOAuthRepository
 from wren.oauth.schemas import AuthorizeParams, ClientRegistrationRequest, TokenRequest
 from wren.oauth.token_exchange import TokenService
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Iterator
 
 pytestmark = pytest.mark.integration
 

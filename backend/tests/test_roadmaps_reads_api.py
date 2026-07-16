@@ -13,8 +13,8 @@ projections' checked reader (as the production wiring binds them).
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from tests.roadmaps_read_builders import (
@@ -47,6 +47,9 @@ from wren.roadmaps.read_service import RoadmapReadService
 from wren.roadmaps.router import create_roadmaps_router
 from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
 from wren.roadmaps.service import RoadmapService
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 MakeSettings = Callable[..., AppSettings]
 

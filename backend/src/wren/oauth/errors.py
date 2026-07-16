@@ -12,12 +12,16 @@ consumed by our own SPA (`/authorize/context`, `/authorize/decision`,
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
-from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from wren.core.app_factory import ExceptionHandler, ExceptionKey
 from wren.core.errors import ExpectedError
+
+if TYPE_CHECKING:
+    from starlette.requests import Request
+
+    from wren.core.app_factory import ExceptionHandler, ExceptionKey
 
 
 class OAuthErrorCode(StrEnum):
