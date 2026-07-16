@@ -3,16 +3,19 @@ name = "wren-mcp"
 version = "0.1.0"
 description = "Wren MCP server: OAuth 2.1 Resource Server (PRM + bearer validation) and thin client of the backend internal API (:8001)."
 requires-python = ">=3.12"
+# Upper-major caps are a safety net (the committed uv.lock is the source of
+# truth; `uv sync --frozen` enforces it), extending the existing `mcp<2` pattern.
+# structlog (calver) is left uncapped so patches are never blocked.
 dependencies = [
-    "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.32.0",
-    "pydantic>=2.9.0",
-    "pydantic-settings>=2.6.0",
+    "fastapi>=0.115.0,<1",
+    "uvicorn[standard]>=0.32.0,<1",
+    "pydantic>=2.9.0,<3",
+    "pydantic-settings>=2.6.0,<3",
     "structlog>=24.4.0",
-    "prometheus-client>=0.21.0",
-    "prometheus-fastapi-instrumentator>=7.0.0",
-    "httpx>=0.27.0",
-    "joserfc>=1.0.0",
+    "prometheus-client>=0.21.0,<1",
+    "prometheus-fastapi-instrumentator>=7.0.0,<9",
+    "httpx>=0.27.0,<1",
+    "joserfc>=1.0.0,<2",
     "mcp>=1.27,<2",
 ]
 
@@ -21,11 +24,11 @@ wren-mcp = "wren_mcp.main:main"
 
 [dependency-groups]
 dev = [
-    "pytest>=8.3.0",
-    "pytest-cov>=6.0.0",
-    "pytest-asyncio>=0.24.0",
-    "ruff>=0.8.0",
-    "mypy>=1.13.0",
+    "pytest>=8.3.0,<10",
+    "pytest-cov>=6.0.0,<8",
+    "pytest-asyncio>=0.24.0,<2",
+    "ruff>=0.8.0,<1",
+    "mypy>=1.13.0,<3",
 ]
 
 [build-system]

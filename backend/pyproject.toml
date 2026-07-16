@@ -3,23 +3,27 @@ name = "wren"
 version = "0.1.0"
 description = "Wren backend: modular-monolith learning-roadmap platform (external :8000 + internal :8001 apps over one service layer)."
 requires-python = ">=3.12"
+# Upper-major caps are a safety net (the committed uv.lock is the source of
+# truth; `uv sync --frozen` enforces it). They bound an unpinned resolve to the
+# major we validated against. calver/security-sensitive deps (structlog,
+# cryptography) are intentionally left uncapped so patches are never blocked.
 dependencies = [
-    "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.32.0",
-    "pydantic>=2.9.0",
-    "pydantic-settings>=2.6.0",
+    "fastapi>=0.115.0,<1",
+    "uvicorn[standard]>=0.32.0,<1",
+    "pydantic>=2.9.0,<3",
+    "pydantic-settings>=2.6.0,<3",
     "structlog>=24.4.0",
-    "prometheus-client>=0.21.0",
-    "prometheus-fastapi-instrumentator>=7.0.0",
-    "sqlalchemy[asyncio]>=2.0.36",
-    "asyncpg>=0.30.0",
-    "alembic>=1.14.0",
-    "pyjwt>=2.9.0",
-    "bcrypt>=4.2.0",
-    "email-validator>=2.2.0",
-    "authlib>=1.3.0",
+    "prometheus-client>=0.21.0,<1",
+    "prometheus-fastapi-instrumentator>=7.0.0,<9",
+    "sqlalchemy[asyncio]>=2.0.36,<3",
+    "asyncpg>=0.30.0,<1",
+    "alembic>=1.14.0,<2",
+    "pyjwt>=2.9.0,<3",
+    "bcrypt>=4.2.0,<6",
+    "email-validator>=2.2.0,<3",
+    "authlib>=1.3.0,<2",
     "cryptography>=43.0.0",
-    "python-multipart>=0.0.9",
+    "python-multipart>=0.0.9,<1",
 ]
 
 [project.scripts]
@@ -28,14 +32,14 @@ wren-api-internal = "wren.api_internal.main:main"
 
 [dependency-groups]
 dev = [
-    "pytest>=8.3.0",
-    "pytest-cov>=6.0.0",
-    "pytest-asyncio>=0.24.0",
-    "httpx>=0.27.0",
-    "ruff>=0.8.0",
-    "mypy>=1.13.0",
-    "testcontainers[postgres]>=4.8.0",
-    "hypothesis>=6.100.0",
+    "pytest>=8.3.0,<10",
+    "pytest-cov>=6.0.0,<8",
+    "pytest-asyncio>=0.24.0,<2",
+    "httpx>=0.27.0,<1",
+    "ruff>=0.8.0,<1",
+    "mypy>=1.13.0,<3",
+    "testcontainers[postgres]>=4.8.0,<5",
+    "hypothesis>=6.100.0,<7",
 ]
 
 [build-system]
