@@ -6,6 +6,18 @@ import type { ConnectedClient } from '../types'
 /** Formats the last-authorized timestamp as a plain, locale-aware date. */
 const dateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
 
+/**
+ * The revoke flow as a single state machine, so impossible combinations (e.g.
+ * `revoking` without having entered the confirm gate) are unrepresentable. Used
+ * only by this component, so it is co-located here rather than in a shared
+ * types module.
+ */
+type RevokeStatus =
+  | { phase: 'idle' }
+  | { phase: 'confirming' }
+  | { phase: 'revoking' }
+  | { phase: 'error'; message: string }
+
 interface ClientRowProps {
   client: ConnectedClient
   onRevoke: (clientId: string) => Promise<boolean>
@@ -18,19 +30,19 @@ interface ClientRowProps {
  * the row; a failure surfaces an inline message.
  */
 export function ClientRow({ client, onRevoke }: ClientRowProps) {
-  const [confirming, setConfirming] = useState(false)
-  const [revoking, setRevoking] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [status, setStatus] = useState<RevokeStatus>({ phase: 'idle' })
+
+  // The confirm/cancel pair stays visible from the confirm gate through the
+  // in-flight revoke; `isRevoking` disables it and swaps the label.
+  const isConfirming = status.phase === 'confirming' || status.phase === 'revoking'
+  const isRevoking = status.phase === 'revoking'
 
   const handleRevoke = async () => {
-    setRevoking(true)
-    setError(null)
+    setStatus({ phase: 'revoking' })
     const ok = await onRevoke(client.client_id)
     if (!ok) {
       // On success the row unmounts; only a failure needs local recovery.
-      setRevoking(false)
-      setConfirming(false)
-      setError('Could not revoke this agent. Please try again.')
+      setStatus({ phase: 'error', message: 'Could not revoke this agent. Please try again.' })
     }
   }
 
@@ -53,25 +65,25 @@ export function ClientRow({ client, onRevoke }: ClientRowProps) {
             ))}
           </ul>
         ) : null}
-        {error ? (
+        {status.phase === 'error' ? (
           <p role="alert" className="mt-2 text-sm text-destructive">
-            {error}
+            {status.message}
           </p>
         ) : null}
       </div>
 
       <div className="flex shrink-0 gap-2">
-        {confirming ? (
+        {isConfirming ? (
           <>
-            <Button variant="destructive" onClick={handleRevoke} disabled={revoking}>
-              {revoking ? 'Revoking...' : 'Confirm revoke'}
+            <Button variant="destructive" onClick={handleRevoke} disabled={isRevoking}>
+              {isRevoking ? 'Revoking...' : 'Confirm revoke'}
             </Button>
-            <Button variant="ghost" onClick={() => setConfirming(false)} disabled={revoking}>
+            <Button variant="ghost" onClick={() => setStatus({ phase: 'idle' })} disabled={isRevoking}>
               Cancel
             </Button>
           </>
         ) : (
-          <Button variant="outline" onClick={() => setConfirming(true)}>
+          <Button variant="outline" onClick={() => setStatus({ phase: 'confirming' })}>
             Revoke
           </Button>
         )}
