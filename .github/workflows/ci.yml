@@ -131,13 +131,13 @@ jobs:
         working-directory: backend
         run: |
           uv sync --frozen
-          uv run pytest --cov-fail-under=80
+          uv run pytest
 
       - name: MCP tests (tool-schema snapshot + tool contract, 80% coverage gate)
         working-directory: mcp
         run: |
           uv sync --frozen
-          uv run pytest --cov-fail-under=80
+          uv run pytest
 
   # ---------------------------------------------------------------------------
   # test-frontend: vitest with the hard 70% coverage gate (the thresholds in

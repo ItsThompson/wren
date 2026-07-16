@@ -68,6 +68,10 @@ branch = true
 
 [tool.coverage.report]
 show_missing = true
+# Hard coverage floor enforced by every `pytest` run (local and `just
+# test-mcp`), not just CI; the redundant `--cov-fail-under` CLI flag was dropped
+# from ci.yml when this moved here.
+fail_under = 80
 exclude_lines = [
     "pragma: no cover",
     "if __name__ == .__main__.:",
