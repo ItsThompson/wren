@@ -59,7 +59,7 @@ files = ["src/wren_mcp"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
-addopts = "--cov=wren_mcp --cov-report=term-missing"
+addopts = "--cov=wren_mcp --cov-report=term-missing --strict-markers --strict-config"
 asyncio_mode = "auto"
 
 [tool.coverage.run]

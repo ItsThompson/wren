@@ -80,7 +80,7 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
-addopts = "--cov=wren --cov-report=term-missing"
+addopts = "--cov=wren --cov-report=term-missing --strict-markers --strict-config"
 asyncio_mode = "auto"
 markers = [
     "integration: requires a real Postgres via testcontainers (Docker); skipped when Docker is unavailable.",
