@@ -534,6 +534,30 @@ def test_patch_op_with_an_unknown_field_is_a_422_naming_it(make_settings: MakeSe
     assert any("bogus" in field for field in body["fields"])
 
 
+def test_patch_with_an_unknown_top_level_field_is_a_422_naming_it(
+    make_settings: MakeSettings,
+) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created_id = _create_publishable(client)
+    # A stray top-level field alongside `operations` (here `revision`, which
+    # actually travels in If-Match, not the body) is rejected, not silently
+    # dropped: the PATCH wrapper forbids unknowns.
+    response = client.patch(
+        f"/roadmaps/{created_id}",
+        headers={"If-Match": "1"},
+        json={
+            "operations": [{"op": "set_tags", "subsection_id": "sub_arrays", "tags": ["x"]}],
+            "revision": 1,
+        },
+    )
+    assert response.status_code == 422
+    body = response.json()
+    assert response.headers["content-type"] == "application/problem+json"
+    assert body["code"] == "VALIDATION"
+    assert any("revision" in field for field in body["fields"])
+
+
 def test_patch_cycle_creating_edge_is_a_422_explaining_the_cycle(
     make_settings: MakeSettings,
 ) -> None:

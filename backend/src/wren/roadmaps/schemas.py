@@ -429,6 +429,8 @@ class PatchRequest(BaseModel):
     that would still burn a revision.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     operations: list[PatchOp] = Field(min_length=1)
 
 
