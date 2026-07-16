@@ -18,7 +18,6 @@ HTTP ``status_code`` and problem ``code`` so the tool-metrics wrapper
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 import httpx
@@ -97,6 +96,8 @@ def _format_violations(violations: list[Any]) -> str:
 def _parse_body(response: httpx.Response) -> dict[str, Any] | None:
     try:
         parsed = response.json()
-    except (json.JSONDecodeError, ValueError):
+    except ValueError:
+        # httpx raises json.JSONDecodeError, a ValueError subclass, on a non-JSON
+        # body; catching ValueError covers it without importing the json module.
         return None
     return parsed if isinstance(parsed, dict) else None
