@@ -21,6 +21,7 @@ from wren_mcp.client import InternalApiClient
 from wren_mcp.config import MCP_PATH, PRM_PATH
 from wren_mcp.keys import RemoteKeyProvider
 from wren_mcp.settings import RsSettings
+from wren_mcp.state import get_rs_deps
 
 MakeSettings = Callable[..., RsSettings]
 
@@ -145,11 +146,12 @@ def test_app_exposes_the_tool_layer_seams(make_settings: MakeSettings) -> None:
     internal_client = _internal_client()
     app = create_rs_app(make_settings(), key_provider=provider, internal_client=internal_client)
 
-    # The seams the tool dispatch builds on: the verified-identity
-    # verifier and the internal client the tools call.
-    assert app.state.internal_client is internal_client
-    assert app.state.token_verifier is not None
-    assert app.state.key_provider is provider
+    # The seams the tool dispatch builds on, behind the typed RsDeps façade: the
+    # verified-identity verifier and the internal client the tools call.
+    deps = get_rs_deps(app)
+    assert deps.internal_client is internal_client
+    assert deps.token_verifier is not None
+    assert deps.key_provider is provider
 
 
 async def test_create_json_fetch_parses_json() -> None:

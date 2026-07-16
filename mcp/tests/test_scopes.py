@@ -17,9 +17,9 @@ from mcp.server.fastmcp.exceptions import ToolError
 from starlette.requests import Request
 
 from log_capture import capture_correlated_logs
-from wren_mcp.auth import AGENT_STATE_KEY
 from wren_mcp.config import SCOPE_PROGRESS_WRITE, SCOPE_ROADMAPS_READ, SCOPE_ROADMAPS_WRITE
 from wren_mcp.scopes import require_scope
+from wren_mcp.state import set_request_agent
 from wren_mcp.tokens import VerifiedAgentToken
 
 
@@ -27,9 +27,9 @@ def _ctx_with(request: Request | None) -> SimpleNamespace:
     return SimpleNamespace(request_context=SimpleNamespace(request=request))
 
 
-def _request_with_agent(principal: object) -> Request:
+def _request_with_agent(principal: VerifiedAgentToken) -> Request:
     request = Request({"type": "http", "headers": [], "method": "POST", "path": "/mcp"})
-    setattr(request.state, AGENT_STATE_KEY, principal)
+    set_request_agent(request, principal)
     return request
 
 

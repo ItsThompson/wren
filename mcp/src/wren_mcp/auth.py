@@ -10,22 +10,21 @@ deliberate: a tool route mounted under the prefix cannot forget
 to authenticate.
 
 On success the resolved principal is stashed on ``request.state`` (never the raw
-token, which is exchanged for an ``X-User-ID`` header downstream); handlers read
-it via :func:`agent_identity`.
+token, which is exchanged for an ``X-User-ID`` header downstream); the tool layer
+reads it through :func:`wren_mcp.scopes.require_scope` (which resolves it via
+:func:`wren_mcp.state.get_request_agent`), never from a tool argument.
 
-This is also where an agent action's correlation context begins: on entry to the
-guarded transport the middleware clears any leftover contextvars and binds a
-fresh ``request_id``, so the tool layer, the internal-hop client, and the backend
-all share one id (``merge_contextvars`` attaches it to every line). A rejected
-bearer is logged at ``warning`` with a reason and never the raw token.
+The per-request correlation context is started app-wide by
+:class:`wren_mcp.correlation.CorrelationMiddleware` (which mints the
+``request_id``); once this boundary resolves the principal it binds ``user_id``
+onto that context, so the tool-entry line and the internal-hop client all carry
+the actor. A rejected bearer is logged at ``warning`` with a reason and never the
+raw token.
 """
 
 from __future__ import annotations
 
-from uuid import uuid4
-
 import structlog
-from fastapi import HTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -33,13 +32,12 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from wren_mcp.logging import get_logger
 from wren_mcp.prm import www_authenticate_challenge
 from wren_mcp.settings import SERVICE
-from wren_mcp.tokens import AgentTokenVerifier, VerifiedAgentToken
+from wren_mcp.state import set_request_agent
+from wren_mcp.tokens import AgentTokenVerifier
 
 _log = get_logger(SERVICE)
 
 _BEARER_PREFIX = "Bearer "
-# Key the resolved principal is stashed under on request.state.
-AGENT_STATE_KEY = "agent"
 
 
 def _extract_bearer(header_value: str | None) -> str | None:
@@ -70,11 +68,6 @@ class BearerAuthMiddleware:
         if scope["type"] != "http" or not self._is_protected(str(scope["path"])):
             await self.app(scope, receive, send)
             return
-        # An agent action enters here: start its correlation context (clear first
-        # so a reused worker context cannot leak a prior request's bindings) so
-        # the tool layer, the internal-hop client, and the backend share one id.
-        structlog.contextvars.clear_contextvars()
-        structlog.contextvars.bind_contextvars(request_id=uuid4().hex)
         request = Request(scope, receive=receive)
         token = _extract_bearer(request.headers.get("authorization"))
         principal = await self._verifier.verify(token) if token is not None else None
@@ -89,11 +82,12 @@ class BearerAuthMiddleware:
             return
         # Boundary guarantee: the handler receives a resolved identity, never the
         # raw token. The token is exchanged for X-User-ID by the internal client.
-        request.state.agent = principal
-        # Identity is already resolved here, so bind the actor onto the correlation
-        # context now: this puts user_id on the tool-entry line (tool_invoked) too.
-        # require_scope re-binds the same value (idempotent) as the canonical
-        # tool-layer site, so the off-transport gate path stays covered.
+        set_request_agent(request, principal)
+        # Identity is resolved here, so bind the actor onto the correlation context
+        # (started app-wide by CorrelationMiddleware): this puts user_id on the
+        # tool-entry line (tool_invoked) too. require_scope re-binds the same value
+        # (idempotent) as the canonical tool-layer site, so the off-transport gate
+        # path stays covered.
         structlog.contextvars.bind_contextvars(user_id=principal.user_id)
         await self.app(scope, receive, send)
 
@@ -106,17 +100,3 @@ class BearerAuthMiddleware:
             status_code=401,
             headers={"WWW-Authenticate": www_authenticate_challenge(self._resource)},
         )
-
-
-def agent_identity(request: Request) -> VerifiedAgentToken:
-    """Return the principal resolved by the boundary middleware.
-
-    Handlers mounted under the guarded prefix depend on this to
-    get the single ``user_id`` the request is scoped to. Fails closed with 401 if
-    it is ever reached without the middleware having set the principal (a route
-    mounted outside the guarded prefix), so identity can never be silently absent.
-    """
-    principal = getattr(request.state, AGENT_STATE_KEY, None)
-    if not isinstance(principal, VerifiedAgentToken):
-        raise HTTPException(status_code=401, detail="Unauthenticated.")
-    return principal

@@ -22,9 +22,9 @@ from mcp.server.fastmcp.exceptions import ToolError
 from mcp.server.session import ServerSession
 from starlette.requests import Request
 
-from wren_mcp.auth import AGENT_STATE_KEY
 from wren_mcp.logging import get_logger
 from wren_mcp.settings import SERVICE
+from wren_mcp.state import get_request_agent
 from wren_mcp.tokens import VerifiedAgentToken
 
 _log = get_logger(SERVICE)
@@ -42,8 +42,8 @@ def _resolve_agent(ctx: AgentContext) -> VerifiedAgentToken:
     unauthenticated. Once resolved, binds ``user_id`` into contextvars so every
     subsequent line for this tool call carries it via ``merge_contextvars``."""
     request = ctx.request_context.request
-    principal = getattr(request.state, AGENT_STATE_KEY, None) if request is not None else None
-    if not isinstance(principal, VerifiedAgentToken):
+    principal = get_request_agent(request)
+    if principal is None:
         _log.warning("unauthenticated", reason="no_verified_identity")
         raise ToolError("unauthenticated: no verified agent identity on the request.")
     structlog.contextvars.bind_contextvars(user_id=principal.user_id)
