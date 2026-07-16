@@ -12,17 +12,30 @@ to authenticate.
 On success the resolved principal is stashed on ``request.state`` (never the raw
 token, which is exchanged for an ``X-User-ID`` header downstream); handlers read
 it via :func:`agent_identity`.
+
+This is also where an agent action's correlation context begins: on entry to the
+guarded transport the middleware clears any leftover contextvars and binds a
+fresh ``request_id``, so the tool layer, the internal-hop client, and the backend
+all share one id (``merge_contextvars`` attaches it to every line). A rejected
+bearer is logged at ``warning`` with a reason and never the raw token.
 """
 
 from __future__ import annotations
 
+from uuid import uuid4
+
+import structlog
 from fastapi import HTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from wren_mcp.logging import get_logger
 from wren_mcp.prm import www_authenticate_challenge
+from wren_mcp.settings import SERVICE
 from wren_mcp.tokens import AgentTokenVerifier, VerifiedAgentToken
+
+_log = get_logger(SERVICE)
 
 _BEARER_PREFIX = "Bearer "
 # Key the resolved principal is stashed under on request.state.
@@ -57,10 +70,21 @@ class BearerAuthMiddleware:
         if scope["type"] != "http" or not self._is_protected(str(scope["path"])):
             await self.app(scope, receive, send)
             return
+        # An agent action enters here: start its correlation context (clear first
+        # so a reused worker context cannot leak a prior request's bindings) so
+        # the tool layer, the internal-hop client, and the backend share one id.
+        structlog.contextvars.clear_contextvars()
+        structlog.contextvars.bind_contextvars(request_id=uuid4().hex)
         request = Request(scope, receive=receive)
         token = _extract_bearer(request.headers.get("authorization"))
         principal = await self._verifier.verify(token) if token is not None else None
         if principal is None:
+            # Never log the raw token; no verified principal exists yet, so only a
+            # reason is available (client_id/sub cannot be trusted pre-validation).
+            _log.warning(
+                "agent_token_rejected",
+                reason="missing_bearer" if token is None else "invalid_token",
+            )
             await self._challenge()(scope, receive, send)
             return
         # Boundary guarantee: the handler receives a resolved identity, never the
