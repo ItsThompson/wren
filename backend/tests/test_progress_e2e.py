@@ -33,7 +33,10 @@ from wren.core.settings import AppSettings
 from wren.progress.api import create_progress_router
 from wren.progress.wiring import build_progress_service_provider
 from wren.roadmaps.api import create_roadmaps_router
-from wren.roadmaps.wiring import build_roadmap_service_provider
+from wren.roadmaps.wiring import (
+    build_roadmap_read_service_provider,
+    build_roadmap_service_provider,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -96,7 +99,9 @@ def _external_app(database_url: str, settings: AppSettings) -> FastAPI:
         build_account_service_provider(hasher, codec),
         cookie_config=CookieConfig(secure=False, domain=None),
     )
-    roadmaps_router = create_roadmaps_router(build_roadmap_service_provider())
+    roadmaps_router = create_roadmaps_router(
+        build_roadmap_service_provider(), build_roadmap_read_service_provider()
+    )
     progress_router = create_progress_router(build_progress_service_provider())
     app = create_app(
         settings,

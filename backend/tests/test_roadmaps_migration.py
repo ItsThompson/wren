@@ -21,6 +21,7 @@ from roadmaps_fakes import constant_follower_counter
 from wren.core.db import create_database
 from wren.core.errors import NotFound
 from wren.roadmaps.models import RoadmapRecord
+from wren.roadmaps.read_service import RoadmapReadService
 from wren.roadmaps.repository import SqlAlchemyRoadmapRepository
 from wren.roadmaps.schemas import (
     ChecklistItemInput,
@@ -109,21 +110,17 @@ async def test_create_draft_persists_and_owner_read_round_trips(
 
         # A fresh session reads the persisted JSONB document back into the model.
         async with database.sessionmaker() as session:
-            service = RoadmapService(
-                SqlAlchemyRoadmapRepository(session), follower_counter=constant_follower_counter()
-            )
-            fetched = await service.get("owner-1", roadmap_id)
+            read_service = RoadmapReadService(SqlAlchemyRoadmapRepository(session))
+            fetched = await read_service.get("owner-1", roadmap_id)
             assert fetched.id == roadmap_id
             assert fetched.subject_tags == ["cs"]
             assert "sub_arrays" in fetched.sections["sec_foundations"].subsections
 
         # A non-owner read is a NotFound (owner-scoped query, no existence leak).
         async with database.sessionmaker() as session:
-            service = RoadmapService(
-                SqlAlchemyRoadmapRepository(session), follower_counter=constant_follower_counter()
-            )
+            read_service = RoadmapReadService(SqlAlchemyRoadmapRepository(session))
             with pytest.raises(NotFound):
-                await service.get("intruder", roadmap_id)
+                await read_service.get("intruder", roadmap_id)
     finally:
         await database.engine.dispose()
 

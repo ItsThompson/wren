@@ -30,6 +30,7 @@ from wren.core.errors import build_exception_handlers
 from wren.core.identity import USER_ID_HEADER, StripInboundIdentityMiddleware
 from wren.core.settings import AppSettings
 from wren.roadmaps.api import create_roadmaps_router
+from wren.roadmaps.read_service import RoadmapReadService
 from wren.roadmaps.service import RoadmapService
 
 MakeSettings = Callable[..., AppSettings]
@@ -122,10 +123,13 @@ def _build_client(
             token_factory=sequence_token_factory(tokens or ["7f3k", "9x2b", "abcd", "efgh"]),
         )
 
+    def read_provider() -> RoadmapReadService:
+        return RoadmapReadService(roadmap_repo)
+
     accounts_router = create_accounts_router(
         account_provider, cookie_config=CookieConfig(secure=False, domain=None)
     )
-    roadmaps_router = create_roadmaps_router(roadmap_provider)
+    roadmaps_router = create_roadmaps_router(roadmap_provider, read_provider)
 
     app: FastAPI = create_app(
         make_settings(),

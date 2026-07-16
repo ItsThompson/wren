@@ -1,6 +1,6 @@
 """Service-level tests for the read projections + readability.
 
-Sociable tests through :class:`RoadmapService`'s public read methods with the
+Sociable tests through :class:`RoadmapReadService`'s public read methods with the
 real projection modules behind it and only the repository substituted. These
 concentrate on the business rules the API tests exercise only
 indirectly: the study-time readability rule (owner draft preview vs a non-owner's
@@ -17,7 +17,7 @@ import pytest
 
 from progress_builders import make_record
 from progress_fakes import InMemoryProgressRepository
-from roadmaps_fakes import InMemoryRoadmapRepository, constant_follower_counter
+from roadmaps_fakes import InMemoryRoadmapRepository
 from roadmaps_read_builders import (
     AUTHOR,
     CHK_ARRAYS_READ,
@@ -30,8 +30,8 @@ from wren.core.errors import NotFound, Validation
 from wren.core.read_contract import ResponseFormat
 from wren.progress.schemas import Progress
 from wren.roadmaps.read_schemas import SectionInclude
+from wren.roadmaps.read_service import CheckedReader, RoadmapReadService
 from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
-from wren.roadmaps.service import CheckedReader, RoadmapService
 from wren.roadmaps.wiring import _checked_reader
 
 _NON_OWNER = "reader"
@@ -44,14 +44,12 @@ def _reader(*item_ids: str) -> CheckedReader:
     return read
 
 
-def _service(roadmap: Roadmap, *, checked_reader: CheckedReader | None = None) -> RoadmapService:
+def _service(
+    roadmap: Roadmap, *, checked_reader: CheckedReader | None = None
+) -> RoadmapReadService:
     repo = InMemoryRoadmapRepository()
     repo._by_id[roadmap.id] = make_record(roadmap)
-    return RoadmapService(
-        repo,
-        follower_counter=constant_follower_counter(),
-        checked_reader=checked_reader or _reader(),
-    )
+    return RoadmapReadService(repo, checked_reader=checked_reader or _reader())
 
 
 # --- readability rule (owner draft preview vs non-owner published) ----------
@@ -87,6 +85,28 @@ async def test_non_owner_gets_not_found_on_a_public_draft() -> None:
     service = _service(build_read_roadmap(status=RoadmapStatus.DRAFT, visibility=Visibility.PUBLIC))
     with pytest.raises(NotFound):
         await service.get_node(_NON_OWNER, ROADMAP_ID, SUB_ARRAYS, ResponseFormat.CONCISE)
+
+
+# --- get (full readable document) -------------------------------------------
+
+
+async def test_get_returns_the_full_roadmap_to_its_owner() -> None:
+    service = _service(build_read_roadmap(owner=AUTHOR, status=RoadmapStatus.DRAFT))
+    roadmap = await service.get(AUTHOR, ROADMAP_ID)
+    assert roadmap.id == ROADMAP_ID
+    assert roadmap.status is RoadmapStatus.DRAFT
+
+
+async def test_get_is_404_for_a_non_owner_on_a_private_roadmap() -> None:
+    service = _service(build_read_roadmap(visibility=Visibility.PRIVATE))
+    with pytest.raises(NotFound):
+        await service.get(_NON_OWNER, ROADMAP_ID)
+
+
+async def test_get_is_404_for_an_unknown_id() -> None:
+    service = _service(build_read_roadmap())
+    with pytest.raises(NotFound):
+        await service.get(AUTHOR, "does-not-exist-0000")
 
 
 # --- model-recoverable errors ----------------------------------------------

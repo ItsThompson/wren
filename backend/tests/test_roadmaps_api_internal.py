@@ -27,6 +27,7 @@ from wren.core.errors import build_exception_handlers
 from wren.core.identity import INTERNAL_TOKEN_HEADER, USER_ID_HEADER
 from wren.core.settings import AppSettings
 from wren.roadmaps.api_internal import create_internal_roadmaps_router
+from wren.roadmaps.read_service import RoadmapReadService
 from wren.roadmaps.service import RoadmapService
 
 MakeSettings = Callable[..., AppSettings]
@@ -104,9 +105,12 @@ def _build_client(
             token_factory=sequence_token_factory(tokens or ["7f3k", "9x2b", "abcd", "efgh"]),
         )
 
+    def read_provider() -> RoadmapReadService:
+        return RoadmapReadService(roadmap_repo)
+
     app: FastAPI = create_app(
         make_settings(),
-        routers=[create_internal_roadmaps_router(roadmap_provider)],
+        routers=[create_internal_roadmaps_router(roadmap_provider, read_provider)],
         exception_handlers=build_exception_handlers(),
     )
     app.state.internal_api_token = _INTERNAL_TOKEN

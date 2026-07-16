@@ -34,6 +34,7 @@ from wren.core.settings import AppSettings
 from wren.progress.api_internal import create_internal_progress_router
 from wren.progress.service import ProgressService
 from wren.roadmaps.api_internal import create_internal_roadmaps_router
+from wren.roadmaps.read_service import RoadmapReadService
 from wren.roadmaps.schemas import Roadmap
 from wren.roadmaps.service import RoadmapService
 
@@ -59,6 +60,11 @@ def _build_client(
         return RoadmapService(
             roadmap_repo,
             follower_counter=progress_repo.count_followers,
+        )
+
+    def read_provider() -> RoadmapReadService:
+        return RoadmapReadService(
+            roadmap_repo,
             checked_reader=checked_reader_over(progress_repo),
         )
 
@@ -68,7 +74,7 @@ def _build_client(
     app: FastAPI = create_app(
         make_settings(),
         routers=[
-            create_internal_roadmaps_router(roadmap_provider),
+            create_internal_roadmaps_router(roadmap_provider, read_provider),
             create_internal_progress_router(progress_provider),
         ],
         exception_handlers=build_exception_handlers(),

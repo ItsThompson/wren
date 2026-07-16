@@ -16,6 +16,7 @@ from roadmaps_fakes import (
 from wren.core.errors import Conflict, ErrorCode, NotFound, Validation
 from wren.progress.schemas import CompletionState
 from wren.progress.service import ProgressService
+from wren.roadmaps.read_service import RoadmapReadService
 from wren.roadmaps.repository import transaction
 from wren.roadmaps.schemas import (
     AddItemOp,
@@ -51,6 +52,13 @@ def _service(
         clock=lambda: _FIXED_NOW,
     )
     return service, repo
+
+
+async def _read(repo: InMemoryRoadmapRepository, user_id: str, roadmap_id: str) -> Roadmap:
+    """Read a roadmap back through the split-out :class:`RoadmapReadService` over
+    the same repo: reads no longer live on :class:`RoadmapService`, so a write test
+    verifies persisted state via the canonical read path."""
+    return await RoadmapReadService(repo).get(user_id, roadmap_id)
 
 
 def _minimal_doc(title: str = "Grokking DSA") -> RoadmapInput:
@@ -218,28 +226,6 @@ async def test_proposed_roadmap_id_is_used_as_the_slug_base() -> None:
     assert created.id == "my-custom-name-7f3k"
 
 
-async def test_get_returns_the_owners_roadmap() -> None:
-    service, _ = _service()
-    created = await service.create_draft("user-1", _minimal_doc())
-    fetched = await service.get("user-1", created.id)
-    assert fetched.id == created.id
-    assert fetched.title == created.title
-    assert fetched.status is RoadmapStatus.DRAFT
-
-
-async def test_get_is_404_for_a_non_owner() -> None:
-    service, _ = _service()
-    created = await service.create_draft("owner", _minimal_doc())
-    with pytest.raises(NotFound):
-        await service.get("intruder", created.id)
-
-
-async def test_get_is_404_for_an_unknown_id() -> None:
-    service, _ = _service()
-    with pytest.raises(NotFound):
-        await service.get("user-1", "does-not-exist-0000")
-
-
 # --- transaction boundary (the single-sourced commit/rollback invariant) ----
 
 
@@ -277,12 +263,12 @@ async def test_validate_returns_no_violations_for_a_publishable_draft() -> None:
 
 async def test_validate_returns_violations_for_an_incomplete_draft() -> None:
     # The minimal doc omits suggested_path, so the minimal V3 gate fires.
-    service, _ = _service()
+    service, repo = _service()
     created = await service.create_draft("user-1", _minimal_doc())
     violations = await service.validate("user-1", created.id)
     assert [v.rule for v in violations] == [StructuralRule.V3_PATH_COVERAGE]
     # Still a draft afterwards (validate is read-only).
-    assert (await service.get("user-1", created.id)).status is RoadmapStatus.DRAFT
+    assert (await _read(repo, "user-1", created.id)).status is RoadmapStatus.DRAFT
 
 
 async def test_validate_is_404_for_a_non_owner() -> None:
@@ -310,7 +296,7 @@ async def test_publish_transitions_a_valid_draft_to_published() -> None:
     assert published.status is RoadmapStatus.PUBLISHED
     assert published.id == created.id
     # Persisted: a fresh read reflects the transition, and publish committed once.
-    assert (await service.get("user-1", created.id)).status is RoadmapStatus.PUBLISHED
+    assert (await _read(repo, "user-1", created.id)).status is RoadmapStatus.PUBLISHED
     assert repo.commits == 2
 
 
@@ -321,7 +307,7 @@ async def test_publish_hard_blocks_on_violations_and_keeps_the_draft() -> None:
         await service.publish("user-1", created.id)
     assert [v.rule for v in excinfo.value.violations] == [StructuralRule.V3_PATH_COVERAGE]
     # No transition and no commit for the blocked publish.
-    assert (await service.get("user-1", created.id)).status is RoadmapStatus.DRAFT
+    assert (await _read(repo, "user-1", created.id)).status is RoadmapStatus.DRAFT
     assert repo.commits == 1
 
 
@@ -364,7 +350,7 @@ async def test_patch_applies_ops_bumps_revision_and_persists() -> None:
     assert result.roadmap_id == created.id
     assert result.revision == created.revision + 1
     # Persisted: a fresh read reflects the edit and the bumped revision.
-    fetched = await service.get("user-1", created.id)
+    fetched = await _read(repo, "user-1", created.id)
     assert fetched.revision == created.revision + 1
     assert fetched.sections["sec_foundations"].subsections["sub_arrays"].tags == ["core"]
     assert repo.commits == 2
@@ -484,7 +470,7 @@ async def test_patch_with_an_invalid_op_is_a_field_level_validation_error() -> N
     assert "sub_arrays" in message  # names the valid sibling
     # Atomic: the failed batch persisted nothing.
     assert repo.commits == 1
-    assert (await service.get("user-1", created.id)).revision == created.revision
+    assert (await _read(repo, "user-1", created.id)).revision == created.revision
 
 
 # --- replace (full-document import escape hatch) -----------------------------
@@ -516,7 +502,7 @@ async def test_replace_keeps_the_roadmap_id_and_bumps_the_revision() -> None:
 
     assert replaced.revision == created.revision + 1
     # Persisted: a fresh read reflects the imported content and the bumped revision.
-    fetched = await service.get("user-1", created.id)
+    fetched = await _read(repo, "user-1", created.id)
     assert fetched.revision == created.revision + 1
     assert fetched.title == "Grokking DSA v2"
     assert "sub_graphs" in fetched.sections["sec_core"].subsections
@@ -524,9 +510,9 @@ async def test_replace_keeps_the_roadmap_id_and_bumps_the_revision() -> None:
 
 
 async def test_replace_preserves_created_at_and_stays_a_draft() -> None:
-    service, _ = _service()
+    service, repo = _service()
     created = await service.create_draft("user-1", _publishable_doc())
-    original_created_at = (await service.get("user-1", created.id)).created_at
+    original_created_at = (await _read(repo, "user-1", created.id)).created_at
 
     replaced = await service.replace_draft("user-1", created.id, created.revision, _replace_doc())
 
@@ -603,7 +589,7 @@ async def test_replace_with_a_stale_revision_is_a_stale_revision_conflict() -> N
     assert "re-read" in excinfo.value.detail.lower()
     # Nothing persisted on the stale import.
     assert repo.commits == 1
-    assert (await service.get("user-1", created.id)).revision == created.revision
+    assert (await _read(repo, "user-1", created.id)).revision == created.revision
 
 
 # --- fork -------------------------------------------------------------------
@@ -642,16 +628,16 @@ async def test_fork_copies_content_and_persists_the_new_roadmap() -> None:
     assert fork.suggested_path == source.suggested_path
     assert set(fork.sections["sec_foundations"].subsections) == {"sub_arrays"}
     # Persisted: a fresh read returns the fork owned by the forker.
-    fetched = await service.get("owner", fork.id)
+    fetched = await _read(repo, "owner", fork.id)
     assert fetched.id == fork.id
     assert repo.commits == 2
 
 
 async def test_fork_leaves_the_source_untouched() -> None:
-    service, _ = _service(tokens=["7f3k", "9x2b"])
+    service, repo = _service(tokens=["7f3k", "9x2b"])
     source = await service.create_draft("owner", _publishable_doc())
     await service.fork("owner", source.id)
-    reread = await service.get("owner", source.id)
+    reread = await _read(repo, "owner", source.id)
     assert reread.id == source.id
     assert reread.owner == "owner"
     assert reread.status is RoadmapStatus.DRAFT
@@ -765,14 +751,14 @@ async def test_edit_metadata_works_on_a_published_roadmap() -> None:
 
 
 async def test_edit_metadata_does_not_bump_the_revision() -> None:
-    service, _ = _service()
+    service, repo = _service()
     created = await service.create_draft("user-1", _publishable_doc())
     edited = await service.edit_metadata(
         "user-1", created.id, title="Renamed", description=None, subject_tags=None
     )
     assert edited.revision == created.revision
     # Persisted without a revision bump (last-write-wins, no If-Match).
-    assert (await service.get("user-1", created.id)).revision == created.revision
+    assert (await _read(repo, "user-1", created.id)).revision == created.revision
 
 
 async def test_edit_metadata_leaves_unprovided_fields_unchanged() -> None:
@@ -815,7 +801,7 @@ async def test_replace_preserves_the_stored_drafts_visibility() -> None:
     # A full-document import replaces content but must NOT silently flip the
     # draft's visibility: visibility is a web-only lifecycle toggle, not part of
     # the imported document's authority.
-    service, _ = _service()
+    service, repo = _service()
     created = await service.create_draft("user-1", _publishable_doc())
     # Make the draft public via the sanctioned lifecycle path.
     await service.set_visibility("user-1", created.id, Visibility.PUBLIC)
@@ -823,7 +809,7 @@ async def test_replace_preserves_the_stored_drafts_visibility() -> None:
     replaced = await service.replace_draft("user-1", created.id, created.revision, _replace_doc())
     assert replaced.visibility is Visibility.PUBLIC
     # And it is persisted public, not reset to the imported doc's private default.
-    assert (await service.get("user-1", created.id)).visibility is Visibility.PUBLIC
+    assert (await _read(repo, "user-1", created.id)).visibility is Visibility.PUBLIC
 
 
 # --- web-only lifecycle: set_visibility -------------------------------------
@@ -836,17 +822,17 @@ async def test_set_visibility_toggles_public_and_back_to_private() -> None:
 
     made_public = await service.set_visibility("user-1", created.id, Visibility.PUBLIC)
     assert made_public.visibility is Visibility.PUBLIC
-    assert (await service.get("user-1", created.id)).visibility is Visibility.PUBLIC
+    assert (await _read(repo, "user-1", created.id)).visibility is Visibility.PUBLIC
 
     made_private = await service.set_visibility("user-1", created.id, Visibility.PRIVATE)
     assert made_private.visibility is Visibility.PRIVATE
-    assert (await service.get("user-1", created.id)).visibility is Visibility.PRIVATE
+    assert (await _read(repo, "user-1", created.id)).visibility is Visibility.PRIVATE
     # Each toggle commits through the shared transaction helper (create + 2 sets).
     assert repo.commits == 3
 
 
 async def test_set_visibility_does_not_alter_content_or_the_revision() -> None:
-    service, _ = _service()
+    service, repo = _service()
     created = await service.create_draft("user-1", _publishable_doc())
     toggled = await service.set_visibility("user-1", created.id, Visibility.PUBLIC)
     # Structure and the structural revision are untouched by a visibility toggle.
@@ -854,7 +840,7 @@ async def test_set_visibility_does_not_alter_content_or_the_revision() -> None:
     assert toggled.section_order == created.section_order
     assert toggled.suggested_path == created.suggested_path
     assert toggled.revision == created.revision
-    assert (await service.get("user-1", created.id)).revision == created.revision
+    assert (await _read(repo, "user-1", created.id)).revision == created.revision
 
 
 async def test_set_visibility_works_on_a_published_roadmap() -> None:
@@ -884,7 +870,7 @@ async def test_archive_transitions_a_published_roadmap_to_archived() -> None:
     await service.publish("user-1", created.id)
     archived = await service.archive("user-1", created.id)
     assert archived.status is RoadmapStatus.ARCHIVED
-    assert (await service.get("user-1", created.id)).status is RoadmapStatus.ARCHIVED
+    assert (await _read(repo, "user-1", created.id)).status is RoadmapStatus.ARCHIVED
     # Committed through the shared transaction helper (create + publish + archive).
     assert repo.commits == 3
 
@@ -892,11 +878,11 @@ async def test_archive_transitions_a_published_roadmap_to_archived() -> None:
 async def test_archive_a_draft_is_a_conflict() -> None:
     # The lifecycle is linear (draft -> published -> archived): a draft is deleted,
     # not archived, so archiving one is a 409.
-    service, _ = _service()
+    service, repo = _service()
     created = await service.create_draft("user-1", _publishable_doc())
     with pytest.raises(Conflict):
         await service.archive("user-1", created.id)
-    assert (await service.get("user-1", created.id)).status is RoadmapStatus.DRAFT
+    assert (await _read(repo, "user-1", created.id)).status is RoadmapStatus.DRAFT
 
 
 async def test_archive_an_already_archived_roadmap_is_a_conflict() -> None:
@@ -926,7 +912,7 @@ async def test_delete_removes_a_roadmap_with_zero_followers() -> None:
     # The row is gone: a subsequent read is a 404.
     assert await repo.get(created.id) is None
     with pytest.raises(NotFound):
-        await service.get("user-1", created.id)
+        await _read(repo, "user-1", created.id)
     # Committed through the shared transaction helper (create + delete).
     assert repo.commits == 2
 
