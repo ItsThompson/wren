@@ -50,24 +50,18 @@ build-backend = "hatchling.build"
 packages = ["src/wren"]
 
 [tool.ruff]
-line-length = 100
+# Shared line-length/target-version/lint config lives in the repo-root ruff.toml;
+# only per-package bits stay here. `src` is kept local so first-party import
+# detection resolves against this package's own src/tests, not the repo root.
+extend = "../ruff.toml"
 src = ["src", "tests"]
-target-version = "py312"
 
-[tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
-
-[tool.ruff.lint.flake8-bugbear]
-# FastAPI's dependency-injection idiom calls Depends()/Query()/... in argument
-# defaults by design; these are immutable markers, not mutable-default bugs.
-extend-immutable-calls = [
-    "fastapi.Depends",
-    "fastapi.Query",
-    "fastapi.Path",
-    "fastapi.Header",
-    "fastapi.Cookie",
-    "fastapi.Body",
-]
+[tool.ruff.lint.per-file-ignores]
+# Tests assert liberally (S101), pass dummy secrets as arguments (S106), bundle
+# multi-condition assertions (PT018), catch broad exceptions to skip when Docker
+# is unavailable (BLE001), unpack fixtures they do not all consume (RUF059), and
+# exercise the bind-all host as test data (S104).
+"tests/**/*.py" = ["S101", "S104", "S106", "PT018", "BLE001", "RUF059"]
 
 [tool.mypy]
 python_version = "3.12"

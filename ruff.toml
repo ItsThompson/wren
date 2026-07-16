@@ -1,0 +1,53 @@
+# Shared ruff base for the backend and MCP packages.
+#
+# Only the three sections that are byte-identical across both packages live here
+# (the `[tool.ruff]`, `[tool.ruff.lint]` and `[tool.ruff.lint.flake8-bugbear]`
+# blocks from each pyproject.toml). Each package's `pyproject.toml` `[tool.ruff]`
+# does `extend = "../ruff.toml"` and keeps only its own bits local (mypy `files`,
+# the `--cov` target, the `integration` marker, per-file-ignores). Lint runs from
+# the full checkout in CI (`ruff check .` per package), so the relative `extend`
+# resolves to this file.
+
+line-length = 100
+src = ["src", "tests"]
+target-version = "py312"
+
+[lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "UP",
+    "B",
+    "SIM",
+    "ASYNC",
+    "S",    # flake8-bandit: activates the intentional `# noqa: S104` bind annotation
+    "RUF",  # includes RUF100 (unused-noqa)
+    "BLE",  # blind-except: activates the `# noqa: BLE001` readiness-probe annotations
+    "DTZ",  # tz-aware datetimes on a token-TTL/OAuth service
+    "PT",   # pytest style over the fixture-heavy suite
+    "LOG",  # structlog is a core dependency
+    "G",    # logging-format
+    "C4",   # comprehension hygiene
+    "RET",  # return hygiene
+    "TID",  # tidy imports
+]
+# S105 (hardcoded-password-string) is a name-based heuristic: every hit in this
+# repo is a protocol constant (GRANT_TYPE_REFRESH_TOKEN, TOKEN_ALPHABET,
+# INTERNAL_TOKEN_HEADER, ...) or a dummy test fixture, never a real secret (real
+# secrets are env-sourced pydantic settings). It has no true positives here, so
+# it is disabled repo-wide. S106 stays enabled for source and is ignored only in
+# tests (see each package's per-file-ignores).
+ignore = ["S105"]
+
+[lint.flake8-bugbear]
+# FastAPI's dependency-injection idiom calls Depends()/Query()/... in argument
+# defaults by design; these are immutable markers, not mutable-default bugs.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Header",
+    "fastapi.Cookie",
+    "fastapi.Body",
+]
