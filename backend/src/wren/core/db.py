@@ -27,9 +27,11 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-# ``get_session`` is a FastAPI dependency (not a decorated route handler), so
-# FastAPI resolves its ``Request`` annotation at runtime; it must stay a runtime
-# import or FastAPI mistakes ``request`` for a query field.
+# ``get_session`` is a FastAPI dependency, not a decorated route handler, so
+# ``runtime-evaluated-decorators`` does not cover it. FastAPI resolves each
+# parameter annotation at runtime to build the dependency; ``Request`` must stay
+# importable at runtime so FastAPI recognizes the special request-injection
+# parameter instead of treating ``request`` as a validated query field.
 from starlette.requests import Request  # noqa: TC002
 
 from wren.core.health import CheckResult, ReadinessCheck
