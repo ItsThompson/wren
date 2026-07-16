@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
@@ -88,6 +89,7 @@ function noStaleFlash(): boolean {
 
 describe('AC5 revalidate-after-write: server state reflected with no stale flash and no extra GET', () => {
   it('publish reflects the returned published roadmap in place', async () => {
+    const user = userEvent.setup()
     let roadmapGets = 0
     server.use(
       http.get('*/roadmaps/:id', () => {
@@ -99,7 +101,7 @@ describe('AC5 revalidate-after-write: server state reflected with no stale flash
     renderWithProviders(<WriteProbe />, { baseUrl: BASE })
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('draft'))
 
-    fireEvent.click(screen.getByRole('button', { name: 'publish' }))
+    await user.click(screen.getByRole('button', { name: 'publish' }))
 
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('published'))
     expect(roadmapGets).toBe(1) // no revalidating GET after the write
@@ -107,6 +109,7 @@ describe('AC5 revalidate-after-write: server state reflected with no stale flash
   })
 
   it('editMetadata reflects the returned title in place', async () => {
+    const user = userEvent.setup()
     let roadmapGets = 0
     server.use(
       http.get('*/roadmaps/:id', () => {
@@ -118,7 +121,7 @@ describe('AC5 revalidate-after-write: server state reflected with no stale flash
     renderWithProviders(<WriteProbe />, { baseUrl: BASE })
     await waitFor(() => expect(screen.getByTestId('title')).toHaveTextContent(mockRoadmap.title))
 
-    fireEvent.click(screen.getByRole('button', { name: 'edit' }))
+    await user.click(screen.getByRole('button', { name: 'edit' }))
 
     await waitFor(() => expect(screen.getByTestId('title')).toHaveTextContent('Renamed live'))
     expect(roadmapGets).toBe(1)
@@ -126,6 +129,7 @@ describe('AC5 revalidate-after-write: server state reflected with no stale flash
   })
 
   it('visibility toggle reflects the returned visibility in place', async () => {
+    const user = userEvent.setup()
     let roadmapGets = 0
     server.use(
       http.get('*/roadmaps/:id', () => {
@@ -137,7 +141,7 @@ describe('AC5 revalidate-after-write: server state reflected with no stale flash
     renderWithProviders(<WriteProbe />, { baseUrl: BASE })
     await waitFor(() => expect(screen.getByTestId('visibility')).toHaveTextContent('public'))
 
-    fireEvent.click(screen.getByRole('button', { name: 'make-private' }))
+    await user.click(screen.getByRole('button', { name: 'make-private' }))
 
     await waitFor(() => expect(screen.getByTestId('visibility')).toHaveTextContent('private'))
     expect(roadmapGets).toBe(1)
@@ -145,6 +149,7 @@ describe('AC5 revalidate-after-write: server state reflected with no stale flash
   })
 
   it('archive reflects the returned archived status in place', async () => {
+    const user = userEvent.setup()
     let roadmapGets = 0
     server.use(
       http.get('*/roadmaps/:id', () => {
@@ -156,7 +161,7 @@ describe('AC5 revalidate-after-write: server state reflected with no stale flash
     renderWithProviders(<WriteProbe />, { baseUrl: BASE })
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('published'))
 
-    fireEvent.click(screen.getByRole('button', { name: 'archive' }))
+    await user.click(screen.getByRole('button', { name: 'archive' }))
 
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('archived'))
     expect(roadmapGets).toBe(1)

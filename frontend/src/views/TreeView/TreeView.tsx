@@ -6,8 +6,8 @@ import { TreeCanvas } from './components/TreeCanvas'
 import { TreeHeader } from './components/TreeHeader'
 import { TreeSkeleton } from './components/TreeSkeleton'
 import { useTreeData } from './hooks/useTreeData'
-import { layoutTree } from './layout'
-import { buildTreeGraph } from './tree-graph'
+import { layoutTree } from './util/layout'
+import { buildTreeGraph } from './util/tree-graph'
 
 /**
  * The Tree/DAG view: the roadmap's subsections

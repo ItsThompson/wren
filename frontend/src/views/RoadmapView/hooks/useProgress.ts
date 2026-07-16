@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 
 import { keys, runQuery, useApiQuery, useSessionClient } from '@/api'
 import { isStaleRevision, toProblem } from '@/lib/problem'
-import { firstNextSubsectionId, patchCheckedIds, patchDeadline } from '../progress-derive'
+import { firstNextSubsectionId, patchCheckedIds, patchDeadline } from '../util/progress-derive'
 import type { ProgressNotice } from '../types'
 
 /**

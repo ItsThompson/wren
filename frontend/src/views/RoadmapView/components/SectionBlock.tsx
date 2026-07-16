@@ -1,5 +1,5 @@
-import { orderedSubsectionIds } from '../ordering'
-import { sectionCount } from '../progress-derive'
+import { orderedSubsectionIds } from '../util/ordering'
+import { sectionCount } from '../util/progress-derive'
 import type { ProgressBinding, Section } from '../types'
 import { NodeCard } from './NodeCard'
 import { ProgressBar } from './ProgressBar'

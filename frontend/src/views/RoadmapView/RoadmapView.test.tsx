@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll } from 'vitest'
@@ -286,6 +287,7 @@ describe('RoadmapView publish', () => {
   })
 
   it('renders the returned violations inline when publish is hard-blocked (422)', async () => {
+    const user = userEvent.setup()
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
       http.post(PUBLISH_URL, () =>
@@ -310,7 +312,7 @@ describe('RoadmapView publish', () => {
     renderView()
     await screen.findByText('Grokking DSA')
 
-    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }))
+    await user.click(screen.getByRole('button', { name: /^publish$/i }))
 
     // The offending rule + message are surfaced inline for the author to fix.
     expect(await screen.findByText('subsection sub_hashing has no resources')).toBeInTheDocument()
@@ -320,6 +322,7 @@ describe('RoadmapView publish', () => {
   })
 
   it('routes to the tracking list view after a successful publish (200)', async () => {
+    const user = userEvent.setup()
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
       http.post(PUBLISH_URL, () => HttpResponse.json(buildDraft({ status: 'published' }))),
@@ -328,7 +331,7 @@ describe('RoadmapView publish', () => {
     renderView()
     await screen.findByText('Grokking DSA')
 
-    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }))
+    await user.click(screen.getByRole('button', { name: /^publish$/i }))
 
     // Publish is one-way: the tracking list view (progress bar + interactive
     // checklist) replaces the preview; the action and the draft badge are gone.
@@ -355,6 +358,7 @@ describe('RoadmapView publish', () => {
   })
 
   it('surfaces a retry message when publish fails unexpectedly (500)', async () => {
+    const user = userEvent.setup()
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
       http.post(PUBLISH_URL, () => new HttpResponse(null, { status: 500 })),
@@ -362,7 +366,7 @@ describe('RoadmapView publish', () => {
     renderView()
     await screen.findByText('Grokking DSA')
 
-    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }))
+    await user.click(screen.getByRole('button', { name: /^publish$/i }))
 
     expect(await screen.findByText(/couldn.t publish this roadmap/i)).toBeInTheDocument()
     // Still a draft, and the action remains available to retry.
@@ -395,6 +399,7 @@ describe('RoadmapView progress tracking', () => {
   })
 
   it('persists a check via progress_update and advances the overall bar', async () => {
+    const user = userEvent.setup()
     let posted: unknown
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(publishedRoadmap())),
@@ -409,7 +414,7 @@ describe('RoadmapView progress tracking', () => {
     const overall = await screen.findByRole('progressbar', { name: /overall progress/i })
     expect(overall).toHaveAttribute('aria-valuenow', '0')
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Read the walkthrough' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Read the walkthrough' }))
 
     // Explicit-set complete for exactly the toggled item.
     await waitFor(() =>
@@ -424,6 +429,7 @@ describe('RoadmapView progress tracking', () => {
   })
 
   it('sends state=incomplete when unchecking an already-checked item', async () => {
+    const user = userEvent.setup()
     let posted: unknown
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(publishedRoadmap())),
@@ -438,7 +444,7 @@ describe('RoadmapView progress tracking', () => {
     const checkbox = await screen.findByRole('checkbox', { name: 'Read the walkthrough' })
     // The detailed snapshot hydrates the checked state asynchronously on mount.
     await waitFor(() => expect(checkbox).toBeChecked())
-    fireEvent.click(checkbox)
+    await user.click(checkbox)
 
     await waitFor(() =>
       expect(posted).toEqual({ item_ids: ['chk_read'], state: 'incomplete' }),
@@ -493,6 +499,7 @@ describe('RoadmapView deadline countdown', () => {
   })
 
   it('sets a deadline via PUT when the date input changes', async () => {
+    const user = userEvent.setup()
     let put: unknown
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
@@ -505,13 +512,14 @@ describe('RoadmapView deadline countdown', () => {
     renderView()
 
     const input = await screen.findByLabelText('Deadline')
-    fireEvent.change(input, { target: { value: '2026-12-01' } })
+    await user.type(input, '2026-12-01')
 
     await waitFor(() => expect(put).toEqual({ deadline: '2026-12-01' }))
     await waitFor(() => expect(input).toHaveValue('2026-12-01'))
   })
 
   it('clears the deadline via PUT null when Clear is pressed', async () => {
+    const user = userEvent.setup()
     let put: unknown
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
@@ -525,7 +533,7 @@ describe('RoadmapView deadline countdown', () => {
 
     // Clear only appears once a deadline has hydrated.
     await waitFor(() => expect(screen.getByLabelText('Deadline')).toHaveValue('2099-12-31'))
-    fireEvent.click(screen.getByRole('button', { name: /clear/i }))
+    await user.click(screen.getByRole('button', { name: /clear/i }))
 
     await waitFor(() => expect(put).toEqual({ deadline: null }))
     await waitFor(() => expect(screen.getByLabelText('Deadline')).toHaveValue(''))
@@ -540,6 +548,9 @@ describe('RoadmapView deadline countdown', () => {
     renderView()
 
     const input = await screen.findByLabelText('Deadline')
+    // D4 date-input exception: this site keeps fireEvent.change. user.type awaits
+    // its act() flush, which lets the network-error revert land before the
+    // synchronous optimistic assertion below can observe the value.
     fireEvent.change(input, { target: { value: '2026-12-01' } })
     // Optimistically shows the new date synchronously ...
     expect(input).toHaveValue('2026-12-01')
@@ -548,6 +559,7 @@ describe('RoadmapView deadline countdown', () => {
   })
 
   it('surfaces a quiet inline notice and reverts when a deadline write fails (500)', async () => {
+    const user = userEvent.setup()
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
       http.get(PROGRESS_URL, () => HttpResponse.json(progressWithDeadline(null))),
@@ -556,7 +568,7 @@ describe('RoadmapView deadline countdown', () => {
     renderView()
 
     const input = await screen.findByLabelText('Deadline')
-    fireEvent.change(input, { target: { value: '2026-12-01' } })
+    await user.type(input, '2026-12-01')
 
     // The deadline write path now announces failures like the toggle path does ...
     expect(await screen.findByRole('status')).toHaveTextContent(/couldn.t save that change/i)
@@ -565,6 +577,7 @@ describe('RoadmapView deadline countdown', () => {
   })
 
   it('surfaces the ochre re-read prompt when a deadline write is stale (409)', async () => {
+    const user = userEvent.setup()
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
       http.get(PROGRESS_URL, () => HttpResponse.json(progressWithDeadline(null))),
@@ -578,7 +591,7 @@ describe('RoadmapView deadline countdown', () => {
     renderView()
 
     const input = await screen.findByLabelText('Deadline')
-    fireEvent.change(input, { target: { value: '2026-12-01' } })
+    await user.type(input, '2026-12-01')
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/reload to continue/i)
     await waitFor(() => expect(input).toHaveValue(''))
@@ -595,6 +608,7 @@ describe('RoadmapView fork', () => {
   }
 
   it('forks an owned draft and navigates to the new draft', async () => {
+    const user = userEvent.setup()
     server.use(
       // Any id resolves to a draft (the source, then the fork after navigation).
       http.get('*/roadmaps/:id', ({ params }) =>
@@ -607,7 +621,7 @@ describe('RoadmapView fork', () => {
     renderView()
     await screen.findByText('Grokking DSA')
 
-    fireEvent.click(screen.getByRole('button', { name: /^fork$/i }))
+    await user.click(screen.getByRole('button', { name: /^fork$/i }))
 
     // Fork navigates to the freshly-minted draft's route.
     await waitFor(() =>
@@ -632,6 +646,7 @@ describe('RoadmapView fork', () => {
   })
 
   it('surfaces a retry message when a fork fails unexpectedly (500)', async () => {
+    const user = userEvent.setup()
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
       http.post(FORK_URL, () => new HttpResponse(null, { status: 500 })),
@@ -639,7 +654,7 @@ describe('RoadmapView fork', () => {
     renderView()
     await screen.findByText('Grokking DSA')
 
-    fireEvent.click(screen.getByRole('button', { name: /^fork$/i }))
+    await user.click(screen.getByRole('button', { name: /^fork$/i }))
 
     expect(await screen.findByText(/couldn.t fork this roadmap/i)).toBeInTheDocument()
     // Did not navigate away: still on the source route.
@@ -651,6 +666,7 @@ describe('RoadmapView metadata edit', () => {
   const METADATA_URL = `${BASE}/roadmaps/${ROADMAP_ID}/metadata`
 
   it('lets the owner edit presentation metadata and reflects the new title', async () => {
+    const user = userEvent.setup()
     let patched: unknown
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
@@ -669,10 +685,14 @@ describe('RoadmapView metadata edit', () => {
     renderView()
     await screen.findByText('Grokking DSA')
 
-    fireEvent.click(screen.getByRole('button', { name: /edit details/i }))
-    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renamed' } })
-    fireEvent.change(screen.getByLabelText('Subject tags'), { target: { value: 'cs, dsa' } })
-    fireEvent.click(screen.getByRole('button', { name: /save details/i }))
+    await user.click(screen.getByRole('button', { name: /edit details/i }))
+    const titleInput = screen.getByLabelText('Title')
+    await user.clear(titleInput)
+    await user.type(titleInput, 'Renamed')
+    const tagsInput = screen.getByLabelText('Subject tags')
+    await user.clear(tagsInput)
+    await user.type(tagsInput, 'cs, dsa')
+    await user.click(screen.getByRole('button', { name: /save details/i }))
 
     // Only the three presentation fields are sent; parsed tags are trimmed.
     await waitFor(() =>
@@ -690,6 +710,7 @@ describe('RoadmapView metadata edit', () => {
   })
 
   it('edits metadata on a published roadmap (allowed post-publish)', async () => {
+    const user = userEvent.setup()
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
       http.get('*/roadmaps/:id/progress', () => HttpResponse.json(buildProgress())),
@@ -700,9 +721,11 @@ describe('RoadmapView metadata edit', () => {
     renderView()
     await screen.findByRole('progressbar', { name: /overall progress/i })
 
-    fireEvent.click(screen.getByRole('button', { name: /edit details/i }))
-    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renamed live' } })
-    fireEvent.click(screen.getByRole('button', { name: /save details/i }))
+    await user.click(screen.getByRole('button', { name: /edit details/i }))
+    const titleInput = screen.getByLabelText('Title')
+    await user.clear(titleInput)
+    await user.type(titleInput, 'Renamed live')
+    await user.click(screen.getByRole('button', { name: /save details/i }))
 
     await waitFor(() =>
       expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Renamed live'),
@@ -714,6 +737,7 @@ describe('RoadmapView metadata edit', () => {
   })
 
   it('keeps the editor open and shows a retry message when the edit fails (500)', async () => {
+    const user = userEvent.setup()
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
       http.patch(METADATA_URL, () => new HttpResponse(null, { status: 500 })),
@@ -721,9 +745,11 @@ describe('RoadmapView metadata edit', () => {
     renderView()
     await screen.findByText('Grokking DSA')
 
-    fireEvent.click(screen.getByRole('button', { name: /edit details/i }))
-    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renamed' } })
-    fireEvent.click(screen.getByRole('button', { name: /save details/i }))
+    await user.click(screen.getByRole('button', { name: /edit details/i }))
+    const titleInput = screen.getByLabelText('Title')
+    await user.clear(titleInput)
+    await user.type(titleInput, 'Renamed')
+    await user.click(screen.getByRole('button', { name: /save details/i }))
 
     expect(await screen.findByText(/couldn.t save your changes/i)).toBeInTheDocument()
     // The editor stays open so the entered values are not lost.
@@ -731,14 +757,15 @@ describe('RoadmapView metadata edit', () => {
   })
 
   it('closes the editor on Cancel without saving', async () => {
+    const user = userEvent.setup()
     server.use(http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())))
     renderView()
     await screen.findByText('Grokking DSA')
 
-    fireEvent.click(screen.getByRole('button', { name: /edit details/i }))
+    await user.click(screen.getByRole('button', { name: /edit details/i }))
     expect(screen.getByRole('button', { name: /save details/i })).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+    await user.click(screen.getByRole('button', { name: /cancel/i }))
     // The editor collapses; the toggle returns to "Edit details".
     expect(screen.queryByRole('button', { name: /save details/i })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /edit details/i })).toBeInTheDocument()
@@ -757,6 +784,7 @@ describe('RoadmapView web-only lifecycle', () => {
   }
 
   it('lets the owner toggle a draft public and flips the control', async () => {
+    const user = userEvent.setup()
     let put: unknown
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
@@ -770,7 +798,7 @@ describe('RoadmapView web-only lifecycle', () => {
     await screen.findByText('Grokking DSA')
 
     // Private draft: the toggle offers "Make public".
-    fireEvent.click(screen.getByRole('button', { name: /make public/i }))
+    await user.click(screen.getByRole('button', { name: /make public/i }))
 
     await waitFor(() => expect(put).toEqual({ visibility: 'public' }))
     // The returned roadmap replaces the loaded one, so the control flips.
@@ -788,6 +816,7 @@ describe('RoadmapView web-only lifecycle', () => {
   })
 
   it('archives a published roadmap after confirmation and shows the archived badge', async () => {
+    const user = userEvent.setup()
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
       http.get('*/roadmaps/:id/progress', () => HttpResponse.json(buildProgress())),
@@ -797,8 +826,8 @@ describe('RoadmapView web-only lifecycle', () => {
     await screen.findByRole('progressbar', { name: /overall progress/i })
 
     // Confirm-gated: the first click reveals a confirmation step.
-    fireEvent.click(screen.getByRole('button', { name: /^archive$/i }))
-    fireEvent.click(screen.getByRole('button', { name: /confirm archive/i }))
+    await user.click(screen.getByRole('button', { name: /^archive$/i }))
+    await user.click(screen.getByRole('button', { name: /confirm archive/i }))
 
     // The archived badge appears and the Archive action is gone (already archived).
     expect(await screen.findByText('Archived')).toBeInTheDocument()
@@ -806,6 +835,7 @@ describe('RoadmapView web-only lifecycle', () => {
   })
 
   it('deletes a follower-free roadmap after confirmation and navigates away', async () => {
+    const user = userEvent.setup()
     let deleted = false
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
@@ -817,8 +847,8 @@ describe('RoadmapView web-only lifecycle', () => {
     renderView()
     await screen.findByText('Grokking DSA')
 
-    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
-    fireEvent.click(screen.getByRole('button', { name: /confirm delete/i }))
+    await user.click(screen.getByRole('button', { name: /^delete$/i }))
+    await user.click(screen.getByRole('button', { name: /confirm delete/i }))
 
     await waitFor(() => expect(deleted).toBe(true))
     // A successful delete leaves the now-removed roadmap's route.
@@ -826,6 +856,7 @@ describe('RoadmapView web-only lifecycle', () => {
   })
 
   it('blocks delete when the roadmap has followers and steers to archive', async () => {
+    const user = userEvent.setup()
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
       http.get('*/roadmaps/:id/progress', () => HttpResponse.json(buildProgress())),
@@ -845,8 +876,8 @@ describe('RoadmapView web-only lifecycle', () => {
     renderView()
     await screen.findByRole('progressbar', { name: /overall progress/i })
 
-    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
-    fireEvent.click(screen.getByRole('button', { name: /confirm delete/i }))
+    await user.click(screen.getByRole('button', { name: /^delete$/i }))
+    await user.click(screen.getByRole('button', { name: /confirm delete/i }))
 
     // The 409 steers the owner to archive instead; the roadmap is not removed.
     expect(await screen.findByText(/archive it instead/i)).toBeInTheDocument()
@@ -856,6 +887,7 @@ describe('RoadmapView web-only lifecycle', () => {
   })
 
   it('cancels a destructive action without firing a request', async () => {
+    const user = userEvent.setup()
     let deleteCalled = false
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
@@ -867,9 +899,9 @@ describe('RoadmapView web-only lifecycle', () => {
     renderView()
     await screen.findByText('Grokking DSA')
 
-    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
+    await user.click(screen.getByRole('button', { name: /^delete$/i }))
     expect(screen.getByRole('button', { name: /confirm delete/i })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+    await user.click(screen.getByRole('button', { name: /cancel/i }))
 
     // The confirmation collapses and nothing was deleted.
     expect(screen.queryByRole('button', { name: /confirm delete/i })).not.toBeInTheDocument()
@@ -895,6 +927,7 @@ describe('RoadmapView web-only lifecycle', () => {
   })
 
   it('surfaces a retry message when a visibility toggle fails (500)', async () => {
+    const user = userEvent.setup()
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
       http.put(VISIBILITY_URL, () => new HttpResponse(null, { status: 500 })),
@@ -902,13 +935,14 @@ describe('RoadmapView web-only lifecycle', () => {
     renderView()
     await screen.findByText('Grokking DSA')
 
-    fireEvent.click(screen.getByRole('button', { name: /make public/i }))
+    await user.click(screen.getByRole('button', { name: /make public/i }))
     expect(await screen.findByText(/couldn.t update visibility/i)).toBeInTheDocument()
     // Unchanged: still offers "Make public" (the toggle did not take effect).
     expect(screen.getByRole('button', { name: /make public/i })).toBeInTheDocument()
   })
 
   it('surfaces a retry message when archive fails (500)', async () => {
+    const user = userEvent.setup()
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
       http.get('*/roadmaps/:id/progress', () => HttpResponse.json(buildProgress())),
@@ -917,8 +951,8 @@ describe('RoadmapView web-only lifecycle', () => {
     renderView()
     await screen.findByRole('progressbar', { name: /overall progress/i })
 
-    fireEvent.click(screen.getByRole('button', { name: /^archive$/i }))
-    fireEvent.click(screen.getByRole('button', { name: /confirm archive/i }))
+    await user.click(screen.getByRole('button', { name: /^archive$/i }))
+    await user.click(screen.getByRole('button', { name: /confirm archive/i }))
     expect(await screen.findByText(/couldn.t archive this roadmap/i)).toBeInTheDocument()
     // Not archived: the Archive action remains available to retry.
     expect(screen.getByRole('button', { name: /^archive$/i })).toBeInTheDocument()
@@ -986,6 +1020,7 @@ describe('RoadmapView list view (tags, filter chips, next highlight)', () => {
   })
 
   it('filters subsections to the selected tag and clears on re-select', async () => {
+    const user = userEvent.setup()
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(filterableRoadmap())),
       http.get(PROGRESS_URL, () => HttpResponse.json(buildProgress())),
@@ -998,7 +1033,7 @@ describe('RoadmapView list view (tags, filter chips, next highlight)', () => {
     expect(screen.getByRole('heading', { level: 3, name: 'Arrays & two pointers' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 3, name: 'Hashing' })).toBeInTheDocument()
 
-    fireEvent.click(arraysChip)
+    await user.click(arraysChip)
 
     // Active chip is styled/announced active; only the matching subsection shows.
     expect(arraysChip).toHaveAttribute('aria-pressed', 'true')
@@ -1006,7 +1041,7 @@ describe('RoadmapView list view (tags, filter chips, next highlight)', () => {
     expect(screen.queryByRole('heading', { level: 3, name: 'Hashing' })).not.toBeInTheDocument()
 
     // Re-selecting the active chip clears the filter and restores all subsections.
-    fireEvent.click(arraysChip)
+    await user.click(arraysChip)
     expect(arraysChip).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByRole('heading', { level: 3, name: 'Hashing' })).toBeInTheDocument()
   })
@@ -1114,6 +1149,7 @@ describe('RoadmapView states (loading/empty/error, 409/422, tabs, anchor)', () =
   }
 
   it('surfaces an ochre re-read prompt (color AND text) when a progress write is stale (409)', async () => {
+    const user = userEvent.setup()
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
       http.get(PROGRESS_URL, () => HttpResponse.json(buildProgress())),
@@ -1124,7 +1160,7 @@ describe('RoadmapView states (loading/empty/error, 409/422, tabs, anchor)', () =
     renderView()
 
     const checkbox = await screen.findByRole('checkbox', { name: 'Read the walkthrough' })
-    fireEvent.click(checkbox)
+    await user.click(checkbox)
 
     // The stale write becomes the first-class ochre re-read prompt, not a toast.
     const alert = await screen.findByRole('alert')
@@ -1135,11 +1171,12 @@ describe('RoadmapView states (loading/empty/error, 409/422, tabs, anchor)', () =
     await waitFor(() => expect(checkbox).not.toBeChecked())
 
     // Reloading clears the prompt and refetches fresh state.
-    fireEvent.click(within(alert).getByRole('button', { name: 'Reload' }))
+    await user.click(within(alert).getByRole('button', { name: 'Reload' }))
     await waitFor(() => expect(screen.queryByText(/reload to continue/i)).not.toBeInTheDocument())
   })
 
   it('surfaces a quiet inline notice (not silent) and reverts when a progress write fails (500)', async () => {
+    const user = userEvent.setup()
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
       http.get(PROGRESS_URL, () => HttpResponse.json(buildProgress())),
@@ -1148,7 +1185,7 @@ describe('RoadmapView states (loading/empty/error, 409/422, tabs, anchor)', () =
     renderView()
 
     const checkbox = await screen.findByRole('checkbox', { name: 'Read the walkthrough' })
-    fireEvent.click(checkbox)
+    await user.click(checkbox)
 
     // A failed persist is announced (never a silent revert) ...
     expect(await screen.findByRole('status')).toHaveTextContent(/couldn.t save that change/i)
@@ -1157,6 +1194,7 @@ describe('RoadmapView states (loading/empty/error, 409/422, tabs, anchor)', () =
   })
 
   it('steers a 409 immutable publish to fork-to-change', async () => {
+    const user = userEvent.setup()
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
       http.post(PUBLISH_URL, () =>
@@ -1166,7 +1204,7 @@ describe('RoadmapView states (loading/empty/error, 409/422, tabs, anchor)', () =
     renderView()
     await screen.findByText('Grokking DSA')
 
-    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }))
+    await user.click(screen.getByRole('button', { name: /^publish$/i }))
 
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent(/fork it to make changes/i)
@@ -1243,6 +1281,7 @@ describe('RoadmapView sub-state reset on roadmapId change (R2 invariant)', () =>
   }
 
   it('clears a blocked publish sub-state when the route changes on the same instance', async () => {
+    const user = userEvent.setup()
     server.use(
       http.post('*/auth/refresh', () => HttpResponse.json(AUTH_USER)),
       // Both roadmap A and roadmap B resolve to an owned draft (echo the id), so
@@ -1263,7 +1302,7 @@ describe('RoadmapView sub-state reset on roadmapId change (R2 invariant)', () =>
     )
 
     await screen.findByText('Grokking DSA')
-    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }))
+    await user.click(screen.getByRole('button', { name: /^publish$/i }))
     // Roadmap A's publish is hard-blocked: the violation is shown inline.
     expect(
       await screen.findByText('subsection sub_hashing has no resources'),
@@ -1272,7 +1311,7 @@ describe('RoadmapView sub-state reset on roadmapId change (R2 invariant)', () =>
     // Navigate to roadmap B WITHOUT unmounting RoadmapView: React Router keeps the
     // same instance across a `:roadmapId` change, so the plain-useState publish
     // sub-state would leak onto B unless it is reset (the R2 invariant).
-    fireEvent.click(screen.getByRole('button', { name: /go to roadmap b/i }))
+    await user.click(screen.getByRole('button', { name: /go to roadmap b/i }))
 
     // Once roadmap B is loaded (its Publish action is back), the blocked violation
     // from roadmap A is gone: the sub-state reset fired on the route change.
