@@ -1,6 +1,6 @@
 import { createContext } from 'react'
 
-import type { AuthContextValue } from './types'
+import type { AuthContextValue } from '../types'
 
 /**
  * Session context. `null` until an `AuthProvider` mounts; `useAuth` turns that

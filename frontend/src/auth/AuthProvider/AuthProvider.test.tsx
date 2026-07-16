@@ -9,7 +9,7 @@ import { handlers } from '@/mocks/handlers'
 import { mockAuthUser } from '@/mocks/data'
 import { ApiClientProvider } from '@/api'
 import { AuthProvider } from './AuthProvider'
-import { useAuth } from './useAuth'
+import { useAuth } from '../useAuth'
 
 const BASE = 'https://api.test'
 const server = setupServer(...handlers)

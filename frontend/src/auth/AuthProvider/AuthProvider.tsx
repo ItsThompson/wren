@@ -2,8 +2,8 @@ import type { ReactNode } from 'react'
 
 import { useSessionClient } from '@/api'
 
-import { AuthContext } from './auth-context'
-import { useAuthSession } from './hooks/useAuthSession'
+import { AuthContext } from '../auth-context'
+import { useAuthSession } from '../hooks/useAuthSession'
 
 interface AuthProviderProps {
   children: ReactNode

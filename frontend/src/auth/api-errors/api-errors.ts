@@ -1,4 +1,4 @@
-import type { AuthResult } from './types'
+import type { AuthResult } from '../types'
 
 /**
  * The subset of the RFC 9457 problem+json body the auth forms use:

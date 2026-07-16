@@ -1,7 +1,7 @@
 import { useContext } from 'react'
 
-import { AuthContext } from './auth-context'
-import type { AuthContextValue } from './types'
+import { AuthContext } from '../auth-context'
+import type { AuthContextValue } from '../types'
 
 /** Read the session context. Throws if used outside an `AuthProvider`. */
 export function useAuth(): AuthContextValue {
