@@ -1,5 +1,5 @@
 import { collectTrackTags } from './track-tags'
-import type { Roadmap, Section, Subsection } from './types'
+import type { Roadmap, Section, Subsection } from '../../types'
 
 function subsection(id: string, tags: string[]): Subsection {
   return {

@@ -1,4 +1,4 @@
-import type { NextResult, ProgressSnapshot, Roadmap, Section, Subsection } from './types'
+import type { NextResult, ProgressSnapshot, Roadmap, Section, Subsection } from '../../types'
 
 /**
  * Pure client-side progress derivation: overall and

@@ -1,4 +1,4 @@
-import type { Roadmap } from './types'
+import type { Roadmap } from '../../types'
 
 /**
  * The distinct subsection track tags across a roadmap, in first-appearance

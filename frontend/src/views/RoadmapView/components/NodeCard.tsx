@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react'
 
-import { isSubsectionDone } from '../progress-derive'
+import { isSubsectionDone } from '../util/progress-derive'
 import type { ProgressBinding, Subsection } from '../types'
 import { ChecklistRow } from './ChecklistRow'
 import { TagPill } from './TagPill'

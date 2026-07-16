@@ -1,4 +1,4 @@
-import { computeCountdown } from '../deadline-countdown'
+import { computeCountdown } from '../util/deadline-countdown'
 
 interface DeadlineCountdownProps {
   /** The caller's per-user deadline (`YYYY-MM-DD`), or null when none is set. */

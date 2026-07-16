@@ -1,5 +1,5 @@
 import { orderedSubsectionIds } from './ordering'
-import type { Section } from './types'
+import type { Section } from '../../types'
 
 function section(overrides: Partial<Section> = {}): Section {
   return {

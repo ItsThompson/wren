@@ -1,6 +1,6 @@
 import { isSubsectionDone, overallCount, sectionCount } from './progress-derive'
 import { firstNextSubsectionId, patchCheckedIds, patchDeadline } from './progress-derive'
-import type { NextResult, ProgressSnapshot, Roadmap, Section, Subsection } from './types'
+import type { NextResult, ProgressSnapshot, Roadmap, Section, Subsection } from '../../types'
 
 /** A subsection with the given item ids and no resources. */
 function subsection(id: string, itemIds: string[]): Subsection {

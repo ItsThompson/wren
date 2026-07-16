@@ -1,4 +1,4 @@
-import { tagPillStyle } from '../tag-pill-style'
+import { tagPillStyle } from '../util/tag-pill-style'
 
 interface TagPillProps {
   tag: string

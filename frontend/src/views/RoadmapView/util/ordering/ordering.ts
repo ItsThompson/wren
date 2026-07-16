@@ -1,4 +1,4 @@
-import type { Section } from './types'
+import type { Section } from '../../types'
 
 /**
  * The order subsections render within a section: pedagogical `suggested_path`
