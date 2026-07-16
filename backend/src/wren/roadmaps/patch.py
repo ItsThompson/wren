@@ -119,6 +119,12 @@ class _Applier:
         self._changes: dict[tuple[ChangedNodeKind, str], ChangedNode] = {}
 
     def dispatch(self, op: PatchOp) -> None:
+        # L6 decision: kept as an explicit isinstance spine (not a dict handler
+        # table) on purpose. The assert_never fallback below gives mypy
+        # compile-time exhaustiveness, so adding a PatchOp subtype fails type-check
+        # until it is handled here; a dict dispatch would only be worth it if it
+        # preserved that guarantee (a plain dict that no-ops an unhandled op is a
+        # net loss).
         if isinstance(op, AddSubsectionOp):
             self._add_subsection(op)
         elif isinstance(op, UpdateSubsectionOp):
