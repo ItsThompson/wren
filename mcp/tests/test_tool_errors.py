@@ -49,13 +49,13 @@ def test_violations_name_the_rule_and_ids() -> None:
         code="VALIDATION",
         detail="publish blocked",
         violations=[
-            {"rule": "V2_CYCLE", "ids": ["sub_a", "sub_b"], "message": "prerequisite cycle"},
+            {"rule": "V1_ACYCLIC", "ids": ["sub_a", "sub_b"], "message": "prerequisite cycle"},
         ],
     )
     with pytest.raises(ToolError) as excinfo:
         raise_for_problem(response)
     message = str(excinfo.value)
-    assert "V2_CYCLE" in message
+    assert "V1_ACYCLIC" in message
     assert "prerequisite cycle" in message
     assert "sub_a" in message and "sub_b" in message
 
