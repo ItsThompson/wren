@@ -14,7 +14,8 @@ tokens are short-lived and revocation takes effect within the access-token TTL.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from collections.abc import Callable
+from datetime import datetime, timedelta
 
 from wren.core.errors import NotFound
 from wren.core.logging import get_logger
@@ -25,6 +26,7 @@ from wren.oauth.config import (
     OAuthConfig,
 )
 from wren.oauth.errors import OAuthError
+from wren.oauth.injection import Clock, OpaqueIdFactory, new_hex_id, utcnow
 from wren.oauth.models import OAuthRefreshToken
 from wren.oauth.pkce import is_valid_s256
 from wren.oauth.repository import OAuthRepository
@@ -34,15 +36,42 @@ from wren.oauth.tokens import AccessTokenCodec, hash_token, mint_refresh_token
 _log = get_logger("wren-oauth")
 _BEARER = "Bearer"
 
+# grant_type -> increment. Injected so no business method names the global metric
+# (F23); the default keeps the metric name/labels stable.
+IssuedCounter = Callable[[str], None]
+
+
+def _default_issued_counter(grant_type: str) -> None:
+    """Default issuance counter: bump the process-global ``OAUTH_TOKENS_ISSUED``."""
+    OAUTH_TOKENS_ISSUED.labels(grant_type=grant_type).inc()
+
 
 @track_failures("oauth")
 class TokenService:
     """Token issuance, refresh rotation, revocation, and connected-client grants."""
 
-    def __init__(self, repo: OAuthRepository, config: OAuthConfig, codec: AccessTokenCodec) -> None:
+    def __init__(
+        self,
+        repo: OAuthRepository,
+        config: OAuthConfig,
+        codec: AccessTokenCodec,
+        *,
+        clock: Clock = utcnow,
+        new_id: OpaqueIdFactory = mint_refresh_token,
+        new_record_id: OpaqueIdFactory = new_hex_id,
+        issued_counter: IssuedCounter = _default_issued_counter,
+    ) -> None:
         self._repo = repo
         self._config = config
         self._codec = codec
+        # Injected so tests pin expiry and force deterministic ids/counting without
+        # patching globals; the defaults reproduce the prior ambient behavior.
+        self._clock = clock
+        # Raw refresh-token secret (url-safe); grant/audit surrogate keys (hex).
+        self._new_id = new_id
+        self._new_record_id = new_record_id
+        # Counts issuance post-commit; default binds OAUTH_TOKENS_ISSUED (F23).
+        self._issued_counter = issued_counter
 
     async def exchange(self, request: TokenRequest) -> TokenResponse:
         """Dispatch the token endpoint on ``grant_type`` (RFC 6749)."""
@@ -56,7 +85,7 @@ class TokenService:
         if not request.code or not request.code_verifier or not request.client_id:
             raise OAuthError.invalid_request("code, code_verifier, and client_id are required.")
         code = await self._repo.get_code(request.code)
-        if code is None or _is_expired(code.expires_at):
+        if code is None or self._is_expired(code.expires_at):
             raise OAuthError.invalid_grant("Authorization code is invalid or expired.")
         if code.client_id != request.client_id:
             raise OAuthError.invalid_grant("Authorization code was issued to another client.")
@@ -85,7 +114,7 @@ class TokenService:
             event=OAuthEvent.TOKEN_ISSUED,
         )
         await self._repo.commit()
-        OAUTH_TOKENS_ISSUED.labels(grant_type=GRANT_TYPE_AUTHORIZATION_CODE).inc()
+        self._issued_counter(GRANT_TYPE_AUTHORIZATION_CODE)
         _log.info("oauth_token_issued", client_id=code.client_id, user_id=code.user_id)
         return tokens
 
@@ -101,7 +130,7 @@ class TokenService:
             await self._repo.revoke_grant_refresh_tokens(existing.grant_id)
             await self._repo.commit()
             raise OAuthError.invalid_grant("Refresh token has already been used.")
-        if _is_expired(existing.expires_at):
+        if self._is_expired(existing.expires_at):
             raise OAuthError.invalid_grant("Refresh token is expired.")
         if existing.client_id != request.client_id:
             raise OAuthError.invalid_grant("Refresh token was issued to another client.")
@@ -117,7 +146,7 @@ class TokenService:
             event=OAuthEvent.REFRESHED,
         )
         await self._repo.commit()
-        OAUTH_TOKENS_ISSUED.labels(grant_type=GRANT_TYPE_REFRESH_TOKEN).inc()
+        self._issued_counter(GRANT_TYPE_REFRESH_TOKEN)
         _log.info("oauth_token_refreshed", client_id=existing.client_id, user_id=existing.user_id)
         return tokens
 
@@ -139,20 +168,30 @@ class TokenService:
             client_id=existing.client_id,
             event=OAuthEvent.REVOKED.value,
             scope=existing.scope,
+            now=self._clock(),
+            event_id=self._new_record_id(),
         )
         await self._repo.commit()
         _log.info("oauth_token_revoked", client_id=existing.client_id, user_id=existing.user_id)
 
     async def list_connected_clients(self, user_id: str) -> list[ConnectedClient]:
-        """The user's authorized agents (``GET /me/clients``)."""
+        """The user's authorized agents (``GET /me/clients``).
+
+        One batch ``get_clients`` read over the shared session instead of N serial
+        ``get_client`` awaits; a grant whose client was deleted (a map miss) is
+        skipped.
+        """
         grants = await self._repo.list_active_grants(user_id)
+        names = await self._repo.get_clients([grant.client_id for grant in grants])
         connected: list[ConnectedClient] = []
         for grant in grants:
-            client = await self._repo.get_client(grant.client_id)
+            client_name = names.get(grant.client_id)
+            if client_name is None:
+                continue
             connected.append(
                 ConnectedClient(
                     client_id=grant.client_id,
-                    client_name=client.client_name if client is not None else grant.client_id,
+                    client_name=client_name,
                     scopes=grant.scope.split(),
                     last_authorized=grant.authorized_at,
                 )
@@ -161,18 +200,23 @@ class TokenService:
 
     async def revoke_connected_client(self, user_id: str, client_id: str) -> None:
         """Revoke a user's grant + its refresh tokens (``DELETE``)."""
-        grant = await self._repo.revoke_grant(user_id, client_id)
+        grant = await self._repo.revoke_grant(user_id, client_id, now=self._clock())
         if grant is None:
             raise NotFound("No connected client to revoke.")
         await self._repo.record_event(
-            user_id=user_id, client_id=client_id, event=OAuthEvent.REVOKED.value, scope=grant.scope
+            user_id=user_id,
+            client_id=client_id,
+            event=OAuthEvent.REVOKED.value,
+            scope=grant.scope,
+            now=self._clock(),
+            event_id=self._new_record_id(),
         )
         await self._repo.commit()
         _log.info("oauth_client_revoked", client_id=client_id, user_id=user_id)
 
     async def cleanup_stale_clients(self, older_than: timedelta) -> int:
         """Periodic P0 hook: drop open-registration clients older than ``older_than``."""
-        cutoff = datetime.now(UTC) - older_than
+        cutoff = self._clock() - older_than
         deleted = await self._repo.delete_clients_created_before(cutoff)
         await self._repo.commit()
         return deleted
@@ -190,7 +234,8 @@ class TokenService:
         access = self._codec.mint(
             subject=user_id, client_id=client_id, scope=scope, audience=resource
         )
-        refresh_raw = mint_refresh_token()
+        now = self._clock()
+        refresh_raw = self._new_id()
         await self._repo.add_refresh_token(
             OAuthRefreshToken(
                 token_hash=hash_token(refresh_raw),
@@ -199,11 +244,17 @@ class TokenService:
                 user_id=user_id,
                 scope=scope,
                 resource=resource,
-                expires_at=datetime.now(UTC) + self._config.refresh_ttl,
-            )
+                expires_at=now + self._config.refresh_ttl,
+            ),
+            now=now,
         )
         await self._repo.record_event(
-            user_id=user_id, client_id=client_id, event=event.value, scope=scope
+            user_id=user_id,
+            client_id=client_id,
+            event=event.value,
+            scope=scope,
+            now=now,
+            event_id=self._new_record_id(),
         )
         return TokenResponse(
             access_token=access.token,
@@ -213,6 +264,5 @@ class TokenService:
             scope=scope,
         )
 
-
-def _is_expired(expires_at: datetime) -> bool:
-    return expires_at <= datetime.now(UTC)
+    def _is_expired(self, expires_at: datetime) -> bool:
+        return expires_at <= self._clock()

@@ -10,11 +10,13 @@ revocation, one-time codes).
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from collections.abc import Sequence
+from datetime import datetime, timedelta
 
 from authlib.oauth2.rfc7636 import create_s256_code_challenge
 
 from wren.oauth.config import OAuthConfig
+from wren.oauth.injection import Clock, utcnow
 from wren.oauth.keys import SigningKeySet, load_signing_key_set
 from wren.oauth.models import (
     OAuthAuthorizationCode,
@@ -56,8 +58,23 @@ def build_test_keyset(config: OAuthConfig) -> SigningKeySet:
     return load_signing_key_set(config, is_dev=True)
 
 
-def build_test_codec(config: OAuthConfig, keyset: SigningKeySet) -> AccessTokenCodec:
-    return AccessTokenCodec(keyset, config)
+def build_test_codec(
+    config: OAuthConfig, keyset: SigningKeySet, *, clock: Clock = utcnow
+) -> AccessTokenCodec:
+    return AccessTokenCodec(keyset, config, clock=clock)
+
+
+class MutableClock:
+    """A pinned, advanceable clock for expiry tests (no ``sleep``/negative TTL)."""
+
+    def __init__(self, now: datetime) -> None:
+        self._now = now
+
+    def __call__(self) -> datetime:
+        return self._now
+
+    def advance(self, delta: timedelta) -> None:
+        self._now += delta
 
 
 def make_pkce_pair() -> tuple[str, str]:
@@ -85,6 +102,9 @@ class InMemoryOAuthRepository:
 
     async def get_client(self, client_id: str) -> OAuthClient | None:
         return self._clients.get(client_id)
+
+    async def get_clients(self, client_ids: Sequence[str]) -> dict[str, str]:
+        return {cid: self._clients[cid].client_name for cid in client_ids if cid in self._clients}
 
     async def delete_clients_created_before(self, cutoff: datetime) -> int:
         stale = [cid for cid, c in self._clients.items() if c.created_at < cutoff]
@@ -116,7 +136,8 @@ class InMemoryOAuthRepository:
 
     # --- refresh tokens -----------------------------------------------------
 
-    async def add_refresh_token(self, token: OAuthRefreshToken) -> None:
+    async def add_refresh_token(self, token: OAuthRefreshToken, *, now: datetime) -> None:
+        token.created_at = now
         if token.revoked is None:
             token.revoked = False
         self._refresh[token.token_hash] = token
@@ -136,20 +157,22 @@ class InMemoryOAuthRepository:
 
     # --- grants -------------------------------------------------------------
 
-    async def upsert_grant(self, *, user_id: str, client_id: str, scope: str) -> str:
+    async def upsert_grant(
+        self, *, user_id: str, client_id: str, scope: str, now: datetime, grant_id: str
+    ) -> str:
         key = (user_id, client_id)
         existing = self._grants.get(key)
         if existing is not None:
             existing.scope = scope
-            existing.authorized_at = datetime.now(UTC)
+            existing.authorized_at = now
             existing.revoked_at = None
             return existing.id
         grant = OAuthGrant(
-            id=uuid.uuid4().hex,
+            id=grant_id,
             user_id=user_id,
             client_id=client_id,
             scope=scope,
-            authorized_at=datetime.now(UTC),
+            authorized_at=now,
         )
         self._grants[key] = grant
         return grant.id
@@ -163,21 +186,37 @@ class InMemoryOAuthRepository:
         ]
         return sorted(active, key=lambda g: g.authorized_at, reverse=True)
 
-    async def revoke_grant(self, user_id: str, client_id: str) -> OAuthGrant | None:
+    async def revoke_grant(
+        self, user_id: str, client_id: str, *, now: datetime
+    ) -> OAuthGrant | None:
         grant = self._grants.get((user_id, client_id))
         if grant is None or grant.revoked_at is not None:
             return None
-        grant.revoked_at = datetime.now(UTC)
+        grant.revoked_at = now
         await self.revoke_grant_refresh_tokens(grant.id)
         return grant
 
     # --- audit --------------------------------------------------------------
 
     async def record_event(
-        self, *, user_id: str, client_id: str, event: str, scope: str | None = None
+        self,
+        *,
+        user_id: str,
+        client_id: str,
+        event: str,
+        scope: str | None = None,
+        now: datetime,
+        event_id: str,
     ) -> None:
         self.audit.append(
-            OAuthAuditEntry(user_id=user_id, client_id=client_id, event=event, scope=scope)
+            OAuthAuditEntry(
+                event_id=event_id,
+                user_id=user_id,
+                client_id=client_id,
+                event=event,
+                scope=scope,
+                created_at=now,
+            )
         )
 
     async def commit(self) -> None:
@@ -187,8 +226,19 @@ class InMemoryOAuthRepository:
 class OAuthAuditEntry:
     """A recorded audit event, so tests can assert (client, user, event)."""
 
-    def __init__(self, *, user_id: str, client_id: str, event: str, scope: str | None) -> None:
+    def __init__(
+        self,
+        *,
+        event_id: str,
+        user_id: str,
+        client_id: str,
+        event: str,
+        scope: str | None,
+        created_at: datetime,
+    ) -> None:
+        self.event_id = event_id
         self.user_id = user_id
         self.client_id = client_id
         self.event = event
         self.scope = scope
+        self.created_at = created_at

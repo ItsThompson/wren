@@ -8,14 +8,16 @@ downgrade/mismatch/replay/expiry failure paths.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
 from oauth_fakes import (
     InMemoryOAuthRepository,
+    MutableClock,
     build_test_codec,
     build_test_config,
     build_test_keyset,
@@ -26,6 +28,7 @@ from wren.core.observability import WREN_REGISTRY
 from wren.oauth.authorization import AuthorizationService
 from wren.oauth.config import OAuthConfig
 from wren.oauth.errors import OAuthError, OAuthErrorCode
+from wren.oauth.injection import Clock, utcnow
 from wren.oauth.schemas import (
     AuthorizeParams,
     ClientRegistrationRequest,
@@ -48,13 +51,23 @@ class Harness:
     codec: AccessTokenCodec
 
 
-def _harness(**config_overrides: object) -> Harness:
+def _harness(
+    *,
+    clock: Clock = utcnow,
+    issued_counter: Callable[[str], None] | None = None,
+    **config_overrides: object,
+) -> Harness:
     config = build_test_config(**config_overrides)  # type: ignore[arg-type]
-    codec = build_test_codec(config, build_test_keyset(config))
+    codec = build_test_codec(config, build_test_keyset(config), clock=clock)
     repo = InMemoryOAuthRepository()
+    tokens = (
+        TokenService(repo, config, codec, clock=clock)
+        if issued_counter is None
+        else TokenService(repo, config, codec, clock=clock, issued_counter=issued_counter)
+    )
     return Harness(
-        auth=AuthorizationService(repo, config),
-        tokens=TokenService(repo, config, codec),
+        auth=AuthorizationService(repo, config, clock=clock),
+        tokens=tokens,
         repo=repo,
         config=config,
         codec=codec,
@@ -319,10 +332,13 @@ async def test_decision_without_state_omits_state_in_the_redirect() -> None:
 
 
 async def test_expired_parked_request_is_not_found() -> None:
-    h = _harness(auth_request_ttl=timedelta(seconds=-1))
+    clock = MutableClock(datetime(2024, 1, 1, tzinfo=UTC))
+    h = _harness(clock=clock, auth_request_ttl=timedelta(minutes=10))
     client_id = await _register(h.auth)
     _verifier, challenge = make_pkce_pair()
     request_id = await _park(h.auth, client_id, challenge)
+    # Advance a pinned clock past the TTL instead of parking with a negative one.
+    clock.advance(timedelta(minutes=11))
     with pytest.raises(NotFound):
         await h.auth.get_context(request_id, authenticated=True)
 
@@ -468,10 +484,13 @@ async def test_code_exchange_rejects_foreign_resource() -> None:
 
 
 async def test_expired_code_is_rejected() -> None:
-    h = _harness(code_ttl=timedelta(seconds=-1))
+    clock = MutableClock(datetime(2024, 1, 1, tzinfo=UTC))
+    h = _harness(clock=clock, code_ttl=timedelta(minutes=1))
     client_id = await _register(h.auth)
     verifier, challenge = make_pkce_pair()
     code = await _authorize_to_code(h, client_id, challenge)
+    # Advance past the code TTL via the pinned clock (no negative timedelta).
+    clock.advance(timedelta(minutes=2))
     with pytest.raises(OAuthError) as exc:
         await h.tokens.exchange(
             TokenRequest(
@@ -613,9 +632,12 @@ async def test_refresh_requires_refresh_token_and_client_id() -> None:
 
 
 async def test_expired_refresh_token_is_rejected() -> None:
-    h = _harness(refresh_ttl=timedelta(seconds=-1))
+    clock = MutableClock(datetime(2024, 1, 1, tzinfo=UTC))
+    h = _harness(clock=clock, refresh_ttl=timedelta(days=30))
     client_id = await _register(h.auth)
     first = await _issue_tokens(h, client_id)
+    # Advance past the refresh TTL via the pinned clock (no negative timedelta).
+    clock.advance(timedelta(days=31))
     with pytest.raises(OAuthError) as exc:
         await h.tokens.exchange(
             TokenRequest(
@@ -688,9 +710,94 @@ async def test_revoke_connected_client_kills_refresh_and_is_scoped_to_owner() ->
 
 
 async def test_cleanup_stale_clients_drops_old_registrations() -> None:
-    h = _harness()
+    clock = MutableClock(datetime(2024, 1, 1, tzinfo=UTC))
+    h = _harness(clock=clock)
     client_id = await _register(h.auth)
-    # Everything registered "now" is older than a negative window.
-    deleted = await h.tokens.cleanup_stale_clients(older_than=timedelta(seconds=-1))
+    # Advance a day, then sweep anything older than an hour: the client qualifies.
+    clock.advance(timedelta(days=1))
+    deleted = await h.tokens.cleanup_stale_clients(older_than=timedelta(hours=1))
     assert deleted == 1
     assert await h.repo.get_client(client_id) is None
+
+
+# --- pinned-clock lifecycle + injected counter + N+1 batch ------------------
+
+
+async def test_pinned_clock_expires_access_but_keeps_refresh_valid() -> None:
+    # F5/US-DI-01: mint at t0, advance the pinned clock past the access TTL, and
+    # assert "access expired, refresh still valid" -- no sleep, no negative TTL.
+    clock = MutableClock(datetime(2024, 1, 1, tzinfo=UTC))
+    h = _harness(clock=clock, access_ttl=timedelta(minutes=15), refresh_ttl=timedelta(days=30))
+    client_id = await _register(h.auth)
+    tokens = await _issue_tokens(h, client_id)
+    assert h.codec.verify(tokens.access_token) is not None  # valid at t0
+
+    clock.advance(timedelta(minutes=16))  # past the access TTL, within the refresh TTL
+
+    assert h.codec.verify(tokens.access_token) is None  # access has expired
+    rotated = await h.tokens.exchange(
+        TokenRequest(
+            grant_type="refresh_token", client_id=client_id, refresh_token=tokens.refresh_token
+        )
+    )
+    assert rotated.refresh_token  # refresh still valid -> rotation succeeds
+    assert h.codec.verify(rotated.access_token) is not None  # fresh access minted at t0+16m
+
+
+async def test_issuance_counter_fires_once_post_commit() -> None:
+    # F23/US-DI-03: issuance is counted via the injected counter (no business
+    # method names the global), exactly once, and only after the commit.
+    fired: list[tuple[str, int]] = []
+    h = _harness(issued_counter=lambda grant_type: fired.append((grant_type, h.repo.commits)))
+    client_id = await _register(h.auth)
+    await _issue_tokens(h, client_id)
+
+    assert len(fired) == 1
+    grant_type, commits_when_fired = fired[0]
+    assert grant_type == "authorization_code"
+    # The counter observed the issuance commit already applied (fired post-commit,
+    # not before): a pre-commit fire would see one fewer commit than the total.
+    assert commits_when_fired == h.repo.commits
+
+
+async def test_list_connected_clients_skips_a_deleted_client() -> None:
+    # F29/US-DI-05: a still-active grant whose client row was deleted is a map
+    # miss in the batch read and is skipped rather than surfaced.
+    h = _harness()
+    kept = await _register(h.auth, scope="roadmaps:read")
+    deleted = await _register(h.auth)
+    await _issue_tokens(h, kept)
+    await _issue_tokens(h, deleted)
+    # Delete the client out from under its grant (test-double state manipulation).
+    del h.repo._clients[deleted]
+
+    connected = await h.tokens.list_connected_clients(_USER)
+    assert [c.client_id for c in connected] == [kept]
+
+
+async def test_list_connected_clients_issues_one_batch_query() -> None:
+    # F29: one batch get_clients read replaces the per-grant serial get_client N+1.
+    h = _harness()
+    first = await _register(h.auth, scope="roadmaps:read")
+    second = await _register(h.auth, scope="roadmaps:write")
+    await _issue_tokens(h, first)
+    await _issue_tokens(h, second)
+
+    calls = {"get_clients": 0, "get_client": 0}
+    original_batch = h.repo.get_clients
+    original_single = h.repo.get_client
+
+    async def counting_batch(client_ids: object) -> dict[str, str]:
+        calls["get_clients"] += 1
+        return await original_batch(client_ids)  # type: ignore[arg-type]
+
+    async def counting_single(client_id: str) -> object:
+        calls["get_client"] += 1
+        return await original_single(client_id)
+
+    h.repo.get_clients = counting_batch  # type: ignore[method-assign]
+    h.repo.get_client = counting_single  # type: ignore[method-assign]
+
+    connected = await h.tokens.list_connected_clients(_USER)
+    assert len(connected) == 2
+    assert calls == {"get_clients": 1, "get_client": 0}
