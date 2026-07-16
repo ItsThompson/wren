@@ -19,6 +19,7 @@ from typing import Any
 
 import httpx
 import structlog
+from mcp.server.fastmcp.exceptions import ToolError
 
 from wren_mcp.config import INTERNAL_TOKEN_HEADER, USER_ID_HEADER
 from wren_mcp.settings import RsSettings
@@ -40,7 +41,7 @@ class InternalApiClient:
         self._http = http_client
         self._api_token = api_token
 
-    async def request(
+    async def _request(
         self,
         method: str,
         path: str,
@@ -55,8 +56,15 @@ class InternalApiClient:
         The trusted identity + shared-secret headers are applied last, so they
         can never be overridden by ``extra_headers`` and the agent token is never
         propagated (only ``user_id`` crosses this boundary). The correlation
-        ``request_id`` bound for this agent action (:mod:`wren_mcp.auth`) rides
-        along as ``X-Request-ID`` so the backend logs share the same id.
+        ``request_id`` bound for this agent action (:mod:`wren_mcp.correlation`)
+        rides along as ``X-Request-ID`` so the backend logs share the same id.
+
+        A transport failure (the backend unreachable or timed out) is translated
+        into a model-recoverable :class:`ToolError` here, so every named method
+        inherits a structured "retry shortly" error instead of an opaque,
+        often-empty transport exception. A backend that answers with a >=400
+        status still returns a ``Response``; that path is handled by
+        :func:`wren_mcp.tool_errors.raise_for_problem`, not this ``except``.
         """
         headers = dict(extra_headers or {})
         headers[USER_ID_HEADER] = user_id
@@ -64,13 +72,19 @@ class InternalApiClient:
         request_id = structlog.contextvars.get_contextvars().get("request_id")
         if request_id is not None:
             headers[REQUEST_ID_HEADER] = str(request_id)
-        return await self._http.request(method, path, json=json, params=params, headers=headers)
+        try:
+            return await self._http.request(method, path, json=json, params=params, headers=headers)
+        except (httpx.TimeoutException, httpx.RequestError) as exc:
+            raise ToolError(
+                "backend_unavailable: the roadmap service is unreachable or timed out; "
+                "retry shortly."
+            ) from exc
 
     async def create_draft(self, user_id: str, document: Any) -> httpx.Response:
-        return await self.request("POST", "/roadmaps", user_id=user_id, json=document)
+        return await self._request("POST", "/roadmaps", user_id=user_id, json=document)
 
     async def get_roadmap(self, user_id: str, roadmap_id: str) -> httpx.Response:
-        return await self.request("GET", f"/roadmaps/{roadmap_id}", user_id=user_id)
+        return await self._request("GET", f"/roadmaps/{roadmap_id}", user_id=user_id)
 
     # ---------- Read projections (study-time tools) ----------
     # Each backs one MCP read tool, one internal GET per tool. The
@@ -78,19 +92,19 @@ class InternalApiClient:
     # ``?cursor=``; ``?include=`` selects the section-page shape.
 
     async def get_overview(self, user_id: str, roadmap_id: str, fmt: str) -> httpx.Response:
-        return await self.request(
+        return await self._request(
             "GET", f"/roadmaps/{roadmap_id}/overview", user_id=user_id, params={"format": fmt}
         )
 
     async def get_next(self, user_id: str, roadmap_id: str, fmt: str) -> httpx.Response:
-        return await self.request(
+        return await self._request(
             "GET", f"/roadmaps/{roadmap_id}/next", user_id=user_id, params={"format": fmt}
         )
 
     async def get_node(
         self, user_id: str, roadmap_id: str, subsection_id: str, fmt: str
     ) -> httpx.Response:
-        return await self.request(
+        return await self._request(
             "GET",
             f"/roadmaps/{roadmap_id}/nodes/{subsection_id}",
             user_id=user_id,
@@ -105,7 +119,7 @@ class InternalApiClient:
         params: dict[str, Any] = {"include": include}
         if cursor is not None:
             params["cursor"] = cursor
-        return await self.request(
+        return await self._request(
             "GET", f"/roadmaps/{roadmap_id}/sections/{section_id}", user_id=user_id, params=params
         )
 
@@ -116,12 +130,12 @@ class InternalApiClient:
         params: dict[str, Any] = {"q": q}
         if tags:
             params["tags"] = tags
-        return await self.request(
+        return await self._request(
             "GET", f"/roadmaps/{roadmap_id}/search", user_id=user_id, params=params
         )
 
     async def get_progress(self, user_id: str, roadmap_id: str, detailed: bool) -> httpx.Response:
-        return await self.request(
+        return await self._request(
             "GET",
             f"/roadmaps/{roadmap_id}/progress",
             user_id=user_id,
@@ -133,7 +147,7 @@ class InternalApiClient:
     ) -> httpx.Response:
         # Explicit set (complete|incomplete), batch item_ids: the
         # server applies atomically and returns the fresh snapshot + next.
-        return await self.request(
+        return await self._request(
             "POST",
             f"/roadmaps/{roadmap_id}/progress",
             user_id=user_id,
@@ -145,7 +159,7 @@ class InternalApiClient:
     ) -> httpx.Response:
         # The target revision travels in If-Match, matching the
         # internal router's PATCH contract.
-        return await self.request(
+        return await self._request(
             "PATCH",
             f"/roadmaps/{roadmap_id}",
             user_id=user_id,
@@ -158,7 +172,7 @@ class InternalApiClient:
     ) -> httpx.Response:
         # The full-document import escape hatch (PUT) shares the PATCH's If-Match
         # optimistic-concurrency guard; the roadmap ID is unchanged.
-        return await self.request(
+        return await self._request(
             "PUT",
             f"/roadmaps/{roadmap_id}",
             user_id=user_id,
@@ -167,14 +181,14 @@ class InternalApiClient:
         )
 
     async def validate_draft(self, user_id: str, roadmap_id: str) -> httpx.Response:
-        return await self.request("POST", f"/roadmaps/{roadmap_id}:validate", user_id=user_id)
+        return await self._request("POST", f"/roadmaps/{roadmap_id}:validate", user_id=user_id)
 
     async def publish(self, user_id: str, roadmap_id: str) -> httpx.Response:
-        return await self.request("POST", f"/roadmaps/{roadmap_id}:publish", user_id=user_id)
+        return await self._request("POST", f"/roadmaps/{roadmap_id}:publish", user_id=user_id)
 
     async def fork(self, user_id: str, roadmap_id: str) -> httpx.Response:
         # Forks any roadmap the user can read into a fresh draft.
-        return await self.request("POST", f"/roadmaps/{roadmap_id}:fork", user_id=user_id)
+        return await self._request("POST", f"/roadmaps/{roadmap_id}:fork", user_id=user_id)
 
     async def edit_metadata(
         self,
@@ -195,7 +209,7 @@ class InternalApiClient:
             body["description"] = description
         if subject_tags is not None:
             body["subject_tags"] = subject_tags
-        return await self.request(
+        return await self._request(
             "PATCH", f"/roadmaps/{roadmap_id}/metadata", user_id=user_id, json=body
         )
 

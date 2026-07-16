@@ -9,9 +9,12 @@ to capture the outgoing request without a live backend.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 
 import httpx
+import pytest
 import structlog
+from mcp.server.fastmcp.exceptions import ToolError
 
 from wren_mcp.client import REQUEST_ID_HEADER, InternalApiClient
 from wren_mcp.config import INTERNAL_TOKEN_HEADER, USER_ID_HEADER
@@ -137,7 +140,7 @@ async def test_extra_headers_cannot_override_the_trusted_identity() -> None:
     # the shared secret: the trusted pair is applied last.
     client, captured = _client_with_capture()
 
-    await client.request(
+    await client._request(
         "GET",
         "/roadmaps/x-0000",
         user_id="user-ada",
@@ -242,3 +245,48 @@ async def test_request_omits_x_request_id_when_none_is_bound() -> None:
     await client.get_roadmap("user-ada", "r-1")
 
     assert REQUEST_ID_HEADER not in captured[0].headers
+
+
+# ---------- transport-failure translation (F15) ----------
+
+
+def _client_with_transport(
+    handler: Callable[[httpx.Request], httpx.Response],
+) -> InternalApiClient:
+    http = httpx.AsyncClient(base_url="http://backend:8001", transport=httpx.MockTransport(handler))
+    return InternalApiClient(http, api_token=_API_TOKEN)
+
+
+async def test_connect_error_is_translated_to_a_structured_tool_error() -> None:
+    # The backend being unreachable must reach the agent as a model-recoverable
+    # ToolError, not the opaque (often empty) transport exception FastMCP would
+    # otherwise stringify.
+    def unreachable(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused")
+
+    client = _client_with_transport(unreachable)
+    with pytest.raises(ToolError) as excinfo:
+        await client.get_roadmap("user-ada", "r-1")
+    assert "backend_unavailable" in str(excinfo.value)
+
+
+async def test_timeout_is_translated_to_a_structured_tool_error() -> None:
+    def times_out(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("timed out", request=request)
+
+    client = _client_with_transport(times_out)
+    with pytest.raises(ToolError) as excinfo:
+        await client.create_draft("user-ada", {"title": "Grokking DSA"})
+    assert "backend_unavailable" in str(excinfo.value)
+
+
+async def test_error_status_response_passes_through_untranslated() -> None:
+    # A backend that ANSWERS with a >=400 status is not a transport failure: the
+    # response passes through unchanged for raise_for_problem to map, so the
+    # transport except must not swallow it.
+    def five_hundred(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, json={"code": "INTERNAL"})
+
+    client = _client_with_transport(five_hundred)
+    response = await client.get_roadmap("user-ada", "r-1")
+    assert response.status_code == 500
