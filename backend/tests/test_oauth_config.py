@@ -7,6 +7,8 @@ resource the AS serves.
 
 from __future__ import annotations
 
+from pydantic import SecretStr
+
 from tests.oauth_fakes import build_test_config
 from wren.core.settings import AppSettings
 from wren.oauth.config import (
@@ -61,8 +63,8 @@ def test_build_oauth_config_reads_only_pinned_settings() -> None:
         log_level="info",
         host="127.0.0.1",
         database_url="postgresql+asyncpg://wren:wren@localhost:5432/wren",
-        internal_api_token="t",
-        session_jwt_secret="s",
+        internal_api_token=SecretStr("t"),
+        session_jwt_secret=SecretStr("s"),
         cookie_domain="",
         public_base_url="https://api.usewren.com",
         app_public_url="https://usewren.com",

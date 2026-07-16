@@ -17,6 +17,8 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, cast
 
+from pydantic import SecretStr
+
 if TYPE_CHECKING:
     from starlette.applications import Starlette
 
@@ -50,11 +52,13 @@ def get_session_verifier(app: Starlette) -> SessionVerifier:
     return deny_all_sessions
 
 
-def get_internal_token(app: Starlette) -> str:
-    """The configured internal API token, or ``""``.
+def get_internal_token(app: Starlette) -> SecretStr:
+    """The configured internal API token, or an empty :class:`SecretStr`.
 
-    Returns the empty string when the seam is unset OR not a ``str``; an empty
-    expected token fail-safe denies every internal call (see
-    :func:`wren.core.identity.require_internal_user`)."""
-    token = getattr(app.state, INTERNAL_API_TOKEN_ATTR, "")
-    return token if isinstance(token, str) else ""
+    Returns ``SecretStr("")`` when the seam is unset OR not a ``SecretStr``; an
+    empty expected token fail-safe denies every internal call (see
+    :func:`wren.core.identity.require_internal_user`). Kept as ``SecretStr`` so the
+    raw value is unwrapped only at the constant-time compare, never earlier where
+    it could be logged."""
+    token = getattr(app.state, INTERNAL_API_TOKEN_ATTR, SecretStr(""))
+    return token if isinstance(token, SecretStr) else SecretStr("")

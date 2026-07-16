@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
+from pydantic import SecretStr
 from sqlalchemy.exc import IntegrityError
 
 from wren.accounts.config import SessionConfig
@@ -79,7 +80,9 @@ def build_test_codec(
 ) -> SessionTokenCodec:
     """A codec with the test secret and overridable TTLs/clock (for expiry tests)."""
     return SessionTokenCodec(
-        SessionConfig(secret=TEST_SESSION_SECRET, access_ttl=access_ttl, refresh_ttl=refresh_ttl),
+        SessionConfig(
+            secret=SecretStr(TEST_SESSION_SECRET), access_ttl=access_ttl, refresh_ttl=refresh_ttl
+        ),
         clock=clock,
     )
 

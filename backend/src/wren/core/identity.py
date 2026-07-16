@@ -100,12 +100,15 @@ async def require_internal_user(request: Request) -> str:
     """
     expected = get_internal_token(request.app)
     supplied = request.headers.get(INTERNAL_TOKEN_HEADER)
-    # Compare on encoded bytes: secrets.compare_digest raises TypeError on a
-    # non-ASCII str, which would surface as a 500 instead of a clean 401.
+    # Unwrap the SecretStr once here, the single use site; the raw value never
+    # leaves this comparison (it is never logged). Compare on encoded bytes:
+    # secrets.compare_digest raises TypeError on a non-ASCII str, which would
+    # surface as a 500 instead of a clean 401.
+    expected_value = expected.get_secret_value()
     if (
-        not expected
+        not expected_value
         or supplied is None
-        or not secrets.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8"))
+        or not secrets.compare_digest(supplied.encode("utf-8"), expected_value.encode("utf-8"))
     ):
         _log.warning("internal_token_rejected", reason="missing_or_invalid_token")
         raise Unauthorized("Missing or invalid internal API token.")

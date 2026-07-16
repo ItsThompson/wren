@@ -14,6 +14,8 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
+    from pydantic import SecretStr
+
     from wren.core.settings import AppSettings
 
 # The access cookie is the session cookie the shared identity seam reads
@@ -37,7 +39,7 @@ MIN_SESSION_SECRET_BYTES = 32
 class SessionConfig:
     """Inputs the token codec needs to sign and verify session JWTs."""
 
-    secret: str
+    secret: SecretStr
     access_ttl: timedelta = DEFAULT_ACCESS_TTL
     refresh_ttl: timedelta = DEFAULT_REFRESH_TTL
 
@@ -74,7 +76,7 @@ def validate_session_secret(config: SessionConfig, *, is_dev: bool) -> None:
     """
     if is_dev:
         return
-    if len(config.secret.encode("utf-8")) < MIN_SESSION_SECRET_BYTES:
+    if len(config.secret.get_secret_value().encode("utf-8")) < MIN_SESSION_SECRET_BYTES:
         raise RuntimeError(
             f"SESSION_JWT_SECRET must be at least {MIN_SESSION_SECRET_BYTES} bytes "
             "outside development."

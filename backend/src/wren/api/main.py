@@ -129,7 +129,7 @@ app.state.db = db
 # session rather than sign with an empty key.
 app.state.session_verifier = (
     create_session_verifier(codec, build_revocation_lookup(db))
-    if session_config.secret
+    if session_config.secret.get_secret_value()
     else deny_all_sessions
 )
 # Strip any client-supplied X-User-ID app-wide: the external app never trusts it.

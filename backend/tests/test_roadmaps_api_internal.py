@@ -16,6 +16,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from tests.support.fakes.roadmaps_fakes import (
     InMemoryRoadmapRepository,
@@ -122,7 +123,7 @@ def _build_client(
         ],
         exception_handlers=build_exception_handlers(),
     )
-    app.state.internal_api_token = _INTERNAL_TOKEN
+    app.state.internal_api_token = SecretStr(_INTERNAL_TOKEN)
     return TestClient(app), roadmap_repo
 
 

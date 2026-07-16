@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 
 import jwt
 import pytest
+from pydantic import SecretStr
 
 from tests.support.fakes.accounts_fakes import TEST_SESSION_SECRET, MutableClock, build_test_codec
 from wren.accounts.config import SessionConfig
@@ -57,7 +58,7 @@ def test_expired_refresh_token_does_not_verify() -> None:
 
 
 def test_token_signed_with_a_different_secret_is_rejected() -> None:
-    minted = SessionTokenCodec(SessionConfig(secret="other-secret")).mint_pair("user-1")
+    minted = SessionTokenCodec(SessionConfig(secret=SecretStr("other-secret"))).mint_pair("user-1")
     verifier = build_test_codec()
     assert verifier.verify_access(minted.access_token) is None
 

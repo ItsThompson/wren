@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from tests.support.fakes.accounts_fakes import (
     InMemoryAccountRepository,
@@ -312,7 +313,7 @@ def _internal_harness(make_settings: MakeSettings) -> _Harness:
         ],
         exception_handlers=build_exception_handlers(),
     )
-    app.state.internal_api_token = _INTERNAL_TOKEN
+    app.state.internal_api_token = SecretStr(_INTERNAL_TOKEN)
     client = TestClient(app)
     trusted = {INTERNAL_TOKEN_HEADER: _INTERNAL_TOKEN, USER_ID_HEADER: _USER}
     return _Harness(client, auth_headers=trusted, login=lambda: None)

@@ -15,6 +15,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from tests.support.fakes.progress_builders import CHK_ARRAYS_READ, build_roadmap, make_record
 from tests.support.fakes.progress_fakes import InMemoryProgressRepository
@@ -55,7 +56,7 @@ def _build_client(make_settings: MakeSettings) -> TestClient:
         routers=[create_progress_router(progress_provider, identity=require_internal_user)],
         exception_handlers=build_exception_handlers(),
     )
-    app.state.internal_api_token = _INTERNAL_TOKEN
+    app.state.internal_api_token = SecretStr(_INTERNAL_TOKEN)
     return TestClient(app)
 
 

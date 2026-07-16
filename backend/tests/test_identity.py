@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 import structlog
 from fastapi import APIRouter, Depends, FastAPI, Request
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
 
@@ -84,7 +85,7 @@ def _internal_client(make_settings: MakeSettings, *, token: str = _INTERNAL_TOKE
         routers=[router],
         exception_handlers=build_exception_handlers(),
     )
-    app.state.internal_api_token = token
+    app.state.internal_api_token = SecretStr(token)
     return TestClient(app)
 
 
@@ -251,7 +252,7 @@ def _internal_probe_client(make_settings: MakeSettings) -> TestClient:
     app: FastAPI = create_app(
         make_settings(), routers=[router], exception_handlers=build_exception_handlers()
     )
-    app.state.internal_api_token = _INTERNAL_TOKEN
+    app.state.internal_api_token = SecretStr(_INTERNAL_TOKEN)
     return TestClient(app)
 
 

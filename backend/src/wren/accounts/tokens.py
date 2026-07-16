@@ -119,13 +119,13 @@ class SessionTokenCodec:
             "iat": issued,
             "exp": expires,
         }
-        return jwt.encode(payload, self._config.secret, algorithm=_ALGORITHM)
+        return jwt.encode(payload, self._config.secret.get_secret_value(), algorithm=_ALGORITHM)
 
     def _decode(self, token: str, expected_type: str) -> dict[str, Any] | None:
         try:
             payload = jwt.decode(
                 token,
-                self._config.secret,
+                self._config.secret.get_secret_value(),
                 algorithms=[_ALGORITHM],
                 # exp presence is still required; expiry itself is checked against
                 # the injected clock below so a pinned clock governs the assertion.

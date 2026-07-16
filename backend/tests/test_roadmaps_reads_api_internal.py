@@ -15,6 +15,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from tests.roadmaps_read_builders import (
     CHK_ARRAYS_READ,
@@ -87,7 +88,7 @@ def _build_client(
         ],
         exception_handlers=build_exception_handlers(),
     )
-    app.state.internal_api_token = _INTERNAL_TOKEN
+    app.state.internal_api_token = SecretStr(_INTERNAL_TOKEN)
     return TestClient(app), progress_repo
 
 
