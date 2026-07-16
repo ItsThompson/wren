@@ -138,6 +138,10 @@ class TokenService:
             raise OAuthError.invalid_grant("Refresh token is expired.")
         if existing.client_id != request.client_id:
             raise OAuthError.invalid_grant("Refresh token was issued to another client.")
+        if await self._repo.get_client(existing.client_id) is None:
+            # Defense in depth: a deleted client's refresh fails closed even if its
+            # grant were somehow left un-revoked (cleanup cascade-revokes it first).
+            raise OAuthError.invalid_grant("Refresh token's client no longer exists.")
 
         # Rotate: revoke the presented refresh, then issue a fresh pair.
         await self._repo.revoke_refresh_token(existing.token_hash)
@@ -219,11 +223,20 @@ class TokenService:
         _log.info("oauth_client_revoked", client_id=client_id, user_id=user_id)
 
     async def cleanup_stale_clients(self, older_than: timedelta) -> int:
-        """Periodic P0 hook: drop open-registration clients older than ``older_than``."""
+        """Periodic P0 hook: drop open-registration clients older than ``older_than``.
+
+        Cascade-revokes each doomed client's grant + refresh chain in the same
+        transaction, so cleanup can never leave a grant that is hidden from
+        ``/me/clients`` (which skips clientless grants) yet whose refresh token
+        still rotates.
+        """
         cutoff = self._clock() - older_than
-        deleted = await self._repo.delete_clients_created_before(cutoff)
+        now = self._clock()
+        deleted_client_ids = await self._repo.delete_clients_created_before(cutoff)
+        for grant in await self._repo.list_grants_for_clients(deleted_client_ids):
+            await self._repo.revoke_grant(grant.user_id, grant.client_id, now=now)
         await self._repo.commit()
-        return deleted
+        return len(deleted_client_ids)
 
     async def _issue_pair(
         self,

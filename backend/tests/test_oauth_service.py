@@ -632,6 +632,25 @@ async def test_refresh_rejects_unknown_token() -> None:
         )
 
 
+async def test_refresh_fails_closed_when_the_client_is_gone() -> None:
+    # Defense in depth: even if a grant were orphaned without its refresh chain
+    # being revoked (client row dropped directly, bypassing the cleanup cascade),
+    # _refresh fails closed rather than minting a fresh pair for a client that no
+    # longer exists.
+    h = _harness()
+    client_id = await _register(h.auth)
+    tokens = await _issue_tokens(h, client_id)
+    # Drop only the client row, leaving the grant + un-revoked refresh intact.
+    await h.repo.delete_client(client_id)
+    with pytest.raises(OAuthError) as exc:
+        await h.tokens.exchange(
+            TokenRequest(
+                grant_type="refresh_token", client_id=client_id, refresh_token=tokens.refresh_token
+            )
+        )
+    assert exc.value.error == OAuthErrorCode.INVALID_GRANT
+
+
 async def test_refresh_requires_refresh_token_and_client_id() -> None:
     h = _harness()
     with pytest.raises(OAuthError) as exc:
@@ -726,6 +745,43 @@ async def test_cleanup_stale_clients_drops_old_registrations() -> None:
     deleted = await h.tokens.cleanup_stale_clients(older_than=timedelta(hours=1))
     assert deleted == 1
     assert await h.repo.get_client(client_id) is None
+
+
+async def test_cleanup_stale_clients_cascade_revokes_orphaned_grants() -> None:
+    # Dropping a stale client must cascade-revoke its grant + refresh chain in the
+    # same sweep. Otherwise the grant is orphaned: hidden from /me/clients (which
+    # skips clientless grants) yet its refresh token still rotates forever, an
+    # unrevocable live-token chain.
+    clock = MutableClock(datetime(2024, 1, 1, tzinfo=UTC))
+    h = _harness(clock=clock)
+    client_id = await _register(h.auth)
+    tokens = await _issue_tokens(h, client_id)
+    clock.advance(timedelta(days=1))
+    deleted = await h.tokens.cleanup_stale_clients(older_than=timedelta(hours=1))
+    assert deleted == 1
+    # The regression that proves the live-chain bug is closed: the previously-valid
+    # refresh token no longer rotates.
+    with pytest.raises(OAuthError):
+        await h.tokens.exchange(
+            TokenRequest(
+                grant_type="refresh_token", client_id=client_id, refresh_token=tokens.refresh_token
+            )
+        )
+    # The grant is genuinely revoked in the repo (not merely hidden).
+    grant = await h.repo.get_grant(_USER, client_id)
+    assert grant is not None and grant.revoked_at is not None
+    # ...and it stays omitted from the connected-client list.
+    assert await h.tokens.list_connected_clients(_USER) == []
+
+
+async def test_cleanup_stale_clients_without_grants_is_a_plain_delete() -> None:
+    # A stale client that was never authorized has no grant to cascade: the sweep
+    # still deletes it and touches no grant.
+    clock = MutableClock(datetime(2024, 1, 1, tzinfo=UTC))
+    h = _harness(clock=clock)
+    await _register(h.auth)
+    clock.advance(timedelta(days=1))
+    assert await h.tokens.cleanup_stale_clients(older_than=timedelta(hours=1)) == 1
 
 
 # --- pinned-clock lifecycle + injected counter + N+1 batch ------------------

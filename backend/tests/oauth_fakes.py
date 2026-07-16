@@ -113,11 +113,11 @@ class InMemoryOAuthRepository:
         """Test-support: drop a client row, orphaning any grant that referenced it."""
         self._clients.pop(client_id, None)
 
-    async def delete_clients_created_before(self, cutoff: datetime) -> int:
+    async def delete_clients_created_before(self, cutoff: datetime) -> list[str]:
         stale = [cid for cid, c in self._clients.items() if c.created_at < cutoff]
         for cid in stale:
             del self._clients[cid]
-        return len(stale)
+        return stale
 
     # --- parked authorize requests ------------------------------------------
 
@@ -192,6 +192,10 @@ class InMemoryOAuthRepository:
             g for (uid, _), g in self._grants.items() if uid == user_id and g.revoked_at is None
         ]
         return sorted(active, key=lambda g: g.authorized_at, reverse=True)
+
+    async def list_grants_for_clients(self, client_ids: Sequence[str]) -> list[OAuthGrant]:
+        ids = set(client_ids)
+        return [g for (_, cid), g in self._grants.items() if cid in ids]
 
     async def revoke_grant(
         self, user_id: str, client_id: str, *, now: datetime
