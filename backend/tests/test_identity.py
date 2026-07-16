@@ -6,8 +6,12 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+import pytest
+import structlog
 from fastapi import APIRouter, Depends, FastAPI, Request
 from fastapi.testclient import TestClient
+from structlog.contextvars import merge_contextvars
+from structlog.testing import capture_logs
 
 from wren.core.app_factory import create_app
 from wren.core.errors import build_exception_handlers
@@ -203,3 +207,133 @@ def test_internal_unconfigured_token_denies_all(make_settings: MakeSettings) -> 
         "/whoami", headers={INTERNAL_TOKEN_HEADER: "", USER_ID_HEADER: "agent-user"}
     )
     assert response.status_code == 401
+
+
+# --- request correlation: user_id binding + auth-rejection logging (F13, F14) --
+#
+# The rejection warnings are emitted by identity.py itself, so the existing
+# clients suffice; user_id binding is confirmed through a route that logs after
+# the dependency resolves (the bound value rides via merge_contextvars).
+
+
+def _external_probe_client(
+    make_settings: MakeSettings,
+    *,
+    verifier: SessionVerifier | None = _async_cookie_verifier,
+) -> TestClient:
+    router = APIRouter()
+
+    @router.get("/probe")
+    async def probe(user_id: str = Depends(require_user)) -> dict[str, str]:
+        # Fresh logger so capture_logs intercepts it (module loggers freeze their
+        # processor list at import); merge_contextvars then attaches user_id.
+        structlog.get_logger().info("probe_event")
+        return {"user_id": user_id}
+
+    app: FastAPI = create_app(
+        make_settings(), routers=[router], exception_handlers=build_exception_handlers()
+    )
+    if verifier is not None:
+        app.state.session_verifier = verifier
+    app.add_middleware(StripInboundIdentityMiddleware)
+    return TestClient(app)
+
+
+def _internal_probe_client(make_settings: MakeSettings) -> TestClient:
+    router = APIRouter()
+
+    @router.get("/probe")
+    async def probe(user_id: str = Depends(require_internal_user)) -> dict[str, str]:
+        structlog.get_logger().info("probe_event")
+        return {"user_id": user_id}
+
+    app: FastAPI = create_app(
+        make_settings(), routers=[router], exception_handlers=build_exception_handlers()
+    )
+    app.state.internal_api_token = _INTERNAL_TOKEN
+    return TestClient(app)
+
+
+def _events(logs: list[dict[str, object]], event: str) -> list[dict[str, object]]:
+    return [entry for entry in logs if entry.get("event") == event]
+
+
+def test_require_user_binds_user_id_for_later_log_lines(make_settings: MakeSettings) -> None:
+    client = _external_probe_client(make_settings)
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        client.get("/probe", headers={"Cookie": f"{SESSION_COOKIE_NAME}={_VALID_COOKIE}"})
+    probe = _events(logs, "probe_event")
+    assert len(probe) == 1
+    assert probe[0]["user_id"] == _COOKIE_USER
+
+
+def test_require_internal_user_binds_user_id_for_later_log_lines(
+    make_settings: MakeSettings,
+) -> None:
+    client = _internal_probe_client(make_settings)
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        client.get(
+            "/probe",
+            headers={INTERNAL_TOKEN_HEADER: _INTERNAL_TOKEN, USER_ID_HEADER: "agent-user"},
+        )
+    probe = _events(logs, "probe_event")
+    assert len(probe) == 1
+    assert probe[0]["user_id"] == "agent-user"
+
+
+def test_missing_cookie_logs_session_invalid(
+    make_settings: MakeSettings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        monkeypatch.setattr("wren.core.identity._log", structlog.get_logger())
+        _external_client(make_settings).get("/whoami")
+    rejections = _events(logs, "session_invalid")
+    assert len(rejections) == 1
+    assert rejections[0]["log_level"] == "warning"
+    assert rejections[0]["reason"] == "missing_cookie"
+
+
+def test_invalid_cookie_logs_session_invalid_without_leaking_the_cookie(
+    make_settings: MakeSettings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    secret_cookie = "do-not-log-this-cookie-value"
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        monkeypatch.setattr("wren.core.identity._log", structlog.get_logger())
+        _external_client(make_settings).get(
+            "/whoami", headers={"Cookie": f"{SESSION_COOKIE_NAME}={secret_cookie}"}
+        )
+    rejections = _events(logs, "session_invalid")
+    assert len(rejections) == 1
+    assert rejections[0]["reason"] == "invalid_or_expired"
+    # The raw cookie value never reaches a log field.
+    assert secret_cookie not in repr(logs)
+
+
+def test_bad_internal_token_logs_internal_token_rejected_without_leaking_it(
+    make_settings: MakeSettings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    secret_token = "do-not-log-this-token-value"
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        monkeypatch.setattr("wren.core.identity._log", structlog.get_logger())
+        _internal_client(make_settings).get(
+            "/whoami",
+            headers={INTERNAL_TOKEN_HEADER: secret_token, USER_ID_HEADER: "agent-user"},
+        )
+    rejections = _events(logs, "internal_token_rejected")
+    assert len(rejections) == 1
+    assert rejections[0]["log_level"] == "warning"
+    assert rejections[0]["reason"] == "missing_or_invalid_token"
+    assert secret_token not in repr(logs)
+
+
+def test_missing_x_user_id_logs_internal_token_rejected(
+    make_settings: MakeSettings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        monkeypatch.setattr("wren.core.identity._log", structlog.get_logger())
+        _internal_client(make_settings).get(
+            "/whoami", headers={INTERNAL_TOKEN_HEADER: _INTERNAL_TOKEN}
+        )
+    rejections = _events(logs, "internal_token_rejected")
+    assert len(rejections) == 1
+    assert rejections[0]["reason"] == "missing_user_id"

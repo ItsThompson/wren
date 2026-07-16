@@ -23,10 +23,14 @@ from __future__ import annotations
 import secrets
 from collections.abc import Awaitable, Callable
 
+import structlog
 from starlette.requests import Request
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from wren.core.errors import Unauthorized
+from wren.core.logging import get_logger
+
+_log = get_logger("wren-core")
 
 USER_ID_HEADER = "X-User-ID"
 INTERNAL_TOKEN_HEADER = "X-Internal-Api-Token"
@@ -80,10 +84,15 @@ async def require_user(request: Request) -> str:
     verify: SessionVerifier = getattr(request.app.state, "session_verifier", deny_all_sessions)
     cookie = request.cookies.get(SESSION_COOKIE_NAME)
     if cookie is None:
+        _log.warning("session_invalid", reason="missing_cookie")
         raise Unauthorized("No session cookie present.")
     user_id = await verify(cookie)
     if user_id is None:
+        _log.warning("session_invalid", reason="invalid_or_expired")
         raise Unauthorized("Session is invalid or expired.")
+    # Bind the resolved actor so every subsequent line for this request carries
+    # user_id via merge_contextvars; retires the per-call-site actor kwarg.
+    structlog.contextvars.bind_contextvars(user_id=user_id)
     return user_id
 
 
@@ -103,8 +112,11 @@ async def require_internal_user(request: Request) -> str:
         or supplied is None
         or not secrets.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8"))
     ):
+        _log.warning("internal_token_rejected", reason="missing_or_invalid_token")
         raise Unauthorized("Missing or invalid internal API token.")
     user_id = request.headers.get(USER_ID_HEADER)
     if not user_id:
+        _log.warning("internal_token_rejected", reason="missing_user_id")
         raise Unauthorized("Missing trusted X-User-ID header.")
+    structlog.contextvars.bind_contextvars(user_id=user_id)
     return user_id
