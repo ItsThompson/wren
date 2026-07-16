@@ -1,5 +1,5 @@
 import type { components } from '@/api'
-import { RoadmapCard } from './RoadmapCard'
+import { RoadmapCard } from '../RoadmapCard'
 
 type RoadmapCardData = components['schemas']['RoadmapCard']
 
