@@ -271,7 +271,11 @@ def test_replace_on_published_roadmap_is_rejected_as_immutable() -> None:
 
 
 def test_validate_reports_violations_without_mutating() -> None:
-    violation = {"rule": "V1_EMPTY", "ids": ["sec_intro"], "message": "section has no subsections"}
+    violation = {
+        "rule": "V5_SUBSECTION_REQUIRED",
+        "ids": ["sec_intro"],
+        "message": "section has no subsections",
+    }
     harness = AgentHarness(lambda _r: httpx.Response(200, json={"violations": [violation]}))
     with harness.open() as client:
         result = harness.call_tool(client, "validate_roadmap_draft", {"roadmap_id": _ROADMAP_ID})
@@ -307,7 +311,11 @@ def test_publish_transitions_to_published() -> None:
 
 
 def test_publish_hard_block_surfaces_the_violation_list() -> None:
-    violation = {"rule": "V4_ORDER", "ids": ["sub_b"], "message": "prerequisite after dependent"}
+    violation = {
+        "rule": "V4_PATH_ORDER",
+        "ids": ["sub_b"],
+        "message": "prerequisite after dependent",
+    }
     backend = lambda _r: json_error(  # noqa: E731
         422, "VALIDATION", "publish blocked", violations=[violation]
     )
@@ -315,7 +323,7 @@ def test_publish_hard_block_surfaces_the_violation_list() -> None:
     with harness.open() as client:
         result = harness.call_tool(client, "publish_roadmap", {"roadmap_id": _ROADMAP_ID})
     assert result["isError"] is True
-    assert "V4_ORDER" in result["content"][0]["text"]
+    assert "V4_PATH_ORDER" in result["content"][0]["text"]
 
 
 # ---------- fork ----------
