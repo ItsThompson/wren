@@ -78,7 +78,11 @@ module = ["authlib.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+# "." (the backend root) puts the packaged ``tests`` on the import path so test
+# modules use absolute imports (``from tests.support.fakes.X import ...``);
+# ``src`` keeps first-party ``wren`` imports resolving. ``testpaths`` recurses
+# into tests/support and any subfolders unchanged.
+pythonpath = ["src", "."]
 testpaths = ["tests"]
 addopts = "--cov=wren --cov-report=term-missing --strict-markers --strict-config"
 asyncio_mode = "auto"

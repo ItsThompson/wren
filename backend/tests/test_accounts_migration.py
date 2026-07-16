@@ -16,7 +16,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import text
 
-from accounts_fakes import build_test_codec, build_test_hasher
+from tests.support.fakes.accounts_fakes import build_test_codec, build_test_hasher
 from wren.accounts.repository import SqlAlchemyAccountRepository
 from wren.accounts.service import AccountService
 from wren.accounts.session import build_revocation_lookup

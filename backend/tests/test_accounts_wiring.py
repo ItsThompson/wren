@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from accounts_fakes import build_test_codec, build_test_hasher
+from tests.support.fakes.accounts_fakes import build_test_codec, build_test_hasher
 from wren.accounts.service import AccountService
 from wren.accounts.wiring import build_account_service_provider
 

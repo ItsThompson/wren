@@ -17,8 +17,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.testclient import TestClient
 
-from conftest import MakeSettings
-from oauth_fakes import (
+from tests.conftest import MakeSettings
+from tests.oauth_fakes import (
     InMemoryOAuthRepository,
     build_test_codec,
     build_test_config,

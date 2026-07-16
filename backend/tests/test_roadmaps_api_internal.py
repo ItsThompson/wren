@@ -17,7 +17,7 @@ from collections.abc import Callable
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from roadmaps_fakes import (
+from tests.support.fakes.roadmaps_fakes import (
     InMemoryRoadmapRepository,
     constant_follower_counter,
     sequence_token_factory,

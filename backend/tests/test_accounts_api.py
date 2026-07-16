@@ -14,7 +14,11 @@ import pytest
 from fastapi import APIRouter, Depends, FastAPI, Request
 from fastapi.testclient import TestClient
 
-from accounts_fakes import InMemoryAccountRepository, build_test_codec, build_test_hasher
+from tests.support.fakes.accounts_fakes import (
+    InMemoryAccountRepository,
+    build_test_codec,
+    build_test_hasher,
+)
 from wren.accounts.api import create_accounts_router
 from wren.accounts.config import REFRESH_COOKIE_NAME, CookieConfig
 from wren.accounts.service import AccountService

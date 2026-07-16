@@ -20,7 +20,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import text
 
-from oauth_fakes import build_test_codec, build_test_config, build_test_keyset, make_pkce_pair
+from tests.oauth_fakes import build_test_codec, build_test_config, build_test_keyset, make_pkce_pair
 from wren.core.db import create_database
 from wren.core.errors import NotFound
 from wren.oauth.authorization import AuthorizationService

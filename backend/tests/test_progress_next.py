@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from hypothesis import given
 from hypothesis import strategies as st
 
-from progress_builders import (
+from tests.support.fakes.progress_builders import (
     CHK_ARRAYS_DRILL,
     CHK_ARRAYS_READ,
     CHK_GRAPHS,

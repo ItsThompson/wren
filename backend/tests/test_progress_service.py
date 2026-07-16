@@ -13,15 +13,15 @@ from datetime import date
 
 import pytest
 
-from progress_builders import (
+from tests.support.fakes.progress_builders import (
     CHK_ARRAYS_DRILL,
     CHK_ARRAYS_READ,
     CHK_HASH,
     build_roadmap,
     make_record,
 )
-from progress_fakes import InMemoryProgressRepository
-from roadmaps_fakes import InMemoryRoadmapRepository
+from tests.support.fakes.progress_fakes import InMemoryProgressRepository
+from tests.support.fakes.roadmaps_fakes import InMemoryRoadmapRepository
 from wren.core.errors import Conflict, NotFound, Validation
 from wren.core.read_contract import ResponseFormat
 from wren.progress.schemas import CompletionState

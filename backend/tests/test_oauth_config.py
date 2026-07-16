@@ -7,7 +7,7 @@ resource the AS serves.
 
 from __future__ import annotations
 
-from oauth_fakes import build_test_config
+from tests.oauth_fakes import build_test_config
 from wren.core.settings import AppSettings
 from wren.oauth.config import (
     AUTHORIZE_PATH,

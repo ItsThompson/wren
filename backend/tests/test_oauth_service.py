@@ -15,7 +15,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from oauth_fakes import (
+from tests.oauth_fakes import (
     InMemoryOAuthRepository,
     MutableClock,
     build_test_codec,

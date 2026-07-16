@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from oauth_fakes import build_test_codec, build_test_config, build_test_keyset
+from tests.oauth_fakes import build_test_codec, build_test_config, build_test_keyset
 from wren.oauth.authorization import AuthorizationService
 from wren.oauth.token_exchange import TokenService
 from wren.oauth.wiring import (

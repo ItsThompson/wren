@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 
-from progress_fakes import InMemoryProgressRepository
+from tests.support.fakes.progress_fakes import InMemoryProgressRepository
 from wren.roadmaps.schemas import (
     ChecklistItem,
     Resource,

@@ -7,8 +7,8 @@ from datetime import UTC, datetime
 
 import pytest
 
-from progress_fakes import InMemoryProgressRepository
-from roadmaps_fakes import (
+from tests.support.fakes.progress_fakes import InMemoryProgressRepository
+from tests.support.fakes.roadmaps_fakes import (
     InMemoryRoadmapRepository,
     constant_follower_counter,
     sequence_token_factory,

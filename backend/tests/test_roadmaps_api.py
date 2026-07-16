@@ -15,8 +15,12 @@ from collections.abc import Callable
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from accounts_fakes import InMemoryAccountRepository, build_test_codec, build_test_hasher
-from roadmaps_fakes import (
+from tests.support.fakes.accounts_fakes import (
+    InMemoryAccountRepository,
+    build_test_codec,
+    build_test_hasher,
+)
+from tests.support.fakes.roadmaps_fakes import (
     InMemoryRoadmapRepository,
     constant_follower_counter,
     sequence_token_factory,

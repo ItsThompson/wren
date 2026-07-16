@@ -17,7 +17,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import text
 
-from roadmaps_fakes import constant_follower_counter
+from tests.support.fakes.roadmaps_fakes import constant_follower_counter
 from wren.core.db import create_database
 from wren.core.errors import NotFound
 from wren.roadmaps.models import RoadmapRecord

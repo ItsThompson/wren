@@ -20,7 +20,7 @@ from alembic.config import Config
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from accounts_fakes import build_test_codec, build_test_hasher
+from tests.support.fakes.accounts_fakes import build_test_codec, build_test_hasher
 from wren.accounts.api import create_accounts_router
 from wren.accounts.config import CookieConfig
 from wren.accounts.session import build_revocation_lookup, create_session_verifier

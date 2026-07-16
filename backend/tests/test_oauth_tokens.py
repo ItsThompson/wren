@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from oauth_fakes import (
+from tests.oauth_fakes import (
     MutableClock,
     build_test_codec,
     build_test_config,

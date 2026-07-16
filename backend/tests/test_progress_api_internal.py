@@ -16,9 +16,9 @@ from collections.abc import Callable
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from progress_builders import CHK_ARRAYS_READ, build_roadmap, make_record
-from progress_fakes import InMemoryProgressRepository
-from roadmaps_fakes import InMemoryRoadmapRepository
+from tests.support.fakes.progress_builders import CHK_ARRAYS_READ, build_roadmap, make_record
+from tests.support.fakes.progress_fakes import InMemoryProgressRepository
+from tests.support.fakes.roadmaps_fakes import InMemoryRoadmapRepository
 from wren.core.app_factory import create_app
 from wren.core.errors import build_exception_handlers
 from wren.core.identity import (

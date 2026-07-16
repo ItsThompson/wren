@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from accounts_fakes import (
+from tests.support.fakes.accounts_fakes import (
     InMemoryAccountRepository,
     MutableClock,
     build_test_codec,

@@ -15,8 +15,12 @@ from collections.abc import Callable
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from accounts_fakes import InMemoryAccountRepository, build_test_codec, build_test_hasher
-from progress_builders import (
+from tests.support.fakes.accounts_fakes import (
+    InMemoryAccountRepository,
+    build_test_codec,
+    build_test_hasher,
+)
+from tests.support.fakes.progress_builders import (
     CHK_ARRAYS_DRILL,
     CHK_ARRAYS_READ,
     CHK_HASH,
@@ -24,8 +28,8 @@ from progress_builders import (
     build_roadmap,
     make_record,
 )
-from progress_fakes import InMemoryProgressRepository
-from roadmaps_fakes import InMemoryRoadmapRepository
+from tests.support.fakes.progress_fakes import InMemoryProgressRepository
+from tests.support.fakes.roadmaps_fakes import InMemoryRoadmapRepository
 from wren.accounts.api import create_accounts_router
 from wren.accounts.config import CookieConfig
 from wren.accounts.service import AccountService

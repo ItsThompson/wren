@@ -15,10 +15,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from progress_builders import make_record
-from progress_fakes import InMemoryProgressRepository
-from roadmaps_fakes import InMemoryRoadmapRepository
-from roadmaps_read_builders import (
+from tests.roadmaps_read_builders import (
     AUTHOR,
     CHK_ARRAYS_READ,
     ROADMAP_ID,
@@ -26,6 +23,9 @@ from roadmaps_read_builders import (
     SUB_HASHING,
     build_read_roadmap,
 )
+from tests.support.fakes.progress_builders import make_record
+from tests.support.fakes.progress_fakes import InMemoryProgressRepository
+from tests.support.fakes.roadmaps_fakes import InMemoryRoadmapRepository
 from wren.core.errors import NotFound, Validation
 from wren.core.read_contract import ResponseFormat
 from wren.progress.schemas import Progress

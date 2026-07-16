@@ -13,7 +13,7 @@ import base64
 
 import pytest
 
-from roadmaps_read_builders import (
+from tests.roadmaps_read_builders import (
     CHK_ARRAYS_DRILL,
     CHK_ARRAYS_READ,
     CHK_HASH,

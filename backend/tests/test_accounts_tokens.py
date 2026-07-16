@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 import jwt
 import pytest
 
-from accounts_fakes import TEST_SESSION_SECRET, MutableClock, build_test_codec
+from tests.support.fakes.accounts_fakes import TEST_SESSION_SECRET, MutableClock, build_test_codec
 from wren.accounts.config import SessionConfig
 from wren.accounts.tokens import SessionTokenCodec
 

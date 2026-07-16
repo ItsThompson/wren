@@ -19,7 +19,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import text
 
-from progress_builders import CHK_ARRAYS_READ, build_roadmap, make_record
+from tests.support.fakes.progress_builders import CHK_ARRAYS_READ, build_roadmap, make_record
 from wren.core.db import create_database
 from wren.progress.repository import SqlAlchemyProgressRepository
 from wren.progress.schemas import Progress
