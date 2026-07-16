@@ -1,29 +1,16 @@
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll } from 'vitest'
-import type { Client } from 'openapi-fetch'
 
 import { createApiClient } from './client'
 import { handlers } from '@/mocks/handlers'
 import { mockDashboard } from '@/mocks/data'
-import type { MockDashboard } from '@/mocks/types'
 
 /**
- * The generated `paths` now holds the /auth routes, but `/me/dashboard` is a
- * dev-harness mock route not yet in the schema, so this test casts the client
- * to a minimal path shape at the boundary to prove
- * the factory wires openapi-fetch: it issues a request to the configured base
- * URL and parses the JSON response. Real product reads are typed from
- * `schema.d.ts` as their endpoints land.
+ * `/me/dashboard` is a real schema route (`schema.d.ts`), so the factory returns
+ * a genuine `Client<paths>` whose `.GET('/me/dashboard')` type-checks against the
+ * generated schema with no cast. This proves the factory wires openapi-fetch: it
+ * issues a request to the configured base URL and parses the JSON response.
  */
-interface TestPaths {
-  '/me/dashboard': {
-    get: {
-      responses: {
-        200: { content: { 'application/json': MockDashboard } }
-      }
-    }
-  }
-}
 
 const server = setupServer(...handlers)
 
@@ -33,7 +20,7 @@ afterAll(() => server.close())
 
 describe('createApiClient', () => {
   it('issues typed requests against the configured base URL', async () => {
-    const client = createApiClient('https://api.test') as unknown as Client<TestPaths>
+    const client = createApiClient('https://api.test')
 
     const { data, response } = await client.GET('/me/dashboard')
 

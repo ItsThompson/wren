@@ -1,19 +1,20 @@
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, expectTypeOf, it, vi } from 'vitest'
-import type { Client } from 'openapi-fetch'
 
-import { createApiClient } from '../client'
+import { makeTestApiClient } from '@/test/api-clients'
+
 import { runQuery, type OpenApiResult } from './fetcher'
 
 const BASE = 'https://api.test'
 
 /**
- * A stand-in typed path. The generated `paths` holds only product routes, so
- * (as the sibling client/session tests do) the client is cast to this minimal
- * shape at the boundary to exercise `runQuery` against a schema-typed body.
+ * A stand-in typed path. The generated `paths` holds only product routes, so it
+ * is merged into the real `paths` via `makeTestApiClient`'s `Extra` type param,
+ * exercising `runQuery` against a schema-typed body with no `as unknown as`
+ * round-trip while every real route stays checked against `schema.d.ts`.
  */
-interface TestPaths {
+interface WidgetPaths {
   '/widget': {
     get: { responses: { 200: { content: { 'application/json': { id: string } } } } }
   }
@@ -26,7 +27,7 @@ afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
 function widgetClient() {
-  return createApiClient(BASE) as unknown as Client<TestPaths>
+  return makeTestApiClient<WidgetPaths>(BASE)
 }
 
 describe('runQuery', () => {
