@@ -36,7 +36,7 @@ from __future__ import annotations
 import functools
 import inspect
 from collections.abc import Awaitable, Callable
-from typing import Any, TypeVar
+from typing import Any
 
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
 
@@ -73,10 +73,7 @@ ACTIVE_CONNECTIONS = Gauge(
     registry=WREN_REGISTRY,
 )
 
-_ServiceT = TypeVar("_ServiceT")
-
-
-def track_failures(service: str) -> Callable[[type[_ServiceT]], type[_ServiceT]]:
+def track_failures[ServiceT](service: str) -> Callable[[type[ServiceT]], type[ServiceT]]:
     """Class decorator: count each public async method's *unexpected* failures.
 
     Wraps every public coroutine method (``async def`` not prefixed with ``_``)
@@ -87,7 +84,7 @@ def track_failures(service: str) -> Callable[[type[_ServiceT]], type[_ServiceT]]
     method is reached through another wrapped method.
     """
 
-    def decorate(cls: type[_ServiceT]) -> type[_ServiceT]:
+    def decorate(cls: type[ServiceT]) -> type[ServiceT]:
         for name, attr in list(vars(cls).items()):
             if name.startswith("_") or not inspect.iscoroutinefunction(attr):
                 continue
