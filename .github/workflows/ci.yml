@@ -112,10 +112,12 @@ jobs:
   # contract-drift: run the dev/test-only `contract/` uv project, the only
   # interpreter where `wren.*` and `wren_mcp.*` import together (it editable
   # path-installs both packages; neither deployable depends on the other, per
-  # section 12). It guards the cross-package frozen contract: today the internal-
-  # boundary header constants, later the schema mirror. An independent failure
-  # signal, gated by lint like the test jobs; not folded into the isolated-venv
-  # test-backend steps. Mirrors codegen-drift's frozen-contract-guard shape.
+  # section 12). It guards the cross-package frozen contract: the internal-
+  # boundary header constants and the backend<->MCP schema mirror (Group A shapes
+  # asserted field-equal, the lean write results asserted a fields-subset). An
+  # independent failure signal, gated by lint like the test jobs; not folded into
+  # the isolated-venv test-backend steps. Mirrors codegen-drift's frozen-contract-
+  # guard shape.
   # ---------------------------------------------------------------------------
   contract-drift:
     needs: [lint]
@@ -129,7 +131,7 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Contract drift (cross-package header constants)
+      - name: Contract drift (cross-package header constants + schema mirror)
         working-directory: contract
         run: |
           uv sync --frozen
