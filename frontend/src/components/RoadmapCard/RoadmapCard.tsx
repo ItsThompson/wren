@@ -1,8 +1,8 @@
 import { Link } from 'react-router'
 
 import type { components } from '@/api'
-import { StatusBadge } from './badges/StatusBadge'
-import { VisibilityBadge } from './badges/VisibilityBadge'
+import { StatusBadge } from '../badges/StatusBadge'
+import { VisibilityBadge } from '../badges/VisibilityBadge'
 
 type RoadmapCardData = components['schemas']['RoadmapCard']
 
