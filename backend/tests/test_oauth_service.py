@@ -768,8 +768,8 @@ async def test_list_connected_clients_skips_a_deleted_client() -> None:
     deleted = await _register(h.auth)
     await _issue_tokens(h, kept)
     await _issue_tokens(h, deleted)
-    # Delete the client out from under its grant (test-double state manipulation).
-    del h.repo._clients[deleted]
+    # Delete the client out from under its still-active grant.
+    await h.repo.delete_client(deleted)
 
     connected = await h.tokens.list_connected_clients(_USER)
     assert [c.client_id for c in connected] == [kept]

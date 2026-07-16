@@ -106,6 +106,10 @@ class InMemoryOAuthRepository:
     async def get_clients(self, client_ids: Sequence[str]) -> dict[str, str]:
         return {cid: self._clients[cid].client_name for cid in client_ids if cid in self._clients}
 
+    async def delete_client(self, client_id: str) -> None:
+        """Test-support: drop a client row, orphaning any grant that referenced it."""
+        self._clients.pop(client_id, None)
+
     async def delete_clients_created_before(self, cutoff: datetime) -> int:
         stale = [cid for cid, c in self._clients.items() if c.created_at < cutoff]
         for cid in stale:
