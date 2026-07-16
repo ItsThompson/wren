@@ -203,7 +203,7 @@ def test_patch_on_published_roadmap_is_rejected_as_immutable() -> None:
 
 
 def test_patch_dag_cycle_violation_names_the_offending_nodes() -> None:
-    violation = {"rule": "V2_CYCLE", "ids": ["sub_a", "sub_b"], "message": "prerequisite cycle"}
+    violation = {"rule": "V1_ACYCLIC", "ids": ["sub_a", "sub_b"], "message": "prerequisite cycle"}
     backend = lambda _r: json_error(  # noqa: E731
         422, "VALIDATION", "1 structural violation.", violations=[violation]
     )
@@ -220,7 +220,7 @@ def test_patch_dag_cycle_violation_names_the_offending_nodes() -> None:
         )
     assert result["isError"] is True
     text = result["content"][0]["text"]
-    assert "V2_CYCLE" in text
+    assert "V1_ACYCLIC" in text
     assert "sub_a" in text and "sub_b" in text
 
 
