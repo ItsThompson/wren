@@ -30,6 +30,7 @@ from wren.roadmaps.read_schemas import (
     SectionInclude,
     SectionPage,
 )
+from wren.roadmaps.read_service import RoadmapReadService
 from wren.roadmaps.schemas import (
     MetadataEditRequest,
     PatchRequest,
@@ -44,15 +45,21 @@ from wren.roadmaps.service import RoadmapService
 
 # A FastAPI dependency that yields a RoadmapService for the request.
 RoadmapServiceProvider = Callable[..., object]
+# A FastAPI dependency that yields a RoadmapReadService for the request.
+RoadmapReadServiceProvider = Callable[..., object]
 
 
-def create_internal_roadmaps_router(service_provider: RoadmapServiceProvider) -> APIRouter:
-    """Build the internal /roadmaps router, injecting the service provider.
+def create_internal_roadmaps_router(
+    service_provider: RoadmapServiceProvider,
+    read_service_provider: RoadmapReadServiceProvider,
+) -> APIRouter:
+    """Build the internal /roadmaps router, injecting the service providers.
 
     Every handler resolves ``user_id`` from the trusted ``X-User-ID`` header (via
     :func:`require_internal_user`) and delegates to one service method; the service
     scopes every query to that user, so a tool can never reach another user's
-    roadmap even though the internal app trusts the injected identity.
+    roadmap even though the internal app trusts the injected identity. Writes and
+    lifecycle bind the authoring provider; the reads bind the read provider.
     """
     router = APIRouter(prefix=ROADMAPS_PATH, tags=["roadmaps-internal"])
 
@@ -68,7 +75,7 @@ def create_internal_roadmaps_router(service_provider: RoadmapServiceProvider) ->
     async def get_roadmap(
         roadmap_id: str,
         user_id: str = Depends(require_internal_user),
-        service: RoadmapService = Depends(service_provider),
+        service: RoadmapReadService = Depends(read_service_provider),
     ) -> Roadmap:
         # Full document to a reader: the trusted user reads their
         # own roadmap (any status) or a public published/archived one; a private
@@ -80,7 +87,7 @@ def create_internal_roadmaps_router(service_provider: RoadmapServiceProvider) ->
         roadmap_id: str,
         format: ResponseFormat = ResponseFormat.CONCISE,
         user_id: str = Depends(require_internal_user),
-        service: RoadmapService = Depends(service_provider),
+        service: RoadmapReadService = Depends(read_service_provider),
     ) -> Overview:
         # Backs the roadmap_get_overview MCP tool.
         return await service.get_overview(user_id, roadmap_id, format)
@@ -91,7 +98,7 @@ def create_internal_roadmaps_router(service_provider: RoadmapServiceProvider) ->
         subsection_id: str,
         format: ResponseFormat = ResponseFormat.CONCISE,
         user_id: str = Depends(require_internal_user),
-        service: RoadmapService = Depends(service_provider),
+        service: RoadmapReadService = Depends(read_service_provider),
     ) -> NodeDetail:
         # Backs the roadmap_get_node MCP tool: unknown id -> 404 naming
         # valid siblings so the agent can self-correct.
@@ -104,7 +111,7 @@ def create_internal_roadmaps_router(service_provider: RoadmapServiceProvider) ->
         cursor: str | None = None,
         include: SectionInclude = SectionInclude.BOTH,
         user_id: str = Depends(require_internal_user),
-        service: RoadmapService = Depends(service_provider),
+        service: RoadmapReadService = Depends(read_service_provider),
     ) -> SectionPage:
         # Backs the roadmap_get_section MCP tool: opaque cursor + include.
         return await service.get_section(user_id, roadmap_id, section_id, cursor, include)
@@ -115,7 +122,7 @@ def create_internal_roadmaps_router(service_provider: RoadmapServiceProvider) ->
         q: str | None = None,
         tags: list[str] | None = Query(default=None),
         user_id: str = Depends(require_internal_user),
-        service: RoadmapService = Depends(service_provider),
+        service: RoadmapReadService = Depends(read_service_provider),
     ) -> list[SearchHit]:
         # Backs the roadmap_search MCP tool: search, not list-all.
         return await service.search(user_id, roadmap_id, q, tags)

@@ -23,7 +23,10 @@ from wren.core.settings import INTERNAL_PORT, INTERNAL_SERVICE, build_app_settin
 from wren.progress.api_internal import create_internal_progress_router
 from wren.progress.wiring import build_progress_service_provider
 from wren.roadmaps.api_internal import create_internal_roadmaps_router
-from wren.roadmaps.wiring import build_roadmap_service_provider
+from wren.roadmaps.wiring import (
+    build_roadmap_read_service_provider,
+    build_roadmap_service_provider,
+)
 
 settings = build_app_settings(service=INTERNAL_SERVICE, port=INTERNAL_PORT)
 db = create_database(settings.database_url)
@@ -31,7 +34,9 @@ db = create_database(settings.database_url)
 # Roadmap authoring/reading over the trusted identity: the same RoadmapService and
 # request-scoped DB session the external app binds, differing only in that
 # require_internal_user resolves the user from the trusted X-User-ID header.
-internal_roadmaps_router = create_internal_roadmaps_router(build_roadmap_service_provider())
+internal_roadmaps_router = create_internal_roadmaps_router(
+    build_roadmap_service_provider(), build_roadmap_read_service_provider()
+)
 
 # Progress surface over the trusted identity: follow / snapshot /
 # explicit-set / next, the endpoints the MCP progress tools call.

@@ -38,7 +38,11 @@ from wren.progress.api import create_progress_router
 from wren.progress.wiring import build_progress_service_provider
 from wren.roadmaps.api import create_roadmaps_router
 from wren.roadmaps.listing_api import create_listing_router
-from wren.roadmaps.wiring import build_listing_service_provider, build_roadmap_service_provider
+from wren.roadmaps.wiring import (
+    build_listing_service_provider,
+    build_roadmap_read_service_provider,
+    build_roadmap_service_provider,
+)
 from wren.skill.api import create_skill_router
 
 settings = build_app_settings(service=EXTERNAL_SERVICE, port=EXTERNAL_PORT)
@@ -57,7 +61,9 @@ accounts_router = create_accounts_router(service_provider, cookie_config=cookie_
 
 # Roadmap authoring: create-draft + owner-scoped read over the same service
 # layer, resolving identity via the human session cookie (require_user).
-roadmaps_router = create_roadmaps_router(build_roadmap_service_provider())
+roadmaps_router = create_roadmaps_router(
+    build_roadmap_service_provider(), build_roadmap_read_service_provider()
+)
 
 # Dashboard + public profile: the private
 # dashboard (authored + followed, require_user) and the public profile
