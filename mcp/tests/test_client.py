@@ -11,8 +11,9 @@ from __future__ import annotations
 import json
 
 import httpx
+import structlog
 
-from wren_mcp.client import InternalApiClient
+from wren_mcp.client import REQUEST_ID_HEADER, InternalApiClient
 from wren_mcp.config import INTERNAL_TOKEN_HEADER, USER_ID_HEADER
 
 _API_TOKEN = "shared-internal-token"
@@ -214,3 +215,30 @@ async def test_update_progress_posts_the_explicit_set_batch() -> None:
         "state": "complete",
     }
     assert request.headers[USER_ID_HEADER] == "user-ada"
+
+
+# ---------- request-id propagation (F4) ----------
+
+
+async def test_request_forwards_the_bound_request_id() -> None:
+    # The correlation id bound for the agent action (by the bearer boundary)
+    # rides to the backend as X-Request-ID so the hop is traceable end to end.
+    client, captured = _client_with_capture()
+
+    structlog.contextvars.bind_contextvars(request_id="corr-abc-123")
+    try:
+        await client.get_roadmap("user-ada", "r-1")
+    finally:
+        structlog.contextvars.clear_contextvars()
+
+    assert captured[0].headers[REQUEST_ID_HEADER] == "corr-abc-123"
+
+
+async def test_request_omits_x_request_id_when_none_is_bound() -> None:
+    # Off the transport there is no bound request_id, so the header is simply
+    # absent rather than sent empty.
+    client, captured = _client_with_capture()
+
+    await client.get_roadmap("user-ada", "r-1")
+
+    assert REQUEST_ID_HEADER not in captured[0].headers

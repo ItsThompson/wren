@@ -18,12 +18,19 @@ from __future__ import annotations
 from typing import Any
 
 import httpx
+import structlog
 
 from wren_mcp.config import INTERNAL_TOKEN_HEADER, USER_ID_HEADER
 from wren_mcp.settings import RsSettings
 
 # Bound so a hung internal call cannot pin an MCP worker indefinitely.
 _DEFAULT_TIMEOUT_SECONDS = 10.0
+
+# Forwarded so one agent action is traceable across the MCP -> backend hop: the
+# backend CorrelationMiddleware honors this inbound id instead of minting a new
+# one. Mirrors ``wren.core.correlation.REQUEST_ID_HEADER`` (a duplicated wire
+# contract, since the RS and backend are separate images with no shared code).
+REQUEST_ID_HEADER = "X-Request-ID"
 
 
 class InternalApiClient:
@@ -47,11 +54,16 @@ class InternalApiClient:
 
         The trusted identity + shared-secret headers are applied last, so they
         can never be overridden by ``extra_headers`` and the agent token is never
-        propagated (only ``user_id`` crosses this boundary).
+        propagated (only ``user_id`` crosses this boundary). The correlation
+        ``request_id`` bound for this agent action (:mod:`wren_mcp.auth`) rides
+        along as ``X-Request-ID`` so the backend logs share the same id.
         """
         headers = dict(extra_headers or {})
         headers[USER_ID_HEADER] = user_id
         headers[INTERNAL_TOKEN_HEADER] = self._api_token
+        request_id = structlog.contextvars.get_contextvars().get("request_id")
+        if request_id is not None:
+            headers[REQUEST_ID_HEADER] = str(request_id)
         return await self._http.request(method, path, json=json, params=params, headers=headers)
 
     async def create_draft(self, user_id: str, document: Any) -> httpx.Response:
