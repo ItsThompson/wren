@@ -18,6 +18,7 @@ from __future__ import annotations
 import base64
 
 from wren.core.read_contract import ResponseFormat
+from wren.core.section_counts import count_section, percent
 from wren.roadmaps.read_schemas import (
     ItemState,
     NodeDetail,
@@ -57,14 +58,14 @@ def build_overview(roadmap: Roadmap, checked: frozenset[str], *, fmt: ResponseFo
         section = roadmap.sections.get(section_id)
         if section is None:
             continue
-        total, done = _count_section(section, checked)
+        total, done = count_section(section, checked)
         sections.append(
             SectionOverview(
                 section_id=section_id,
                 title=section.title,
                 total_items=total,
                 checked_items=done,
-                percent=_percent(done, total),
+                percent=percent(done, total),
             )
         )
         total_all += total
@@ -78,7 +79,7 @@ def build_overview(roadmap: Roadmap, checked: frozenset[str], *, fmt: ResponseFo
         overall=OverallProgress(
             total_items=total_all,
             checked_items=checked_all,
-            percent=_percent(checked_all, total_all),
+            percent=percent(checked_all, total_all),
         ),
     )
 
@@ -312,20 +313,3 @@ def _subsection_index(roadmap: Roadmap) -> dict[str, Subsection]:
 def _is_done(subsection: Subsection, checked: frozenset[str]) -> bool:
     """True when every checklist item of ``subsection`` is checked."""
     return all(item_id in checked for item_id in subsection.item_order)
-
-
-def _count_section(section: Section, checked: frozenset[str]) -> tuple[int, int]:
-    """Return ``(total_items, checked_items)`` across a section's subsections."""
-    total = 0
-    done = 0
-    for subsection in section.subsections.values():
-        for item_id in subsection.item_order:
-            total += 1
-            if item_id in checked:
-                done += 1
-    return total, done
-
-
-def _percent(done: int, total: int) -> int:
-    """Integer completion percent (0..100); 0 for an item-less collection."""
-    return round(done / total * 100) if total else 0

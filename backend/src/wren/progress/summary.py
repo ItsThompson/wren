@@ -9,9 +9,10 @@ framework-free, sharing the traversal helpers with ``next``.
 
 from __future__ import annotations
 
+from wren.core.section_counts import count_section, percent
 from wren.progress.schemas import Progress, ProgressSnapshot, SectionProgress
 from wren.progress.traversal import checked_item_ids
-from wren.roadmaps import Roadmap, Section
+from wren.roadmaps import Roadmap
 
 
 def summarize(roadmap: Roadmap, progress: Progress, *, detailed: bool) -> ProgressSnapshot:
@@ -29,13 +30,13 @@ def summarize(roadmap: Roadmap, progress: Progress, *, detailed: bool) -> Progre
         section = roadmap.sections.get(section_id)
         if section is None:
             continue
-        total, done = _count_section(section, checked)
+        total, done = count_section(section, checked)
         sections.append(
             SectionProgress(
                 section_id=section_id,
                 total_items=total,
                 checked_items=done,
-                percent=_percent(done, total),
+                percent=percent(done, total),
             )
         )
         total_all += total
@@ -45,25 +46,8 @@ def summarize(roadmap: Roadmap, progress: Progress, *, detailed: bool) -> Progre
         roadmap_id=roadmap.id,
         total_items=total_all,
         checked_items=checked_all,
-        percent=_percent(checked_all, total_all),
+        percent=percent(checked_all, total_all),
         deadline=progress.deadline,
         sections=sections,
         checked_ids=sorted(checked) if detailed else None,
     )
-
-
-def _count_section(section: Section, checked: set[str]) -> tuple[int, int]:
-    """Return ``(total_items, checked_items)`` across a section's subsections."""
-    total = 0
-    done = 0
-    for subsection in section.subsections.values():
-        for item_id in subsection.item_order:
-            total += 1
-            if item_id in checked:
-                done += 1
-    return total, done
-
-
-def _percent(done: int, total: int) -> int:
-    """Integer completion percent (0..100); 0 for an item-less collection."""
-    return round(done / total * 100) if total else 0
