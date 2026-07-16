@@ -12,10 +12,13 @@ Metric names and labels follow a stable convention so alert
 rules and dashboards can be dropped in later:
 
 - ``service_method_failures_total{service,method}`` (counter): one increment when
-  a public service method exits with an *unexpected* error. A ``WrenError`` is a
-  model-recoverable 4xx domain outcome (a 404/409/422), not an operational
-  failure, so it is deliberately excluded: this counter tracks the faults that
-  surface as 5xx and correlates with the ``HighErrorRate`` alert.
+  a public service method exits with an *unexpected* error. A model-recoverable
+  4xx (any ``ExpectedError`` with ``status < 500``: a ``WrenError`` 404/409/422 or
+  an OAuth ``invalid_grant``) is a domain outcome, not an operational failure, so
+  it is deliberately excluded; an ``ExpectedError`` with ``status >= 500`` (e.g. an
+  OAuth ``server_error``) and any non-``ExpectedError`` exception are counted. This
+  counter tracks the faults that surface as 5xx and correlates with the
+  ``HighErrorRate`` alert.
 - ``oauth_tokens_issued_total{grant_type}`` (counter): access/refresh token
   issuance, split by grant (``authorization_code`` = first issuance,
   ``refresh_token`` = rotation).
@@ -45,7 +48,7 @@ WREN_REGISTRY = CollectorRegistry()
 
 SERVICE_METHOD_FAILURES = Counter(
     "service_method_failures_total",
-    "Public service-layer methods that exited with an unexpected (non-WrenError) error.",
+    "Public service-layer methods that exited with an unexpected (5xx / non-ExpectedError) error.",
     labelnames=("service", "method"),
     registry=WREN_REGISTRY,
 )
@@ -110,12 +113,21 @@ def _wrap_method(
 
 
 def _is_unexpected(exc: BaseException) -> bool:
-    """True for a fault that should surface as 5xx (not a model-recoverable 4xx).
+    """True for a fault that should surface as 5xx (an operational failure).
 
-    ``WrenError`` is imported lazily here (only on the failure path) so this leaf
-    module stays free of the ``errors`` -> ``app_factory`` -> ``metrics`` import
-    chain at module load.
+    An :class:`~wren.core.errors.ExpectedError` (a ``WrenError`` or an
+    ``OAuthError``) with an HTTP ``status`` below 500 is a model-recoverable 4xx
+    outcome and is NOT counted; one with ``status`` >= 500 (e.g. an OAuth
+    ``server_error``) IS counted; any other exception IS counted. Classification is
+    by status, not by type: ``status`` is read via ``getattr`` because ``WrenError``
+    declares it at class level while ``OAuthError`` sets it per-instance.
+
+    ``ExpectedError`` is imported lazily here (only on the failure path) so this
+    leaf module stays free of the ``errors`` -> ``app_factory`` -> ``metrics``
+    import chain at module load.
     """
-    from wren.core.errors import WrenError
+    from wren.core.errors import ExpectedError
 
-    return not isinstance(exc, WrenError)
+    if isinstance(exc, ExpectedError):
+        return getattr(exc, "status", 500) >= 500
+    return True

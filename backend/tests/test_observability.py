@@ -24,6 +24,7 @@ from wren.core.observability import (
     track_failures,
 )
 from wren.core.settings import AppSettings
+from wren.oauth.errors import OAuthError, OAuthErrorCode
 
 MakeSettings = Callable[..., AppSettings]
 
@@ -43,6 +44,13 @@ class _Sample:
 
     async def raises_unexpected(self) -> None:
         raise RuntimeError("boom")
+
+    async def raises_oauth_client_error(self) -> None:
+        # OAuthError.invalid_grant defaults to status 400: a model-recoverable 4xx.
+        raise OAuthError.invalid_grant("stale authorization code")
+
+    async def raises_oauth_server_error(self) -> None:
+        raise OAuthError(OAuthErrorCode.SERVER_ERROR, "token store unreachable", status=500)
 
     async def _private_unexpected(self) -> None:  # not wrapped: underscore-prefixed
         raise RuntimeError("boom")
@@ -68,6 +76,24 @@ async def test_wren_error_is_not_counted_as_a_failure() -> None:
         await _Sample().raises_domain()
     # A model-recoverable 4xx domain error is an expected outcome, not a failure.
     assert _failures("raises_domain") == before
+
+
+async def test_oauth_client_error_below_500_is_not_counted() -> None:
+    before = _failures("raises_oauth_client_error")
+    with pytest.raises(OAuthError):
+        await _Sample().raises_oauth_client_error()
+    # A routine OAuth 4xx (invalid_grant -> 400) is model-recoverable, not a fault:
+    # the counter classifies by HTTP status, not by exception type.
+    assert _failures("raises_oauth_client_error") == before
+
+
+async def test_oauth_server_error_at_or_above_500_is_counted() -> None:
+    before = _failures("raises_oauth_server_error")
+    with pytest.raises(OAuthError):
+        await _Sample().raises_oauth_server_error()
+    # An OAuth server_error (status 500) is an operational fault and IS counted,
+    # even though it is an ExpectedError like the 4xx invalid_grant above.
+    assert _failures("raises_oauth_server_error") == before + 1
 
 
 async def test_success_is_transparent_and_uncounted() -> None:
