@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { http, HttpResponse, delay } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
@@ -84,6 +85,7 @@ describe('AC-CACHE-04 SWR posture', () => {
   })
 
   it('serves a warm cross-route key from cache without a refetch while a cold key still fetches', async () => {
+    const user = userEvent.setup()
     let roadmapGets = 0
     let progressGets = 0
     server.use(
@@ -109,7 +111,7 @@ describe('AC-CACHE-04 SWR posture', () => {
 
     // Mount the tree route: it reads the now-warm `keys.roadmap(id)` and the cold
     // `keys.progress(id)`.
-    fireEvent.click(screen.getByRole('button', { name: 'mount-tree' }))
+    await user.click(screen.getByRole('button', { name: 'mount-tree' }))
 
     // The warm key is served from cache synchronously (no loading placeholder).
     expect(screen.getByTestId('tree-roadmap')).toHaveTextContent(mockRoadmap.title)
