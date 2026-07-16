@@ -11,8 +11,8 @@ const BASE = 'https://api.test'
 /**
  * A stand-in typed path. The generated `paths` holds only product routes, so it
  * is merged into the real `paths` via `makeTestApiClient`'s `Extra` type param,
- * exercising `runQuery` against a schema-typed body with no `as unknown as`
- * round-trip while every real route stays checked against `schema.d.ts`.
+ * exercising `runQuery` against a schema-typed body without an unchecked
+ * round-trip cast while every real route stays checked against `schema.d.ts`.
  */
 interface WidgetPaths {
   '/widget': {
