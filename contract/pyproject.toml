@@ -1,0 +1,24 @@
+[project]
+# Dev/test-only cross-package contract harness. NEVER shipped: no image builds
+# from it. It is the only interpreter where both `wren.*` and `wren_mcp.*`
+# import together, so the cross-package coupling lives HERE and nowhere else.
+# Neither deployable (backend/mcp) gains a dependency on the other (§12).
+name = "wren-contract-tests"
+version = "0"
+requires-python = ">=3.12"
+dependencies = ["wren", "wren-mcp", "pytest>=8"]
+
+[tool.uv]
+# No source of our own to build: this is a virtual project that only assembles
+# a combined test environment.
+package = false
+
+[tool.uv.sources]
+# Editable path installs: a schema/constant edit in either package is picked up
+# from the working tree with no relock. backend/uv.lock and mcp/uv.lock are
+# never touched.
+wren = { path = "../backend", editable = true }
+wren-mcp = { path = "../mcp", editable = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
