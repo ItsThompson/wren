@@ -4,8 +4,11 @@ The MCP server is a separate image with no backend-code dependency, so the
 authoring wire shapes are re-declared here as the **frozen MCP contract** (the
 same "duplicated domain truth kept in sync by contract" pattern as
 :mod:`wren_mcp.config`'s header names). A snapshot test freezes the generated
-JSON Schemas so the deliberately-frozen tool contracts cannot drift silently:
-the MCP analog of the OpenAPI drift check.
+JSON Schemas on the MCP side (the MCP analog of the OpenAPI drift check), and the
+cross-package ``contract-drift`` check (``contract/tests/test_schema_mirror.py``)
+asserts this mirror stays equal to the backend source types: field-for-field for
+the shared shapes, and a fields-subset check for the deliberately-lean write
+results. Together they make the mirror sync-by-test, not sync-by-discipline.
 
 Inputs mirror the backend authoring types (ordered arrays + optional
 ``proposed_id``, key-addressed, never index-addressed). Outputs are **lean**
@@ -437,7 +440,8 @@ class MetadataResult(BaseModel):
 # field renaming. They are re-declared here (not imported) because the MCP server
 # is a separate image with no backend-code dependency: the same "duplicated domain
 # truth kept in sync by contract" pattern as the authoring inputs above, frozen by
-# the schema snapshot. Design rules encoded: summary-first (no
+# the schema snapshot and asserted equal to the backend read projections by the
+# ``contract-drift`` schema-mirror test. Design rules encoded: summary-first (no
 # item bodies on ``Overview``), resource links never inlined bodies, and the
 # ``concise | detailed`` switch (the verbose ``description`` / ``path_position``
 # is present only under detailed).
