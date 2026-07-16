@@ -25,7 +25,7 @@ from datetime import date
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ResourceType(StrEnum):
@@ -88,13 +88,17 @@ class CompletionState(StrEnum):
 class ResourceInput(BaseModel):
     """An external link on a subsection; the body is never inlined."""
 
+    model_config = ConfigDict(extra="forbid")
+
     proposed_id: str | None = None
-    title: str
+    title: str = Field(min_length=1)
     url: str
     type: ResourceType
 
 
 class ChecklistItemInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     proposed_id: str | None = None
     text: str
 
@@ -103,8 +107,10 @@ class SubsectionInput(BaseModel):
     """A DAG node. Child collections are ordered arrays because IDs are
     server-minted; ``prereq_ids`` may reference sibling ``proposed_id``s."""
 
+    model_config = ConfigDict(extra="forbid")
+
     proposed_id: str | None = None
-    title: str
+    title: str = Field(min_length=1)
     description: str | None = None
     tags: list[str] = Field(default_factory=list)
     effort_estimate: str | None = None
@@ -114,8 +120,10 @@ class SubsectionInput(BaseModel):
 
 
 class SectionInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     proposed_id: str | None = None
-    title: str
+    title: str = Field(min_length=1)
     subsections: list[SubsectionInput] = Field(default_factory=list)
 
 
@@ -123,8 +131,10 @@ class RoadmapDraftInput(BaseModel):
     """The full-document payload for ``create_roadmap_draft`` and
     ``replace_roadmap_draft``."""
 
+    model_config = ConfigDict(extra="forbid")
+
     proposed_id: str | None = None
-    title: str
+    title: str = Field(min_length=1)
     description: str | None = None
     subject_tags: list[str] = Field(default_factory=list)
     sections: list[SectionInput] = Field(default_factory=list)
@@ -143,6 +153,8 @@ class RoadmapDraftInput(BaseModel):
 
 
 class AddSubsectionOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["add_subsection"]
     section_id: str
     subsection: SubsectionInput
@@ -151,14 +163,18 @@ class AddSubsectionOp(BaseModel):
 
 
 class UpdateSubsectionOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["update_subsection"]
     subsection_id: str
-    title: str | None = None
+    title: str | None = Field(default=None, min_length=1)
     description: str | None = None
     effort_estimate: str | None = None
 
 
 class RemoveSubsectionOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["remove_subsection"]
     subsection_id: str
 
@@ -166,36 +182,48 @@ class RemoveSubsectionOp(BaseModel):
 class AddEdgeOp(BaseModel):
     """``to_id`` gains ``from_id`` as a prerequisite."""
 
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["add_edge"]
     from_id: str
     to_id: str
 
 
 class RemoveEdgeOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["remove_edge"]
     from_id: str
     to_id: str
 
 
 class SetTagsOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["set_tags"]
     subsection_id: str
     tags: list[str] = Field(default_factory=list)
 
 
 class SetResourcesOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["set_resources"]
     subsection_id: str
     resources: list[ResourceInput] = Field(default_factory=list)
 
 
 class SetEffortOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["set_effort"]
     subsection_id: str
     effort_estimate: str | None = None
 
 
 class AddItemOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["add_item"]
     subsection_id: str
     text: str
@@ -205,18 +233,24 @@ class AddItemOp(BaseModel):
 
 
 class UpdateItemOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["update_item"]
     item_id: str
     text: str
 
 
 class RemoveItemOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["remove_item"]
     item_id: str
 
 
 class ReorderOp(BaseModel):
     """Move any node (section / subsection / item) within its sibling order."""
+
+    model_config = ConfigDict(extra="forbid")
 
     op: Literal["reorder"]
     target_id: str
@@ -225,25 +259,33 @@ class ReorderOp(BaseModel):
 
 
 class SetSuggestedPathOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["set_suggested_path"]
     path: list[str] = Field(default_factory=list)
 
 
 class AddSectionOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["add_section"]
-    title: str
+    title: str = Field(min_length=1)
     proposed_id: str | None = None
     before_id: str | None = None
     after_id: str | None = None
 
 
 class UpdateSectionOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["update_section"]
     section_id: str
-    title: str
+    title: str = Field(min_length=1)
 
 
 class RemoveSectionOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["remove_section"]
     section_id: str
 
@@ -298,7 +340,7 @@ class Violation(BaseModel):
     """One structural rule failure, model-recoverable by naming the rule + IDs."""
 
     rule: str
-    ids: list[str] = Field(default_factory=list)
+    ids: list[str]
     message: str
 
 

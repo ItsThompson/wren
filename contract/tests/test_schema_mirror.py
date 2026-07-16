@@ -23,14 +23,14 @@ The mirrored types fall into three groups, treated differently:
 * **Group C (:data:`EXCLUDED_MCP_ONLY` / :data:`EXCLUDED_BACKEND_ONLY`)** are not
   mirrored at all and are documented, never compared.
 
-:data:`INTENTIONAL_DELTAS` is the allowlist of the two known, deliberate Group-A
-divergences (``RoadmapDraftInput`` omits ``visibility``; ``Violation.ids`` is
-required on the backend but defaulted on the current frozen MCP mirror). It
-freezes the *current* pre-hardening contract: the input-hardening slice that
-aligns ``Violation.ids`` and adds ``extra="forbid"`` must update this allowlist
-and the MCP snapshot in the same change, so any such edit is caught deliberately.
-:func:`test_intentional_deltas_are_load_bearing` fails if an allowlist entry ever
-stops describing a real divergence, keeping the allowlist honest.
+:data:`INTENTIONAL_DELTAS` is the allowlist of the deliberate Group-A
+divergences. The only remaining entry is ``RoadmapDraftInput`` omitting
+``visibility`` (a web-only lifecycle control with no agent tool). The
+input-hardening slice (Ticket 14) aligned ``Violation.ids`` (now required on both
+sides) and added ``extra="forbid"`` to both mirrors together, dropping the
+``Violation`` allowlist entry and regenerating the MCP snapshot in the same
+change. :func:`test_intentional_deltas_are_load_bearing` fails if an allowlist
+entry ever stops describing a real divergence, keeping the allowlist honest.
 """
 
 from __future__ import annotations
@@ -207,8 +207,8 @@ ASSERT_EQUAL: list[tuple[type, type]] = [
     (backend.RemoveSectionOp, mcp.RemoveSectionOp),
     # Changed-node echo (field-identical, so asserted equal rather than subset).
     (backend.ChangedNode, mcp.ChangedNode),
-    # Structural-rule violation (ids is name-equal; the required delta is
-    # allowlisted, so type drift on ids is still caught).
+    # Structural-rule violation (aligned in Ticket 14: ids is required on both
+    # sides now, so the pair is asserted fully field-equal with no delta).
     (backend_errors.Violation, mcp.Violation),
     # Read projections (roadmaps).
     (backend_read.ResourceRef, mcp.ResourceRef),
@@ -233,15 +233,12 @@ ASSERT_EQUAL: list[tuple[type, type]] = [
 PATCH_OP_UNION: tuple[object, object] = (backend.PatchOp, mcp.PatchOp)
 
 # Allowlist of deliberate Group-A divergences, keyed by MCP class name. Applied
-# to the *backend* side (the stricter mirror) so it matches the current frozen
-# MCP contract. Ticket 14 aligns these and removes the entries in the same slice.
+# to the *backend* side (the stricter mirror) so it matches the frozen MCP
+# contract. Ticket 14 aligned ``Violation.ids`` and removed that entry; the
+# ``RoadmapDraftInput`` visibility omission is a permanent, intentional delta.
 INTENTIONAL_DELTAS: dict[str, dict[str, tuple[str, ...]]] = {
     # visibility is a web-only lifecycle control with no agent tool.
     "RoadmapDraftInput": {"omit": ("visibility",)},
-    # ids is required on the backend but defaulted on the frozen MCP mirror. The
-    # drift is latent (the backend always sends ids); aligning it is Ticket 14,
-    # which also regenerates the MCP snapshot and drops this entry.
-    "Violation": {"optional": ("ids",)},
 }
 
 
