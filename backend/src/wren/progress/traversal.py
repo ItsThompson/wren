@@ -10,7 +10,7 @@ re-derived divergently per projection.
 from __future__ import annotations
 
 from wren.progress.schemas import Progress
-from wren.roadmaps.schemas import Roadmap, Subsection
+from wren.roadmaps import Roadmap, Subsection
 
 
 def index_subsections(roadmap: Roadmap) -> dict[str, Subsection]:

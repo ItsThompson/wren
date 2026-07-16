@@ -17,6 +17,7 @@ guards the load-bearing thesis that the app is not the brain.
 
 from __future__ import annotations
 
+from wren.core.read_contract import ResponseFormat
 from wren.progress.schemas import NextItem, NextResult, Progress, ResourceLink
 from wren.progress.traversal import (
     all_item_ids,
@@ -24,8 +25,7 @@ from wren.progress.traversal import (
     index_subsections,
     is_subsection_done,
 )
-from wren.roadmaps.read_schemas import ResponseFormat
-from wren.roadmaps.schemas import Roadmap, Subsection
+from wren.roadmaps import Roadmap, Subsection
 
 
 def compute(

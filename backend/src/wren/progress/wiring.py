@@ -18,6 +18,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from wren.core.db import get_session
 from wren.progress.repository import SqlAlchemyProgressRepository
 from wren.progress.service import ProgressService
+
+# Cross-domain coupling: progress composes the concrete roadmap repository for
+# its read access. Genuine coupling, not a missing re-export; a shared read-port
+# abstraction is a known follow-up.
 from wren.roadmaps.repository import SqlAlchemyRoadmapRepository
 
 

@@ -21,11 +21,11 @@ from collections.abc import Callable
 from fastapi import APIRouter, Depends, Header, Query
 
 from wren.core.identity import require_internal_user
+from wren.core.read_contract import ResponseFormat
 from wren.roadmaps.config import ROADMAPS_PATH
 from wren.roadmaps.read_schemas import (
     NodeDetail,
     Overview,
-    ResponseFormat,
     SearchHit,
     SectionInclude,
     SectionPage,

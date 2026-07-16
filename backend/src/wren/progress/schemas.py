@@ -24,7 +24,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
-from wren.roadmaps.schemas import ResourceType
+from wren.roadmaps import ResourceType
 
 
 class CompletionState(StrEnum):

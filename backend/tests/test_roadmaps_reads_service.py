@@ -27,8 +27,9 @@ from roadmaps_read_builders import (
     build_read_roadmap,
 )
 from wren.core.errors import NotFound, Validation
+from wren.core.read_contract import ResponseFormat
 from wren.progress.schemas import Progress
-from wren.roadmaps.read_schemas import ResponseFormat, SectionInclude
+from wren.roadmaps.read_schemas import SectionInclude
 from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
 from wren.roadmaps.service import CheckedReader, RoadmapService
 from wren.roadmaps.wiring import _checked_reader

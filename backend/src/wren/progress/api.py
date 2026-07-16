@@ -18,6 +18,7 @@ from collections.abc import Callable
 from fastapi import APIRouter, Depends
 
 from wren.core.identity import require_user
+from wren.core.read_contract import ResponseFormat
 from wren.progress.schemas import (
     DeadlineRequest,
     NextResult,
@@ -28,7 +29,6 @@ from wren.progress.schemas import (
 )
 from wren.progress.service import ProgressService
 from wren.roadmaps.config import ROADMAPS_PATH
-from wren.roadmaps.read_schemas import ResponseFormat
 
 # A FastAPI dependency that yields a ProgressService for the request.
 ProgressServiceProvider = Callable[..., object]

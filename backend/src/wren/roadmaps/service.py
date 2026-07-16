@@ -25,6 +25,7 @@ from datetime import UTC, datetime
 from wren.core.errors import Conflict, ErrorCode, NotFound, Validation, Violation
 from wren.core.logging import get_logger
 from wren.core.observability import track_failures
+from wren.core.read_contract import ResponseFormat
 from wren.roadmaps import patch, projections, slugs
 from wren.roadmaps.assembly import assemble_draft, assemble_fork
 from wren.roadmaps.config import MAX_ID_MINT_ATTEMPTS, SECTION_PAGE_SIZE
@@ -32,7 +33,6 @@ from wren.roadmaps.models import RoadmapRecord
 from wren.roadmaps.read_schemas import (
     NodeDetail,
     Overview,
-    ResponseFormat,
     SearchHit,
     SectionInclude,
     SectionPage,

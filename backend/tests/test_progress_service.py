@@ -23,9 +23,9 @@ from progress_builders import (
 from progress_fakes import InMemoryProgressRepository
 from roadmaps_fakes import InMemoryRoadmapRepository
 from wren.core.errors import Conflict, NotFound, Validation
+from wren.core.read_contract import ResponseFormat
 from wren.progress.schemas import CompletionState
 from wren.progress.service import ProgressService
-from wren.roadmaps.read_schemas import ResponseFormat
 from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
 
 _OWNER = "owner"

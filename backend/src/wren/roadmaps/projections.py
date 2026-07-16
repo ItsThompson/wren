@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import base64
 
+from wren.core.read_contract import ResponseFormat
 from wren.roadmaps.read_schemas import (
     ItemState,
     NodeDetail,
@@ -24,7 +25,6 @@ from wren.roadmaps.read_schemas import (
     Overview,
     PrereqRef,
     ResourceRef,
-    ResponseFormat,
     SearchHit,
     SearchHitKind,
     SectionInclude,

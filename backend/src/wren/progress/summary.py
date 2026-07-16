@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from wren.progress.schemas import Progress, ProgressSnapshot, SectionProgress
 from wren.progress.traversal import checked_item_ids
-from wren.roadmaps.schemas import Roadmap, Section
+from wren.roadmaps import Roadmap, Section
 
 
 def summarize(roadmap: Roadmap, progress: Progress, *, detailed: bool) -> ProgressSnapshot:

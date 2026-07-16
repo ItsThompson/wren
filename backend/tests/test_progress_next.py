@@ -22,9 +22,9 @@ from progress_builders import (
     SUB_HASHING,
     build_roadmap,
 )
+from wren.core.read_contract import ResponseFormat
 from wren.progress.next import compute
 from wren.progress.schemas import Progress
-from wren.roadmaps.read_schemas import ResponseFormat
 from wren.roadmaps.schemas import (
     ChecklistItem,
     Resource,

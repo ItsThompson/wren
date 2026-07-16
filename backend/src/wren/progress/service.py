@@ -25,6 +25,7 @@ from datetime import UTC, date, datetime
 from wren.core.errors import Conflict, NotFound, Validation
 from wren.core.logging import get_logger
 from wren.core.observability import track_failures
+from wren.core.read_contract import ResponseFormat
 from wren.progress.models import ProgressRecord
 from wren.progress.next import compute as compute_next
 from wren.progress.repository import ProgressRepository
@@ -37,9 +38,12 @@ from wren.progress.schemas import (
 )
 from wren.progress.summary import summarize
 from wren.progress.traversal import all_item_ids
-from wren.roadmaps.read_schemas import ResponseFormat
+from wren.roadmaps import Roadmap, RoadmapStatus, Visibility
+
+# Cross-domain coupling: progress reads roadmaps straight from the roadmap
+# repository. Genuine coupling, not a missing re-export; a shared read-port
+# abstraction is a known follow-up.
 from wren.roadmaps.repository import RoadmapRepository
-from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
 
 _log = get_logger("wren-progress")
 
