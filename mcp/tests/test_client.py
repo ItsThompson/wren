@@ -15,6 +15,7 @@ import httpx
 import pytest
 import structlog
 from mcp.server.fastmcp.exceptions import ToolError
+from pydantic import SecretStr
 
 from wren_mcp.client import REQUEST_ID_HEADER, InternalApiClient
 from wren_mcp.config import INTERNAL_TOKEN_HEADER, USER_ID_HEADER
@@ -33,7 +34,7 @@ def _client_with_capture() -> tuple[InternalApiClient, list[httpx.Request]]:
         return httpx.Response(200, json={"ok": True})
 
     http = httpx.AsyncClient(base_url="http://backend:8001", transport=httpx.MockTransport(handler))
-    return InternalApiClient(http, api_token=_API_TOKEN), captured
+    return InternalApiClient(http, api_token=SecretStr(_API_TOKEN)), captured
 
 
 async def test_create_draft_sends_trusted_identity_headers() -> None:
@@ -257,7 +258,7 @@ def _client_with_transport(
     handler: Callable[[httpx.Request], httpx.Response],
 ) -> InternalApiClient:
     http = httpx.AsyncClient(base_url="http://backend:8001", transport=httpx.MockTransport(handler))
-    return InternalApiClient(http, api_token=_API_TOKEN)
+    return InternalApiClient(http, api_token=SecretStr(_API_TOKEN))
 
 
 async def test_connect_error_is_translated_to_a_structured_tool_error() -> None:

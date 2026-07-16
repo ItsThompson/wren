@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pydantic import SecretStr
+
 from wren_mcp.settings import ROOT_ENV_FILE, SERVICE, EnvSettings, build_rs_settings
 
 
@@ -13,7 +15,7 @@ def test_build_rs_settings_maps_pinned_config() -> None:
         public_base_url="https://api.usewren.com",
         mcp_public_url="https://mcp.usewren.com",
         backend_internal_url="http://backend:8001",
-        internal_api_token="tok",
+        internal_api_token=SecretStr("tok"),
     )
 
     settings = build_rs_settings(env)
@@ -23,8 +25,23 @@ def test_build_rs_settings_maps_pinned_config() -> None:
     assert settings.issuer == "https://api.usewren.com"
     assert settings.resource == "https://mcp.usewren.com"
     assert settings.backend_internal_url == "http://backend:8001"
-    assert settings.internal_api_token == "tok"
+    assert settings.internal_api_token.get_secret_value() == "tok"
     assert settings.is_dev is False
+
+
+def test_internal_api_token_is_masked_in_repr_but_recoverable() -> None:
+    """L12: an accidental settings dump/log must not leak the shared internal
+    token. It is ``SecretStr``, so ``repr()``/``str()`` mask it, while
+    ``.get_secret_value()`` still yields the real value where the internal-token
+    header is constructed."""
+    env = EnvSettings(internal_api_token=SecretStr("raw-internal-token-value"))
+    settings = build_rs_settings(env)
+
+    for dump in (repr(env), str(env), repr(settings), str(settings)):
+        assert "raw-internal-token-value" not in dump
+        assert "**********" in dump
+
+    assert settings.internal_api_token.get_secret_value() == "raw-internal-token-value"
 
 
 def test_is_dev_true_in_development() -> None:

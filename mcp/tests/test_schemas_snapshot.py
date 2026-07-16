@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import httpx
+from pydantic import SecretStr
 
 from wren_mcp.client import InternalApiClient
 from wren_mcp.mcp_server import create_mcp_server
@@ -42,13 +43,13 @@ def _settings() -> RsSettings:
         issuer="https://api.usewren.com",
         resource="https://mcp.usewren.com",
         backend_internal_url="http://backend:8001",
-        internal_api_token="tok",
+        internal_api_token=SecretStr("tok"),
     )
 
 
 def _build_server() -> FastMCP:
     http = httpx.AsyncClient(base_url="http://backend:8001")
-    client = InternalApiClient(http, api_token="tok")
+    client = InternalApiClient(http, api_token=SecretStr("tok"))
     mcp = create_mcp_server(_settings())
     register_write_tools(mcp, client)
     register_read_tools(mcp, client)

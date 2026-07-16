@@ -24,6 +24,8 @@ from mcp.server.fastmcp.exceptions import ToolError
 from wren_mcp.config import INTERNAL_TOKEN_HEADER, USER_ID_HEADER
 
 if TYPE_CHECKING:
+    from pydantic import SecretStr
+
     from wren_mcp.settings import RsSettings
 
 # Bound so a hung internal call cannot pin an MCP worker indefinitely.
@@ -39,7 +41,7 @@ REQUEST_ID_HEADER = "X-Request-ID"
 class InternalApiClient:
     """Forwards user-scoped calls to the backend internal app."""
 
-    def __init__(self, http_client: httpx.AsyncClient, *, api_token: str) -> None:
+    def __init__(self, http_client: httpx.AsyncClient, *, api_token: SecretStr) -> None:
         self._http = http_client
         self._api_token = api_token
 
@@ -70,7 +72,9 @@ class InternalApiClient:
         """
         headers = dict(extra_headers or {})
         headers[USER_ID_HEADER] = user_id
-        headers[INTERNAL_TOKEN_HEADER] = self._api_token
+        # Unwrap the SecretStr only here, at the single wire-header use site; the
+        # raw value is never logged.
+        headers[INTERNAL_TOKEN_HEADER] = self._api_token.get_secret_value()
         request_id = structlog.contextvars.get_contextvars().get("request_id")
         if request_id is not None:
             headers[REQUEST_ID_HEADER] = str(request_id)

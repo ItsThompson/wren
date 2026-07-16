@@ -7,6 +7,8 @@ development so the MCP Inspector can attach over localhost.
 
 from __future__ import annotations
 
+from pydantic import SecretStr
+
 from wren_mcp.mcp_server import create_mcp_server
 from wren_mcp.settings import SERVICE, RsSettings
 
@@ -21,7 +23,7 @@ def _settings(environment: str) -> RsSettings:
         issuer="https://api.usewren.com",
         resource="https://mcp.usewren.com",
         backend_internal_url="http://backend:8001",
-        internal_api_token="tok",
+        internal_api_token=SecretStr("tok"),
     )
 
 

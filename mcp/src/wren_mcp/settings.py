@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # `just dev-mcp` cd's into mcp/ before launching uvicorn, so a package-relative
@@ -52,7 +52,9 @@ class EnvSettings(BaseSettings):
     backend_internal_url: str = "http://localhost:8001"
     # Shared secret the internal app requires (defense-in-depth behind compute-net
     # isolation). Empty by default; the internal app fail-safe denies without it.
-    internal_api_token: str = ""
+    # SecretStr so an accidental settings dump/log masks it (L12); read via
+    # .get_secret_value() only when the internal-token header is constructed.
+    internal_api_token: SecretStr = SecretStr("")
 
 
 class RsSettings(BaseModel):
@@ -66,7 +68,7 @@ class RsSettings(BaseModel):
     issuer: str  # expected token ``iss`` + AS discovery base (pinned)
     resource: str  # expected token ``aud`` + PRM ``resource`` (pinned)
     backend_internal_url: str
-    internal_api_token: str
+    internal_api_token: SecretStr
 
     @property
     def is_dev(self) -> bool:

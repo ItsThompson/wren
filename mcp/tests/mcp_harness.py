@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from token_factory import ISSUER, RESOURCE, make_fetch, mint, new_key, public_jwks
 from wren_mcp.app import create_rs_app
@@ -42,7 +43,7 @@ def _settings() -> RsSettings:
         issuer=ISSUER,
         resource=RESOURCE,
         backend_internal_url=_INTERNAL_BASE,
-        internal_api_token=_API_TOKEN,
+        internal_api_token=SecretStr(_API_TOKEN),
     )
 
 
@@ -61,7 +62,7 @@ class AgentHarness:
         key = new_key()
         provider = RemoteKeyProvider(ISSUER, make_fetch(public_jwks(key)))
         http = httpx.AsyncClient(base_url=_INTERNAL_BASE, transport=httpx.MockTransport(capture))
-        self._client = InternalApiClient(http, api_token=_API_TOKEN)
+        self._client = InternalApiClient(http, api_token=SecretStr(_API_TOKEN))
         self.app: FastAPI = create_rs_app(
             _settings(), key_provider=provider, internal_client=self._client
         )

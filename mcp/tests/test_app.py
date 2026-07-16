@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from token_factory import ISSUER, RESOURCE, make_fetch, mint, new_key, public_jwks
 from wren_mcp.app import build_app, create_json_fetch, create_rs_app
@@ -47,7 +48,7 @@ def _internal_client() -> InternalApiClient:
         base_url="http://backend:8001",
         transport=httpx.MockTransport(lambda _request: httpx.Response(200)),
     )
-    return InternalApiClient(http, api_token="tok")
+    return InternalApiClient(http, api_token=SecretStr("tok"))
 
 
 def _build(
