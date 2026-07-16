@@ -7,9 +7,12 @@
 # the `--cov` target, the `integration` marker, per-file-ignores). Lint runs from
 # the full checkout in CI (`ruff check .` per package), so the relative `extend`
 # resolves to this file.
+#
+# `src` is intentionally NOT set here: ruff resolves it relative to the file that
+# declares it, so a value here would misresolve to `<repo-root>/src`. Each package
+# sets `src = ["src", "tests"]` locally in its own `pyproject.toml` instead.
 
 line-length = 100
-src = ["src", "tests"]
 target-version = "py312"
 
 [lint]
