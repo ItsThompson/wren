@@ -13,7 +13,6 @@ the blacklist and the rotation policy; this module only mints and verifies.
 
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -21,6 +20,7 @@ from typing import Any
 import jwt
 
 from wren.accounts.config import SessionConfig
+from wren.accounts.injection import Clock, OpaqueIdFactory, new_hex_id, utcnow
 
 _ALGORITHM = "HS256"
 _ACCESS_TYPE = "access"
@@ -59,13 +59,23 @@ class TokenPair:
 class SessionTokenCodec:
     """Mints and verifies session JWTs for one signing config."""
 
-    def __init__(self, config: SessionConfig) -> None:
+    def __init__(
+        self,
+        config: SessionConfig,
+        *,
+        clock: Clock = utcnow,
+        new_id: OpaqueIdFactory = new_hex_id,
+    ) -> None:
         self._config = config
+        # Injected so mint and verify share one clock (tests advance it to assert
+        # expiry) and the sid is deterministic; defaults reproduce the ambient calls.
+        self._clock = clock
+        self._new_id = new_id
 
     def mint_pair(self, user_id: str) -> TokenPair:
         """Mint an access + refresh pair sharing a fresh session id."""
-        sid = uuid.uuid4().hex
-        now = datetime.now(UTC)
+        sid = self._new_id()
+        now = self._clock()
         access_expires = now + self._config.access_ttl
         refresh_expires = now + self._config.refresh_ttl
         access_token = self._encode(user_id, sid, _ACCESS_TYPE, now, access_expires)
@@ -115,10 +125,14 @@ class SessionTokenCodec:
                 token,
                 self._config.secret,
                 algorithms=[_ALGORITHM],
-                options={"require": ["exp", "sub"]},
+                # exp presence is still required; expiry itself is checked against
+                # the injected clock below so a pinned clock governs the assertion.
+                options={"require": ["exp", "sub"], "verify_exp": False},
             )
         except jwt.InvalidTokenError:
             return None
         if payload.get("type") != expected_type or "sid" not in payload:
+            return None
+        if datetime.fromtimestamp(payload["exp"], tz=UTC) <= self._clock():
             return None
         return payload

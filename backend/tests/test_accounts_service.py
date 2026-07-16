@@ -4,11 +4,14 @@ repository and the real hasher + token codec (sociable).
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from sqlalchemy.exc import IntegrityError
 
 from accounts_fakes import (
     InMemoryAccountRepository,
+    MutableClock,
     build_test_codec,
     build_test_hasher,
 )
@@ -186,6 +189,27 @@ async def test_refresh_for_a_deleted_user_is_401() -> None:
     orphan = codec.mint_pair("ghost-user")
     with pytest.raises(Unauthorized):
         await service.refresh(orphan.refresh_token)
+
+
+async def test_session_expiry_and_rotation_under_a_pinned_clock() -> None:
+    # US-DI-02: assert session-token expiry and refresh rotation against a pinned
+    # clock via the injected SessionTokenCodec clock -- no sleep, no negative TTL.
+    clock = MutableClock(datetime(2024, 1, 1, tzinfo=UTC))
+    codec = build_test_codec(
+        access_ttl=timedelta(minutes=15), refresh_ttl=timedelta(days=14), clock=clock
+    )
+    service, _ = _service(codec=codec)
+    session = await service.register("ada", "ada@example.com", _PASSWORD)
+    assert codec.verify_access(session.tokens.access_token) is not None  # valid at t0
+
+    clock.advance(timedelta(minutes=16))  # past the access TTL, within the refresh TTL
+
+    # The access token has expired against the pinned clock...
+    assert codec.verify_access(session.tokens.access_token) is None
+    # ...but the refresh token is still valid, so rotation issues a fresh session.
+    rotated = await service.refresh(session.tokens.refresh_token)
+    assert rotated.tokens.sid != session.tokens.sid
+    assert codec.verify_access(rotated.tokens.access_token) is not None
 
 
 async def test_profile_returns_the_public_handle() -> None:
