@@ -408,3 +408,18 @@ def test_excluded_backend_only_types_have_no_mcp_mirror() -> None:
     for name in EXCLUDED_BACKEND_ONLY:
         assert name in backend_types, f"{name} is no longer a backend type; update EXCLUDED."
         assert name not in mcp_types, f"{name} now has an MCP mirror; move it out of EXCLUDED."
+
+
+def test_excluded_mcp_only_types_have_no_backend_mirror() -> None:
+    """The documented MCP-only exclusions are real and unmirrored (symmetric guard)."""
+    backend_types = (
+        _declared_contract_types(backend)
+        | _declared_contract_types(backend_read)
+        | _declared_contract_types(backend_progress)
+    )
+    mcp_types = _declared_contract_types(mcp)
+    for name in EXCLUDED_MCP_ONLY:
+        assert name in mcp_types, f"{name} is no longer an MCP type; update EXCLUDED."
+        assert name not in backend_types, (
+            f"{name} now has a backend mirror; move it out of EXCLUDED."
+        )
