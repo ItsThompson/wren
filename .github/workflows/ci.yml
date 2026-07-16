@@ -129,7 +129,7 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Contract drift (cross-package header + schema equivalence)
+      - name: Contract drift (cross-package header constants)
         working-directory: contract
         run: |
           uv sync --frozen
