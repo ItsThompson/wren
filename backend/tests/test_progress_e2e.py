@@ -13,14 +13,14 @@ from __future__ import annotations
 import os
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from alembic import command
 from alembic.config import Config
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from accounts_fakes import build_test_codec, build_test_hasher
+from tests.support.fakes.accounts_fakes import build_test_codec, build_test_hasher
 from wren.accounts.api import create_accounts_router
 from wren.accounts.config import CookieConfig
 from wren.accounts.session import build_revocation_lookup, create_session_verifier
@@ -28,12 +28,18 @@ from wren.accounts.wiring import build_account_service_provider
 from wren.core.app_factory import create_app
 from wren.core.db import create_database
 from wren.core.errors import build_exception_handlers
-from wren.core.identity import StripInboundIdentityMiddleware
+from wren.core.identity import StripInboundIdentityMiddleware, require_user
 from wren.core.settings import AppSettings
-from wren.progress.api import create_progress_router
+from wren.progress.router import create_progress_router
 from wren.progress.wiring import build_progress_service_provider
-from wren.roadmaps.api import create_roadmaps_router
-from wren.roadmaps.wiring import build_roadmap_service_provider
+from wren.roadmaps.router import create_roadmaps_router
+from wren.roadmaps.wiring import (
+    build_roadmap_read_service_provider,
+    build_roadmap_service_provider,
+)
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 pytestmark = pytest.mark.integration
 
@@ -96,8 +102,15 @@ def _external_app(database_url: str, settings: AppSettings) -> FastAPI:
         build_account_service_provider(hasher, codec),
         cookie_config=CookieConfig(secure=False, domain=None),
     )
-    roadmaps_router = create_roadmaps_router(build_roadmap_service_provider())
-    progress_router = create_progress_router(build_progress_service_provider())
+    roadmaps_router = create_roadmaps_router(
+        build_roadmap_service_provider(),
+        build_roadmap_read_service_provider(),
+        identity=require_user,
+        include_web_lifecycle=True,
+    )
+    progress_router = create_progress_router(
+        build_progress_service_provider(), identity=require_user
+    )
     app = create_app(
         settings,
         routers=[accounts_router, roadmaps_router, progress_router],

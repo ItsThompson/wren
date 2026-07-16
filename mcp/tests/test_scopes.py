@@ -10,24 +10,35 @@ transport, mirroring the fast identity-guard checks the tool tests can't isolate
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
+import structlog
 from mcp.server.fastmcp.exceptions import ToolError
 from starlette.requests import Request
 
-from wren_mcp.auth import AGENT_STATE_KEY
+from log_capture import capture_correlated_logs
 from wren_mcp.config import SCOPE_PROGRESS_WRITE, SCOPE_ROADMAPS_READ, SCOPE_ROADMAPS_WRITE
 from wren_mcp.scopes import require_scope
+from wren_mcp.state import set_request_agent
 from wren_mcp.tokens import VerifiedAgentToken
 
+if TYPE_CHECKING:
+    from collections.abc import MutableMapping
 
-def _ctx_with(request: Request | None) -> SimpleNamespace:
-    return SimpleNamespace(request_context=SimpleNamespace(request=request))
+    from wren_mcp.scopes import AgentContext
 
 
-def _request_with_agent(principal: object) -> Request:
+def _ctx_with(request: Request | None) -> AgentContext:
+    return cast(
+        "AgentContext",
+        SimpleNamespace(request_context=SimpleNamespace(request=request)),
+    )
+
+
+def _request_with_agent(principal: VerifiedAgentToken) -> Request:
     request = Request({"type": "http", "headers": [], "method": "POST", "path": "/mcp"})
-    setattr(request.state, AGENT_STATE_KEY, principal)
+    set_request_agent(request, principal)
     return request
 
 
@@ -76,3 +87,53 @@ def test_require_scope_fails_closed_when_identity_is_absent() -> None:
 def test_require_scope_fails_closed_without_a_request() -> None:
     with pytest.raises(ToolError):
         require_scope(_ctx_with(None), scope=SCOPE_ROADMAPS_READ)
+
+
+# --- request correlation: user_id binding + auth-rejection logging (F13, F14) --
+#
+# user_id is bound once identity resolves so every subsequent line for the tool
+# call carries it via merge_contextvars; rejections are logged at warning with a
+# reason and never the raw token.
+
+
+def _events(logs: list[MutableMapping[str, Any]], event: str) -> list[MutableMapping[str, Any]]:
+    return [entry for entry in logs if entry.get("event") == event]
+
+
+def test_require_scope_binds_user_id_into_contextvars() -> None:
+    ctx = _ctx_with(_request_with_agent(_agent("roadmaps:read")))
+    require_scope(ctx, scope=SCOPE_ROADMAPS_READ)
+    assert structlog.contextvars.get_contextvars().get("user_id") == "user-ada"
+
+
+def test_unauthenticated_is_logged_when_identity_is_absent(monkeypatch: pytest.MonkeyPatch) -> None:
+    bare = Request({"type": "http", "headers": [], "method": "POST", "path": "/mcp"})
+    with capture_correlated_logs() as logs:
+        monkeypatch.setattr("wren_mcp.scopes._log", structlog.get_logger())
+        with pytest.raises(ToolError):
+            require_scope(_ctx_with(bare), scope=SCOPE_ROADMAPS_READ)
+    rejections = _events(logs, "unauthenticated")
+    assert len(rejections) == 1
+    assert rejections[0]["log_level"] == "warning"
+    assert rejections[0]["reason"] == "no_verified_identity"
+    # No identity resolved, so user_id is never bound.
+    assert "user_id" not in structlog.contextvars.get_contextvars()
+
+
+def test_insufficient_scope_is_logged_with_required_and_client_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctx = _ctx_with(_request_with_agent(_agent("roadmaps:read")))
+    with capture_correlated_logs() as logs:
+        monkeypatch.setattr("wren_mcp.scopes._log", structlog.get_logger())
+        with pytest.raises(ToolError):
+            require_scope(ctx, scope=SCOPE_PROGRESS_WRITE)
+    rejections = _events(logs, "insufficient_scope")
+    assert len(rejections) == 1
+    assert rejections[0]["log_level"] == "warning"
+    assert rejections[0]["reason"] == "missing_required_scope"
+    assert rejections[0]["required"] == SCOPE_PROGRESS_WRITE
+    assert rejections[0]["client_id"] == "agent"
+    # Identity resolved before the scope check, so the rejection line carries the
+    # bound user_id via merge_contextvars.
+    assert rejections[0]["user_id"] == "user-ada"

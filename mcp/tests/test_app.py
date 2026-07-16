@@ -10,10 +10,12 @@ WWW-Authenticate pointing at the PRM.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from token_factory import ISSUER, RESOURCE, make_fetch, mint, new_key, public_jwks
 from wren_mcp.app import build_app, create_json_fetch, create_rs_app
@@ -21,6 +23,12 @@ from wren_mcp.client import InternalApiClient
 from wren_mcp.config import MCP_PATH, PRM_PATH
 from wren_mcp.keys import RemoteKeyProvider
 from wren_mcp.settings import RsSettings
+from wren_mcp.state import get_rs_deps
+
+if TYPE_CHECKING:
+    from joserfc.jwk import KeySet, RSAKey
+
+    from wren_mcp.keys import KeyProvider
 
 MakeSettings = Callable[..., RsSettings]
 
@@ -28,10 +36,10 @@ MakeSettings = Callable[..., RsSettings]
 class _FailingKeyProvider:
     """A key provider whose discovery always fails (AS unreachable)."""
 
-    async def key_set_for(self, kid: str | None) -> object:
+    async def key_set_for(self, kid: str | None) -> KeySet:
         raise RuntimeError("AS unreachable")
 
-    async def load(self) -> object:
+    async def load(self) -> KeySet:
         raise RuntimeError("AS unreachable")
 
 
@@ -40,10 +48,15 @@ def _internal_client() -> InternalApiClient:
         base_url="http://backend:8001",
         transport=httpx.MockTransport(lambda _request: httpx.Response(200)),
     )
-    return InternalApiClient(http, api_token="tok")
+    return InternalApiClient(http, api_token=SecretStr("tok"))
 
 
-def _build(make_settings: MakeSettings, *, key=None, key_provider=None) -> TestClient:
+def _build(
+    make_settings: MakeSettings,
+    *,
+    key: RSAKey | None = None,
+    key_provider: KeyProvider | None = None,
+) -> TestClient:
     provider = key_provider or RemoteKeyProvider(ISSUER, make_fetch(public_jwks(key or new_key())))
     app = create_rs_app(make_settings(), key_provider=provider, internal_client=_internal_client())
     return TestClient(app)
@@ -145,11 +158,12 @@ def test_app_exposes_the_tool_layer_seams(make_settings: MakeSettings) -> None:
     internal_client = _internal_client()
     app = create_rs_app(make_settings(), key_provider=provider, internal_client=internal_client)
 
-    # The seams the tool dispatch builds on: the verified-identity
-    # verifier and the internal client the tools call.
-    assert app.state.internal_client is internal_client
-    assert app.state.token_verifier is not None
-    assert app.state.key_provider is provider
+    # The seams the tool dispatch builds on, behind the typed RsDeps façade: the
+    # verified-identity verifier and the internal client the tools call.
+    deps = get_rs_deps(app)
+    assert deps.internal_client is internal_client
+    assert deps.token_verifier is not None
+    assert deps.key_provider is provider
 
 
 async def test_create_json_fetch_parses_json() -> None:

@@ -8,20 +8,23 @@ automatically when Docker is unavailable.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import text
 
-from accounts_fakes import build_test_codec, build_test_hasher
+from tests.support.fakes.accounts_fakes import build_test_codec, build_test_hasher
 from wren.accounts.repository import SqlAlchemyAccountRepository
 from wren.accounts.service import AccountService
 from wren.accounts.session import build_revocation_lookup
 from wren.core.db import create_database
 from wren.core.errors import Conflict
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 pytestmark = pytest.mark.integration
 

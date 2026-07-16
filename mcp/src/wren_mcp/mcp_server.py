@@ -18,12 +18,14 @@ over localhost.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
-from wren_mcp.settings import RsSettings
+if TYPE_CHECKING:
+    from wren_mcp.settings import RsSettings
 
 # Served at the mount root so the transport endpoint is exactly the guarded
 # MCP_PATH (``/mcp``) rather than ``/mcp/mcp``.

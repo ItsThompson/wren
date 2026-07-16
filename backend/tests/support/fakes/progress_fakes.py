@@ -10,9 +10,12 @@ follow / update paths are exercised without a database.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from wren.progress.models import ProgressRecord
-from wren.progress.schemas import Progress
+
+if TYPE_CHECKING:
+    from wren.progress.schemas import Progress
 
 
 class InMemoryProgressRepository:

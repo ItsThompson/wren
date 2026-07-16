@@ -13,25 +13,22 @@ frozen schema snapshot is unaffected.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import Any, TypeVar
-
-from mcp.server.fastmcp import FastMCP
-from mcp.types import ToolAnnotations
+from typing import TYPE_CHECKING, Any
 
 from wren_mcp.tool_metrics import count_invocations
 
-# A tool coroutine; the registrar preserves this exact type so call sites keep
-# their real signatures (and thus their generated schemas).
-_ToolFn = TypeVar("_ToolFn", bound=Callable[..., Awaitable[Any]])
+if TYPE_CHECKING:
+    from mcp.server.fastmcp import FastMCP
+    from mcp.types import ToolAnnotations
 
 
-def counted_tool_registrar(
+def counted_tool_registrar[ToolFn: Callable[..., Awaitable[Any]]](
     mcp: FastMCP,
-) -> Callable[[ToolAnnotations], Callable[[_ToolFn], _ToolFn]]:
+) -> Callable[[ToolAnnotations], Callable[[ToolFn], ToolFn]]:
     """Return a ``tool(annotations)`` decorator that counts then registers onto ``mcp``."""
 
-    def tool(annotations: ToolAnnotations) -> Callable[[_ToolFn], _ToolFn]:
-        def register(fn: _ToolFn) -> _ToolFn:
+    def tool(annotations: ToolAnnotations) -> Callable[[ToolFn], ToolFn]:
+        def register(fn: ToolFn) -> ToolFn:
             mcp.tool(annotations=annotations)(count_invocations(fn))
             return fn
 

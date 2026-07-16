@@ -15,13 +15,19 @@ external and internal apps can run in one process (the smoke test does) without
 duplicate-timeseries errors. ``/metrics`` serves that private registry
 concatenated with the shared :data:`~wren.core.observability.WREN_REGISTRY`
 (domain, service, and DB-pool families), so one scrape sees the whole picture.
+
+Kept in sync with :mod:`wren_mcp.metrics` by hand: the two differ only by which
+shared registry is concatenated onto ``/metrics`` (``WREN_REGISTRY`` here vs the
+MCP's ``TOOL_METRICS_REGISTRY``). Any change to the HTTP-metric families or
+instrumentator wiring here MUST be mirrored there. See
+``docs/infra-duplication.md`` for the `wren-common` deferral and drift checklist.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
     CollectorRegistry,
@@ -34,6 +40,9 @@ from prometheus_fastapi_instrumentator.metrics import Info
 from starlette.responses import Response
 
 from wren.core.observability import WREN_REGISTRY
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 # An instrumentation function receives one request's Info and records to a metric.
 Instrumentation = Callable[[Info], None]

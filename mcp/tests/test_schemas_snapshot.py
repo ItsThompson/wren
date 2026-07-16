@@ -16,16 +16,19 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
-from mcp.server.fastmcp import FastMCP
+from pydantic import SecretStr
 
 from wren_mcp.client import InternalApiClient
 from wren_mcp.mcp_server import create_mcp_server
 from wren_mcp.settings import SERVICE, RsSettings
 from wren_mcp.tools_read import register_read_tools
 from wren_mcp.tools_write import register_write_tools
+
+if TYPE_CHECKING:
+    from mcp.server.fastmcp import FastMCP
 
 _SNAPSHOT = Path(__file__).parent / "snapshots" / "tools_schema.json"
 
@@ -40,13 +43,13 @@ def _settings() -> RsSettings:
         issuer="https://api.usewren.com",
         resource="https://mcp.usewren.com",
         backend_internal_url="http://backend:8001",
-        internal_api_token="tok",
+        internal_api_token=SecretStr("tok"),
     )
 
 
 def _build_server() -> FastMCP:
     http = httpx.AsyncClient(base_url="http://backend:8001")
-    client = InternalApiClient(http, api_token="tok")
+    client = InternalApiClient(http, api_token=SecretStr("tok"))
     mcp = create_mcp_server(_settings())
     register_write_tools(mcp, client)
     register_read_tools(mcp, client)

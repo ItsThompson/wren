@@ -8,16 +8,19 @@ pinned issuer advertising S256.
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from joserfc.jwk import RSAKey
 
-from oauth_fakes import build_test_config, build_test_keyset
+from tests.oauth_fakes import build_test_config, build_test_keyset
 from wren.oauth.keys import SigningKeySet, load_signing_key_set
 from wren.oauth.metadata import build_as_metadata
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _write_pem(path: Path) -> None:

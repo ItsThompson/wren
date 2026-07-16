@@ -15,16 +15,18 @@ from __future__ import annotations
 
 import hashlib
 import secrets
-import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from joserfc import jwt
 from joserfc.errors import JoseError
 from joserfc.jwt import JWTClaimsRegistry
 
-from wren.oauth.config import OAuthConfig
-from wren.oauth.keys import SigningKeySet
+from wren.oauth.injection import Clock, OpaqueIdFactory, new_hex_id, utcnow
+
+if TYPE_CHECKING:
+    from wren.oauth.config import OAuthConfig
+    from wren.oauth.keys import SigningKeySet
 
 _ALGORITHMS = ["RS256"]
 # Opaque refresh-token entropy (bytes -> ~43 char urlsafe string).
@@ -54,15 +56,26 @@ class VerifiedAccessToken:
 class AccessTokenCodec:
     """Mints and verifies RS256 access tokens for one signing key set and config."""
 
-    def __init__(self, keyset: SigningKeySet, config: OAuthConfig) -> None:
+    def __init__(
+        self,
+        keyset: SigningKeySet,
+        config: OAuthConfig,
+        *,
+        clock: Clock = utcnow,
+        new_id: OpaqueIdFactory = new_hex_id,
+    ) -> None:
         self._keyset = keyset
         self._config = config
+        # Injected so mint and verify share one clock (tests advance it to assert
+        # expiry) and the jti is deterministic; defaults reproduce the ambient calls.
+        self._clock = clock
+        self._new_id = new_id
 
     def mint(self, *, subject: str, client_id: str, scope: str, audience: str) -> MintedAccessToken:
         """Sign a short-lived access token bound to ``audience`` (the MCP resource)."""
-        now = datetime.now(UTC)
+        now = self._clock()
         expires_in = int(self._config.access_ttl.total_seconds())
-        jti = uuid.uuid4().hex
+        jti = self._new_id()
         claims = {
             "iss": self._config.issuer,
             "sub": subject,
@@ -81,10 +94,13 @@ class AccessTokenCodec:
 
         The Resource Server owns request-time bearer validation; this
         mirror is used to prove audience binding and expiry in the AS's own tests.
+        Expiry is checked against the injected clock so a pinned clock governs the
+        mint -> expire assertion.
         """
         try:
             decoded = jwt.decode(token, self._keyset.verifying_key_set(), algorithms=_ALGORITHMS)
             registry = JWTClaimsRegistry(
+                now=int(self._clock().timestamp()),
                 iss={"essential": True, "value": self._config.issuer},
                 aud={"essential": True, "value": self._config.resource},
                 exp={"essential": True},

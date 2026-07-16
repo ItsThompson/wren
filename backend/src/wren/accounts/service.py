@@ -14,21 +14,24 @@ still-unexpired access token stops resolving.
 
 from __future__ import annotations
 
+import asyncio
 import re
-import uuid
-from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy.exc import IntegrityError
 
+from wren.accounts.injection import Clock, OpaqueIdFactory, new_hex_id, utcnow
 from wren.accounts.models import User
 from wren.accounts.passwords import PasswordHasher, validate_password_strength
-from wren.accounts.repository import AccountRepository
 from wren.accounts.schemas import AuthenticatedUser, PublicProfile, Session
-from wren.accounts.tokens import SessionTokenCodec
 from wren.core.db import is_unique_violation
 from wren.core.errors import Conflict, NotFound, Unauthorized, Validation
 from wren.core.logging import get_logger
 from wren.core.observability import track_failures
+
+if TYPE_CHECKING:
+    from wren.accounts.repository import AccountRepository
+    from wren.accounts.tokens import SessionTokenCodec
 
 # A public handle: 3..32 chars, lowercase letters/digits/underscore/hyphen. Kept
 # conservative because it appears in public profile URLs.
@@ -52,10 +55,17 @@ class AccountService:
         repo: AccountRepository,
         hasher: PasswordHasher,
         codec: SessionTokenCodec,
+        *,
+        clock: Clock = utcnow,
+        new_id: OpaqueIdFactory = new_hex_id,
     ) -> None:
         self._repo = repo
         self._hasher = hasher
         self._codec = codec
+        # Injected so tests pin timestamps and force a deterministic user id without
+        # patching globals; the defaults reproduce the prior ambient calls.
+        self._clock = clock
+        self._new_id = new_id
 
     async def register(self, username: str, email: str, password: str) -> Session:
         """Create a user and start a session, or raise a field-level error.
@@ -70,12 +80,12 @@ class AccountService:
         self._reject_invalid_handle(handle)
         self._reject_weak_password(password)
 
-        now = datetime.now(UTC)
+        now = self._clock()
         user = User(
-            id=uuid.uuid4().hex,
+            id=self._new_id(),
             username=handle,
             email=normalized_email,
-            password_hash=self._hasher.hash(password),
+            password_hash=await asyncio.to_thread(self._hasher.hash, password),
             created_at=now,
             updated_at=now,
         )
@@ -94,7 +104,9 @@ class AccountService:
     async def login(self, email: str, password: str) -> Session:
         """Authenticate by email + password; generic 401 on any mismatch."""
         user = await self._repo.get_by_email(_normalize_email(email))
-        if user is None or not self._hasher.verify(password, user.password_hash):
+        if user is None or not await asyncio.to_thread(
+            self._hasher.verify, password, user.password_hash
+        ):
             raise Unauthorized(_INVALID_CREDENTIALS)
         _log.info("user_logged_in", user_id=user.id)
         return self._start_session(user)

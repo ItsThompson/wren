@@ -10,11 +10,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from wren.roadmaps.assembly import assemble_draft, assemble_fork
+from wren.roadmaps.assembly import AssembledDraft, assemble_draft, assemble_fork
 from wren.roadmaps.schemas import (
     ChecklistItemInput,
     ResourceInput,
     ResourceType,
+    Roadmap,
     RoadmapInput,
     RoadmapStatus,
     SectionInput,
@@ -41,7 +42,7 @@ def _sub(
     )
 
 
-def _assemble(doc: RoadmapInput):
+def _assemble(doc: RoadmapInput) -> AssembledDraft:
     return assemble_draft(doc, "grokking-dsa-7f3k", owner="user-1", now=_NOW)
 
 
@@ -260,7 +261,7 @@ def test_subject_tags_and_visibility_are_carried_from_input() -> None:
 _LATER = datetime(2026, 8, 1, tzinfo=UTC)
 
 
-def _source_roadmap():
+def _source_roadmap() -> Roadmap:
     """A published, public source roadmap with references, for fork tests."""
     doc = RoadmapInput(
         title="Grokking DSA",

@@ -18,9 +18,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from fastapi import FastAPI
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 
 class AccessLevel(StrEnum):
@@ -143,8 +144,9 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
 # Internal app routes (:8001), reachable only by the MCP server on compute-net.
 # Every route resolves identity via require_internal_user (the trusted X-User-ID
 # header behind INTERNAL_API_TOKEN), so all are INTERNAL_TRUSTED. These mirror the
-# external roadmap surface op-for-op (see wren.roadmaps.api_internal); the MCP
-# tools are thin clients of exactly these endpoints.
+# external roadmap surface op-for-op (see wren.roadmaps.router, mounted with
+# identity=require_internal_user); the MCP tools are thin clients of exactly these
+# endpoints.
 INTERNAL_ROUTE_ACCESS: RouteRegistry = {
     RouteKey(method="POST", path="/roadmaps"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}"): AccessLevel.INTERNAL_TRUSTED,

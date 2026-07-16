@@ -6,8 +6,9 @@ from datetime import UTC, datetime, timedelta
 
 import jwt
 import pytest
+from pydantic import SecretStr
 
-from accounts_fakes import TEST_SESSION_SECRET, build_test_codec
+from tests.support.fakes.accounts_fakes import TEST_SESSION_SECRET, MutableClock, build_test_codec
 from wren.accounts.config import SessionConfig
 from wren.accounts.tokens import SessionTokenCodec
 
@@ -39,19 +40,25 @@ def test_access_token_is_not_accepted_as_refresh_and_vice_versa() -> None:
 
 
 def test_expired_access_token_does_not_verify() -> None:
-    codec = build_test_codec(access_ttl=timedelta(seconds=-1))
+    clock = MutableClock(datetime(2024, 1, 1, tzinfo=UTC))
+    codec = build_test_codec(access_ttl=timedelta(minutes=15), clock=clock)
     pair = codec.mint_pair("user-1")
-    assert codec.verify_access(pair.access_token) is None
+    assert codec.verify_access(pair.access_token) is not None  # valid before the TTL
+    clock.advance(timedelta(minutes=16))
+    assert codec.verify_access(pair.access_token) is None  # expired after
 
 
 def test_expired_refresh_token_does_not_verify() -> None:
-    codec = build_test_codec(refresh_ttl=timedelta(seconds=-1))
+    clock = MutableClock(datetime(2024, 1, 1, tzinfo=UTC))
+    codec = build_test_codec(refresh_ttl=timedelta(days=14), clock=clock)
     pair = codec.mint_pair("user-1")
-    assert codec.verify_refresh(pair.refresh_token) is None
+    assert codec.verify_refresh(pair.refresh_token) is not None  # valid before the TTL
+    clock.advance(timedelta(days=15))
+    assert codec.verify_refresh(pair.refresh_token) is None  # expired after
 
 
 def test_token_signed_with_a_different_secret_is_rejected() -> None:
-    minted = SessionTokenCodec(SessionConfig(secret="other-secret")).mint_pair("user-1")
+    minted = SessionTokenCodec(SessionConfig(secret=SecretStr("other-secret"))).mint_pair("user-1")
     verifier = build_test_codec()
     assert verifier.verify_access(minted.access_token) is None
 

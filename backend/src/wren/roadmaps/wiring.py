@@ -8,33 +8,55 @@ service's token factory and clock keep their process-wide defaults.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from wren.accounts.repository import SqlAlchemyAccountRepository
 from wren.core.db import get_session
 from wren.progress.repository import SqlAlchemyProgressRepository
 from wren.roadmaps.listing import HandleResolver, ListingService, ProfileOwner
+from wren.roadmaps.read_service import CheckedReader, RoadmapReadService
 from wren.roadmaps.repository import SqlAlchemyRoadmapRepository
-from wren.roadmaps.service import CheckedReader, RoadmapService
+from wren.roadmaps.service import RoadmapService
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 def build_roadmap_service_provider() -> Callable[[AsyncSession], RoadmapService]:
     """A FastAPI dependency that builds a request-scoped :class:`RoadmapService`."""
 
     def provider(session: AsyncSession = Depends(get_session)) -> RoadmapService:
-        # The follower counter and the checked reader are bound to the progress
-        # repository over the SAME request-scoped session (delete's zero-followers
-        # guard; and the caller's checked set for the
-        # progress-aware read projections). The roadmaps service stays decoupled
-        # from the progress domain: it only receives the narrow callables, not the
-        # repository.
+        # The follower counter is bound to the progress repository over the
+        # request-scoped session (delete's zero-followers guard). The roadmaps
+        # service stays decoupled from the progress domain: it only receives the
+        # narrow callable, not the repository.
         progress_repo = SqlAlchemyProgressRepository(session)
         return RoadmapService(
             SqlAlchemyRoadmapRepository(session),
             follower_counter=progress_repo.count_followers,
+        )
+
+    return provider
+
+
+def build_roadmap_read_service_provider() -> Callable[[AsyncSession], RoadmapReadService]:
+    """A FastAPI dependency that builds a request-scoped :class:`RoadmapReadService`.
+
+    The read service is composed over the SAME request-scoped session the authoring
+    provider uses, so both bind their repositories to one transaction. Its checked
+    reader is bound to the progress repository (the caller's checked set for the
+    progress-aware read projections); the roadmaps domain stays decoupled from the
+    progress domain, receiving only the narrow :data:`CheckedReader` callable.
+    """
+
+    def provider(session: AsyncSession = Depends(get_session)) -> RoadmapReadService:
+        progress_repo = SqlAlchemyProgressRepository(session)
+        return RoadmapReadService(
+            SqlAlchemyRoadmapRepository(session),
             checked_reader=_checked_reader(progress_repo),
         )
 

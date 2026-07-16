@@ -1,0 +1,88 @@
+# Shared ruff base for the backend and MCP packages.
+#
+# Only the three sections that are byte-identical across both packages live here
+# (the `[tool.ruff]`, `[tool.ruff.lint]` and `[tool.ruff.lint.flake8-bugbear]`
+# blocks from each pyproject.toml). Each package's `pyproject.toml` `[tool.ruff]`
+# does `extend = "../ruff.toml"` and keeps only its own bits local (mypy `files`,
+# the `--cov` target, the `integration` marker, per-file-ignores). Lint runs from
+# the full checkout in CI (`ruff check .` per package), so the relative `extend`
+# resolves to this file.
+#
+# `src` is intentionally NOT set here: ruff resolves it relative to the file that
+# declares it, so a value here would misresolve to `<repo-root>/src`. Each package
+# sets `src = ["src", "tests"]` locally in its own `pyproject.toml` instead.
+
+line-length = 100
+target-version = "py312"
+
+[lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "UP",
+    "B",
+    "SIM",
+    "ASYNC",
+    "S",    # flake8-bandit: activates the intentional `# noqa: S104` bind annotation
+    "RUF",  # includes RUF100 (unused-noqa)
+    "BLE",  # blind-except: activates the `# noqa: BLE001` readiness-probe annotations
+    "DTZ",  # tz-aware datetimes on a token-TTL/OAuth service
+    "PT",   # pytest style over the fixture-heavy suite
+    "LOG",  # structlog is a core dependency
+    "G",    # logging-format
+    "C4",   # comprehension hygiene
+    "RET",  # return hygiene
+    "TID",  # tidy imports
+    "TC",   # flake8-type-checking: type-only imports live under TYPE_CHECKING
+]
+# S105 (hardcoded-password-string) is a name-based heuristic: every hit in this
+# repo is a protocol constant (GRANT_TYPE_REFRESH_TOKEN, TOKEN_ALPHABET,
+# INTERNAL_TOKEN_HEADER, ...) or a dummy test fixture, never a real secret (real
+# secrets are env-sourced pydantic settings). It has no true positives here, so
+# it is disabled repo-wide. S106 stays enabled for source and is ignored only in
+# tests (see each package's per-file-ignores).
+ignore = ["S105"]
+
+[lint.flake8-bugbear]
+# FastAPI's dependency-injection idiom calls Depends()/Query()/... in argument
+# defaults by design; these are immutable markers, not mutable-default bugs.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Header",
+    "fastapi.Cookie",
+    "fastapi.Body",
+]
+
+[lint.flake8-type-checking]
+# TC moves type-only imports into `if TYPE_CHECKING:`. Some framework seams read
+# annotations at RUNTIME, so their imports must stay runtime-visible or the app
+# fails to construct:
+#   - Pydantic builds validators from field annotations at class-creation time.
+#   - SQLAlchemy resolves `Mapped[...]` annotations when it maps a model.
+#   - FastAPI evaluates a route handler's parameter/return annotations (via
+#     get_type_hints) to build validation and the response model.
+# Marking these base classes / decorators keeps TC from flagging the imports they
+# consume, while every other type-only import is still ratcheted. (Genuine
+# runtime-annotation seams that fit none of these categories, e.g. a FastAPI
+# dependency-provider's own parameter, carry a targeted per-line `# noqa: TC00x`
+# with a rationale rather than a blanket per-file ignore.)
+runtime-evaluated-base-classes = [
+    "pydantic.BaseModel",
+    "sqlalchemy.orm.DeclarativeBase",
+    "wren.core.orm.Base",
+]
+runtime-evaluated-decorators = [
+    "fastapi.APIRouter.get",
+    "fastapi.APIRouter.post",
+    "fastapi.APIRouter.put",
+    "fastapi.APIRouter.patch",
+    "fastapi.APIRouter.delete",
+    "fastapi.FastAPI.get",
+    "fastapi.FastAPI.post",
+    "fastapi.FastAPI.put",
+    "fastapi.FastAPI.patch",
+    "fastapi.FastAPI.delete",
+]

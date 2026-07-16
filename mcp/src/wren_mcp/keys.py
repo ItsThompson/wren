@@ -83,7 +83,7 @@ class RemoteKeyProvider:
         async with self._lock:
             if self._key_set is None:
                 await self._reload_locked()
-            assert self._key_set is not None
+            assert self._key_set is not None  # noqa: S101 - narrows type after _reload_locked
             return self._key_set
 
     async def _refresh_if_cool(self, current: KeySet) -> KeySet:

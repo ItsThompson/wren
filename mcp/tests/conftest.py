@@ -2,14 +2,27 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 
 import pytest
+import structlog
 
 from token_factory import ISSUER, RESOURCE
 from wren_mcp.settings import SERVICE, RsSettings
 
 MakeSettings = Callable[..., RsSettings]
+
+
+@pytest.fixture(autouse=True)
+def _isolate_contextvars() -> Iterator[None]:
+    """Clear structlog contextvars around every test.
+
+    The bearer boundary binds ``request_id`` and ``require_scope`` binds
+    ``user_id``; clearing before and after keeps one test's bindings from leaking
+    into another's log/contextvar assertions."""
+    structlog.contextvars.clear_contextvars()
+    yield
+    structlog.contextvars.clear_contextvars()
 
 
 @pytest.fixture

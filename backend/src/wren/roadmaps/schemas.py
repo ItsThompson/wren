@@ -42,6 +42,14 @@ class ResourceType(StrEnum):
     OTHER = "other"
 
 
+# A resource link constrained to an http(s) URL: rejects non-URLs (and empty
+# strings) at the wire boundary without normalizing the stored value. A plain
+# ``str`` (not ``AnyUrl``) on purpose, so an already-stored URL round-trips
+# through ``model_validate`` and is echoed back verbatim (no trailing-slash or
+# host-casing rewrite of persisted roadmaps).
+ResourceUrl = Annotated[str, Field(pattern=r"^https?://")]
+
+
 # ---------- Roadmap (definition) ----------
 
 
@@ -50,7 +58,7 @@ class Resource(BaseModel):
 
     id: str
     title: str
-    url: str
+    url: ResourceUrl
     type: ResourceType
 
 
@@ -108,20 +116,26 @@ class Roadmap(BaseModel):
 
 
 class ResourceInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     proposed_id: str | None = None
-    title: str
-    url: str
+    title: str = Field(min_length=1)
+    url: ResourceUrl
     type: ResourceType
 
 
 class ChecklistItemInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     proposed_id: str | None = None
     text: str
 
 
 class SubsectionInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     proposed_id: str | None = None
-    title: str
+    title: str = Field(min_length=1)
     description: str | None = None
     tags: list[str] = Field(default_factory=list)
     effort_estimate: str | None = None
@@ -131,16 +145,20 @@ class SubsectionInput(BaseModel):
 
 
 class SectionInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     proposed_id: str | None = None
-    title: str
+    title: str = Field(min_length=1)
     subsections: list[SubsectionInput] = Field(default_factory=list)
 
 
 class RoadmapInput(BaseModel):
     """The ``create_roadmap_draft`` / ``replace_roadmap_draft`` payload."""
 
+    model_config = ConfigDict(extra="forbid")
+
     proposed_id: str | None = None
-    title: str
+    title: str = Field(min_length=1)
     description: str | None = None
     subject_tags: list[str] = Field(default_factory=list)
     visibility: Visibility = Visibility.PRIVATE
@@ -245,6 +263,8 @@ class ValidateResult(BaseModel):
 
 
 class AddSubsectionOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["add_subsection"]
     section_id: str
     subsection: SubsectionInput
@@ -253,14 +273,18 @@ class AddSubsectionOp(BaseModel):
 
 
 class UpdateSubsectionOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["update_subsection"]
     subsection_id: str
-    title: str | None = None
+    title: str | None = Field(default=None, min_length=1)
     description: str | None = None
     effort_estimate: str | None = None
 
 
 class RemoveSubsectionOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["remove_subsection"]
     subsection_id: str
 
@@ -268,36 +292,48 @@ class RemoveSubsectionOp(BaseModel):
 class AddEdgeOp(BaseModel):
     """``to_id`` gains ``from_id`` as a prerequisite."""
 
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["add_edge"]
     from_id: str
     to_id: str
 
 
 class RemoveEdgeOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["remove_edge"]
     from_id: str
     to_id: str
 
 
 class SetTagsOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["set_tags"]
     subsection_id: str
     tags: list[str] = Field(default_factory=list)
 
 
 class SetResourcesOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["set_resources"]
     subsection_id: str
     resources: list[ResourceInput] = Field(default_factory=list)
 
 
 class SetEffortOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["set_effort"]
     subsection_id: str
     effort_estimate: str | None = None
 
 
 class AddItemOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["add_item"]
     subsection_id: str
     text: str
@@ -307,18 +343,24 @@ class AddItemOp(BaseModel):
 
 
 class UpdateItemOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["update_item"]
     item_id: str
     text: str
 
 
 class RemoveItemOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["remove_item"]
     item_id: str
 
 
 class ReorderOp(BaseModel):
     """Move any node (section / subsection / item) within its sibling order."""
+
+    model_config = ConfigDict(extra="forbid")
 
     op: Literal["reorder"]
     target_id: str
@@ -327,25 +369,33 @@ class ReorderOp(BaseModel):
 
 
 class SetSuggestedPathOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["set_suggested_path"]
     path: list[str] = Field(default_factory=list)
 
 
 class AddSectionOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["add_section"]
-    title: str
+    title: str = Field(min_length=1)
     proposed_id: str | None = None
     before_id: str | None = None
     after_id: str | None = None
 
 
 class UpdateSectionOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["update_section"]
     section_id: str
-    title: str
+    title: str = Field(min_length=1)
 
 
 class RemoveSectionOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op: Literal["remove_section"]
     section_id: str
 
@@ -378,6 +428,8 @@ class PatchRequest(BaseModel):
     not the body. At least one op is required so a patch is never a silent no-op
     that would still burn a revision.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     operations: list[PatchOp] = Field(min_length=1)
 

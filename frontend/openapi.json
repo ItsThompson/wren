@@ -1674,6 +1674,7 @@
             "title": "To Id"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "op",
@@ -1732,6 +1733,7 @@
             "title": "After Id"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "op",
@@ -1749,6 +1751,7 @@
           },
           "title": {
             "type": "string",
+            "minLength": 1,
             "title": "Title"
           },
           "proposed_id": {
@@ -1785,6 +1788,7 @@
             "title": "After Id"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "op",
@@ -1829,6 +1833,7 @@
             "title": "After Id"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "op",
@@ -2084,6 +2089,7 @@
             "title": "Text"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "text"
@@ -2726,6 +2732,7 @@
             "title": "Operations"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "operations"
@@ -3002,6 +3009,7 @@
             "title": "To Id"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "op",
@@ -3022,6 +3030,7 @@
             "title": "Item Id"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "op",
@@ -3041,6 +3050,7 @@
             "title": "Section Id"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "op",
@@ -3060,6 +3070,7 @@
             "title": "Subsection Id"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "op",
@@ -3101,6 +3112,7 @@
             "title": "After Id"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "op",
@@ -3121,6 +3133,7 @@
           },
           "url": {
             "type": "string",
+            "pattern": "^https?://",
             "title": "Url"
           },
           "type": {
@@ -3152,16 +3165,19 @@
           },
           "title": {
             "type": "string",
+            "minLength": 1,
             "title": "Title"
           },
           "url": {
             "type": "string",
+            "pattern": "^https?://",
             "title": "Url"
           },
           "type": {
             "$ref": "#/components/schemas/ResourceType"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "title",
@@ -3474,6 +3490,7 @@
           },
           "title": {
             "type": "string",
+            "minLength": 1,
             "title": "Title"
           },
           "description": {
@@ -3513,6 +3530,7 @@
             "title": "Suggested Path"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "title"
@@ -3739,6 +3757,7 @@
           },
           "title": {
             "type": "string",
+            "minLength": 1,
             "title": "Title"
           },
           "subsections": {
@@ -3749,6 +3768,7 @@
             "title": "Subsections"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "title"
@@ -3893,6 +3913,7 @@
             "title": "Effort Estimate"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "op",
@@ -3919,6 +3940,7 @@
             "title": "Resources"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "op",
@@ -3941,6 +3963,7 @@
             "title": "Path"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "op"
@@ -3966,6 +3989,7 @@
             "title": "Tags"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "op",
@@ -4071,6 +4095,7 @@
           },
           "title": {
             "type": "string",
+            "minLength": 1,
             "title": "Title"
           },
           "description": {
@@ -4124,6 +4149,7 @@
             "title": "Checklist Items"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "title"
@@ -4146,6 +4172,7 @@
             "title": "Text"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "op",
@@ -4167,9 +4194,11 @@
           },
           "title": {
             "type": "string",
+            "minLength": 1,
             "title": "Title"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "op",
@@ -4192,7 +4221,8 @@
           "title": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "minLength": 1
               },
               {
                 "type": "null"
@@ -4223,6 +4253,7 @@
             "title": "Effort Estimate"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "op",

@@ -14,14 +14,13 @@ registry (``core.route_registry``) so the coverage test can enforce access level
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Body, Depends, Form, Query, Request, Response
 from starlette.responses import JSONResponse, RedirectResponse
 
 from wren.core.errors import Unauthorized
 from wren.core.identity import require_user
-from wren.oauth.authorization import AuthorizationService
 from wren.oauth.config import (
     AUTHORIZE_CONTEXT_PATH,
     AUTHORIZE_DECISION_PATH,
@@ -34,7 +33,6 @@ from wren.oauth.config import (
     WELL_KNOWN_AS_METADATA_PATH,
     OAuthConfig,
 )
-from wren.oauth.keys import SigningKeySet
 from wren.oauth.metadata import build_as_metadata
 from wren.oauth.schemas import (
     AuthorizationContext,
@@ -46,7 +44,11 @@ from wren.oauth.schemas import (
     DecisionResult,
     TokenRequest,
 )
-from wren.oauth.token_exchange import TokenService
+
+if TYPE_CHECKING:
+    from wren.oauth.authorization import AuthorizationService
+    from wren.oauth.keys import SigningKeySet
+    from wren.oauth.token_exchange import TokenService
 
 # FastAPI dependencies that yield the request-scoped services.
 ServiceProvider = Callable[..., Any]

@@ -8,8 +8,17 @@ their injected settings, per the two-app split.
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pathlib import Path
+
+from pydantic import BaseModel, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# `just dev-api`/`dev-api-internal` cd into backend/ before launching uvicorn, so
+# a package-relative ".env" silently misses the canonical repo-root .env (F27).
+# Anchor it to the repo root from this file's location so the host inner loop
+# loads it regardless of CWD. Compose/CD inject real env vars, which always win
+# over env_file, so this affects only the host-run inner loop.
+ROOT_ENV_FILE = Path(__file__).resolve().parents[4] / ".env"
 
 # Per-app identity. Service names are bound onto every structlog line so external
 # and internal traffic is distinguishable in aggregated logs.
@@ -27,7 +36,7 @@ class EnvSettings(BaseSettings):
     can carry vars for other consumers.
     """
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=ROOT_ENV_FILE, extra="ignore")
 
     environment: str = "development"
     log_level: str = "info"
@@ -39,11 +48,14 @@ class EnvSettings(BaseSettings):
     # Shared secret the MCP server sends to reach the internal app;
     # defense-in-depth behind compute-net isolation. Empty by default so an
     # unconfigured internal app fail-safe denies (`require_internal_user`).
-    internal_api_token: str = ""
+    # SecretStr so an accidental settings dump/log masks it (L12); read via
+    # .get_secret_value() only at the constant-time compare in identity.py.
+    internal_api_token: SecretStr = SecretStr("")
     # HS256 secret for human session JWTs, separate from the
     # agent OAuth keypair. Empty by default so an unconfigured external app
-    # fail-safe denies every session (no cookie resolves).
-    session_jwt_secret: str = ""
+    # fail-safe denies every session (no cookie resolves). SecretStr for the same
+    # leak-in-depth reason; read via .get_secret_value() only at JWT sign/verify.
+    session_jwt_secret: SecretStr = SecretStr("")
     # Cookie Domain for the session cookie. Prod pins `.usewren.com` so the SPA
     # (usewren.com) and API (api.usewren.com) share it; empty in dev makes the
     # cookie host-only (localhost).
@@ -82,8 +94,8 @@ class AppSettings(BaseModel):
     log_level: str
     host: str
     database_url: str
-    internal_api_token: str
-    session_jwt_secret: str
+    internal_api_token: SecretStr
+    session_jwt_secret: SecretStr
     cookie_domain: str
     public_base_url: str
     app_public_url: str

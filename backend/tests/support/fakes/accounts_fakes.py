@@ -9,14 +9,19 @@ path is exercised without a database.
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
+from pydantic import SecretStr
 from sqlalchemy.exc import IntegrityError
 
 from wren.accounts.config import SessionConfig
-from wren.accounts.models import User
+from wren.accounts.injection import Clock, utcnow
 from wren.accounts.passwords import BcryptPasswordHasher
 from wren.accounts.tokens import RefreshClaims, SessionTokenCodec
+
+if TYPE_CHECKING:
+    from wren.accounts.models import User
 
 # Cheap bcrypt cost for tests: real hashing + verification path, fast. Cost 12 is
 # asserted directly in test_accounts_passwords.
@@ -71,11 +76,28 @@ def build_test_codec(
     *,
     access_ttl: timedelta = timedelta(minutes=15),
     refresh_ttl: timedelta = timedelta(days=14),
+    clock: Clock = utcnow,
 ) -> SessionTokenCodec:
-    """A codec with the test secret and overridable TTLs (for expiry tests)."""
+    """A codec with the test secret and overridable TTLs/clock (for expiry tests)."""
     return SessionTokenCodec(
-        SessionConfig(secret=TEST_SESSION_SECRET, access_ttl=access_ttl, refresh_ttl=refresh_ttl)
+        SessionConfig(
+            secret=SecretStr(TEST_SESSION_SECRET), access_ttl=access_ttl, refresh_ttl=refresh_ttl
+        ),
+        clock=clock,
     )
+
+
+class MutableClock:
+    """A pinned, advanceable clock for expiry tests (no ``sleep``/negative TTL)."""
+
+    def __init__(self, now: datetime) -> None:
+        self._now = now
+
+    def __call__(self) -> datetime:
+        return self._now
+
+    def advance(self, delta: timedelta) -> None:
+        self._now += delta
 
 
 def build_test_hasher() -> BcryptPasswordHasher:

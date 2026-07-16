@@ -15,19 +15,18 @@ server.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+import asyncio
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 from fastapi import APIRouter, FastAPI
 from fastapi.responses import JSONResponse
-from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
-from starlette.types import Lifespan
 
 from wren_mcp.auth import BearerAuthMiddleware
 from wren_mcp.client import InternalApiClient, create_internal_http_client
 from wren_mcp.config import MCP_PATH, PRM_PATH
+from wren_mcp.correlation import CorrelationMiddleware
 from wren_mcp.health import create_health_router, jwks_readiness_check
 from wren_mcp.keys import JsonFetch, KeyProvider, RemoteKeyProvider
 from wren_mcp.logging import configure_logging, get_logger
@@ -35,9 +34,16 @@ from wren_mcp.mcp_server import create_mcp_server
 from wren_mcp.metrics import instrument
 from wren_mcp.prm import build_prm_document
 from wren_mcp.settings import RsSettings, build_rs_settings
+from wren_mcp.state import RsDeps, set_rs_deps
 from wren_mcp.tokens import AgentTokenVerifier
 from wren_mcp.tools_read import register_read_tools
 from wren_mcp.tools_write import register_write_tools
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
+    from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+    from starlette.types import Lifespan
 
 # Bound so a hung AS cannot pin the discovery/readiness call indefinitely.
 _DISCOVERY_TIMEOUT_SECONDS = 10.0
@@ -108,20 +114,24 @@ def create_rs_app(
     )
     app.state.settings = settings
     app.state.log = log
-    # Seams the MCP tool layer consumes: the write tools read the resolved
-    # identity off request.state (set by the boundary middleware) and call the
-    # backend internal app through this injected client.
-    app.state.key_provider = key_provider
-    app.state.token_verifier = verifier
-    app.state.internal_client = internal_client
+    # The injected seams the RS exposes, behind one typed façade (F11): the JWKS
+    # key provider, the bearer verifier, and the internal client the tools call.
+    set_rs_deps(
+        app,
+        RsDeps(
+            key_provider=key_provider,
+            token_verifier=verifier,
+            internal_client=internal_client,
+        ),
+    )
 
     app.include_router(_create_prm_router(settings))
     app.include_router(create_health_router([jwks_readiness_check(key_provider)]))
     app.mount(MCP_PATH, mcp_transport)
 
     # The agent trust boundary: guard the MCP transport prefix. Added before
-    # instrument() so the metrics middleware stays outermost and counts the
-    # boundary's 401s too.
+    # instrument() so the metrics middleware wraps it and counts the boundary's
+    # 401s too.
     app.add_middleware(
         BearerAuthMiddleware,
         verifier=verifier,
@@ -129,6 +139,11 @@ def create_rs_app(
         protected_prefix=MCP_PATH,
     )
     instrument(app)
+
+    # Correlation is mounted last so it is the outermost middleware: request_id is
+    # bound before the metrics middleware, the bearer guard, and the tool layer
+    # run, so the non-guarded paths (/health, /metrics, PRM) are correlated too.
+    app.add_middleware(CorrelationMiddleware, service=settings.service)
 
     log.info(
         "mcp_configured",
@@ -166,8 +181,9 @@ def build_app(settings: RsSettings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         yield
-        await discovery_client.aclose()
-        await internal_http.aclose()
+        # Two independent clients (JWKS discovery + internal API); close them
+        # concurrently on shutdown.
+        await asyncio.gather(discovery_client.aclose(), internal_http.aclose())
 
     return create_rs_app(
         settings,

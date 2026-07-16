@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from hypothesis import given
 from hypothesis import strategies as st
 
-from progress_builders import (
+from tests.support.fakes.progress_builders import (
     CHK_ARRAYS_DRILL,
     CHK_ARRAYS_READ,
     CHK_GRAPHS,
@@ -22,9 +22,9 @@ from progress_builders import (
     SUB_HASHING,
     build_roadmap,
 )
+from wren.core.read_contract import ResponseFormat
 from wren.progress.next import compute
 from wren.progress.schemas import Progress
-from wren.roadmaps.read_schemas import ResponseFormat
 from wren.roadmaps.schemas import (
     ChecklistItem,
     Resource,

@@ -16,16 +16,20 @@ returns only a boolean, never another user's data.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import Protocol
+from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING, Protocol
 
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from wren.core.db import fetch_optional
 from wren.roadmaps.models import RoadmapRecord
 from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Sequence
+
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class RoadmapRepository(Protocol):
@@ -52,6 +56,26 @@ class RoadmapRepository(Protocol):
     async def commit(self) -> None: ...
 
     async def rollback(self) -> None: ...
+
+
+@asynccontextmanager
+async def transaction(repo: RoadmapRepository) -> AsyncIterator[None]:
+    """Single-source the roadmaps write invariant: commit on a clean exit, roll
+    back and re-raise on any error.
+
+    The caller performs an arbitrary mutate (``add``/``save``/``delete``) inside
+    the ``async with`` block; this boundary commits it, or rolls back and
+    re-raises if the block raised. Replaces the ``try/commit/except/rollback``
+    idiom that was inlined at every write site (mirrors
+    :meth:`wren.progress.service.ProgressService._persist`, generalized to wrap
+    any mutate rather than a hard-coded repo method).
+    """
+    try:
+        yield
+        await repo.commit()
+    except Exception:
+        await repo.rollback()
+        raise
 
 
 class SqlAlchemyRoadmapRepository:

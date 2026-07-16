@@ -24,13 +24,16 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from wren.core.errors import NotFound
 from wren.core.observability import track_failures
 from wren.roadmaps.list_schemas import Dashboard, Profile, RoadmapCard
-from wren.roadmaps.models import RoadmapRecord
-from wren.roadmaps.repository import RoadmapRepository
 from wren.roadmaps.schemas import Roadmap
+
+if TYPE_CHECKING:
+    from wren.roadmaps.models import RoadmapRecord
+    from wren.roadmaps.repository import RoadmapRepository
 
 
 @dataclass(frozen=True)

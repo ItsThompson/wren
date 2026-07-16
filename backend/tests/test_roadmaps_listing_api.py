@@ -14,27 +14,34 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from accounts_fakes import InMemoryAccountRepository, build_test_codec, build_test_hasher
-from progress_fakes import InMemoryProgressRepository
-from roadmaps_fakes import InMemoryRoadmapRepository
+from tests.support.fakes.accounts_fakes import (
+    InMemoryAccountRepository,
+    build_test_codec,
+    build_test_hasher,
+)
+from tests.support.fakes.progress_fakes import InMemoryProgressRepository
+from tests.support.fakes.roadmaps_fakes import InMemoryRoadmapRepository
 from wren.accounts.api import create_accounts_router
 from wren.accounts.config import CookieConfig
 from wren.accounts.service import AccountService
 from wren.accounts.session import create_session_verifier
 from wren.core.app_factory import create_app
 from wren.core.errors import build_exception_handlers
-from wren.core.identity import StripInboundIdentityMiddleware
+from wren.core.identity import StripInboundIdentityMiddleware, require_user
 from wren.core.settings import AppSettings
-from wren.progress.api import create_progress_router
+from wren.progress.router import create_progress_router
 from wren.progress.service import ProgressService
 from wren.roadmaps.listing import ListingService, ProfileOwner
 from wren.roadmaps.listing_api import create_listing_router
 from wren.roadmaps.models import RoadmapRecord
 from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 MakeSettings = Callable[..., AppSettings]
 
@@ -56,7 +63,8 @@ class _Harness:
             json={"username": username, "email": email, "password": _PASSWORD},
         )
         assert response.status_code == 201, response.text
-        return response.json()["id"]
+        user_id: str = response.json()["id"]
+        return user_id
 
     def logout(self) -> None:
         self.client.post("/auth/logout")
@@ -137,7 +145,7 @@ def _build_harness(make_settings: MakeSettings) -> _Harness:
         routers=[
             accounts_router,
             create_listing_router(listing_provider),
-            create_progress_router(progress_provider),
+            create_progress_router(progress_provider, identity=require_user),
         ],
         exception_handlers=build_exception_handlers(),
     )

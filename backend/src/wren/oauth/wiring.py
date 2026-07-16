@@ -8,17 +8,22 @@ singletons; the service providers resolve a per-request ``AsyncSession`` via
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from wren.core.db import get_session
 from wren.oauth.authorization import AuthorizationService
-from wren.oauth.config import OAuthConfig
 from wren.oauth.repository import SqlAlchemyOAuthRepository
 from wren.oauth.token_exchange import TokenService
-from wren.oauth.tokens import AccessTokenCodec
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from wren.oauth.config import OAuthConfig
+    from wren.oauth.tokens import AccessTokenCodec
 
 
 def build_authorization_service_provider(

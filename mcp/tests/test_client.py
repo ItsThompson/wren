@@ -9,11 +9,19 @@ to capture the outgoing request without a live backend.
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
 import httpx
+import pytest
+import structlog
+from mcp.server.fastmcp.exceptions import ToolError
+from pydantic import SecretStr
 
-from wren_mcp.client import InternalApiClient
+from wren_mcp.client import REQUEST_ID_HEADER, InternalApiClient
 from wren_mcp.config import INTERNAL_TOKEN_HEADER, USER_ID_HEADER
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 _API_TOKEN = "shared-internal-token"
 
@@ -26,7 +34,7 @@ def _client_with_capture() -> tuple[InternalApiClient, list[httpx.Request]]:
         return httpx.Response(200, json={"ok": True})
 
     http = httpx.AsyncClient(base_url="http://backend:8001", transport=httpx.MockTransport(handler))
-    return InternalApiClient(http, api_token=_API_TOKEN), captured
+    return InternalApiClient(http, api_token=SecretStr(_API_TOKEN)), captured
 
 
 async def test_create_draft_sends_trusted_identity_headers() -> None:
@@ -136,7 +144,7 @@ async def test_extra_headers_cannot_override_the_trusted_identity() -> None:
     # the shared secret: the trusted pair is applied last.
     client, captured = _client_with_capture()
 
-    await client.request(
+    await client._request(
         "GET",
         "/roadmaps/x-0000",
         user_id="user-ada",
@@ -214,3 +222,75 @@ async def test_update_progress_posts_the_explicit_set_batch() -> None:
         "state": "complete",
     }
     assert request.headers[USER_ID_HEADER] == "user-ada"
+
+
+# ---------- request-id propagation (F4) ----------
+
+
+async def test_request_forwards_the_bound_request_id() -> None:
+    # The correlation id bound for the agent action (by the bearer boundary)
+    # rides to the backend as X-Request-ID so the hop is traceable end to end.
+    client, captured = _client_with_capture()
+
+    structlog.contextvars.bind_contextvars(request_id="corr-abc-123")
+    try:
+        await client.get_roadmap("user-ada", "r-1")
+    finally:
+        structlog.contextvars.clear_contextvars()
+
+    assert captured[0].headers[REQUEST_ID_HEADER] == "corr-abc-123"
+
+
+async def test_request_omits_x_request_id_when_none_is_bound() -> None:
+    # Off the transport there is no bound request_id, so the header is simply
+    # absent rather than sent empty.
+    client, captured = _client_with_capture()
+
+    await client.get_roadmap("user-ada", "r-1")
+
+    assert REQUEST_ID_HEADER not in captured[0].headers
+
+
+# ---------- transport-failure translation (F15) ----------
+
+
+def _client_with_transport(
+    handler: Callable[[httpx.Request], httpx.Response],
+) -> InternalApiClient:
+    http = httpx.AsyncClient(base_url="http://backend:8001", transport=httpx.MockTransport(handler))
+    return InternalApiClient(http, api_token=SecretStr(_API_TOKEN))
+
+
+async def test_connect_error_is_translated_to_a_structured_tool_error() -> None:
+    # The backend being unreachable must reach the agent as a model-recoverable
+    # ToolError, not the opaque (often empty) transport exception FastMCP would
+    # otherwise stringify.
+    def unreachable(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused")
+
+    client = _client_with_transport(unreachable)
+    with pytest.raises(ToolError) as excinfo:
+        await client.get_roadmap("user-ada", "r-1")
+    assert "backend_unavailable" in str(excinfo.value)
+
+
+async def test_timeout_is_translated_to_a_structured_tool_error() -> None:
+    def times_out(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("timed out", request=request)
+
+    client = _client_with_transport(times_out)
+    with pytest.raises(ToolError) as excinfo:
+        await client.create_draft("user-ada", {"title": "Grokking DSA"})
+    assert "backend_unavailable" in str(excinfo.value)
+
+
+async def test_error_status_response_passes_through_untranslated() -> None:
+    # A backend that ANSWERS with a >=400 status is not a transport failure: the
+    # response passes through unchanged for raise_for_problem to map, so the
+    # transport except must not swallow it.
+    def five_hundred(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, json={"code": "INTERNAL"})
+
+    client = _client_with_transport(five_hundred)
+    response = await client.get_roadmap("user-ada", "r-1")
+    assert response.status_code == 500

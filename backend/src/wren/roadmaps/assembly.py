@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from datetime import datetime
+from typing import TYPE_CHECKING
 
 from wren.roadmaps import slugs
 from wren.roadmaps.config import (
@@ -39,6 +39,9 @@ from wren.roadmaps.schemas import (
     SubsectionInput,
     Visibility,
 )
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 # An author's ``proposed_id`` -> the final minted ID, leaving unknown references
 # unchanged (a dangling reference is caught later at publish, not here).

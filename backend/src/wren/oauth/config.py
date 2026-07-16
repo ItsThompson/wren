@@ -17,8 +17,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
-from wren.core.settings import AppSettings
+if TYPE_CHECKING:
+    from wren.core.settings import AppSettings
 
 # --- Endpoint paths (mounted on the external app) ---------------------------
 # The AS metadata document advertises the absolute forms of these, built from

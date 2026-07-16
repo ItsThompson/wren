@@ -11,8 +11,17 @@ gotcha").
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pathlib import Path
+
+from pydantic import BaseModel, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# `just dev-mcp` cd's into mcp/ before launching uvicorn, so a package-relative
+# ".env" silently misses the canonical repo-root .env (F27). Anchor it to the
+# repo root from this file's location so the host inner loop loads it regardless
+# of CWD. Compose/CD inject real env vars, which always win over env_file, so
+# this affects only the host-run inner loop.
+ROOT_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
 
 SERVICE = "wren-mcp"
 DEFAULT_PORT = 9000
@@ -26,7 +35,7 @@ class EnvSettings(BaseSettings):
     consumers.
     """
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=ROOT_ENV_FILE, extra="ignore")
 
     environment: str = "development"
     log_level: str = "info"
@@ -43,7 +52,9 @@ class EnvSettings(BaseSettings):
     backend_internal_url: str = "http://localhost:8001"
     # Shared secret the internal app requires (defense-in-depth behind compute-net
     # isolation). Empty by default; the internal app fail-safe denies without it.
-    internal_api_token: str = ""
+    # SecretStr so an accidental settings dump/log masks it (L12); read via
+    # .get_secret_value() only when the internal-token header is constructed.
+    internal_api_token: SecretStr = SecretStr("")
 
 
 class RsSettings(BaseModel):
@@ -57,7 +68,7 @@ class RsSettings(BaseModel):
     issuer: str  # expected token ``iss`` + AS discovery base (pinned)
     resource: str  # expected token ``aud`` + PRM ``resource`` (pinned)
     backend_internal_url: str
-    internal_api_token: str
+    internal_api_token: SecretStr
 
     @property
     def is_dev(self) -> bool:

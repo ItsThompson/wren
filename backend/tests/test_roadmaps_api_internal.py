@@ -13,21 +13,30 @@ required.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
-from roadmaps_fakes import (
+from tests.support.fakes.roadmaps_fakes import (
     InMemoryRoadmapRepository,
     constant_follower_counter,
     sequence_token_factory,
 )
 from wren.core.app_factory import create_app
 from wren.core.errors import build_exception_handlers
-from wren.core.identity import INTERNAL_TOKEN_HEADER, USER_ID_HEADER
+from wren.core.identity import (
+    INTERNAL_TOKEN_HEADER,
+    USER_ID_HEADER,
+    require_internal_user,
+)
 from wren.core.settings import AppSettings
-from wren.roadmaps.api_internal import create_internal_roadmaps_router
+from wren.roadmaps.read_service import RoadmapReadService
+from wren.roadmaps.router import create_roadmaps_router
 from wren.roadmaps.service import RoadmapService
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 MakeSettings = Callable[..., AppSettings]
 
@@ -104,12 +113,17 @@ def _build_client(
             token_factory=sequence_token_factory(tokens or ["7f3k", "9x2b", "abcd", "efgh"]),
         )
 
+    def read_provider() -> RoadmapReadService:
+        return RoadmapReadService(roadmap_repo)
+
     app: FastAPI = create_app(
         make_settings(),
-        routers=[create_internal_roadmaps_router(roadmap_provider)],
+        routers=[
+            create_roadmaps_router(roadmap_provider, read_provider, identity=require_internal_user)
+        ],
         exception_handlers=build_exception_handlers(),
     )
-    app.state.internal_api_token = _INTERNAL_TOKEN
+    app.state.internal_api_token = SecretStr(_INTERNAL_TOKEN)
     return TestClient(app), roadmap_repo
 
 

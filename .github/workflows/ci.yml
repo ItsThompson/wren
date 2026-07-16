@@ -109,6 +109,36 @@ jobs:
         run: git diff --exit-code -- frontend/openapi.json frontend/src/api/schema.d.ts
 
   # ---------------------------------------------------------------------------
+  # contract-drift: run the dev/test-only `contract/` uv project, the only
+  # interpreter where `wren.*` and `wren_mcp.*` import together (it editable
+  # path-installs both packages; neither deployable depends on the other, per
+  # section 12). It guards the cross-package frozen contract: the internal-
+  # boundary header constants (X-User-ID, X-Internal-Api-Token) plus the
+  # X-Request-ID correlation header, and the backend<->MCP schema mirror (Group A
+  # shapes asserted field-equal, the lean write results asserted a fields-subset).
+  # An independent failure signal, gated by lint like the test jobs; not folded
+  # into the isolated-venv test-backend steps. Mirrors codegen-drift's frozen-
+  # contract-guard shape.
+  # ---------------------------------------------------------------------------
+  contract-drift:
+    needs: [lint]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Contract drift (cross-package header constants + schema mirror)
+        working-directory: contract
+        run: |
+          uv sync --frozen
+          uv run pytest
+
+  # ---------------------------------------------------------------------------
   # test-backend: pytest with the hard 80% coverage gate over the backend, plus
   # the MCP suite (tool-schema snapshot + tool contract tests). Real Postgres is
   # started per-test by testcontainers-python (Docker is present on the runner),
@@ -131,13 +161,13 @@ jobs:
         working-directory: backend
         run: |
           uv sync --frozen
-          uv run pytest --cov-fail-under=80
+          uv run pytest
 
       - name: MCP tests (tool-schema snapshot + tool contract, 80% coverage gate)
         working-directory: mcp
         run: |
           uv sync --frozen
-          uv run pytest --cov-fail-under=80
+          uv run pytest
 
   # ---------------------------------------------------------------------------
   # test-frontend: vitest with the hard 70% coverage gate (the thresholds in

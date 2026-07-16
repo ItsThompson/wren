@@ -11,12 +11,16 @@ repositories seeded with a published roadmap; no database is required.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from accounts_fakes import InMemoryAccountRepository, build_test_codec, build_test_hasher
-from progress_builders import (
+from tests.support.fakes.accounts_fakes import (
+    InMemoryAccountRepository,
+    build_test_codec,
+    build_test_hasher,
+)
+from tests.support.fakes.progress_builders import (
     CHK_ARRAYS_DRILL,
     CHK_ARRAYS_READ,
     CHK_HASH,
@@ -24,19 +28,22 @@ from progress_builders import (
     build_roadmap,
     make_record,
 )
-from progress_fakes import InMemoryProgressRepository
-from roadmaps_fakes import InMemoryRoadmapRepository
+from tests.support.fakes.progress_fakes import InMemoryProgressRepository
+from tests.support.fakes.roadmaps_fakes import InMemoryRoadmapRepository
 from wren.accounts.api import create_accounts_router
 from wren.accounts.config import CookieConfig
 from wren.accounts.service import AccountService
 from wren.accounts.session import create_session_verifier
 from wren.core.app_factory import create_app
 from wren.core.errors import build_exception_handlers
-from wren.core.identity import StripInboundIdentityMiddleware
+from wren.core.identity import StripInboundIdentityMiddleware, require_user
 from wren.core.settings import AppSettings
-from wren.progress.api import create_progress_router
+from wren.progress.router import create_progress_router
 from wren.progress.service import ProgressService
 from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 MakeSettings = Callable[..., AppSettings]
 
@@ -66,7 +73,7 @@ def _build_client(
     accounts_router = create_accounts_router(
         account_provider, cookie_config=CookieConfig(secure=False, domain=None)
     )
-    progress_router = create_progress_router(progress_provider)
+    progress_router = create_progress_router(progress_provider, identity=require_user)
 
     app: FastAPI = create_app(
         make_settings(),

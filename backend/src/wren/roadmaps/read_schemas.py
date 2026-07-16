@@ -28,16 +28,6 @@ from pydantic import BaseModel, Field
 from wren.roadmaps.schemas import ResourceType, RoadmapStatus
 
 
-class ResponseFormat(StrEnum):
-    """The ``concise | detailed`` switch on the read tools.
-
-    Concise is roughly one-third the tokens and still carries the follow-up IDs;
-    detailed adds the explanatory free-text (the node ``description``)."""
-
-    CONCISE = "concise"
-    DETAILED = "detailed"
-
-
 class SectionInclude(StrEnum):
     """Which parts of each node a ``SectionPage`` populates.
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from accounts_fakes import build_test_codec
+from tests.support.fakes.accounts_fakes import build_test_codec
 from wren.accounts.session import create_session_verifier
 
 

@@ -10,6 +10,7 @@
     "inputSchema": {
       "$defs": {
         "ChecklistItemInput": {
+          "additionalProperties": false,
           "properties": {
             "proposed_id": {
               "anyOf": [
@@ -35,6 +36,7 @@
           "type": "object"
         },
         "ResourceInput": {
+          "additionalProperties": false,
           "description": "An external link on a subsection; the body is never inlined.",
           "properties": {
             "proposed_id": {
@@ -50,6 +52,7 @@
               "title": "Proposed Id"
             },
             "title": {
+              "minLength": 1,
               "title": "Title",
               "type": "string"
             },
@@ -57,6 +60,7 @@
               "$ref": "#/$defs/ResourceType"
             },
             "url": {
+              "pattern": "^https?://",
               "title": "Url",
               "type": "string"
             }
@@ -82,6 +86,7 @@
           "type": "string"
         },
         "RoadmapDraftInput": {
+          "additionalProperties": false,
           "description": "The full-document payload for ``create_roadmap_draft`` and\n``replace_roadmap_draft``.",
           "properties": {
             "description": {
@@ -130,6 +135,7 @@
               "type": "array"
             },
             "title": {
+              "minLength": 1,
               "title": "Title",
               "type": "string"
             }
@@ -141,6 +147,7 @@
           "type": "object"
         },
         "SectionInput": {
+          "additionalProperties": false,
           "properties": {
             "proposed_id": {
               "anyOf": [
@@ -162,6 +169,7 @@
               "type": "array"
             },
             "title": {
+              "minLength": 1,
               "title": "Title",
               "type": "string"
             }
@@ -173,6 +181,7 @@
           "type": "object"
         },
         "SubsectionInput": {
+          "additionalProperties": false,
           "description": "A DAG node. Child collections are ordered arrays because IDs are\nserver-minted; ``prereq_ids`` may reference sibling ``proposed_id``s.",
           "properties": {
             "checklist_items": {
@@ -240,6 +249,7 @@
               "type": "array"
             },
             "title": {
+              "minLength": 1,
               "title": "Title",
               "type": "string"
             }
@@ -478,6 +488,7 @@
     "inputSchema": {
       "$defs": {
         "AddEdgeOp": {
+          "additionalProperties": false,
           "description": "``to_id`` gains ``from_id`` as a prerequisite.",
           "properties": {
             "from_id": {
@@ -503,6 +514,7 @@
           "type": "object"
         },
         "AddItemOp": {
+          "additionalProperties": false,
           "properties": {
             "after_id": {
               "anyOf": [
@@ -563,6 +575,7 @@
           "type": "object"
         },
         "AddSectionOp": {
+          "additionalProperties": false,
           "properties": {
             "after_id": {
               "anyOf": [
@@ -606,6 +619,7 @@
               "title": "Proposed Id"
             },
             "title": {
+              "minLength": 1,
               "title": "Title",
               "type": "string"
             }
@@ -618,6 +632,7 @@
           "type": "object"
         },
         "AddSubsectionOp": {
+          "additionalProperties": false,
           "properties": {
             "after_id": {
               "anyOf": [
@@ -665,6 +680,7 @@
           "type": "object"
         },
         "ChecklistItemInput": {
+          "additionalProperties": false,
           "properties": {
             "proposed_id": {
               "anyOf": [
@@ -690,6 +706,7 @@
           "type": "object"
         },
         "RemoveEdgeOp": {
+          "additionalProperties": false,
           "properties": {
             "from_id": {
               "title": "From Id",
@@ -714,6 +731,7 @@
           "type": "object"
         },
         "RemoveItemOp": {
+          "additionalProperties": false,
           "properties": {
             "item_id": {
               "title": "Item Id",
@@ -733,6 +751,7 @@
           "type": "object"
         },
         "RemoveSectionOp": {
+          "additionalProperties": false,
           "properties": {
             "op": {
               "const": "remove_section",
@@ -752,6 +771,7 @@
           "type": "object"
         },
         "RemoveSubsectionOp": {
+          "additionalProperties": false,
           "properties": {
             "op": {
               "const": "remove_subsection",
@@ -771,6 +791,7 @@
           "type": "object"
         },
         "ReorderOp": {
+          "additionalProperties": false,
           "description": "Move any node (section / subsection / item) within its sibling order.",
           "properties": {
             "after_id": {
@@ -815,6 +836,7 @@
           "type": "object"
         },
         "ResourceInput": {
+          "additionalProperties": false,
           "description": "An external link on a subsection; the body is never inlined.",
           "properties": {
             "proposed_id": {
@@ -830,6 +852,7 @@
               "title": "Proposed Id"
             },
             "title": {
+              "minLength": 1,
               "title": "Title",
               "type": "string"
             },
@@ -837,6 +860,7 @@
               "$ref": "#/$defs/ResourceType"
             },
             "url": {
+              "pattern": "^https?://",
               "title": "Url",
               "type": "string"
             }
@@ -862,6 +886,7 @@
           "type": "string"
         },
         "SetEffortOp": {
+          "additionalProperties": false,
           "properties": {
             "effort_estimate": {
               "anyOf": [
@@ -893,6 +918,7 @@
           "type": "object"
         },
         "SetResourcesOp": {
+          "additionalProperties": false,
           "properties": {
             "op": {
               "const": "set_resources",
@@ -919,6 +945,7 @@
           "type": "object"
         },
         "SetSuggestedPathOp": {
+          "additionalProperties": false,
           "properties": {
             "op": {
               "const": "set_suggested_path",
@@ -940,6 +967,7 @@
           "type": "object"
         },
         "SetTagsOp": {
+          "additionalProperties": false,
           "properties": {
             "op": {
               "const": "set_tags",
@@ -966,6 +994,7 @@
           "type": "object"
         },
         "SubsectionInput": {
+          "additionalProperties": false,
           "description": "A DAG node. Child collections are ordered arrays because IDs are\nserver-minted; ``prereq_ids`` may reference sibling ``proposed_id``s.",
           "properties": {
             "checklist_items": {
@@ -1033,6 +1062,7 @@
               "type": "array"
             },
             "title": {
+              "minLength": 1,
               "title": "Title",
               "type": "string"
             }
@@ -1044,6 +1074,7 @@
           "type": "object"
         },
         "UpdateItemOp": {
+          "additionalProperties": false,
           "properties": {
             "item_id": {
               "title": "Item Id",
@@ -1068,6 +1099,7 @@
           "type": "object"
         },
         "UpdateSectionOp": {
+          "additionalProperties": false,
           "properties": {
             "op": {
               "const": "update_section",
@@ -1079,6 +1111,7 @@
               "type": "string"
             },
             "title": {
+              "minLength": 1,
               "title": "Title",
               "type": "string"
             }
@@ -1092,6 +1125,7 @@
           "type": "object"
         },
         "UpdateSubsectionOp": {
+          "additionalProperties": false,
           "properties": {
             "description": {
               "anyOf": [
@@ -1129,6 +1163,7 @@
             "title": {
               "anyOf": [
                 {
+                  "minLength": 1,
                   "type": "string"
                 },
                 {
@@ -1776,6 +1811,7 @@
     "inputSchema": {
       "$defs": {
         "ChecklistItemInput": {
+          "additionalProperties": false,
           "properties": {
             "proposed_id": {
               "anyOf": [
@@ -1801,6 +1837,7 @@
           "type": "object"
         },
         "ResourceInput": {
+          "additionalProperties": false,
           "description": "An external link on a subsection; the body is never inlined.",
           "properties": {
             "proposed_id": {
@@ -1816,6 +1853,7 @@
               "title": "Proposed Id"
             },
             "title": {
+              "minLength": 1,
               "title": "Title",
               "type": "string"
             },
@@ -1823,6 +1861,7 @@
               "$ref": "#/$defs/ResourceType"
             },
             "url": {
+              "pattern": "^https?://",
               "title": "Url",
               "type": "string"
             }
@@ -1848,6 +1887,7 @@
           "type": "string"
         },
         "RoadmapDraftInput": {
+          "additionalProperties": false,
           "description": "The full-document payload for ``create_roadmap_draft`` and\n``replace_roadmap_draft``.",
           "properties": {
             "description": {
@@ -1896,6 +1936,7 @@
               "type": "array"
             },
             "title": {
+              "minLength": 1,
               "title": "Title",
               "type": "string"
             }
@@ -1907,6 +1948,7 @@
           "type": "object"
         },
         "SectionInput": {
+          "additionalProperties": false,
           "properties": {
             "proposed_id": {
               "anyOf": [
@@ -1928,6 +1970,7 @@
               "type": "array"
             },
             "title": {
+              "minLength": 1,
               "title": "Title",
               "type": "string"
             }
@@ -1939,6 +1982,7 @@
           "type": "object"
         },
         "SubsectionInput": {
+          "additionalProperties": false,
           "description": "A DAG node. Child collections are ordered arrays because IDs are\nserver-minted; ``prereq_ids`` may reference sibling ``proposed_id``s.",
           "properties": {
             "checklist_items": {
@@ -2006,6 +2050,7 @@
               "type": "array"
             },
             "title": {
+              "minLength": 1,
               "title": "Title",
               "type": "string"
             }
@@ -3017,6 +3062,7 @@
           },
           "required": [
             "rule",
+            "ids",
             "message"
           ],
           "title": "Violation",

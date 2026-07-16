@@ -21,29 +21,28 @@ These are FastAPI dependencies; later route slices declare
 from __future__ import annotations
 
 import secrets
-from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING
 
-from starlette.requests import Request
-from starlette.types import ASGIApp, Receive, Scope, Send
+import structlog
+
+# ``require_user`` / ``require_internal_user`` are FastAPI dependencies (not
+# decorated route handlers, so runtime-evaluated-decorators does not reach them);
+# FastAPI resolves their ``Request`` annotation at runtime, so it must stay a
+# runtime import or FastAPI mistakes ``request`` for a query field.
+from starlette.requests import Request  # noqa: TC002
 
 from wren.core.errors import Unauthorized
+from wren.core.logging import get_logger
+from wren.core.state import SessionVerifier, get_internal_token, get_session_verifier
+
+if TYPE_CHECKING:
+    from starlette.types import ASGIApp, Receive, Scope, Send
+
+_log = get_logger("wren-core")
 
 USER_ID_HEADER = "X-User-ID"
 INTERNAL_TOKEN_HEADER = "X-Internal-Api-Token"
 SESSION_COOKIE_NAME = "wren_session"
-
-# A SessionVerifier turns a raw session-cookie value into a resolved user_id, or
-# None if the cookie is missing/invalid/expired. It is async so a per-request
-# jti-blacklist lookup (an I/O call) can run behind this same contract without
-# reworking require_user.
-SessionVerifier = Callable[[str], Awaitable[str | None]]
-
-
-async def deny_all_sessions(_cookie: str) -> str | None:
-    """Default deny-all verifier: every cookie fails to resolve, so
-    :func:`require_user` fail-safe denies. Replaced by injecting a real
-    ``SessionVerifier`` on ``app.state.session_verifier``."""
-    return None
 
 
 class StripInboundIdentityMiddleware:
@@ -77,13 +76,18 @@ async def require_user(request: Request) -> str:
     upstream by :class:`StripInboundIdentityMiddleware`). Raises ``Unauthorized``
     when no valid session resolves.
     """
-    verify: SessionVerifier = getattr(request.app.state, "session_verifier", deny_all_sessions)
+    verify: SessionVerifier = get_session_verifier(request.app)
     cookie = request.cookies.get(SESSION_COOKIE_NAME)
     if cookie is None:
+        _log.warning("session_invalid", reason="missing_cookie")
         raise Unauthorized("No session cookie present.")
     user_id = await verify(cookie)
     if user_id is None:
+        _log.warning("session_invalid", reason="invalid_or_expired")
         raise Unauthorized("Session is invalid or expired.")
+    # Bind the resolved actor so every subsequent line for this request carries
+    # user_id via merge_contextvars; retires the per-call-site actor kwarg.
+    structlog.contextvars.bind_contextvars(user_id=user_id)
     return user_id
 
 
@@ -94,17 +98,23 @@ async def require_internal_user(request: Request) -> str:
     unconfigured token fail-safe denies. Only then is the trusted ``X-User-ID``
     taken as the resolved identity.
     """
-    expected: str = getattr(request.app.state, "internal_api_token", "")
+    expected = get_internal_token(request.app)
     supplied = request.headers.get(INTERNAL_TOKEN_HEADER)
-    # Compare on encoded bytes: secrets.compare_digest raises TypeError on a
-    # non-ASCII str, which would surface as a 500 instead of a clean 401.
+    # Unwrap the SecretStr once here, the single use site; the raw value never
+    # leaves this comparison (it is never logged). Compare on encoded bytes:
+    # secrets.compare_digest raises TypeError on a non-ASCII str, which would
+    # surface as a 500 instead of a clean 401.
+    expected_value = expected.get_secret_value()
     if (
-        not expected
+        not expected_value
         or supplied is None
-        or not secrets.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8"))
+        or not secrets.compare_digest(supplied.encode("utf-8"), expected_value.encode("utf-8"))
     ):
+        _log.warning("internal_token_rejected", reason="missing_or_invalid_token")
         raise Unauthorized("Missing or invalid internal API token.")
     user_id = request.headers.get(USER_ID_HEADER)
     if not user_id:
+        _log.warning("internal_token_rejected", reason="missing_user_id")
         raise Unauthorized("Missing trusted X-User-ID header.")
+    structlog.contextvars.bind_contextvars(user_id=user_id)
     return user_id

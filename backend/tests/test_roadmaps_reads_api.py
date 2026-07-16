@@ -13,15 +13,11 @@ projections' checked reader (as the production wiring binds them).
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from accounts_fakes import InMemoryAccountRepository, build_test_codec, build_test_hasher
-from progress_builders import make_record
-from progress_fakes import InMemoryProgressRepository
-from roadmaps_fakes import InMemoryRoadmapRepository
-from roadmaps_read_builders import (
+from tests.roadmaps_read_builders import (
     CHK_ARRAYS_READ,
     ROADMAP_ID,
     SUB_ARRAYS,
@@ -29,19 +25,31 @@ from roadmaps_read_builders import (
     build_read_roadmap,
     checked_reader_over,
 )
+from tests.support.fakes.accounts_fakes import (
+    InMemoryAccountRepository,
+    build_test_codec,
+    build_test_hasher,
+)
+from tests.support.fakes.progress_builders import make_record
+from tests.support.fakes.progress_fakes import InMemoryProgressRepository
+from tests.support.fakes.roadmaps_fakes import InMemoryRoadmapRepository
 from wren.accounts.api import create_accounts_router
 from wren.accounts.config import CookieConfig
 from wren.accounts.service import AccountService
 from wren.accounts.session import create_session_verifier
 from wren.core.app_factory import create_app
 from wren.core.errors import build_exception_handlers
-from wren.core.identity import StripInboundIdentityMiddleware
+from wren.core.identity import StripInboundIdentityMiddleware, require_user
 from wren.core.settings import AppSettings
-from wren.progress.api import create_progress_router
+from wren.progress.router import create_progress_router
 from wren.progress.service import ProgressService
-from wren.roadmaps.api import create_roadmaps_router
+from wren.roadmaps.read_service import RoadmapReadService
+from wren.roadmaps.router import create_roadmaps_router
 from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
 from wren.roadmaps.service import RoadmapService
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 MakeSettings = Callable[..., AppSettings]
 
@@ -71,6 +79,11 @@ def _build_client(
         return RoadmapService(
             roadmap_repo,
             follower_counter=progress_repo.count_followers,
+        )
+
+    def read_provider() -> RoadmapReadService:
+        return RoadmapReadService(
+            roadmap_repo,
             checked_reader=checked_reader_over(progress_repo),
             section_page_size=page_size,
         )
@@ -85,8 +98,10 @@ def _build_client(
         make_settings(),
         routers=[
             accounts_router,
-            create_roadmaps_router(roadmap_provider),
-            create_progress_router(progress_provider),
+            create_roadmaps_router(
+                roadmap_provider, read_provider, identity=require_user, include_web_lifecycle=True
+            ),
+            create_progress_router(progress_provider, identity=require_user),
         ],
         exception_handlers=build_exception_handlers(),
     )

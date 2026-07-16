@@ -10,15 +10,14 @@ route is hidden from the OpenAPI surface.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.testclient import TestClient
 
-from conftest import MakeSettings
-from oauth_fakes import (
+from tests.oauth_fakes import (
     InMemoryOAuthRepository,
     build_test_codec,
     build_test_config,
@@ -29,11 +28,18 @@ from wren.api.main import app as external_app
 from wren.core.app_factory import create_app
 from wren.core.errors import build_exception_handlers
 from wren.core.identity import SESSION_COOKIE_NAME, StripInboundIdentityMiddleware
-from wren.core.settings import AppSettings
 from wren.oauth.api import create_oauth_router
 from wren.oauth.authorization import AuthorizationService
 from wren.oauth.errors import build_oauth_exception_handlers
 from wren.oauth.token_exchange import TokenService
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
+
+    from tests.conftest import MakeSettings
+    from wren.core.settings import AppSettings
+    from wren.oauth.config import OAuthConfig
+    from wren.oauth.tokens import AccessTokenCodec
 
 _USER = "user-ada"
 _SESSION_COOKIE = "session-ada"
@@ -41,7 +47,13 @@ _REDIRECT = "http://127.0.0.1:8765/callback"
 
 
 class _Fixture:
-    def __init__(self, client: TestClient, repo: InMemoryOAuthRepository, codec, config) -> None:
+    def __init__(
+        self,
+        client: TestClient,
+        repo: InMemoryOAuthRepository,
+        codec: AccessTokenCodec,
+        config: OAuthConfig,
+    ) -> None:
         self.client = client
         self.repo = repo
         self.codec = codec
@@ -93,7 +105,8 @@ def _register(client: TestClient) -> str:
         "/register", json={"redirect_uris": [_REDIRECT], "client_name": "Test Agent"}
     )
     assert response.status_code == 201, response.text
-    return response.json()["client_id"]
+    client_id: str = response.json()["client_id"]
+    return client_id
 
 
 def _query(url: str) -> dict[str, str]:

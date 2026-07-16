@@ -12,14 +12,12 @@ progress store so a trusted POST /progress feeds the read projections.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
-from progress_builders import make_record
-from progress_fakes import InMemoryProgressRepository
-from roadmaps_fakes import InMemoryRoadmapRepository
-from roadmaps_read_builders import (
+from tests.roadmaps_read_builders import (
     CHK_ARRAYS_READ,
     ROADMAP_ID,
     SUB_ARRAYS,
@@ -27,15 +25,27 @@ from roadmaps_read_builders import (
     build_read_roadmap,
     checked_reader_over,
 )
+from tests.support.fakes.progress_builders import make_record
+from tests.support.fakes.progress_fakes import InMemoryProgressRepository
+from tests.support.fakes.roadmaps_fakes import InMemoryRoadmapRepository
 from wren.core.app_factory import create_app
 from wren.core.errors import build_exception_handlers
-from wren.core.identity import INTERNAL_TOKEN_HEADER, USER_ID_HEADER
+from wren.core.identity import (
+    INTERNAL_TOKEN_HEADER,
+    USER_ID_HEADER,
+    require_internal_user,
+)
 from wren.core.settings import AppSettings
-from wren.progress.api_internal import create_internal_progress_router
+from wren.progress.router import create_progress_router
 from wren.progress.service import ProgressService
-from wren.roadmaps.api_internal import create_internal_roadmaps_router
-from wren.roadmaps.schemas import Roadmap
+from wren.roadmaps.read_service import RoadmapReadService
+from wren.roadmaps.router import create_roadmaps_router
 from wren.roadmaps.service import RoadmapService
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
+
+    from wren.roadmaps.schemas import Roadmap
 
 MakeSettings = Callable[..., AppSettings]
 
@@ -59,6 +69,11 @@ def _build_client(
         return RoadmapService(
             roadmap_repo,
             follower_counter=progress_repo.count_followers,
+        )
+
+    def read_provider() -> RoadmapReadService:
+        return RoadmapReadService(
+            roadmap_repo,
             checked_reader=checked_reader_over(progress_repo),
         )
 
@@ -68,12 +83,12 @@ def _build_client(
     app: FastAPI = create_app(
         make_settings(),
         routers=[
-            create_internal_roadmaps_router(roadmap_provider),
-            create_internal_progress_router(progress_provider),
+            create_roadmaps_router(roadmap_provider, read_provider, identity=require_internal_user),
+            create_progress_router(progress_provider, identity=require_internal_user),
         ],
         exception_handlers=build_exception_handlers(),
     )
-    app.state.internal_api_token = _INTERNAL_TOKEN
+    app.state.internal_api_token = SecretStr(_INTERNAL_TOKEN)
     return TestClient(app), progress_repo
 
 

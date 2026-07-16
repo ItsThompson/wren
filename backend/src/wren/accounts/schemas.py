@@ -11,10 +11,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, EmailStr
 
-from wren.accounts.tokens import TokenPair
+if TYPE_CHECKING:
+    from wren.accounts.tokens import TokenPair
 
 
 class RegisterRequest(BaseModel):

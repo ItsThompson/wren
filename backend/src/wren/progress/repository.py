@@ -16,15 +16,18 @@ making both follow (first write) and repeated updates idempotent.
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from wren.core.db import fetch_optional
 from wren.progress.models import ProgressRecord
-from wren.progress.schemas import Progress
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from wren.progress.schemas import Progress
 
 
 class ProgressRepository(Protocol):

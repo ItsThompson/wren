@@ -3,6 +3,11 @@
 Mirrors the backend's logging setup (dev -> human console, everything else ->
 JSON) so MCP logs land in the same aggregated, queryable shape.
 Configured once per process; the ``service`` field is bound via :func:`get_logger`.
+
+Kept in sync with :mod:`wren.core.logging` by hand: the two copies are
+**code-identical** (only docstrings differ). Any processor added to the
+chain here MUST be added there too. See ``docs/infra-duplication.md`` for the
+`wren-common` deferral and the full drift checklist.
 """
 
 from __future__ import annotations

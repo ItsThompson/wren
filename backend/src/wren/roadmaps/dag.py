@@ -22,9 +22,12 @@ places every prerequisite *before* its dependent.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
 
 # Sentinel colors for the iterative depth-first cycle search.
 _WHITE, _GRAY, _BLACK = 0, 1, 2

@@ -15,11 +15,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from joserfc.jwk import KeyParameters, KeySet, RSAKey
 
-from wren.oauth.config import OAuthConfig
+if TYPE_CHECKING:
+    from wren.oauth.config import OAuthConfig
 
 # joserfc JWK parameters marking a key as an RS256 signing key.
 _SIG_PARAMS: KeyParameters = {"use": "sig", "alg": "RS256"}

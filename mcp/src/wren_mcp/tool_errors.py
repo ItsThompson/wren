@@ -10,24 +10,50 @@ the agent sees a structured, self-correctable error rather than a raw HTTP statu
 self-correct without a human").
 
 ``ToolError`` is the FastMCP-preferred signal for an expected failure: FastMCP
-returns its message to the client with ``isError=True``.
+returns its message to the client with ``isError=True``. Backend failures raise
+:class:`BackendToolError`, a ``ToolError`` subclass that also carries the backend
+HTTP ``status_code`` and problem ``code`` so the tool-metrics wrapper
+(:mod:`wren_mcp.tool_metrics`) can log them on ``tool_failed`` without re-parsing.
 """
 
 from __future__ import annotations
 
-import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import httpx
 from mcp.server.fastmcp.exceptions import ToolError
+
+if TYPE_CHECKING:
+    import httpx
+
+
+class BackendToolError(ToolError):
+    """A model-recoverable tool error that also carries the backend's HTTP status
+    and problem code, so the tool-invocation counter can log them structurally."""
+
+    def __init__(self, message: str, *, status_code: int, code: str) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.code = code
 
 
 def raise_for_problem(response: httpx.Response) -> httpx.Response:
     """Return the response on success; on a >=400 status raise a
-    :class:`ToolError` carrying the backend's structured problem detail."""
+    :class:`BackendToolError` carrying the backend's structured problem detail."""
     if response.status_code < 400:
         return response
-    raise ToolError(_format_problem(response))
+    raise BackendToolError(
+        _format_problem(response),
+        status_code=response.status_code,
+        code=_problem_code(response),
+    )
+
+
+def _problem_code(response: httpx.Response) -> str:
+    """The backend problem ``code`` (or an ``HTTP_<status>`` fallback), matching
+    the code rendered into the :class:`BackendToolError` message."""
+    problem = _parse_body(response)
+    code = problem.get("code") if problem is not None else None
+    return code if isinstance(code, str) and code else f"HTTP_{response.status_code}"
 
 
 def _format_problem(response: httpx.Response) -> str:
@@ -72,6 +98,8 @@ def _format_violations(violations: list[Any]) -> str:
 def _parse_body(response: httpx.Response) -> dict[str, Any] | None:
     try:
         parsed = response.json()
-    except (json.JSONDecodeError, ValueError):
+    except ValueError:
+        # httpx raises json.JSONDecodeError, a ValueError subclass, on a non-JSON
+        # body; catching ValueError covers it without importing the json module.
         return None
     return parsed if isinstance(parsed, dict) else None

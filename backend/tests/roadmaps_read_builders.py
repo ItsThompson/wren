@@ -13,8 +13,8 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
-from progress_fakes import InMemoryProgressRepository
 from wren.roadmaps.schemas import (
     ChecklistItem,
     Resource,
@@ -25,6 +25,9 @@ from wren.roadmaps.schemas import (
     Subsection,
     Visibility,
 )
+
+if TYPE_CHECKING:
+    from tests.support.fakes.progress_fakes import InMemoryProgressRepository
 
 _NOW = datetime(2026, 7, 15, tzinfo=UTC)
 
@@ -137,7 +140,7 @@ CheckedReader = Callable[[str, str], Awaitable[frozenset[str]]]
 
 
 def checked_reader_over(progress_repo: InMemoryProgressRepository) -> CheckedReader:
-    """A :data:`~wren.roadmaps.service.CheckedReader` over the in-memory progress
+    """A :data:`~wren.roadmaps.read_service.CheckedReader` over the in-memory progress
     repository, mirroring how the production wiring binds it: returns the caller's
     checked item ids for ``(user_id, roadmap_id)`` (empty when they have no
     record), so a contract test's Overview counts and NodeDetail done-state follow

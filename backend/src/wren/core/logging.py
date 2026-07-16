@@ -5,6 +5,11 @@ console stream; everywhere else they render as JSON.
 The ``service`` field is bound per app via :func:`get_logger`, so external and
 internal traffic is distinguishable without a process-global that would collide
 when both apps run in one process (e.g. the smoke test).
+
+Kept in sync with :mod:`wren_mcp.logging` by hand: the two copies are
+**code-identical** (only docstrings differ). Any processor added to the
+chain here MUST be added there too. See ``docs/infra-duplication.md`` for the
+`wren-common` deferral and the full drift checklist.
 """
 
 from __future__ import annotations

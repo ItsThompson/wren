@@ -7,6 +7,13 @@
 Readiness checks are injected, so this module stays dependency-free. A DB
 connectivity check is injected through the same seam (see
 ``core.db.db_readiness_check``).
+
+Kept in sync with :mod:`wren_mcp.health` by hand: the shared core
+(``CheckResult``, the ``ReadinessCheck`` contract, the aggregator,
+:func:`create_health_router`) is identical; the MCP copy additionally declares an
+MCP-only ``jwks_readiness_check``. Any change to the shared core here MUST be
+mirrored there. See ``docs/infra-duplication.md`` for the `wren-common` deferral
+and drift checklist.
 """
 
 from __future__ import annotations

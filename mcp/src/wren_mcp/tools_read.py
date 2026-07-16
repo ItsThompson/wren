@@ -24,10 +24,10 @@ blow-up), only the next prereq-satisfied items with a STRUCTURAL ``why_now``.
 
 from __future__ import annotations
 
-from mcp.server.fastmcp import FastMCP
+from typing import TYPE_CHECKING
+
 from mcp.types import ToolAnnotations
 
-from wren_mcp.client import InternalApiClient
 from wren_mcp.config import SCOPE_PROGRESS_WRITE, SCOPE_ROADMAPS_READ
 from wren_mcp.schemas import (
     CompletionState,
@@ -44,6 +44,11 @@ from wren_mcp.schemas import (
 from wren_mcp.scopes import AgentContext, require_scope
 from wren_mcp.tool_errors import raise_for_problem
 from wren_mcp.tool_registry import counted_tool_registrar
+
+if TYPE_CHECKING:
+    from mcp.server.fastmcp import FastMCP
+
+    from wren_mcp.client import InternalApiClient
 
 _OVERVIEW = ToolAnnotations(title="Get roadmap overview", readOnlyHint=True, openWorldHint=False)
 _NEXT = ToolAnnotations(title="Get next steps", readOnlyHint=True, openWorldHint=False)

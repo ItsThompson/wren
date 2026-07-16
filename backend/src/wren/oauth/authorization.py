@@ -14,8 +14,7 @@ Protocol errors on the agent-facing ``/register`` and ``/authorize`` paths are
 
 from __future__ import annotations
 
-import secrets
-from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 from urllib.parse import urlencode, urlsplit
 
 from wren.core.errors import NotFound
@@ -31,9 +30,9 @@ from wren.oauth.config import (
     OAuthConfig,
 )
 from wren.oauth.errors import OAuthError
+from wren.oauth.injection import Clock, OpaqueIdFactory, new_hex_id, new_urlsafe_id, utcnow
 from wren.oauth.models import OAuthAuthorizationCode, OAuthAuthRequest, OAuthClient
 from wren.oauth.redirects import is_allowed_redirect, is_loopback
-from wren.oauth.repository import OAuthRepository
 from wren.oauth.schemas import (
     AuthorizationContext,
     AuthorizeParams,
@@ -42,18 +41,16 @@ from wren.oauth.schemas import (
     OAuthEvent,
 )
 
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    from wren.oauth.repository import OAuthRepository
+
 _log = get_logger("wren-oauth")
 
-# Opaque identifiers (client_id, auth_request_id, code) are high-entropy url-safe
-# tokens; unguessability is defense-in-depth (authorization is by row scoping).
-_TOKEN_BYTES = 32
 _DEFAULT_SCOPE = " ".join(SUPPORTED_SCOPES)
 _DEFAULT_GRANT_TYPES = [GRANT_TYPE_AUTHORIZATION_CODE, GRANT_TYPE_REFRESH_TOKEN]
 _DEFAULT_RESPONSE_TYPES = [RESPONSE_TYPE_CODE]
-
-
-def _new_opaque_id() -> str:
-    return secrets.token_urlsafe(_TOKEN_BYTES)
 
 
 def _append_query(uri: str, params: dict[str, str]) -> str:
@@ -61,17 +58,28 @@ def _append_query(uri: str, params: dict[str, str]) -> str:
     return f"{uri}{separator}{urlencode(params)}"
 
 
-def _is_expired(expires_at: datetime) -> bool:
-    return expires_at <= datetime.now(UTC)
-
-
 @track_failures("oauth")
 class AuthorizationService:
     """Client registration, request parking, consent context, and decision."""
 
-    def __init__(self, repo: OAuthRepository, config: OAuthConfig) -> None:
+    def __init__(
+        self,
+        repo: OAuthRepository,
+        config: OAuthConfig,
+        *,
+        clock: Clock = utcnow,
+        new_id: OpaqueIdFactory = new_urlsafe_id,
+        new_record_id: OpaqueIdFactory = new_hex_id,
+    ) -> None:
         self._repo = repo
         self._config = config
+        # Injected so tests pin "now" and force deterministic ids without patching
+        # globals; the defaults reproduce the prior ambient calls exactly.
+        self._clock = clock
+        # Opaque protocol ids (client_id, auth_request_id, code): url-safe tokens.
+        self._new_id = new_id
+        # Surrogate record keys threaded into the repo writes (grant id, audit id).
+        self._new_record_id = new_record_id
 
     async def register_client(
         self, request: ClientRegistrationRequest
@@ -79,9 +87,9 @@ class AuthorizationService:
         """Open Dynamic Client Registration (RFC 7591): mint a public ``client_id``."""
         self._reject_invalid_redirect_uris(request.redirect_uris)
         scope = self._resolve_registration_scope(request.scope)
-        now = datetime.now(UTC)
+        now = self._clock()
         client = OAuthClient(
-            client_id=_new_opaque_id(),
+            client_id=self._new_id(),
             client_name=request.client_name or "Unnamed agent",
             redirect_uris=request.redirect_uris,
             grant_types=request.grant_types or _DEFAULT_GRANT_TYPES,
@@ -120,7 +128,7 @@ class AuthorizationService:
         if resource is None:
             raise OAuthError.invalid_target("resource does not match the MCP resource.")
 
-        request_id = _new_opaque_id()
+        request_id = self._new_id()
         await self._repo.add_auth_request(
             OAuthAuthRequest(
                 id=request_id,
@@ -131,7 +139,7 @@ class AuthorizationService:
                 code_challenge=params.code_challenge,
                 code_challenge_method=params.code_challenge_method,
                 resource=resource,
-                expires_at=datetime.now(UTC) + self._config.auth_request_ttl,
+                expires_at=self._clock() + self._config.auth_request_ttl,
             )
         )
         await self._repo.commit()
@@ -168,9 +176,13 @@ class AuthorizationService:
             return _append_query(request.redirect_uri, denied)
 
         await self._repo.upsert_grant(
-            user_id=user_id, client_id=request.client_id, scope=request.scope
+            user_id=user_id,
+            client_id=request.client_id,
+            scope=request.scope,
+            now=self._clock(),
+            grant_id=self._new_record_id(),
         )
-        code = _new_opaque_id()
+        code = self._new_id()
         await self._repo.add_code(
             OAuthAuthorizationCode(
                 code=code,
@@ -181,7 +193,7 @@ class AuthorizationService:
                 code_challenge=request.code_challenge,
                 code_challenge_method=request.code_challenge_method,
                 resource=request.resource,
-                expires_at=datetime.now(UTC) + self._config.code_ttl,
+                expires_at=self._clock() + self._config.code_ttl,
             )
         )
         await self._repo.record_event(
@@ -189,6 +201,8 @@ class AuthorizationService:
             client_id=request.client_id,
             event=OAuthEvent.GRANTED.value,
             scope=request.scope,
+            now=self._clock(),
+            event_id=self._new_record_id(),
         )
         await self._repo.commit()
         _log.info("oauth_authorization_granted", client_id=request.client_id, user_id=user_id)
@@ -199,9 +213,12 @@ class AuthorizationService:
 
     async def _load_live_request(self, auth_request_id: str) -> OAuthAuthRequest:
         request = await self._repo.get_auth_request(auth_request_id)
-        if request is None or _is_expired(request.expires_at):
+        if request is None or self._is_expired(request.expires_at):
             raise NotFound("This authorization request expired or does not exist.")
         return request
+
+    def _is_expired(self, expires_at: datetime) -> bool:
+        return expires_at <= self._clock()
 
     @staticmethod
     def _state_only(state: str | None, error: str) -> dict[str, str]:

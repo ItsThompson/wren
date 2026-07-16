@@ -5,7 +5,11 @@ well-known discovery paths, the OAuth scopes, and the internal-boundary header
 names. The header names in particular MUST match the backend's
 ``wren.core.identity`` (``USER_ID_HEADER`` / ``INTERNAL_TOKEN_HEADER``): the RS
 and the backend are separate images with no shared code, so this is a duplicated
-domain truth kept in sync by contract (asserted in the client tests).
+domain truth kept in sync by contract. The equality is mechanically enforced by
+the cross-package ``contract-drift`` check (``contract/tests/test_header_constants.py``),
+the only interpreter where both packages import together; the MCP client tests
+cannot catch drift against the backend because they compare the MCP constant only
+to itself.
 """
 
 from __future__ import annotations

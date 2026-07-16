@@ -13,7 +13,7 @@ import base64
 
 import pytest
 
-from roadmaps_read_builders import (
+from tests.roadmaps_read_builders import (
     CHK_ARRAYS_DRILL,
     CHK_ARRAYS_READ,
     CHK_HASH,
@@ -24,8 +24,9 @@ from roadmaps_read_builders import (
     SUB_HASHING,
     build_read_roadmap,
 )
+from wren.core.read_contract import ResponseFormat
 from wren.roadmaps import projections
-from wren.roadmaps.read_schemas import ResponseFormat, SearchHitKind, SectionInclude
+from wren.roadmaps.read_schemas import SearchHitKind, SectionInclude
 
 _ALL_ARRAYS = frozenset({CHK_ARRAYS_READ, CHK_ARRAYS_DRILL})
 

@@ -9,17 +9,21 @@ The service is backed by the in-memory repository; no database is required.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import pytest
 from fastapi import APIRouter, Depends, FastAPI, Request
 from fastapi.testclient import TestClient
 
-from accounts_fakes import InMemoryAccountRepository, build_test_codec, build_test_hasher
+from tests.support.fakes.accounts_fakes import (
+    InMemoryAccountRepository,
+    build_test_codec,
+    build_test_hasher,
+)
 from wren.accounts.api import create_accounts_router
 from wren.accounts.config import REFRESH_COOKIE_NAME, CookieConfig
 from wren.accounts.service import AccountService
 from wren.accounts.session import create_session_verifier
-from wren.accounts.tokens import SessionTokenCodec
 from wren.core.app_factory import create_app
 from wren.core.errors import build_exception_handlers
 from wren.core.identity import (
@@ -29,6 +33,9 @@ from wren.core.identity import (
     require_user,
 )
 from wren.core.settings import AppSettings
+
+if TYPE_CHECKING:
+    from wren.accounts.tokens import SessionTokenCodec
 
 MakeSettings = Callable[..., AppSettings]
 

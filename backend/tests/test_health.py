@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from wren.core.health import CheckResult, ReadinessCheck, create_health_router
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 def _client(checks: Sequence[ReadinessCheck] = ()) -> TestClient:

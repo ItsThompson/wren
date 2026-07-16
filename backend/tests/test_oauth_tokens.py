@@ -8,16 +8,30 @@ covered here too.
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
-from oauth_fakes import build_test_codec, build_test_config, build_test_keyset, make_pkce_pair
+from tests.oauth_fakes import (
+    MutableClock,
+    build_test_codec,
+    build_test_config,
+    build_test_keyset,
+    make_pkce_pair,
+)
+from wren.oauth.injection import Clock, utcnow
 from wren.oauth.pkce import is_valid_s256
 from wren.oauth.tokens import hash_token, mint_refresh_token
 
+if TYPE_CHECKING:
+    from wren.oauth.config import OAuthConfig
+    from wren.oauth.tokens import AccessTokenCodec
 
-def _codec(**config_overrides: object):
+
+def _codec(
+    *, clock: Clock = utcnow, **config_overrides: object
+) -> tuple[AccessTokenCodec, OAuthConfig]:
     config = build_test_config(**config_overrides)  # type: ignore[arg-type]
-    return build_test_codec(config, build_test_keyset(config)), config
+    return build_test_codec(config, build_test_keyset(config), clock=clock), config
 
 
 def test_minted_access_token_verifies_with_the_expected_claims() -> None:
@@ -47,11 +61,16 @@ def test_access_token_is_audience_bound_to_the_mcp_resource() -> None:
 
 
 def test_expired_access_token_fails_verification() -> None:
-    codec, config = _codec(access_ttl=timedelta(seconds=-1))
+    # Pinned clock: mint at t0, advance past the TTL, then verify against the same
+    # clock (no negative timedelta).
+    clock = MutableClock(datetime(2024, 1, 1, tzinfo=UTC))
+    codec, config = _codec(access_ttl=timedelta(minutes=15), clock=clock)
     minted = codec.mint(
         subject="user-1", client_id="client-1", scope="roadmaps:read", audience=config.resource
     )
-    assert codec.verify(minted.token) is None
+    assert codec.verify(minted.token) is not None  # valid before the TTL elapses
+    clock.advance(timedelta(minutes=16))
+    assert codec.verify(minted.token) is None  # expired after
 
 
 def test_tampered_access_token_fails_verification() -> None:

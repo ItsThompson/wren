@@ -11,13 +11,19 @@ is excluded from its own counters. A private ``CollectorRegistry`` keeps the RS
 independent of any other app sharing a process (the tests do); ``/metrics`` serves
 it concatenated with the shared
 :data:`~wren_mcp.tool_metrics.TOOL_METRICS_REGISTRY` (MCP tool-invocation counter).
+
+Kept in sync with :mod:`wren.core.metrics` by hand: the two differ only by which
+shared registry is concatenated onto ``/metrics`` (``TOOL_METRICS_REGISTRY`` here
+vs the backend's ``WREN_REGISTRY``). Any change to the HTTP-metric families or
+instrumentator wiring here MUST be mirrored there. See
+``docs/infra-duplication.md`` for the `wren-common` deferral and drift checklist.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
     CollectorRegistry,
@@ -30,6 +36,9 @@ from prometheus_fastapi_instrumentator.metrics import Info
 from starlette.responses import Response
 
 from wren_mcp.tool_metrics import TOOL_METRICS_REGISTRY
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 Instrumentation = Callable[[Info], None]
 

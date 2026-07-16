@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from roadmaps_fakes import InMemoryRoadmapRepository
+from tests.support.fakes.roadmaps_fakes import InMemoryRoadmapRepository
 from wren.core.errors import NotFound
 from wren.roadmaps.listing import FollowedReader, HandleResolver, ListingService, ProfileOwner
 from wren.roadmaps.models import RoadmapRecord

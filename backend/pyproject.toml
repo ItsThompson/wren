@@ -3,23 +3,27 @@ name = "wren"
 version = "0.1.0"
 description = "Wren backend: modular-monolith learning-roadmap platform (external :8000 + internal :8001 apps over one service layer)."
 requires-python = ">=3.12"
+# Upper-major caps are a safety net (the committed uv.lock is the source of
+# truth; `uv sync --frozen` enforces it). They bound an unpinned resolve to the
+# major we validated against. calver/security-sensitive deps (structlog,
+# cryptography) are intentionally left uncapped so patches are never blocked.
 dependencies = [
-    "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.32.0",
-    "pydantic>=2.9.0",
-    "pydantic-settings>=2.6.0",
+    "fastapi>=0.115.0,<1",
+    "uvicorn[standard]>=0.32.0,<1",
+    "pydantic>=2.9.0,<3",
+    "pydantic-settings>=2.6.0,<3",
     "structlog>=24.4.0",
-    "prometheus-client>=0.21.0",
-    "prometheus-fastapi-instrumentator>=7.0.0",
-    "sqlalchemy[asyncio]>=2.0.36",
-    "asyncpg>=0.30.0",
-    "alembic>=1.14.0",
-    "pyjwt>=2.9.0",
-    "bcrypt>=4.2.0",
-    "email-validator>=2.2.0",
-    "authlib>=1.3.0",
+    "prometheus-client>=0.21.0,<1",
+    "prometheus-fastapi-instrumentator>=7.0.0,<9",
+    "sqlalchemy[asyncio]>=2.0.36,<3",
+    "asyncpg>=0.30.0,<1",
+    "alembic>=1.14.0,<2",
+    "pyjwt>=2.9.0,<3",
+    "bcrypt>=4.2.0,<6",
+    "email-validator>=2.2.0,<3",
+    "authlib>=1.3.0,<2",
     "cryptography>=43.0.0",
-    "python-multipart>=0.0.9",
+    "python-multipart>=0.0.9,<1",
 ]
 
 [project.scripts]
@@ -28,14 +32,14 @@ wren-api-internal = "wren.api_internal.main:main"
 
 [dependency-groups]
 dev = [
-    "pytest>=8.3.0",
-    "pytest-cov>=6.0.0",
-    "pytest-asyncio>=0.24.0",
-    "httpx>=0.27.0",
-    "ruff>=0.8.0",
-    "mypy>=1.13.0",
-    "testcontainers[postgres]>=4.8.0",
-    "hypothesis>=6.100.0",
+    "pytest>=8.3.0,<10",
+    "pytest-cov>=6.0.0,<8",
+    "pytest-asyncio>=0.24.0,<2",
+    "httpx>=0.27.0,<1",
+    "ruff>=0.8.0,<1",
+    "mypy>=1.13.0,<3",
+    "testcontainers[postgres]>=4.8.0,<5",
+    "hypothesis>=6.100.0,<7",
 ]
 
 [build-system]
@@ -46,32 +50,28 @@ build-backend = "hatchling.build"
 packages = ["src/wren"]
 
 [tool.ruff]
-line-length = 100
+# Shared line-length/target-version/lint config lives in the repo-root ruff.toml;
+# only per-package bits stay here. `src` is kept local so first-party import
+# detection resolves against this package's own src/tests, not the repo root.
+extend = "../ruff.toml"
 src = ["src", "tests"]
-target-version = "py312"
 
-[tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
-
-[tool.ruff.lint.flake8-bugbear]
-# FastAPI's dependency-injection idiom calls Depends()/Query()/... in argument
-# defaults by design; these are immutable markers, not mutable-default bugs.
-extend-immutable-calls = [
-    "fastapi.Depends",
-    "fastapi.Query",
-    "fastapi.Path",
-    "fastapi.Header",
-    "fastapi.Cookie",
-    "fastapi.Body",
-]
+[tool.ruff.lint.per-file-ignores]
+# Tests assert liberally (S101), pass dummy secrets as arguments (S106), bundle
+# multi-condition assertions (PT018), catch broad exceptions to skip when Docker
+# is unavailable (BLE001), unpack fixtures they do not all consume (RUF059), and
+# exercise the bind-all host as test data (S104).
+"tests/**/*.py" = ["S101", "S104", "S106", "PT018", "BLE001", "RUF059"]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
 mypy_path = "src"
-# Type-check the package plus the Alembic env module (which imports wren and is
-# otherwise unchecked); packages= alone only covers src/wren.
-files = ["src/wren", "alembic/env.py"]
+# Type-check the package, the Alembic env module, and the test suite. The test
+# suite is packaged (``tests/__init__.py`` + ``pythonpath = ["src", "."]``), so
+# ``tests.support.fakes.*`` resolves and the hand-written fakes are held to the
+# protocols they implement (a diverged fake signature fails ``mypy --strict``).
+files = ["src/wren", "alembic/env.py", "tests"]
 
 [[tool.mypy.overrides]]
 # Authlib ships no type stubs; only its OAuth RFC helpers are used (PKCE), and
@@ -79,10 +79,20 @@ files = ["src/wren", "alembic/env.py"]
 module = ["authlib.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# testcontainers ships no py.typed marker; it is imported only by the
+# Docker-gated integration tests (skipped when Docker is unavailable).
+module = ["testcontainers.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+# "." (the backend root) puts the packaged ``tests`` on the import path so test
+# modules use absolute imports (``from tests.support.fakes.X import ...``);
+# ``src`` keeps first-party ``wren`` imports resolving. ``testpaths`` recurses
+# into tests/support and any subfolders unchanged.
+pythonpath = ["src", "."]
 testpaths = ["tests"]
-addopts = "--cov=wren --cov-report=term-missing"
+addopts = "--cov=wren --cov-report=term-missing --strict-markers --strict-config"
 asyncio_mode = "auto"
 markers = [
     "integration: requires a real Postgres via testcontainers (Docker); skipped when Docker is unavailable.",
@@ -94,6 +104,10 @@ branch = true
 
 [tool.coverage.report]
 show_missing = true
+# Hard coverage floor enforced by every `pytest` run (local and `just
+# test-backend`), not just CI; the redundant `--cov-fail-under` CLI flag was
+# dropped from ci.yml when this moved here.
+fail_under = 80
 exclude_lines = [
     "pragma: no cover",
     "if __name__ == .__main__.:",

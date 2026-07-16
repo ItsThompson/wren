@@ -13,19 +13,19 @@ from datetime import date
 
 import pytest
 
-from progress_builders import (
+from tests.support.fakes.progress_builders import (
     CHK_ARRAYS_DRILL,
     CHK_ARRAYS_READ,
     CHK_HASH,
     build_roadmap,
     make_record,
 )
-from progress_fakes import InMemoryProgressRepository
-from roadmaps_fakes import InMemoryRoadmapRepository
+from tests.support.fakes.progress_fakes import InMemoryProgressRepository
+from tests.support.fakes.roadmaps_fakes import InMemoryRoadmapRepository
 from wren.core.errors import Conflict, NotFound, Validation
+from wren.core.read_contract import ResponseFormat
 from wren.progress.schemas import CompletionState
 from wren.progress.service import ProgressService
-from wren.roadmaps.read_schemas import ResponseFormat
 from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
 
 _OWNER = "owner"
@@ -310,7 +310,7 @@ async def test_progress_is_scoped_per_user() -> None:
 class _FailingProgressRepository(InMemoryProgressRepository):
     """Upsert always fails, to exercise the service's rollback path."""
 
-    async def upsert(self, progress: object) -> None:  # type: ignore[override]
+    async def upsert(self, progress: object) -> None:
         raise RuntimeError("boom")
 
 

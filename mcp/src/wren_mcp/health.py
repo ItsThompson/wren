@@ -7,6 +7,13 @@
 Readiness checks are injected, so this module stays dependency-free. The RS wires
 a JWKS check (:func:`jwks_readiness_check`): the RS cannot validate any token
 without the AS public keys, so unreachable JWKS is "not ready".
+
+Kept in sync with :mod:`wren.core.health` by hand: the shared core
+(``CheckResult``, the ``ReadinessCheck`` contract, the aggregator,
+:func:`create_health_router`) is identical; this copy adds exactly one MCP-only
+:func:`jwks_readiness_check`. Any change to the shared core here MUST be mirrored
+there. See ``docs/infra-duplication.md`` for the `wren-common` deferral and
+drift checklist.
 """
 
 from __future__ import annotations
@@ -14,11 +21,13 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from wren_mcp.keys import KeyProvider
+if TYPE_CHECKING:
+    from wren_mcp.keys import KeyProvider
 
 HEALTHZ_ENDPOINT = "/healthz"
 READYZ_ENDPOINT = "/readyz"
