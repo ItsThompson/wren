@@ -159,6 +159,31 @@ test_dry_run_pull_and_start_use_overlay_and_profile() {
   contains "${out}" "-f docker-compose.yml -f docker-compose.tunnel.yml --profile tunnels up -d" || return 1
 }
 
+test_dry_run_uses_compose_secrets_without_chowning_sources() {
+  source "${DEPLOY}"
+  CRED_DIR="$(make_cred_dir)"
+  DRY_RUN=1
+  local out
+  out="$(main 203.0.113.10 deploy 2>&1)"
+  contains "${out}" "Phase 9b: assert runtime secret source files" || return 1
+  contains "${out}" "runtime secrets loaded from chmod 600 source files" || return 1
+  not_contains "${out}" "chown 999:999" || return 1
+  not_contains "${out}" "chown 65532:65532" || return 1
+  not_contains "${out}" "chown 65534:65534" || return 1
+}
+
+test_compose_overlay_declares_environment_backed_runtime_secrets() {
+  local overlay
+  overlay="$(cat "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/docker-compose.tunnel.yml")"
+  contains "${overlay}" "environment: WREN_OAUTH_PRIVATE_KEY" || return 1
+  contains "${overlay}" "environment: WREN_CLOUDFLARED_CREDENTIALS" || return 1
+  contains "${overlay}" "environment: WREN_ALERTMANAGER_CONFIG" || return 1
+  contains "${overlay}" "target: /run/secrets/oauth_private_key" || return 1
+  contains "${overlay}" "target: /etc/cloudflared/credentials.json" || return 1
+  contains "${overlay}" "target: /etc/alertmanager/alertmanager.yml" || return 1
+  not_contains "${overlay}" '${OAUTH_PRIVATE_KEY_PATH}:' || return 1
+}
+
 test_preflight_fails_on_missing_credential() {
   source "${DEPLOY}"
   CRED_DIR="${TMPDIR:-/tmp}/wren-empty.$$.${RANDOM}"
@@ -184,6 +209,7 @@ test_rollback_repulls_all_first_party_pins_git_and_up() {
   remote() { printf '%s\n' "$*" >> "${calls}"; }
   first_party_images() { printf '%s\n' "ghcr.io/o/wren/backend" "ghcr.io/o/wren/mcp" "ghcr.io/o/wren/frontend"; }
   render_configs() { :; }
+  run_tunnel_compose() { local tag="$1"; shift; printf 'WREN_IMAGE_TAG=%s %s %s\n' "${tag}" "${COMPOSE_TUNNEL}" "$*" >> "${calls}"; }
 
   rollback "abc123" >/dev/null 2>&1
 
@@ -238,6 +264,8 @@ main_tests() {
   run_test test_dry_run_full_phase_sequence
   run_test test_dry_run_migrations_before_start
   run_test test_dry_run_pull_and_start_use_overlay_and_profile
+  run_test test_dry_run_uses_compose_secrets_without_chowning_sources
+  run_test test_compose_overlay_declares_environment_backed_runtime_secrets
   run_test test_preflight_fails_on_missing_credential
   run_test test_rollback_repulls_all_first_party_pins_git_and_up
   run_test test_rollback_without_prev_sha_cannot_proceed

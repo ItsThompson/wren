@@ -22,7 +22,7 @@
 #                    (default https://github.com/${GITHUB_REPOSITORY:-wren-platform/wren}.git).
 #
 # Phases: preflight -> ssh probe -> dep install -> docker daemon config ->
-# prune cron -> repo sync -> copy tunnel credentials -> assert secrets ->
+# prune cron -> repo sync -> copy tunnel credentials -> assert secret sources ->
 # render deploy configs + pull -> pre-traffic migrations -> start ->
 # health gate -> (rollback on failure) -> cleanup on success.
 #
@@ -98,6 +98,39 @@ copy_to_remote() {
     return 0
   fi
   scp "${SSH_OPTS[@]}" "${src}" "${SSH_TARGET}:${dest}"
+}
+
+# Run a deploy overlay compose command with secret contents supplied from the
+# restricted source files. The values live only in the remote docker compose
+# process environment long enough for Compose to materialize read-only secrets;
+# never print them or pass them on the command line.
+run_tunnel_compose() {
+  local image_tag="$1"
+  shift
+  local compose_args="$*"
+  if is_dry_run; then
+    local tag_prefix=""
+    [[ -n "${image_tag}" ]] && tag_prefix="WREN_IMAGE_TAG=${image_tag} "
+    remote "cd ${REMOTE_DIR} && <runtime secrets loaded from chmod 600 source files> ${tag_prefix}${COMPOSE_TUNNEL} ${compose_args}"
+    return 0
+  fi
+  remote_script "${REMOTE_DIR}" "${COMPOSE_TUNNEL}" "${image_tag}" "${compose_args}" <<'REMOTE'
+set -euo pipefail
+DIR="$1"; COMPOSE_CMD="$2"; IMAGE_TAG="$3"; COMPOSE_ARGS="$4"
+cd "$DIR"
+set -a; . ./.env; set +a
+: "${OAUTH_PRIVATE_KEY_PATH:?OAUTH_PRIVATE_KEY_PATH must be set in /opt/wren/.env (bring-up)}"
+WREN_OAUTH_PRIVATE_KEY="$(cat "$OAUTH_PRIVATE_KEY_PATH")"
+WREN_CLOUDFLARED_CREDENTIALS="$(cat deployments/cloudflare/credentials.json)"
+WREN_ALERTMANAGER_CONFIG="$(cat deployments/alertmanager/alertmanager.rendered.yml)"
+export WREN_OAUTH_PRIVATE_KEY WREN_CLOUDFLARED_CREDENTIALS WREN_ALERTMANAGER_CONFIG
+if [ -n "$IMAGE_TAG" ]; then
+  export WREN_IMAGE_TAG="$IMAGE_TAG"
+fi
+# COMPOSE_CMD and COMPOSE_ARGS are deploy-script constants, not user input.
+# shellcheck disable=SC2086
+${COMPOSE_CMD} ${COMPOSE_ARGS}
+REMOTE
 }
 
 # --- Pure helpers (unit-testable without SSH) -------------------------------
@@ -323,13 +356,44 @@ set -a; . ./.env; set +a
 # container crash-loop until the health gate times out and rolls back.
 : "${DISCORD_WEBHOOK_URL:?DISCORD_WEBHOOK_URL must be set in /opt/wren/.env (bring-up)}"
 # Substitute ONLY the webhook token (single-var allow-list) so the Go templating
-# ({{ ... }}) in title/message survives. The rendered file holds a real secret,
-# so chmod 600; it is gitignored and mounted by the alertmanager service.
+# ({{ ... }}) in title/message survives. The rendered file holds a real secret;
+# deploy.sh passes it to Compose as an environment-backed secret before any `up`.
 envsubst '${DISCORD_WEBHOOK_URL}' \
   < deployments/alertmanager/alertmanager.yml \
   > deployments/alertmanager/alertmanager.rendered.yml
 chmod 600 deployments/alertmanager/alertmanager.rendered.yml
-echo "    rendered deployments/alertmanager/alertmanager.rendered.yml (chmod 600)"
+echo "    rendered deployments/alertmanager/alertmanager.rendered.yml"
+REMOTE
+}
+
+assert_runtime_secret_sources_restricted() {
+  log "==> Phase 9b: assert runtime secret source files (chmod 600)"
+  remote_script "${REMOTE_DIR}" <<'REMOTE'
+set -euo pipefail
+DIR="$1"
+cd "$DIR"
+set -a; . ./.env; set +a
+: "${OAUTH_PRIVATE_KEY_PATH:?OAUTH_PRIVATE_KEY_PATH must be set in /opt/wren/.env (bring-up)}"
+check_secret_file() {
+  path="$1"; label="$2"
+  if [ ! -f "$path" ]; then
+    echo "ERROR: $label missing at $path." >&2
+    exit 1
+  fi
+  if [ ! -s "$path" ]; then
+    echo "ERROR: $label is empty at $path." >&2
+    exit 1
+  fi
+  mode="$(stat -c '%a' "$path")"
+  if [ "$mode" != "600" ]; then
+    echo "ERROR: $label must be chmod 600 (got $mode) at $path." >&2
+    exit 1
+  fi
+}
+check_secret_file "$OAUTH_PRIVATE_KEY_PATH" "OAuth key"
+check_secret_file deployments/cloudflare/credentials.json "Cloudflare tunnel credentials"
+check_secret_file deployments/alertmanager/alertmanager.rendered.yml "Alertmanager rendered config"
+echo "    restricted source files ready for Compose environment-backed secrets"
 REMOTE
 }
 
@@ -338,12 +402,13 @@ REMOTE
 render_configs() {
   render_tunnel_config
   render_alertmanager_config
+  assert_runtime_secret_sources_restricted
 }
 
 render_and_pull() {
   render_configs
-  log "==> Phase 9b: docker compose pull"
-  remote "cd ${REMOTE_DIR} && ${COMPOSE_TUNNEL} pull"
+  log "==> Phase 9c: docker compose pull"
+  run_tunnel_compose "" pull
 }
 
 # --- Phase 10: migrations (explicit, pre-traffic) ---------------------------
@@ -373,7 +438,7 @@ run_migrations() {
   remote "cd ${REMOTE_DIR} && ${COMPOSE} up -d postgres"
   wait_service_healthy postgres 24 5 \
     || die "postgres did not become healthy; aborting before migrations"
-  remote "cd ${REMOTE_DIR} && ${COMPOSE} run --rm backend alembic upgrade head" \
+  run_tunnel_compose "" run --rm backend alembic upgrade head \
     || die "migration failed: aborting before app containers start"
   log "    migrations applied"
 }
@@ -382,7 +447,7 @@ run_migrations() {
 
 start_stack() {
   log "==> Phase 11: start stack (docker compose --profile tunnels up -d)"
-  remote "cd ${REMOTE_DIR} && ${COMPOSE_TUNNEL} up -d"
+  run_tunnel_compose "" up -d
 }
 
 # --- Phase 12: health gate (~60s) -------------------------------------------
@@ -439,7 +504,7 @@ rollback() {
   remote "git -C ${REMOTE_DIR} reset --hard ${prev}"
   render_configs
   log "    bringing the stack back up on :sha-${prev}"
-  remote "cd ${REMOTE_DIR} && WREN_IMAGE_TAG=sha-${prev} ${COMPOSE_TUNNEL} up -d"
+  run_tunnel_compose "sha-${prev}" up -d
 }
 
 # --- Phase 14: success bookkeeping ------------------------------------------

@@ -20,12 +20,16 @@ services:
     image: cloudflare/cloudflared:2026.7.1
     profiles: [tunnels]
     command: tunnel --config /etc/cloudflared/config.yml run
-    # Rendered ingress config + named-tunnel credentials, both read-only.
-    # deploy.sh renders config.rendered.yml (envsubst) and copies
-    # credentials.json (chmod 600); both are gitignored.
+    # Rendered ingress config is not sensitive; named-tunnel credentials are a
+    # Compose secret populated by deploy.sh from the chmod 600 source file.
     volumes:
       - ./deployments/cloudflare/config.rendered.yml:/etc/cloudflared/config.yml:ro
-      - ./deployments/cloudflare/credentials.json:/etc/cloudflared/credentials.json:ro
+    secrets:
+      - source: cloudflared_credentials
+        target: /etc/cloudflared/credentials.json
+        uid: "${WREN_CLOUDFLARED_UID:-65532}"
+        gid: "${WREN_CLOUDFLARED_GID:-65532}"
+        mode: 0400
     networks:
       - edge-net
     depends_on:
@@ -39,21 +43,44 @@ services:
           memory: 128M
     restart: unless-stopped
 
-  # The OAuth AS signing key is a mounted secret: the
-  # operator places the PEM on the host at OAUTH_PRIVATE_KEY_PATH (chmod 600) at
-  # bring-up, and deploy.sh asserts it exists before starting the stack. Bind-mount
-  # it read-only at the SAME path inside the container, so the app opens it at
-  # exactly the OAUTH_PRIVATE_KEY_PATH it already reads from .env (one value; host
-  # path == container path). Without this the AS fails fast on boot outside
-  # development and the deploy health gate rolls back. Deploy-only (this overlay):
-  # local `just up` and the CI e2e stack run ENVIRONMENT=development and generate
-  # an ephemeral in-memory key, so the base file mounts nothing.
+  # The OAuth AS signing key is a Compose secret: the operator places the PEM on
+  # the host at OAUTH_PRIVATE_KEY_PATH (chmod 600) at bring-up, and deploy.sh
+  # feeds it to Compose without changing the source file owner. The backend reads
+  # the container-only secret path below instead of the host path from .env.
+  # Deploy-only (this overlay): local `just up` and the CI e2e stack run
+  # ENVIRONMENT=development and generate an ephemeral in-memory key, so the base
+  # file mounts nothing.
   backend:
-    volumes:
-      - ${OAUTH_PRIVATE_KEY_PATH:?set OAUTH_PRIVATE_KEY_PATH in /opt/wren/.env at bring-up (see docs/runbooks/bring-up.md)}:${OAUTH_PRIVATE_KEY_PATH}:ro
+    environment:
+      OAUTH_PRIVATE_KEY_PATH: /run/secrets/oauth_private_key
+    secrets:
+      - source: oauth_private_key
+        target: /run/secrets/oauth_private_key
+        uid: "${WREN_BACKEND_UID:-999}"
+        gid: "${WREN_BACKEND_GID:-999}"
+        mode: 0400
+
+  alertmanager:
+    secrets:
+      - source: alertmanager_config
+        target: /etc/alertmanager/alertmanager.yml
+        uid: "${WREN_ALERTMANAGER_UID:-65534}"
+        gid: "${WREN_ALERTMANAGER_GID:-65534}"
+        mode: 0400
 
 # edge-net is defined in the base file; redeclared here (identical) so the
 # overlay is self-consistent when merged.
 networks:
   edge-net:
     driver: bridge
+
+# Environment-backed secrets are intentional: Docker Compose local file secrets
+# ignore uid/gid/mode because they are bind mounts, but environment secrets honor
+# the per-service ownership/mode below.
+secrets:
+  oauth_private_key:
+    environment: WREN_OAUTH_PRIVATE_KEY
+  cloudflared_credentials:
+    environment: WREN_CLOUDFLARED_CREDENTIALS
+  alertmanager_config:
+    environment: WREN_ALERTMANAGER_CONFIG

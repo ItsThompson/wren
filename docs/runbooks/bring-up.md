@@ -183,9 +183,9 @@ sudo openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /opt/wren
 sudo chmod 600 /opt/wren/secrets/oauth_private.pem
 ```
 
-The path must equal `OAUTH_PRIVATE_KEY_PATH`. `docker-compose.tunnel.yml`
-bind-mounts this PEM read-only into the backend container **at the same path**, so
-the AS reads it where `.env` says it is. The MCP Resource Server verifies agent
+The path must equal `OAUTH_PRIVATE_KEY_PATH` in `/opt/wren/.env`. `deploy.sh`
+keeps this source PEM `chmod 600` on the VPS and feeds it to Docker Compose as a
+read-only backend secret at runtime. The MCP Resource Server verifies agent
 tokens against the public JWKS the AS derives from this key.
 
 ### C3. Tunnel credentials
@@ -198,8 +198,10 @@ cp ~/.cloudflared/<UUID>.json  deployments/cloudflare/credentials.json
 cp ~/.cloudflared/cert.pem     deployments/cloudflare/cert.pem
 ```
 
-`deploy.sh` copies them to `/opt/wren/deployments/cloudflare/` and `chmod 600`s
-them on the box. Thereafter CD supplies them from the repo secrets (Phase D).
+`deploy.sh` copies them to `/opt/wren/deployments/cloudflare/`, `chmod 600`s
+them on the box, and feeds `credentials.json` to Docker Compose as a read-only
+cloudflared secret at runtime. Thereafter CD supplies them from the repo secrets
+(Phase D).
 
 ---
 
