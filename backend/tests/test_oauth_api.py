@@ -426,6 +426,22 @@ def test_development_cors_allows_mcp_inspector_oauth_callback(
     assert response.headers["access-control-allow-origin"] == "http://localhost:6274"
 
 
+def test_production_cors_rejects_the_mcp_inspector_origin(
+    make_settings: MakeSettings,
+) -> None:
+    # The Inspector widening is gated on is_dev: outside development the preflight
+    # from :6274 must not be echoed back, so prod CORS stays locked to the SPA.
+    fx = _build_client(make_settings, environment="production")
+    response = fx.client.options(
+        "/token",
+        headers={
+            "origin": "http://localhost:6274",
+            "access-control-request-method": "POST",
+        },
+    )
+    assert response.headers.get("access-control-allow-origin") != "http://localhost:6274"
+
+
 def test_cors_preflight_is_answered(make_settings: MakeSettings) -> None:
     fx = _build_client(make_settings)
     response = fx.client.options(
