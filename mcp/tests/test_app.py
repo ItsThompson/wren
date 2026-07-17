@@ -73,6 +73,17 @@ def test_prm_is_served_from_pinned_config(make_settings: MakeSettings) -> None:
     assert body["authorization_servers"] == [ISSUER]
 
 
+def test_prm_is_served_from_transport_scoped_discovery_path(
+    make_settings: MakeSettings,
+) -> None:
+    client = _build(make_settings)
+
+    response = client.get(f"{PRM_PATH}{MCP_PATH}")
+
+    assert response.status_code == 200
+    assert response.json()["resource"] == RESOURCE
+
+
 def test_prm_urls_ignore_the_request_host(make_settings: MakeSettings) -> None:
     # The Site-URL gotcha: even if a client reaches the origin under a different
     # Host, the PRM advertises the pinned resource/issuer.
@@ -126,6 +137,24 @@ def test_unauthenticated_tool_call_is_401_pointing_at_the_prm(make_settings: Mak
     assert response.status_code == 401
     challenge = response.headers["WWW-Authenticate"]
     assert challenge == f'Bearer resource_metadata="{RESOURCE}{PRM_PATH}"'
+
+
+def test_development_cors_allows_mcp_inspector_discovery_preflight(
+    make_settings: MakeSettings,
+) -> None:
+    client = _build(lambda **overrides: make_settings(environment="development", **overrides))
+
+    response = client.options(
+        f"{PRM_PATH}{MCP_PATH}",
+        headers={
+            "origin": "http://localhost:6274",
+            "access-control-request-method": "GET",
+            "access-control-request-headers": "mcp-protocol-version",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:6274"
 
 
 def test_valid_bearer_passes_the_boundary(make_settings: MakeSettings) -> None:

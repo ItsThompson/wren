@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 from fastapi import APIRouter, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from wren_mcp.auth import BearerAuthMiddleware
@@ -49,6 +50,7 @@ if TYPE_CHECKING:
 _DISCOVERY_TIMEOUT_SECONDS = 10.0
 # Metadata responses must not be cached by intermediaries.
 _NO_STORE = {"Cache-Control": "no-store"}
+_INSPECTOR_ORIGIN = "http://localhost:6274"
 
 
 def _compose_lifespan(
@@ -78,10 +80,21 @@ def _create_prm_router(settings: RsSettings) -> APIRouter:
     router = APIRouter(tags=["oauth"])
     document = build_prm_document(resource=settings.resource, issuer=settings.issuer)
 
-    @router.get(PRM_PATH, include_in_schema=False)
     async def protected_resource_metadata() -> JSONResponse:
         return JSONResponse(document, headers=_NO_STORE)
 
+    router.add_api_route(
+        PRM_PATH,
+        protected_resource_metadata,
+        methods=["GET"],
+        include_in_schema=False,
+    )
+    router.add_api_route(
+        f"{PRM_PATH}{MCP_PATH}",
+        protected_resource_metadata,
+        methods=["GET"],
+        include_in_schema=False,
+    )
     return router
 
 
@@ -140,10 +153,21 @@ def create_rs_app(
     )
     instrument(app)
 
-    # Correlation is mounted last so it is the outermost middleware: request_id is
-    # bound before the metrics middleware, the bearer guard, and the tool layer
-    # run, so the non-guarded paths (/health, /metrics, PRM) are correlated too.
+    # Correlation is mounted last in production so it is the outermost middleware:
+    # request_id is bound before the metrics middleware, the bearer guard, and the
+    # tool layer run, so the non-guarded paths (/health, /metrics, PRM) are
+    # correlated too.
     app.add_middleware(CorrelationMiddleware, service=settings.service)
+    if settings.is_dev:
+        # The browser-based MCP Inspector performs OAuth discovery and token
+        # exchange fetches directly from its client origin. Keep this local-only;
+        # production agents are not browsers and do not need CORS here.
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=[_INSPECTOR_ORIGIN],
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
     log.info(
         "mcp_configured",

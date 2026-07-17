@@ -134,13 +134,13 @@ app.state.session_verifier = (
 )
 # Strip any client-supplied X-User-ID app-wide: the external app never trusts it.
 app.add_middleware(StripInboundIdentityMiddleware)
-# CORS for the SPA's credentialed consent/login XHRs: a single
-# allowed origin with credentials so the cross-subdomain cookie flow works
-# (/authorize/context, /authorize/decision, /me/clients). Added last so it is the
-# outermost middleware and handles preflight before the identity strip.
+# CORS for credentialed browser XHRs: the SPA origin for consent/login, plus the
+# local MCP Inspector origin in development so its OAuth callback can exchange
+# the authorization code. Added last so it is the outermost middleware and
+# handles preflight before the identity strip.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.allowed_cors_origin],
+    allow_origins=settings.allowed_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
