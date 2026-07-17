@@ -124,11 +124,6 @@ class AppSettings(BaseModel):
             origins.append(MCP_INSPECTOR_ORIGIN)
         return origins
 
-    @property
-    def allowed_cors_origin(self) -> str:
-        """Compatibility accessor for the primary SPA CORS origin."""
-        return self.allowed_cors_origins[0]
-
 
 def build_app_settings(*, service: str, port: int, env: EnvSettings | None = None) -> AppSettings:
     """Compose per-app settings from injected identity and shared env config."""
