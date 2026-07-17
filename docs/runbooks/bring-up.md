@@ -15,6 +15,17 @@ box is rebuilt.
 None of these can be produced by the codebase or CI; the operator provides them:
 
 1. **A VPS** (Ubuntu LTS) with root or sudo shell access, and its public IP.
+   **Chosen box: Hetzner Cloud CX33** (shared x86, 4 vCPU / 8 GB RAM / 80 GB SSD,
+   ~€8.49/mo excl. VAT, eu-central FSN/NBG). Add the primary IPv4; skip the
+   backup add-on for now (off-host `pg_dump` is the post-P0 plan). Why CX33:
+   - **8 GB RAM** clears the ~3.75 GiB sum of compose memory ceilings with OS +
+     Docker-daemon + burst headroom; the 4 GB entry tier (CX23) sits *below* that
+     sum and risks OOM under the always-on Postgres + Prometheus tenants.
+   - **x86_64** is a drop-in for the current amd64-only first-party images: no
+     multi-arch `cd.yml` change needed (ARM/CAX would require one **and** is now
+     pricier than CX post the Jun 2026 price adjustment).
+   - **4 shared vCPU** matches the 4.0 vCPU ceiling budget; ample at ~5 users
+     since limits are ceilings, not reservations, and builds run in CI, not here.
 2. **An SSH keypair** for the non-root `deploy` user (CD uses the private half).
 3. **A Cloudflare account** with the `usewren.com` zone (DNS managed by Cloudflare)
    and `cloudflared` installed locally to create the tunnel.
