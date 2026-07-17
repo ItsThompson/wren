@@ -50,7 +50,6 @@ if TYPE_CHECKING:
 _DISCOVERY_TIMEOUT_SECONDS = 10.0
 # Metadata responses must not be cached by intermediaries.
 _NO_STORE = {"Cache-Control": "no-store"}
-_INSPECTOR_ORIGIN = "http://localhost:6274"
 
 
 def _compose_lifespan(
@@ -158,13 +157,14 @@ def create_rs_app(
     # tool layer run, so the non-guarded paths (/health, /metrics, PRM) are
     # correlated too.
     app.add_middleware(CorrelationMiddleware, service=settings.service)
-    if settings.is_dev:
-        # The browser-based MCP Inspector performs OAuth discovery and token
-        # exchange fetches directly from its client origin. Keep this local-only;
-        # production agents are not browsers and do not need CORS here.
+    if settings.allowed_cors_origins:
+        # Dev-only (see ``RsSettings.allowed_cors_origins``): the browser MCP
+        # Inspector runs OAuth discovery and token-exchange fetches from its own
+        # origin, so it needs CORS. Mounted outermost so a preflight to the
+        # bearer-guarded /mcp transport clears CORS before the guard 401s it.
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=[_INSPECTOR_ORIGIN],
+            allow_origins=settings.allowed_cors_origins,
             allow_methods=["*"],
             allow_headers=["*"],
         )
