@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 from fastapi import APIRouter, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from wren_mcp.auth import BearerAuthMiddleware
@@ -78,10 +79,21 @@ def _create_prm_router(settings: RsSettings) -> APIRouter:
     router = APIRouter(tags=["oauth"])
     document = build_prm_document(resource=settings.resource, issuer=settings.issuer)
 
-    @router.get(PRM_PATH, include_in_schema=False)
     async def protected_resource_metadata() -> JSONResponse:
         return JSONResponse(document, headers=_NO_STORE)
 
+    router.add_api_route(
+        PRM_PATH,
+        protected_resource_metadata,
+        methods=["GET"],
+        include_in_schema=False,
+    )
+    router.add_api_route(
+        f"{PRM_PATH}{MCP_PATH}",
+        protected_resource_metadata,
+        methods=["GET"],
+        include_in_schema=False,
+    )
     return router
 
 
@@ -140,10 +152,22 @@ def create_rs_app(
     )
     instrument(app)
 
-    # Correlation is mounted last so it is the outermost middleware: request_id is
-    # bound before the metrics middleware, the bearer guard, and the tool layer
-    # run, so the non-guarded paths (/health, /metrics, PRM) are correlated too.
+    # Correlation is mounted last in production so it is the outermost middleware:
+    # request_id is bound before the metrics middleware, the bearer guard, and the
+    # tool layer run, so the non-guarded paths (/health, /metrics, PRM) are
+    # correlated too.
     app.add_middleware(CorrelationMiddleware, service=settings.service)
+    if settings.allowed_cors_origins:
+        # Dev-only (see ``RsSettings.allowed_cors_origins``): the browser MCP
+        # Inspector runs OAuth discovery and token-exchange fetches from its own
+        # origin, so it needs CORS. Mounted outermost so a preflight to the
+        # bearer-guarded /mcp transport clears CORS before the guard 401s it.
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.allowed_cors_origins,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
     log.info(
         "mcp_configured",

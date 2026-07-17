@@ -60,7 +60,7 @@ class _Fixture:
         self.config = config
 
 
-def _build_client(make_settings: MakeSettings) -> _Fixture:
+def _build_client(make_settings: MakeSettings, **settings_overrides: object) -> _Fixture:
     config = build_test_config()
     keyset = build_test_keyset(config)
     codec = build_test_codec(config, keyset)
@@ -78,7 +78,7 @@ def _build_client(make_settings: MakeSettings) -> _Fixture:
         authorization_provider=auth_provider,
         token_provider=token_provider,
     )
-    settings: AppSettings = make_settings(cors_origin="https://usewren.com")
+    settings: AppSettings = make_settings(cors_origin="https://usewren.com", **settings_overrides)
     app: FastAPI = create_app(
         settings,
         routers=[router],
@@ -92,7 +92,7 @@ def _build_client(make_settings: MakeSettings) -> _Fixture:
     app.add_middleware(StripInboundIdentityMiddleware)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[settings.allowed_cors_origin],
+        allow_origins=settings.allowed_cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -409,6 +409,37 @@ def test_cors_allows_the_configured_origin_with_credentials(make_settings: MakeS
     response = fx.client.get("/jwks", headers={"origin": "https://usewren.com"})
     assert response.headers["access-control-allow-origin"] == "https://usewren.com"
     assert response.headers["access-control-allow-credentials"] == "true"
+
+
+def test_development_cors_allows_mcp_inspector_oauth_callback(
+    make_settings: MakeSettings,
+) -> None:
+    fx = _build_client(make_settings, environment="development")
+    response = fx.client.options(
+        "/token",
+        headers={
+            "origin": "http://localhost:6274",
+            "access-control-request-method": "POST",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:6274"
+
+
+def test_production_cors_rejects_the_mcp_inspector_origin(
+    make_settings: MakeSettings,
+) -> None:
+    # The Inspector widening is gated on is_dev: outside development the preflight
+    # from :6274 must not be echoed back, so prod CORS stays locked to the SPA.
+    fx = _build_client(make_settings, environment="production")
+    response = fx.client.options(
+        "/token",
+        headers={
+            "origin": "http://localhost:6274",
+            "access-control-request-method": "POST",
+        },
+    )
+    assert response.headers.get("access-control-allow-origin") != "http://localhost:6274"
 
 
 def test_cors_preflight_is_answered(make_settings: MakeSettings) -> None:

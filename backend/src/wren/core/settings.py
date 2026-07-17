@@ -26,6 +26,7 @@ EXTERNAL_SERVICE = "wren-external"
 INTERNAL_SERVICE = "wren-internal"
 EXTERNAL_PORT = 8000
 INTERNAL_PORT = 8001
+MCP_INSPECTOR_ORIGIN = "http://localhost:6274"
 
 
 class EnvSettings(BaseSettings):
@@ -111,13 +112,17 @@ class AppSettings(BaseModel):
         return self.environment.lower() == "development"
 
     @property
-    def allowed_cors_origin(self) -> str:
-        """The single browser origin allowed to send credentialed SPA XHRs.
+    def allowed_cors_origins(self) -> list[str]:
+        """Browser origins allowed to send credentialed XHRs.
 
         Defaults to the SPA's own public URL when ``CORS_ORIGIN`` is unset, so
-        development (Vite on localhost) works without extra config.
+        development (Vite on localhost) works without extra config. Development
+        also allows the MCP Inspector callback page to complete the OAuth flow.
         """
-        return self.cors_origin or self.app_public_url
+        origins = [self.cors_origin or self.app_public_url]
+        if self.is_dev and MCP_INSPECTOR_ORIGIN not in origins:
+            origins.append(MCP_INSPECTOR_ORIGIN)
+        return origins
 
 
 def build_app_settings(*, service: str, port: int, env: EnvSettings | None = None) -> AppSettings:

@@ -16,6 +16,8 @@ from pathlib import Path
 from pydantic import BaseModel, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from wren_mcp.config import MCP_INSPECTOR_ORIGIN
+
 # `just dev-mcp` cd's into mcp/ before launching uvicorn, so a package-relative
 # ".env" silently misses the canonical repo-root .env (F27). Anchor it to the
 # repo root from this file's location so the host inner loop loads it regardless
@@ -73,6 +75,17 @@ class RsSettings(BaseModel):
     @property
     def is_dev(self) -> bool:
         return self.environment.lower() == "development"
+
+    @property
+    def allowed_cors_origins(self) -> list[str]:
+        """Browser origins allowed to call the RS directly.
+
+        Only the local MCP Inspector, and only in development: its browser runs
+        OAuth discovery and token-exchange fetches from its own origin, so it
+        needs CORS. Empty in production, where agents are not browsers, so
+        ``create_rs_app`` mounts no CORS middleware and the origin stays locked.
+        """
+        return [MCP_INSPECTOR_ORIGIN] if self.is_dev else []
 
 
 def build_rs_settings(env: EnvSettings | None = None) -> RsSettings:

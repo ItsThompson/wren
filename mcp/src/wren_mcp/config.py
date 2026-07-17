@@ -26,6 +26,13 @@ AS_METADATA_PATH = "/.well-known/oauth-authorization-server"
 # WWW-Authenticate; the tool dispatch sits behind the bearer guard.
 MCP_PATH = "/mcp"
 
+# The browser-based MCP Inspector's dev origin. Allowed for CORS only in
+# development (see ``RsSettings.allowed_cors_origins``) so its OAuth discovery
+# and token-exchange fetches reach this RS; production agents are not browsers.
+# Kept in sync with the backend AS's ``MCP_INSPECTOR_ORIGIN`` by contract
+# (separate images, no shared code).
+MCP_INSPECTOR_ORIGIN = "http://localhost:6274"
+
 # OAuth scopes advertised in the PRM. Mirrors the backend AS's
 # supported scopes so a client sees a consistent set on both documents.
 SCOPE_ROADMAPS_READ = "roadmaps:read"
