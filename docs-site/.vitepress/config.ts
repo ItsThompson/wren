@@ -1,0 +1,38 @@
+import { defineConfig } from "vitepress";
+
+// Customer-facing docs for docs.usewren.com. Served at the domain root, so
+// base is '/'. Markdown lives in docs/ (srcDir) while .vitepress/ stays at the
+// package root; the build emits static output to .vitepress/dist.
+export default defineConfig({
+  title: "Wren",
+  description:
+    "Wren documentation: connect an agent and follow learning roadmaps.",
+  base: "/",
+  srcDir: "docs",
+
+  // Clean URLs (/getting-started, no .html) match a modern docs site; nginx
+  // resolves them on deep links via a $uri.html probe with an index.html
+  // history fallback (see nginx.conf, US-DOCS-01).
+  cleanUrls: true,
+
+  // Dead links fail the build so broken internal links or missing pages cannot
+  // ship (US-DOCS-04). This is the VitePress default; set explicitly to make the
+  // build gate intentional.
+  ignoreDeadLinks: false,
+
+  themeConfig: {
+    nav: [
+      { text: "Home", link: "/" },
+      { text: "Getting Started", link: "/getting-started" },
+    ],
+    sidebar: [
+      {
+        text: "Guide",
+        items: [{ text: "Getting Started", link: "/getting-started" }],
+      },
+    ],
+    search: {
+      provider: "local",
+    },
+  },
+});
