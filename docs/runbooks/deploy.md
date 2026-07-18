@@ -63,6 +63,13 @@ ingress (scraped over `monitoring-net` only). Preview the rendered config with
 **Committed non-secret config:** `.env.prod` (sourced in the runner). Its keys and
 meanings mirror `.env.example`'s production values.
 
+**How app config reaches the containers:** the deploy layers a deploy-only overlay
+(`docker-compose.deploy.yml`) that loads `.env.prod` into backend/mcp via
+`env_file` (read CLI-side and transmitted over the context: no file on the box)
+and passes `SESSION_JWT_SECRET`/`INTERNAL_API_TOKEN` through from the runner env.
+The base file's `env_file: .env` stays the local-dev source; the overlay is never
+used locally, so a stray dev `.env` cannot leak into a deploy.
+
 **GitHub repo secrets** (CI/CD only): `DEPLOY_SSH_KEY`, `DEPLOY_SERVER_IP`,
 `POSTGRES_PASSWORD`, `SESSION_JWT_SECRET`, `INTERNAL_API_TOKEN`,
 `DISCORD_WEBHOOK_URL`, `WREN_OAUTH_PRIVATE_KEY` (RAW PEM),
@@ -88,6 +95,12 @@ nothing to roll back to.
 block re-deploying the previous image against the already-migrated DB. Migrations
 are forward-only; down-migrations are manual and out of scope. See `migration.md`
 and `rollback.md`.
+
+**First-deploy caveat:** on the very first rearchitected deploy the previous
+`.deployed-sha` (if the box was deployed under the old model) points at
+pre-rearchitecture code whose `deploy.sh` is incompatible with the context model;
+that rollback aborts cleanly at the old credential preflight. Clear the stale key
+at cutover (see `bring-up.md`) and treat the first deploy as fix-forward-only.
 
 ## First-time bring-up
 

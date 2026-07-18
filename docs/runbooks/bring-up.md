@@ -274,9 +274,23 @@ The script asserts every required config/secret env var is set → pulls → run
 **migrations pre-traffic** (`alembic upgrade head`; aborts on failure) → starts
 the stack under the `tunnels` profile over the context → **health-gates every
 service (~60s)** → records `/opt/wren/.deployed-sha` on success. On a failed gate
-it exits non-zero; CD (not the script) owns the rollback re-run. The **first**
-deploy has no previous `.deployed-sha`, so a failure cannot roll back and must be
-fixed forward.
+it exits non-zero; CD (not the script) owns the rollback re-run.
+
+**Cutover caveat (one-time).** If the box was previously deployed under the old
+model it still holds a `/opt/wren/.deployed-sha` pointing at a **pre-rearchitecture**
+commit. A failed first deploy would check that SHA out and run the OLD `deploy.sh`,
+which aborts at its local-credential preflight (CD no longer stages
+`credentials.json`/`cert.pem`), so the rollback fails cleanly without mutating the
+box. Treat the first rearchitected deploy as **fix-forward-only**, and clear the
+stale key first so a failure refuses rollback cleanly rather than running
+incompatible old code:
+
+```sh
+ssh deploy@<vps-ip> 'rm -f /opt/wren/.deployed-sha'
+```
+
+Run the cutover in a low-traffic window (containers recreate; `pgdata`/`promdata`
+persist).
 
 ---
 
