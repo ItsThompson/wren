@@ -10,11 +10,12 @@
  * Identifies a step. This is a const map + derived union rather than a TS
  * `enum`: the app tsconfig sets `erasableSyntaxOnly`, which forbids enums (see
  * `views/TreeView/types.ts` for the same pattern). Order is defined by the
- * ordered `STEPS` list (steps.ts), not by this map. This slice ships only
- * Welcome; later step ids are appended here alongside their step definitions.
+ * ordered `STEPS` list (steps.ts), not by this map.
  */
 export const OnboardingStepId = {
   WELCOME: 'welcome',
+  CONNECT_AGENT: 'connect_agent',
+  HOW_IT_WORKS: 'how_it_works',
 } as const
 
 export type OnboardingStepId = (typeof OnboardingStepId)[keyof typeof OnboardingStepId]
@@ -78,4 +79,19 @@ export interface OnboardingStepProps {
   isSubmitting: boolean
   /** Inline completion-failure message to surface on the step, or `null`. */
   error: string | null
+}
+
+/**
+ * ConnectAgentStep additionally receives its display config as props. These are
+ * sourced once at the view root (`mcpUrl` from `VITE_MCP_BASE_URL`; the hrefs as
+ * constants) and threaded down, so the step stays presentational and never reads
+ * `import.meta.env` or hardcodes routes itself.
+ */
+export interface ConnectAgentStepProps extends OnboardingStepProps {
+  /** The Wren MCP server URL to add to an MCP client (from `VITE_MCP_BASE_URL`). */
+  mcpUrl: string
+  /** Route to the Connected agents surface. */
+  connectionsHref: string
+  /** Absolute URL of the docs Getting Started guide. */
+  docsHref: string
 }

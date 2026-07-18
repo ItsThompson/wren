@@ -48,13 +48,13 @@ function renderOnboarding(overrides: Partial<AuthContextValue> = {}) {
 }
 
 describe('useOnboarding step machine', () => {
-  it('opens on the first (Welcome) step, which is also the last in this slice', () => {
+  it('opens on the first (Welcome) step of the ordered list', () => {
     const { result } = renderOnboarding()
 
     expect(result.current.state.stepIndex).toBe(0)
-    expect(result.current.state.stepCount).toBe(1)
+    expect(result.current.state.stepCount).toBe(3)
     expect(result.current.state.isFirstStep).toBe(true)
-    expect(result.current.state.isLastStep).toBe(true)
+    expect(result.current.state.isLastStep).toBe(false)
     expect(result.current.state.phase).toBe('idle')
     expect(result.current.state.error).toBeNull()
   })
@@ -63,8 +63,17 @@ describe('useOnboarding step machine', () => {
     const { result } = renderOnboarding()
 
     act(() => result.current.actions.next())
-    expect(result.current.state.stepIndex).toBe(0) // clamped at the last step
+    expect(result.current.state.stepIndex).toBe(1)
+    act(() => result.current.actions.next())
+    expect(result.current.state.stepIndex).toBe(2)
+    expect(result.current.state.isLastStep).toBe(true)
+    act(() => result.current.actions.next())
+    expect(result.current.state.stepIndex).toBe(2) // clamped at the last step
 
+    act(() => result.current.actions.back())
+    expect(result.current.state.stepIndex).toBe(1)
+    act(() => result.current.actions.back())
+    expect(result.current.state.stepIndex).toBe(0)
     act(() => result.current.actions.back())
     expect(result.current.state.stepIndex).toBe(0) // clamped at the first step
   })

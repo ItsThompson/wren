@@ -1,10 +1,29 @@
 import type { ReactNode } from 'react'
 
+import { ConnectAgentStep } from './components/ConnectAgentStep'
+import { HowItWorksStep } from './components/HowItWorksStep'
 import { OnboardingProgress } from './components/OnboardingProgress'
 import { WelcomeStep } from './components/WelcomeStep'
 import { useOnboarding } from './hooks/useOnboarding'
 import { STEPS } from './steps'
-import { OnboardingStepId, type OnboardingStepProps } from './types'
+import { OnboardingStepId, type ConnectAgentStepProps, type OnboardingStepProps } from './types'
+
+/**
+ * Pinned public MCP base URL, used when the build-time `VITE_MCP_BASE_URL` is not
+ * set (local `npm run dev`, tests). Production bakes the env from `MCP_PUBLIC_URL`
+ * via the Dockerfile ARG + compose build.args.
+ */
+const DEFAULT_MCP_BASE_URL = 'https://mcp.usewren.com'
+
+/**
+ * Config for the connect-agent step, sourced once here at the view root and
+ * threaded down as props so no leaf reads `import.meta.env` or hardcodes routes.
+ * Mirrors `App.tsx`'s read-once handling of `VITE_API_BASE_URL`. `/mcp` is the
+ * MCP transport path appended to the origin.
+ */
+const MCP_URL = `${import.meta.env.VITE_MCP_BASE_URL ?? DEFAULT_MCP_BASE_URL}/mcp`
+const CONNECTIONS_HREF = '/settings/connections'
+const DOCS_GETTING_STARTED_HREF = 'https://docs.usewren.com/getting-started'
 
 /** Exhaustiveness guard: a compile error here means a step `id` has no case. */
 function assertNever(value: never): never {
@@ -19,9 +38,9 @@ function assertNever(value: never): never {
  * receive callbacks + flags and emit intent only.
  *
  * The active step routes on the step's `id` (a switch, so each concrete step can
- * receive its own props). In this slice only Welcome exists and it is also the
- * last step, so its primary action maps to the completion path (`submit`);
- * `next` is wired for the multi-step content added later.
+ * receive its own props: ConnectAgentStep additionally gets its display config).
+ * `onContinue` maps to the completion path on the last step and to `next`
+ * otherwise, so the same shared props drive every step.
  */
 export function OnboardingView() {
   const { state, actions } = useOnboarding()
@@ -41,6 +60,19 @@ export function OnboardingView() {
   switch (step.id) {
     case OnboardingStepId.WELCOME:
       activeStep = <WelcomeStep {...stepProps} />
+      break
+    case OnboardingStepId.CONNECT_AGENT: {
+      const connectAgentProps: ConnectAgentStepProps = {
+        ...stepProps,
+        mcpUrl: MCP_URL,
+        connectionsHref: CONNECTIONS_HREF,
+        docsHref: DOCS_GETTING_STARTED_HREF,
+      }
+      activeStep = <ConnectAgentStep {...connectAgentProps} />
+      break
+    }
+    case OnboardingStepId.HOW_IT_WORKS:
+      activeStep = <HowItWorksStep {...stepProps} />
       break
     default:
       activeStep = assertNever(step.id)
