@@ -18,10 +18,9 @@ box is rebuilt.
 None of these can be produced by the codebase or CI; the operator provides them:
 
 1. **A VPS** (Ubuntu LTS) with root or sudo shell access, and its public IP.
-   **Chosen box: OVHcloud VPS-2** (2027 range: x86 KVM, 4 vCores / 8 GB RAM /
-   75 GB NVMe, from ~$8.50/mo on the 12-month term; month-to-month is available at
-   a higher rate). Includes 1 IPv4 and a free rolling daily backup; select a EU
-   datacentre and the Ubuntu 24.04 LTS image at order. Why VPS-2:
+   **Chosen box: Hetzner CX33** (x86 shared vCPU, 4 vCPU / 8 GB RAM / 80 GB NVMe).
+   Select a Hetzner Cloud EU location and the current Ubuntu LTS image at order.
+   Why CX33:
    - **8 GB RAM** clears the ~3.75 GiB sum of compose memory ceilings with OS +
      Docker-daemon + burst headroom; a 4 GB box sits *below* that sum and risks
      OOM under the always-on Postgres + Prometheus tenants.
@@ -29,11 +28,8 @@ None of these can be produced by the codebase or CI; the operator provides them:
      multi-arch `cd.yml` change needed (an ARM box would require one).
    - **4 vCores** match the 4.0 vCPU ceiling budget; ample at ~5 users since
      limits are ceilings, not reservations, and builds run in CI, not here.
-
-   > Originally scoped as a Hetzner CX33 (same 4 vCPU / 8 GB / x86); switched to
-   > OVHcloud VPS-2 because Hetzner's cost-optimized line was out of stock (limited
-   > old-hardware supply, tightened by the 2026 RAM shortage). VPS-2 is the x86
-   > equivalent, so no code change is needed.
+   - **80 GB NVMe** is enough for the current named volumes plus short-term Docker
+     image churn; the prune cron in Phase A5 keeps unused layers bounded.
 2. **An SSH keypair** for the non-root `deploy` user (CD uses the private half).
 3. **A Cloudflare account** with the `usewren.com` zone (DNS managed by Cloudflare)
    and `cloudflared` installed locally to create the tunnel.
