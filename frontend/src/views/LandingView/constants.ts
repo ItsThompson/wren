@@ -48,7 +48,8 @@ export const VALUE_PULL_QUOTE = "Every step is one you're ready for: never too e
 export const VALUE_BENEFIT =
   'Wren sequences each roadmap by what you can take on next, so you keep momentum instead of stalling on something too advanced or coasting through what you already know.'
 
-export const VALUE_FOOTNOTE = 'Learning scientists call this your zone of proximal development.'
+export const VALUE_FOOTNOTE =
+  'Built around the zone of proximal development: progress just beyond what you can do alone.'
 
 export const DUAL_AUDIENCE_TRACKS: AudienceTrackData[] = [
   {

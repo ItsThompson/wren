@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react'
 
 import { buildAuthUser, buildAuthValue, renderWithAuth } from '@/test/auth-harness'
-import { CTA_SETUP_MICROCOPY, VALUE_PULL_QUOTE } from './constants'
+import { CTA_SETUP_MICROCOPY, FAQ_ITEMS, VALUE_FOOTNOTE, VALUE_PULL_QUOTE } from './constants'
 import { LandingView } from './LandingView'
 
 describe('LandingView', () => {
@@ -23,6 +23,27 @@ describe('LandingView', () => {
     const pullQuote = screen.getByText(VALUE_PULL_QUOTE)
     expect(pullQuote).not.toHaveClass('font-serif')
     expect(pullQuote.className).not.toMatch(/display-/)
+  })
+
+  it('mentions the zone of proximal development without the "learning scientists call this" framing', () => {
+    renderWithAuth(<LandingView />)
+
+    expect(screen.getByText(VALUE_FOOTNOTE)).toBeInTheDocument()
+    expect(screen.queryByText(/learning scientists call this/i)).not.toBeInTheDocument()
+  })
+
+  it('lets FAQ answers span the full FAQ row width', () => {
+    renderWithAuth(<LandingView />)
+
+    const answer = screen.getByText(FAQ_ITEMS[0].answer)
+    expect(answer).toHaveClass('w-full')
+    expect(answer).not.toHaveClass('max-w-[64ch]')
+  })
+
+  it('spreads footer content across a responsive grid', () => {
+    renderWithAuth(<LandingView />)
+
+    expect(screen.getByRole('contentinfo')).toHaveClass('grid', 'sm:grid-cols-3')
   })
 
   it('AC8: the hero shows subordinate connect-your-agent setup microcopy near the CTA', () => {
