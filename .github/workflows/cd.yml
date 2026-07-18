@@ -171,7 +171,7 @@ jobs:
           GHCR_OWNER="${GITHUB_REPOSITORY_OWNER,,}"
           WREN_PROMETHEUS_CONFIG="$(cat deployments/prometheus/prometheus.yml)"
           WREN_PROMETHEUS_ALERTS="$(cat deployments/prometheus/alerts.yml)"
-          WREN_CLOUDFLARED_INGRESS="$(envsubst '$CF_TUNNEL_ID $CF_APP_HOSTNAME $CF_API_HOSTNAME $CF_MCP_HOSTNAME' < deployments/cloudflare/config.yml)"
+          WREN_CLOUDFLARED_INGRESS="$(envsubst '$CF_TUNNEL_ID $CF_APP_HOSTNAME $CF_API_HOSTNAME $CF_MCP_HOSTNAME $CF_DOCS_HOSTNAME' < deployments/cloudflare/config.yml)"
           WREN_ALERTMANAGER_CONFIG="$(envsubst '$DISCORD_WEBHOOK_URL' < deployments/alertmanager/alertmanager.yml)"
           set +a
           ./scripts/deploy.sh "${DEPLOY_SERVER_IP}"
@@ -203,7 +203,7 @@ jobs:
           GHCR_OWNER="${GITHUB_REPOSITORY_OWNER,,}"
           WREN_PROMETHEUS_CONFIG="$(cat deployments/prometheus/prometheus.yml)"
           WREN_PROMETHEUS_ALERTS="$(cat deployments/prometheus/alerts.yml)"
-          WREN_CLOUDFLARED_INGRESS="$(envsubst '$CF_TUNNEL_ID $CF_APP_HOSTNAME $CF_API_HOSTNAME $CF_MCP_HOSTNAME' < deployments/cloudflare/config.yml)"
+          WREN_CLOUDFLARED_INGRESS="$(envsubst '$CF_TUNNEL_ID $CF_APP_HOSTNAME $CF_API_HOSTNAME $CF_MCP_HOSTNAME $CF_DOCS_HOSTNAME' < deployments/cloudflare/config.yml)"
           WREN_ALERTMANAGER_CONFIG="$(envsubst '$DISCORD_WEBHOOK_URL' < deployments/alertmanager/alertmanager.yml)"
           set +a
           DEPLOY_SHA="${prev}" WREN_IMAGE_TAG="sha-${prev}" ./scripts/deploy.sh "${DEPLOY_SERVER_IP}"
