@@ -152,12 +152,16 @@ codegen:
 
 # --- Deploy / ops -----------------------------------------------------------
 
-# Deploy to a VPS over push-based SSH; DEPLOY_SHA optional (defaults to synced HEAD).
-# Match DEPLOY_SHA to the CD-built image tags: DEPLOY_SHA=$(git rev-parse HEAD) just deploy 203.0.113.10
+# Deploy the whole stack to a VPS over a Docker Context; DEPLOY_SHA optional
+# (defaults to the checkout HEAD). Register the context and export the
+# config/secret env first (see docs/runbooks/bring-up.md Phase E). Match
+# DEPLOY_SHA to the CD-built image tags: DEPLOY_SHA=$(git rev-parse HEAD) just deploy 203.0.113.10
 deploy ip user='deploy':
     ./scripts/deploy.sh {{ip}} {{user}}
 
-# Print the full deploy phase plan (every ssh/scp) without touching a server.
+# Print the deploy plan (every docker --context compose line + the single ssh
+# line) without touching a server. The preflight runs, so the required
+# config/secret env vars must be set (even dummy values) to reach the plan.
 deploy-plan ip user='deploy':
     DRY_RUN=1 ./scripts/deploy.sh {{ip}} {{user}}
 

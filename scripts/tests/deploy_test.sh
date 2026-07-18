@@ -223,12 +223,20 @@ test_read_deployed_sha_returns_prev_and_refuses_on_empty() {
   rc=$?
   [[ ${rc} -eq 0 ]] || { echo "expected success when sha present"; return 1; }
   equals "${out}" "abc123" || return 1
-  # Empty: refuses (non-zero) with the cannot-roll-back message.
+  # Empty file (ssh ok, no rollback target): refuses with the no-prev message.
   remote() { printf '%s' ""; }
   out="$(read_deployed_sha 2>&1)"
   rc=$?
   [[ ${rc} -ne 0 ]] || { echo "expected non-zero when .deployed-sha empty"; return 1; }
+  contains "${out}" "no previous .deployed-sha" || return 1
   contains "${out}" "cannot roll back" || return 1
+  # SSH/transport failure (non-zero ssh): refuses with a DISTINCT message, not
+  # conflated with an absent file.
+  remote() { return 1; }
+  out="$(read_deployed_sha 2>&1)"
+  rc=$?
+  [[ ${rc} -ne 0 ]] || { echo "expected non-zero on ssh failure"; return 1; }
+  contains "${out}" "cannot reach" || return 1
 }
 
 # --- failed gate: non-zero exit, no internal re-deploy, no sha recorded -----

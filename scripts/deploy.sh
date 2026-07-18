@@ -115,8 +115,11 @@ compose_run() {
 
 # Read image refs (one per line) on stdin; emit unique first-party image bases
 # (tag stripped). First-party = ghcr.io/<owner>/wren/*, matched by path so a new
-# service is picked up automatically. The same derivation cd.yml's discover
-# matrix uses; kept here as a stable, unit-tested pure helper.
+# service is picked up automatically. No production path calls this after the
+# context rearchitecture (the former internal re-pull rollback was deleted); it is
+# retained per the AC6 contract as the canonical first-party derivation (mirrored
+# by cd.yml's discover-matrix jq) and is covered by a deploy_test.sh case. Keep it
+# and that test in sync; if AC6 is ever relaxed, delete it rather than polish it.
 filter_first_party_images() {
   { grep -E '^ghcr\.io/[^/]+/wren/' || true; } | sed -E 's/:[^:/]*$//' | sort -u
 }
@@ -240,8 +243,18 @@ health_gate() {
 # <ip>` on a failed deploy; an empty result means the first deploy has no
 # rollback target and the workflow must fail rather than guess.
 read_deployed_sha() {
-  local sha
+  # `remote`'s command ends in `|| true`, so a non-zero exit here is an SSH/
+  # transport failure, NOT an absent file. Distinguish the two: a transport
+  # failure is transient (a human retries), while an empty read is a genuine
+  # "no rollback target" (e.g. the first deploy). Both refuse (non-zero), so a
+  # bad read can never trigger a rollback to the wrong SHA.
+  local sha rc
   sha="$(remote "cat ${REMOTE_DIR}/.deployed-sha 2>/dev/null || true")"
+  rc=$?
+  if [[ ${rc} -ne 0 ]]; then
+    log "cannot reach ${SSH_TARGET} to read .deployed-sha (ssh exit ${rc}); cannot roll back"
+    return 1
+  fi
   sha="$(printf '%s' "${sha}" | tr -d '[:space:]')"
   if [[ -z "${sha}" ]]; then
     log "no previous .deployed-sha recorded on ${SSH_TARGET}; cannot roll back"
