@@ -122,6 +122,27 @@
         }
       }
     },
+    "/me/onboarding:complete": {
+      "post": {
+        "tags": [
+          "onboarding"
+        ],
+        "summary": "Complete",
+        "operationId": "complete_me_onboarding_complete_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthenticatedUser"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/roadmaps": {
       "post": {
         "tags": [
