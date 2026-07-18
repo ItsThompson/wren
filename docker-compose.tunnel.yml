@@ -1,12 +1,16 @@
 # =============================================================================
 # Cloudflare Tunnel overlay.
 #
-# Layered ON TOP of docker-compose.yml at DEPLOY TIME ONLY:
-#   docker compose -f docker-compose.yml -f docker-compose.tunnel.yml \
+# Layered ON TOP of docker-compose.yml at DEPLOY TIME ONLY, driven by
+# scripts/deploy.sh over a Docker Context (the Compose CLI runs in CI, the engine
+# on the VPS):
+#   docker --context wren compose -f docker-compose.yml -f docker-compose.tunnel.yml \
 #     --profile tunnels up -d
-# scripts/deploy.sh drives this. The tunnel is the ONLY ingress on the VPS;
-# locally the stack runs without it (the base file defines no cloudflared), and
-# the `tunnels` profile keeps cloudflared from ever starting outside a deploy.
+# The tunnel is the ONLY ingress on the VPS; locally the stack runs without it
+# (the base file defines no cloudflared), and the `tunnels` profile keeps
+# cloudflared from ever starting outside a deploy. Every config/secret this
+# overlay adds is environment-sourced (read CLI-side in CI, transmitted to the
+# daemon); nothing here bind-mounts a box file.
 #
 # Kept separate from docker-compose.yml so the base stack stays a
 # self-contained, tunnel-free local artifact and the ingress lives with the
@@ -20,12 +24,19 @@ services:
     image: cloudflare/cloudflared:2026.7.1
     profiles: [tunnels]
     command: tunnel --config /etc/cloudflared/config.yml run
-    # Rendered ingress config + named-tunnel credentials, both read-only.
-    # deploy.sh renders config.rendered.yml (envsubst) and copies
-    # credentials.json (chmod 600); both are gitignored.
-    volumes:
-      - ./deployments/cloudflare/config.rendered.yml:/etc/cloudflared/config.yml:ro
-      - ./deployments/cloudflare/credentials.json:/etc/cloudflared/credentials.json:ro
+    # Ingress config (non-secret) and named-tunnel credentials (secret) are both
+    # sourced CLI-side in CI and transmitted to the daemon: the ingress as an
+    # environment-sourced Compose config, the credentials as an environment-
+    # sourced secret. No rendered file or credentials file lives on the box.
+    configs:
+      - source: cloudflared_ingress
+        target: /etc/cloudflared/config.yml
+    secrets:
+      - source: cloudflared_credentials
+        target: /etc/cloudflared/credentials.json
+        uid: "${WREN_CLOUDFLARED_UID:-65532}"
+        gid: "${WREN_CLOUDFLARED_GID:-65532}"
+        mode: 0400
     networks:
       - edge-net
     depends_on:
@@ -39,21 +50,54 @@ services:
           memory: 128M
     restart: unless-stopped
 
-  # The OAuth AS signing key is a mounted secret: the
-  # operator places the PEM on the host at OAUTH_PRIVATE_KEY_PATH (chmod 600) at
-  # bring-up, and deploy.sh asserts it exists before starting the stack. Bind-mount
-  # it read-only at the SAME path inside the container, so the app opens it at
-  # exactly the OAUTH_PRIVATE_KEY_PATH it already reads from .env (one value; host
-  # path == container path). Without this the AS fails fast on boot outside
-  # development and the deploy health gate rolls back. Deploy-only (this overlay):
-  # local `just up` and the CI e2e stack run ENVIRONMENT=development and generate
-  # an ephemeral in-memory key, so the base file mounts nothing.
+  # The OAuth AS signing key is an environment-sourced Compose secret: CI reads
+  # the PEM from the WREN_OAUTH_PRIVATE_KEY GitHub secret and transmits it to the
+  # daemon, which materializes it as a 0400 file at the container path below. The
+  # backend reads that container path via OAUTH_PRIVATE_KEY_PATH (.env.prod), so
+  # the box never holds the key. Deploy-only (this overlay): local `just up` and
+  # the CI e2e stack run ENVIRONMENT=development and generate an ephemeral
+  # in-memory key, so the base file mounts nothing.
   backend:
-    volumes:
-      - ${OAUTH_PRIVATE_KEY_PATH:?set OAUTH_PRIVATE_KEY_PATH in /opt/wren/.env at bring-up (see docs/runbooks/bring-up.md)}:${OAUTH_PRIVATE_KEY_PATH}:ro
+    environment:
+      OAUTH_PRIVATE_KEY_PATH: /run/secrets/oauth_private_key
+    secrets:
+      - source: oauth_private_key
+        target: /run/secrets/oauth_private_key
+        uid: "${WREN_BACKEND_UID:-999}"
+        gid: "${WREN_BACKEND_GID:-999}"
+        mode: 0400
+
+  alertmanager:
+    secrets:
+      - source: alertmanager_config
+        target: /etc/alertmanager/alertmanager.yml
+        uid: "${WREN_ALERTMANAGER_UID:-65534}"
+        gid: "${WREN_ALERTMANAGER_GID:-65534}"
+        mode: 0400
 
 # edge-net is defined in the base file; redeclared here (identical) so the
 # overlay is self-consistent when merged.
 networks:
   edge-net:
     driver: bridge
+
+# All sources are environment: (never file:). Over an SSH Docker Context a file:
+# source resolves on the daemon host (the VPS, which has no checkout) and fails;
+# environment sources are read CLI-side in CI and transmitted to the daemon at
+# deploy time, and honor the per-service uid/gid/mode above. CI exports each var
+# (a GitHub secret, or envsubst-rendered from a committed file) before any
+# compose call.
+secrets:
+  oauth_private_key:
+    environment: WREN_OAUTH_PRIVATE_KEY
+  cloudflared_credentials:
+    environment: WREN_CLOUDFLARED_CREDENTIALS
+  alertmanager_config:
+    environment: WREN_ALERTMANAGER_CONFIG
+
+configs:
+  # Non-secret Cloudflare ingress (the MCP path allow-list is a security control
+  # that stays in git); envsubst-rendered in CI from
+  # deployments/cloudflare/config.yml into WREN_CLOUDFLARED_INGRESS.
+  cloudflared_ingress:
+    environment: WREN_CLOUDFLARED_INGRESS

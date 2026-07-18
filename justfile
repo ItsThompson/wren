@@ -76,9 +76,13 @@ sync-skill:
 build:
     docker compose build
 
-# Run the production-shaped stack locally (expose-only; tunnel added at deploy time)
+# Run the production-shaped stack locally (expose-only; tunnel added at deploy time).
+# Prometheus reads its config via an environment-sourced Compose config, so
+# populate the vars from the committed files (same mechanism as the deploy).
 up:
-    docker compose up -d --build
+    WREN_PROMETHEUS_CONFIG="$(cat deployments/prometheus/prometheus.yml)" \
+      WREN_PROMETHEUS_ALERTS="$(cat deployments/prometheus/alerts.yml)" \
+      docker compose up -d --build
 
 # Stop the production-shaped stack (keeps named volumes)
 down:
@@ -86,7 +90,9 @@ down:
 
 # Run the full stack locally in dev mode (bind mounts, --reload, relaxed cookies)
 up-dev:
-    docker compose {{dev_compose}} up -d --build
+    WREN_PROMETHEUS_CONFIG="$(cat deployments/prometheus/prometheus.yml)" \
+      WREN_PROMETHEUS_ALERTS="$(cat deployments/prometheus/alerts.yml)" \
+      docker compose {{dev_compose}} up -d --build
 
 # Stop the dev stack (keeps named volumes)
 down-dev:
@@ -146,12 +152,16 @@ codegen:
 
 # --- Deploy / ops -----------------------------------------------------------
 
-# Deploy to a VPS over push-based SSH; DEPLOY_SHA optional (defaults to synced HEAD).
-# Match DEPLOY_SHA to the CD-built image tags: DEPLOY_SHA=$(git rev-parse HEAD) just deploy 203.0.113.10
+# Deploy the whole stack to a VPS over a Docker Context; DEPLOY_SHA optional
+# (defaults to the checkout HEAD). Register the context and export the
+# config/secret env first (see docs/runbooks/bring-up.md Phase E). Match
+# DEPLOY_SHA to the CD-built image tags: DEPLOY_SHA=$(git rev-parse HEAD) just deploy 203.0.113.10
 deploy ip user='deploy':
     ./scripts/deploy.sh {{ip}} {{user}}
 
-# Print the full deploy phase plan (every ssh/scp) without touching a server.
+# Print the deploy plan (every docker --context compose line + the single ssh
+# line) without touching a server. The preflight runs, so the required
+# config/secret env vars must be set (even dummy values) to reach the plan.
 deploy-plan ip user='deploy':
     DRY_RUN=1 ./scripts/deploy.sh {{ip}} {{user}}
 
@@ -185,7 +195,13 @@ setup-e2e:
     cd e2e && npm ci && npx playwright install --with-deps chromium
 
 # Build + boot the e2e stack (published ports) and run pre-traffic migrations.
+# Both `up` and the migration `run` materialize the environment-sourced
+# Prometheus config, so export the vars for the whole recipe.
 e2e-up:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export WREN_PROMETHEUS_CONFIG="$(cat deployments/prometheus/prometheus.yml)"
+    export WREN_PROMETHEUS_ALERTS="$(cat deployments/prometheus/alerts.yml)"
     docker compose {{e2e_compose}} up -d --build
     docker compose {{e2e_compose}} run --rm backend alembic upgrade head
 

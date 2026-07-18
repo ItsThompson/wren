@@ -177,9 +177,12 @@ services:
       - "--query.timeout=30s"
     expose:
       - "9090"
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
+      - source: prometheus_alerts
+        target: /etc/prometheus/alerts.yml
     volumes:
-      - ./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./deployments/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - promdata:/prometheus
     networks:
       - monitoring-net
@@ -227,24 +230,21 @@ services:
 
   alertmanager:
     image: prom/alertmanager:v0.27.0
-    # Gated behind the `tunnels` profile (the only profile the deploy activates,
-    # via scripts/deploy.sh's COMPOSE_TUNNEL). Alertmanager v0.27 EXITS on config
-    # load if webhook_url is not a valid URL, and the committed alertmanager.yml
-    # keeps the unrendered ${DISCORD_WEBHOOK_URL} placeholder, so deploy.sh renders
-    # alertmanager.rendered.yml (envsubst, chmod 600) with the real webhook and
-    # this mount points at that rendered file. Without the profile gate, local
-    # `just up`/`up-dev` (no profile) would crash-loop this restart:unless-stopped
-    # + healthchecked container. In the real deploy the profile is active and the
-    # rendered config supplies a valid webhook, so it boots; local dev skips it
-    # (Prometheus + node-exporter still run).
+    # Gated behind the `tunnels` profile (the only profile the deploy activates).
+    # Alertmanager v0.27 EXITS on config load if webhook_url is not a valid URL,
+    # and the committed alertmanager.yml keeps the unrendered ${DISCORD_WEBHOOK_URL}
+    # placeholder, so CI renders it (envsubst) into WREN_ALERTMANAGER_CONFIG and
+    # docker-compose.tunnel.yml delivers it as an environment-sourced Compose
+    # secret. Without the profile gate, local `just up`/`up-dev` (no profile) would
+    # crash-loop this restart:unless-stopped + healthchecked container. In the real
+    # deploy the profile is active and the rendered config supplies a valid webhook,
+    # so it boots; local dev skips it (Prometheus + node-exporter still run).
     profiles: ["tunnels"]
     command:
       - "--config.file=/etc/alertmanager/alertmanager.yml"
       - "--storage.path=/alertmanager"
     expose:
       - "9093"
-    volumes:
-      - ./deployments/alertmanager/alertmanager.rendered.yml:/etc/alertmanager/alertmanager.yml:ro
     networks:
       - monitoring-net
     depends_on:
@@ -278,3 +278,20 @@ networks:
 volumes:
   pgdata:
   promdata:
+
+# -----------------------------------------------------------------------------
+# Configs (environment-sourced; delivered CLI-side, never bind-mounted)
+#
+# Prometheus config + alerts are non-secret but must reach the container without
+# a bind mount: over an SSH Docker Context a file:/bind source resolves on the
+# daemon host (the VPS has no checkout). The content is read CLI-side and
+# transmitted to the daemon. Locally and in CI the recipes populate
+# WREN_PROMETHEUS_CONFIG/_ALERTS from the committed deployments/prometheus/*.yml
+# files (`just up`/`up-dev`/`e2e-up`; the CI e2e job exports them explicitly), so
+# the base stack stays bootable against a local daemon.
+# -----------------------------------------------------------------------------
+configs:
+  prometheus_config:
+    environment: WREN_PROMETHEUS_CONFIG
+  prometheus_alerts:
+    environment: WREN_PROMETHEUS_ALERTS

@@ -1,11 +1,12 @@
 # =============================================================================
 # Cloudflare Tunnel ingress for Wren.
 #
-# This is the COMMITTED TEMPLATE. scripts/deploy.sh renders it to
-# config.rendered.yml with envsubst (substituting only the CF_* vars below,
-# sourced from /opt/wren/.env), and cloudflared (docker-compose.tunnel.yml)
-# mounts the rendered file read-only. The rendered output and the credentials
-# file are gitignored.
+# This is the COMMITTED TEMPLATE. CI renders it with envsubst (substituting only
+# the CF_* vars below, sourced from the committed .env.prod) into the
+# WREN_CLOUDFLARED_INGRESS env var, and cloudflared (docker-compose.tunnel.yml)
+# receives it as an environment-sourced Compose config mounted read-only at
+# /etc/cloudflared/config.yml. No rendered file is written to the box; the
+# credentials are delivered the same way (a GitHub secret).
 #
 # One named tunnel, three ingress rules, outbound-only (zero inbound ports).
 # TLS terminates at the Cloudflare edge; origin traffic inside Docker is

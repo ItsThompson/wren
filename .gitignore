@@ -25,6 +25,10 @@ coverage/
 .env.local
 .env.*.local
 e2e/.env.test
+# .env.prod is intentionally COMMITTED (non-secret production config; the .env
+# rule above does not match it and .env.*.local needs a .local suffix). Secrets
+# stay in GitHub Actions, never here.
+!.env.prod
 
 # --- Cloudflare tunnel credentials and rendered configs ---------------------
 deployments/cloudflare/*.json

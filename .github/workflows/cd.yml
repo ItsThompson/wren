@@ -113,9 +113,12 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ---------------------------------------------------------------------------
-  # deploy: decode the Cloudflare tunnel secrets to the paths deploy.sh asserts,
-  # set up SSH to the VPS, then hand off to scripts/deploy.sh with DEPLOY_SHA so
-  # it deploys/records the just-built images.
+  # deploy: register a Docker Context to the VPS, render/read every config and
+  # secret CLI-side (committed .env.prod + files rendered in the runner + GitHub
+  # secrets), and hand off to scripts/deploy.sh which drives the whole lifecycle
+  # over the context. Rollback is CI-owned: on a failed deploy the conditional
+  # step below reads the previous .deployed-sha, checks it out, re-exports env
+  # from that checkout, and re-runs the deploy once with WREN_IMAGE_TAG=sha-<prev>.
   # ---------------------------------------------------------------------------
   deploy:
     needs: [build-and-push]
@@ -128,31 +131,79 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.DEPLOY_SHA }}
+          # Full history so the rollback step can `git checkout <prev-sha>`.
+          fetch-depth: 0
 
-      - name: Decode Cloudflare tunnel credentials
-        run: |
-          mkdir -p deployments/cloudflare
-          echo "${{ secrets.CF_TUNNEL_CREDENTIALS }}" | base64 -d > deployments/cloudflare/credentials.json
-          echo "${{ secrets.CF_CERT_PEM }}" | base64 -d > deployments/cloudflare/cert.pem
-
-      - name: Validate credential files are non-empty
-        run: |
-          for f in deployments/cloudflare/credentials.json deployments/cloudflare/cert.pem; do
-            if [ ! -s "$f" ]; then
-              echo "ERROR: $f is empty or missing. Check the CF_TUNNEL_CREDENTIALS / CF_CERT_PEM repo secrets."
-              exit 1
-            fi
-          done
-          echo "Cloudflare credential files decoded."
-
-      - name: Set up SSH
+      - name: Set up SSH (used by the Docker Context and the .deployed-sha line)
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "${{ secrets.DEPLOY_SERVER_IP }}" >> ~/.ssh/known_hosts
 
-      - name: Deploy to the VPS
-        run: ./scripts/deploy.sh "${{ secrets.DEPLOY_SERVER_IP }}"
+      - name: Register the Docker Context to the VPS
+        run: |
+          docker context create wren \
+            --docker "host=ssh://deploy@${{ secrets.DEPLOY_SERVER_IP }}"
+
+      # A single step runs the whole deploy: a step-level env: block carries the
+      # GitHub secrets (masked; referenced as $VARS, never interpolated into the
+      # run: text), and the script renders/reads the config content and exports it
+      # as the environment-sourced Compose config/secret vars. ALL are set before
+      # deploy.sh's first compose call (the migration `run` materializes
+      # configs/secrets exactly like `up`). Secrets are kept OUT of $GITHUB_ENV.
+      - name: Deploy over the Docker Context
         env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          SESSION_JWT_SECRET: ${{ secrets.SESSION_JWT_SECRET }}
+          INTERNAL_API_TOKEN: ${{ secrets.INTERNAL_API_TOKEN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          WREN_OAUTH_PRIVATE_KEY: ${{ secrets.WREN_OAUTH_PRIVATE_KEY }}
+          WREN_CLOUDFLARED_CREDENTIALS: ${{ secrets.WREN_CLOUDFLARED_CREDENTIALS }}
+          DEPLOY_SERVER_IP: ${{ secrets.DEPLOY_SERVER_IP }}
           DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
+        run: |
+          set -euo pipefail
+          : "${DISCORD_WEBHOOK_URL:?DISCORD_WEBHOOK_URL is required (Alertmanager exits on a blank webhook and fails the gate after migrations)}"
+          set -a
+          source .env.prod
+          # Pull from the same owner build-and-push pushed to (owner-agnostic).
+          GHCR_OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          WREN_PROMETHEUS_CONFIG="$(cat deployments/prometheus/prometheus.yml)"
+          WREN_PROMETHEUS_ALERTS="$(cat deployments/prometheus/alerts.yml)"
+          WREN_CLOUDFLARED_INGRESS="$(envsubst '$CF_TUNNEL_ID $CF_APP_HOSTNAME $CF_API_HOSTNAME $CF_MCP_HOSTNAME' < deployments/cloudflare/config.yml)"
+          WREN_ALERTMANAGER_CONFIG="$(envsubst '$DISCORD_WEBHOOK_URL' < deployments/alertmanager/alertmanager.yml)"
+          set +a
+          ./scripts/deploy.sh "${DEPLOY_SERVER_IP}"
+
+      # CI-owned rollback (design note 5.2). On any failure above, read the
+      # previous .deployed-sha, check it out, re-export env FROM THAT checkout,
+      # and re-run the deploy once pinned to the previous images AND config. If no
+      # previous SHA exists (first deploy) read-deployed-sha refuses and the job
+      # fails; a failed rollback re-run also fails the job (human intervention).
+      - name: Roll back to the previous SHA on failure
+        if: failure()
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          SESSION_JWT_SECRET: ${{ secrets.SESSION_JWT_SECRET }}
+          INTERNAL_API_TOKEN: ${{ secrets.INTERNAL_API_TOKEN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          WREN_OAUTH_PRIVATE_KEY: ${{ secrets.WREN_OAUTH_PRIVATE_KEY }}
+          WREN_CLOUDFLARED_CREDENTIALS: ${{ secrets.WREN_CLOUDFLARED_CREDENTIALS }}
+          DEPLOY_SERVER_IP: ${{ secrets.DEPLOY_SERVER_IP }}
+        run: |
+          set -euo pipefail
+          : "${DISCORD_WEBHOOK_URL:?DISCORD_WEBHOOK_URL is required}"
+          prev="$(./scripts/deploy.sh read-deployed-sha "${DEPLOY_SERVER_IP}")" \
+            || { echo 'no previous .deployed-sha; cannot roll back'; exit 1; }
+          echo "rolling back to ${prev}"
+          git checkout "${prev}"
+          set -a
+          source .env.prod
+          GHCR_OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          WREN_PROMETHEUS_CONFIG="$(cat deployments/prometheus/prometheus.yml)"
+          WREN_PROMETHEUS_ALERTS="$(cat deployments/prometheus/alerts.yml)"
+          WREN_CLOUDFLARED_INGRESS="$(envsubst '$CF_TUNNEL_ID $CF_APP_HOSTNAME $CF_API_HOSTNAME $CF_MCP_HOSTNAME' < deployments/cloudflare/config.yml)"
+          WREN_ALERTMANAGER_CONFIG="$(envsubst '$DISCORD_WEBHOOK_URL' < deployments/alertmanager/alertmanager.yml)"
+          set +a
+          DEPLOY_SHA="${prev}" WREN_IMAGE_TAG="sha-${prev}" ./scripts/deploy.sh "${DEPLOY_SERVER_IP}"

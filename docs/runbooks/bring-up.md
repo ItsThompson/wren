@@ -7,8 +7,11 @@ that runs afterward is `deploy.md`; this runbook never has to run again unless t
 box is rebuilt.
 
 > The deploy machinery (`scripts/deploy.sh`, `docker-compose.tunnel.yml`, CI/CD)
-> is already delivered and tested. This runbook only provisions the infra it runs
-> against and performs the first deploy.
+> is already delivered and tested. This runbook provisions the infra it runs
+> against, owns the one-time host bootstrap (Docker install, daemon config, prune
+> cron) and Docker Context registration, and performs the first deploy. The
+> repeatable deploy afterward (`deploy.md`) drives everything over a Docker
+> Context: the box holds NO `.env`, OAuth key, or rendered config.
 
 ## What the operator must supply (prerequisites)
 
@@ -40,8 +43,10 @@ None of these can be produced by the codebase or CI; the operator provides them:
 5. **Admin rights on the GitHub repo** to set the CD repo secrets.
 6. **Authorization to run the live deploy.**
 
-Never commit any of these; `.env`, the OAuth PEM, and the tunnel credentials are
-all gitignored. `.env.example` is the canonical description of every variable.
+Never commit the secret values; they live only in GitHub Actions secrets (Phase
+D). Non-secret production config is committed in `.env.prod`; the box holds no
+`.env`, no OAuth PEM, and no tunnel credentials. `.env.example` describes the
+dev/local variables; `.env.prod` is the committed production (non-secret) config.
 
 ---
 
@@ -77,9 +82,11 @@ sudo systemctl restart ssh   # keep your current session open until you verify a
 
 ### A3. Non-root deploy user
 
-`scripts/deploy.sh` connects as `deploy` by default and uses `sudo` for the
-system phases (dependency install, `/etc/docker/daemon.json`, the prune cron), so
-`deploy` needs passwordless sudo and Docker-group membership.
+`scripts/deploy.sh` connects as `deploy` over an SSH Docker Context, so `deploy`
+needs Docker-group membership. Host bootstrap (Docker install,
+`/etc/docker/daemon.json`, the prune cron) is a one-time step in Phase A5 below,
+not part of the repeatable deploy, so passwordless sudo is only needed here at
+bring-up.
 
 ```sh
 sudo adduser --disabled-password --gecos "" deploy
@@ -88,7 +95,7 @@ sudo mkdir -p /home/deploy/.ssh
 echo "ssh-ed25519 AAAA... deploy@wren" | sudo tee /home/deploy/.ssh/authorized_keys
 sudo chown -R deploy:deploy /home/deploy/.ssh && sudo chmod 700 /home/deploy/.ssh && sudo chmod 600 /home/deploy/.ssh/authorized_keys
 echo "deploy ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/deploy && sudo chmod 440 /etc/sudoers.d/deploy
-sudo usermod -aG docker deploy   # (docker is installed by deploy.sh phase 3; re-run if the group did not exist yet)
+sudo usermod -aG docker deploy   # (docker is installed in Phase A5; re-run if the group did not exist yet)
 ```
 
 ### A4. fail2ban + unattended-upgrades
@@ -102,6 +109,38 @@ sudo dpkg-reconfigure -plow unattended-upgrades      # enable automatic security
 
 Verify a fresh **key-only** login as `deploy@<ip>` works before closing your root
 session.
+
+### A5. Host bootstrap (Docker, daemon config, prune cron)
+
+The repeatable deploy no longer mutates the host, so install Docker and its
+runtime config once here (as root/sudo on the box).
+
+```sh
+curl -fsSL https://get.docker.com | sudo sh          # Docker Engine + CLI
+sudo usermod -aG docker deploy                        # log out/in for it to take effect
+
+# Log rotation (mirror deployments/docker/daemon.json in the repo):
+sudo mkdir -p /etc/docker
+sudo tee /etc/docker/daemon.json >/dev/null <<'JSON'
+{
+  "log-driver": "json-file",
+  "log-opts": { "max-size": "50m", "max-file": "5" }
+}
+JSON
+sudo systemctl restart docker
+
+# Daily image/build-cache prune (was a deploy.sh phase; now a one-time cron):
+sudo tee /etc/cron.daily/wren-docker-prune >/dev/null <<'CRON'
+#!/bin/sh
+echo "$(date -Is): docker system prune" >> /var/log/wren-docker-prune.log
+docker system prune -af --filter until=72h >> /var/log/wren-docker-prune.log 2>&1
+CRON
+sudo chmod +x /etc/cron.daily/wren-docker-prune
+
+# The box only needs a dir for the rollback key; named volumes are created by
+# Compose over the context on the first deploy.
+sudo mkdir -p /opt/wren && sudo chown deploy:deploy /opt/wren
+```
 
 ---
 
@@ -118,28 +157,50 @@ cloudflared tunnel route dns wren api.usewren.com
 cloudflared tunnel route dns wren mcp.usewren.com
 ```
 
-Record the **tunnel UUID** (→ `CF_TUNNEL_ID` in `.env`). The two credential files
-are `~/.cloudflared/<UUID>.json` (→ `credentials.json`) and `~/.cloudflared/cert.pem`.
-The tunnel dials out only; no inbound port is opened.
+Record the **tunnel UUID** → set `CF_TUNNEL_ID` in the committed `.env.prod`
+(non-secret) and commit it. The credentials file `~/.cloudflared/<UUID>.json`
+becomes the `WREN_CLOUDFLARED_CREDENTIALS` GitHub secret (RAW JSON, Phase D);
+`~/.cloudflared/cert.pem` is a tunnel-management artifact only (used for `tunnel
+create`/`route` here) and is NOT needed at runtime, so it never leaves your
+machine. The tunnel dials out only; no inbound port is opened.
 
 ---
 
-## Phase C: place secrets on the VPS
+## Phase C: prepare the production config and secret values
 
-All files below live under `/opt/wren` and are `chmod 600`. `scripts/deploy.sh`
-**asserts they exist and never creates them.**
+Under the Docker Context model the box stores **no** secrets and no `.env`. This
+phase produces the values that become GitHub secrets (Phase D) and finalizes the
+committed non-secret config.
 
-### C1. `/opt/wren/.env`
+### C1. Finalize `.env.prod` (committed, non-secret)
 
-Start from the canonical example and fill in production values:
+`.env.prod` in the repo holds the non-secret production config. Set the one
+environment-specific value and commit it:
+
+- `CF_TUNNEL_ID` = the tunnel UUID from Phase B (non-secret).
+- Confirm `GHCR_OWNER` matches your GitHub owner (lowercase), and the hostnames
+  and public URLs are correct.
+
+`DATABASE_URL` is assembled from `POSTGRES_*` in the compose `environment:` block,
+so only the password is a secret; do not put it in `.env.prod`. `.env.prod`
+already sets `ENVIRONMENT=production` (fail-fast on a short `SESSION_JWT_SECRET`
+or missing OAuth key, `Secure` cookies) and `OAUTH_PRIVATE_KEY_PATH` to the
+container secret path `/run/secrets/oauth_private_key`.
+
+### C2. Generate the OAuth AS private key (→ a GitHub secret, not the box)
 
 ```sh
-sudo mkdir -p /opt/wren/secrets
-sudo install -m 600 /dev/stdin /opt/wren/.env   # then paste the filled-in file, or scp it and chmod 600
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out oauth_private.pem
 ```
 
-Generate the random secrets (avoid URL-breaking characters in the DB password by
-using hex):
+The PEM content becomes the `WREN_OAUTH_PRIVATE_KEY` GitHub secret (Phase D).
+Compose materializes it as a `0400` file at `/run/secrets/oauth_private_key`
+inside the backend container (the path `OAUTH_PRIVATE_KEY_PATH` points at), so the
+key never lands on the box. Store the PEM in your password manager as the source
+of truth; the MCP Resource Server verifies agent tokens against the public JWKS
+the AS derives from this key.
+
+### C3. Generate the remaining secret values
 
 ```sh
 openssl rand -base64 48   # SESSION_JWT_SECRET  (≥32 bytes)
@@ -147,59 +208,9 @@ openssl rand -base64 48   # INTERNAL_API_TOKEN
 openssl rand -hex 32      # POSTGRES_PASSWORD   (hex → safe inside DATABASE_URL)
 ```
 
-Production values that differ from the dev defaults in `.env.example`:
-
-| Variable | Production value |
-|----------|------------------|
-| `ENVIRONMENT` | `production` |
-| `PUBLIC_BASE_URL` | `https://api.usewren.com` |
-| `APP_PUBLIC_URL` | `https://usewren.com` |
-| `MCP_PUBLIC_URL` | `https://mcp.usewren.com` |
-| `DATABASE_URL` | `postgresql+asyncpg://wren:<POSTGRES_PASSWORD>@postgres:5432/wren` |
-| `POSTGRES_USER` / `POSTGRES_DB` | `wren` / `wren` |
-| `POSTGRES_PASSWORD` | the generated hex value (must match `DATABASE_URL`) |
-| `SESSION_JWT_SECRET` | generated (≥32 bytes) |
-| `COOKIE_DOMAIN` | `.usewren.com` |
-| `INTERNAL_API_TOKEN` | generated |
-| `BACKEND_INTERNAL_URL` | `http://backend:8001` |
-| `OAUTH_PRIVATE_KEY_PATH` | `/opt/wren/secrets/oauth_private.pem` |
-| `OAUTH_KEY_ID` | e.g. `wren-oauth-1` |
-| `CORS_ORIGIN` | `https://usewren.com` |
-| `DISCORD_WEBHOOK_URL` | the real Discord Incoming Webhook |
-| `CF_TUNNEL_ID` | the tunnel UUID from Phase B |
-| `CF_APP_HOSTNAME` / `CF_API_HOSTNAME` / `CF_MCP_HOSTNAME` | `usewren.com` / `api.usewren.com` / `mcp.usewren.com` |
-| `GHCR_OWNER` | your GitHub org/owner (lowercase) |
-| `WREN_IMAGE_TAG` | `latest` |
-
-`ENVIRONMENT=production` makes the app **fail fast** if `SESSION_JWT_SECRET` is
-too short or the OAuth key is missing, and makes cookies `Secure`. All OAuth
-issuer/metadata/redirect URLs are built from the pinned `*_PUBLIC_URL` values, not
-the request host (the "Site-URL gotcha").
-
-### C2. OAuth AS private key
-
-```sh
-sudo openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /opt/wren/secrets/oauth_private.pem
-sudo chmod 600 /opt/wren/secrets/oauth_private.pem
-```
-
-The path must equal `OAUTH_PRIVATE_KEY_PATH`. `docker-compose.tunnel.yml`
-bind-mounts this PEM read-only into the backend container **at the same path**, so
-the AS reads it where `.env` says it is. The MCP Resource Server verifies agent
-tokens against the public JWKS the AS derives from this key.
-
-### C3. Tunnel credentials
-
-For the **first manual deploy** (Phase E), place the two files from Phase B into
-your local checkout so `deploy.sh` copies them to the box (they are gitignored):
-
-```sh
-cp ~/.cloudflared/<UUID>.json  deployments/cloudflare/credentials.json
-cp ~/.cloudflared/cert.pem     deployments/cloudflare/cert.pem
-```
-
-`deploy.sh` copies them to `/opt/wren/deployments/cloudflare/` and `chmod 600`s
-them on the box. Thereafter CD supplies them from the repo secrets (Phase D).
+Also have ready the real `DISCORD_WEBHOOK_URL` and the tunnel `credentials.json`
+from Phase B (its RAW content). All of these are set as GitHub secrets in Phase
+D; none is placed on the box.
 
 ---
 
@@ -209,11 +220,20 @@ CD (`cd.yml`) needs these to build/push images and deploy. Set via the repo
 **Settings → Secrets and variables → Actions**, or `gh`:
 
 ```sh
-gh secret set DEPLOY_SERVER_IP      --body "<vps-ip>"
-gh secret set DEPLOY_SSH_KEY        < ~/.ssh/deploy_ed25519          # the deploy user's PRIVATE key
-gh secret set CF_TUNNEL_CREDENTIALS --body "$(base64 -w0 ~/.cloudflared/<UUID>.json)"
-gh secret set CF_CERT_PEM           --body "$(base64 -w0 ~/.cloudflared/cert.pem)"
+gh secret set DEPLOY_SERVER_IP             --body "<vps-ip>"
+gh secret set DEPLOY_SSH_KEY               < ~/.ssh/deploy_ed25519         # deploy user's PRIVATE key
+gh secret set POSTGRES_PASSWORD            --body "<generated hex>"
+gh secret set SESSION_JWT_SECRET           --body "<generated>"
+gh secret set INTERNAL_API_TOKEN           --body "<generated>"
+gh secret set DISCORD_WEBHOOK_URL          --body "<real discord webhook>"
+gh secret set WREN_OAUTH_PRIVATE_KEY       < oauth_private.pem             # RAW PEM content
+gh secret set WREN_CLOUDFLARED_CREDENTIALS < ~/.cloudflared/<UUID>.json    # RAW credentials.json (NOT base64)
 ```
+
+> `WREN_CLOUDFLARED_CREDENTIALS` holds the RAW, unencoded `credentials.json`
+> (environment-sourced secrets transmit raw content). Do NOT reuse the old
+> base64 `CF_TUNNEL_CREDENTIALS` value; retire `CF_TUNNEL_CREDENTIALS` and
+> `CF_CERT_PEM` (cert.pem is not needed at runtime).
 
 `GITHUB_TOKEN` is **not** set manually: it is the built-in Actions token. Ensure
 Actions is allowed to write packages (repo/org **Settings → Actions → Workflow
@@ -224,25 +244,53 @@ GHCR with it.
 
 ## Phase E: first live deploy
 
-Preview the phase plan first (touches nothing):
+The simplest path: once the repo secrets (Phase D) are set and `.env.prod` is
+committed (C1), push to `main` (or run the CD **workflow_dispatch**). CD registers
+the Docker Context, exports the config/secrets, and runs `scripts/deploy.sh`.
+
+To deploy manually from a local checkout instead, register the context and export
+the same environment yourself (mirroring `cd.yml`):
 
 ```sh
-DRY_RUN=1 ./scripts/deploy.sh <vps-ip> deploy
+# One-time on your machine: register the context (CD does this per-run):
+docker context create wren --docker "host=ssh://deploy@<vps-ip>"
+
+set -a
+source .env.prod
+WREN_PROMETHEUS_CONFIG="$(cat deployments/prometheus/prometheus.yml)"
+WREN_PROMETHEUS_ALERTS="$(cat deployments/prometheus/alerts.yml)"
+WREN_CLOUDFLARED_INGRESS="$(envsubst '$CF_TUNNEL_ID $CF_APP_HOSTNAME $CF_API_HOSTNAME $CF_MCP_HOSTNAME' < deployments/cloudflare/config.yml)"
+WREN_ALERTMANAGER_CONFIG="$(DISCORD_WEBHOOK_URL='<webhook>' envsubst '$DISCORD_WEBHOOK_URL' < deployments/alertmanager/alertmanager.yml)"
+WREN_OAUTH_PRIVATE_KEY="$(cat oauth_private.pem)"
+WREN_CLOUDFLARED_CREDENTIALS="$(cat ~/.cloudflared/<UUID>.json)"
+POSTGRES_PASSWORD='<hex>'; SESSION_JWT_SECRET='<gen>'; INTERNAL_API_TOKEN='<gen>'
+set +a
+
+DRY_RUN=1 DEPLOY_SHA=$(git rev-parse HEAD) ./scripts/deploy.sh <vps-ip> deploy   # preview
+DEPLOY_SHA=$(git rev-parse HEAD) ./scripts/deploy.sh <vps-ip> deploy             # real
 ```
 
-Then run the real deploy from your local checkout (credentials placed in C3,
-`origin/main` at the commit whose `:latest` images GHCR holds):
+The script asserts every required config/secret env var is set → pulls → runs
+**migrations pre-traffic** (`alembic upgrade head`; aborts on failure) → starts
+the stack under the `tunnels` profile over the context → **health-gates every
+service (~60s)** → records `/opt/wren/.deployed-sha` on success. On a failed gate
+it exits non-zero; CD (not the script) owns the rollback re-run.
+
+**Cutover caveat (one-time).** If the box was previously deployed under the old
+model it still holds a `/opt/wren/.deployed-sha` pointing at a **pre-rearchitecture**
+commit. A failed first deploy would check that SHA out and run the OLD `deploy.sh`,
+which aborts at its local-credential preflight (CD no longer stages
+`credentials.json`/`cert.pem`), so the rollback fails cleanly without mutating the
+box. Treat the first rearchitected deploy as **fix-forward-only**, and clear the
+stale key first so a failure refuses rollback cleanly rather than running
+incompatible old code:
 
 ```sh
-DEPLOY_SHA=$(git rev-parse HEAD) ./scripts/deploy.sh <vps-ip> deploy
+ssh deploy@<vps-ip> 'rm -f /opt/wren/.deployed-sha'
 ```
 
-Alternatively, once the repo secrets (Phase D) are set, push to `main` and CD runs
-the same script. The script: installs deps → syncs the repo → copies tunnel creds
-→ **asserts `.env` + the OAuth key exist** → renders the tunnel and Alertmanager
-configs → runs **migrations pre-traffic** (`alembic upgrade head`; aborts on
-failure) → starts the stack under the `tunnels` profile → **health-gates every
-service (~60s)** → rolls back on failure.
+Run the cutover in a low-traffic window (containers recreate; `pgdata`/`promdata`
+persist).
 
 ---
 
@@ -251,15 +299,15 @@ service (~60s)** → rolls back on failure.
 ### F1. All services healthy, zero open inbound ports
 
 ```sh
-# on the box, as deploy:
-cd /opt/wren
-docker compose -f docker-compose.yml -f docker-compose.tunnel.yml --profile tunnels ps   # every service: healthy
-sudo ufw status verbose        # only OpenSSH inbound; the tunnel is outbound-only
+# from your checkout / the runner, over the context (the box has no repo):
+docker --context wren compose -f docker-compose.yml -f docker-compose.tunnel.yml --profile tunnels ps   # every service: healthy
+ssh deploy@<vps-ip> 'sudo ufw status verbose'        # only OpenSSH inbound; the tunnel is outbound-only
 ```
 
 Alertmanager and cloudflared run under the `tunnels` profile; the health gate
-covers them. A missing `DISCORD_WEBHOOK_URL` aborts the deploy at the render step
-(release-gating), so a green deploy means the webhook rendered.
+covers them. `WREN_ALERTMANAGER_CONFIG` is rendered in CI from
+`DISCORD_WEBHOOK_URL`; a blank webhook makes Alertmanager exit on config load and
+the health gate fails, so a green deploy means the webhook rendered.
 
 ### F2. All three hostnames reachable through the tunnel
 
@@ -295,9 +343,9 @@ Exercise the full spine against production:
 Prove the alert path end to end, then restore:
 
 ```sh
-docker compose -f docker-compose.yml -f docker-compose.tunnel.yml --profile tunnels stop mcp
+docker --context wren compose -f docker-compose.yml -f docker-compose.tunnel.yml --profile tunnels stop mcp
 # wait ~1-2m → ServiceDown fires → 🚨 FIRING message in Discord
-docker compose -f docker-compose.yml -f docker-compose.tunnel.yml --profile tunnels start mcp
+docker --context wren compose -f docker-compose.yml -f docker-compose.tunnel.yml --profile tunnels start mcp
 # → ✅ RESOLVED message (send_resolved: true)
 ```
 

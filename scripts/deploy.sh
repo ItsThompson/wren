@@ -2,70 +2,92 @@
 # =============================================================================
 # scripts/deploy.sh
 #
-# Push-based SSH deploy orchestration for Wren (phases 1-14), collapsed to the
-# modular-monolith topology and hardened for a non-root deploy user.
-#
-# Runs from a checkout of this repo (CI runner or an operator's machine) and
-# orchestrates a single VPS over SSH. It never creates secrets on the box: it
-# asserts /opt/wren/.env and the OAuth key already exist (placed at one-time
-# bring-up).
+# Stateless Docker Context deploy for Wren. The Compose CLI runs HERE (a CI
+# runner or an operator's checkout); the engine runs on the VPS, reached through
+# a pre-registered Docker Context (ssh://deploy@<ip>, name `wren`). ALL config
+# and secret content is sourced CLI-side (committed .env.prod + files rendered in
+# the runner + GitHub Actions secrets, all exported into this process's
+# environment) and transmitted to the daemon via environment-sourced Compose
+# configs:/secrets:. The box holds no .env, no rendered config, and no secret
+# files, which removes the secret-ownership problem entirely.
 #
 # Usage:
 #   DEPLOY_SHA=<git-sha> ./scripts/deploy.sh <server-ip> [ssh-user]
+#   ./scripts/deploy.sh read-deployed-sha <server-ip> [ssh-user]
 #
 # Env:
-#   DEPLOY_SHA       git SHA being deployed (recorded for future rollback).
-#                    Defaults to the resolved HEAD after repo sync.
-#   DRY_RUN=1        print the phase plan (every ssh/scp) without executing.
-#   WREN_REMOTE_DIR  remote checkout dir (default /opt/wren).
-#   WREN_REPO_URL    git remote to clone on first deploy
-#                    (default https://github.com/${GITHUB_REPOSITORY:-wren-platform/wren}.git).
+#   DEPLOY_SHA           git SHA being deployed; recorded on success as the
+#                        rollback key. Defaults to the runner checkout's HEAD.
+#   DRY_RUN=1            print the phase plan (every compose/ssh line) without
+#                        executing.
+#   WREN_DOCKER_CONTEXT  Docker context name (default `wren`); CI registers it.
+#   WREN_REMOTE_DIR      remote dir holding .deployed-sha (default /opt/wren).
 #
-# Phases: preflight -> ssh probe -> dep install -> docker daemon config ->
-# prune cron -> repo sync -> copy tunnel credentials -> assert secrets ->
-# render deploy configs + pull -> pre-traffic migrations -> start ->
-# health gate -> (rollback on failure) -> cleanup on success.
+# Required config/secret env vars (asserted before ANY compose call, because the
+# migration `run` materializes configs/secrets exactly like `up`):
+#   WREN_OAUTH_PRIVATE_KEY WREN_CLOUDFLARED_CREDENTIALS WREN_ALERTMANAGER_CONFIG
+#   WREN_CLOUDFLARED_INGRESS WREN_PROMETHEUS_CONFIG WREN_PROMETHEUS_ALERTS
+#   POSTGRES_PASSWORD SESSION_JWT_SECRET INTERNAL_API_TOKEN
 #
-# Not zero-downtime (accepted at ~5 users). Concurrency (a manual dispatch vs a
-# push-deploy) is enforced at the CD layer, not here.
+# Rollback is owned by CI (cd.yml): on a failed health gate this script exits
+# non-zero WITHOUT any internal re-deploy. cd.yml reads the previous SHA
+# (`read-deployed-sha`), checks it out in the runner, re-exports env from that
+# checkout, and re-runs the deploy once with WREN_IMAGE_TAG=sha-<prev>, which
+# restores the previous images AND config.
+#
+# Not zero-downtime (accepted at ~5 users); a brief per-deploy recreate gap is
+# accepted. Concurrency is enforced at the CD layer, not here.
 # =============================================================================
 
 # --- Configuration (safe to evaluate when sourced; no args required) --------
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CRED_DIR="${REPO_ROOT}/deployments/cloudflare"
 REMOTE_DIR="${WREN_REMOTE_DIR:-/opt/wren}"
-REPO_URL="${WREN_REPO_URL:-https://github.com/${GITHUB_REPOSITORY:-wren-platform/wren}.git}"
+CONTEXT_NAME="${WREN_DOCKER_CONTEXT:-wren}"
 
-# Every compose invocation layers the tunnel overlay (the overlay owns ingress;
-# the base docker-compose.yml is untouched). The tunnels profile keeps
-# cloudflared from starting outside a deploy.
-COMPOSE="docker compose -f docker-compose.yml -f docker-compose.tunnel.yml"
+# Every compose invocation runs over the Docker Context and layers the tunnel
+# overlay (owns ingress) and the deploy overlay (feeds backend/mcp the committed
+# .env.prod + app secrets client-side via env_file/environment:, since the box
+# has no .env). The tunnels profile keeps cloudflared and alertmanager from
+# starting outside a deploy.
+COMPOSE="docker --context ${CONTEXT_NAME} compose -f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.deploy.yml"
 COMPOSE_TUNNEL="${COMPOSE} --profile tunnels"
 
 SSH_OPTS=(-o ConnectTimeout=10 -o BatchMode=yes)
 DRY_RUN="${DRY_RUN:-0}"
 
-# Set by configure()/ssh_probe()/sync_repo(); declared here for clarity.
+# Set by configure(); declared here for clarity.
 SERVER_IP=""
 SSH_USER=""
 SSH_TARGET=""
-SUDO="sudo"
-PREV_SHA=""
 CURRENT_SHA=""
 
+# The config/secret env vars every compose call needs. Asserted up front so a
+# missing value fails fast with a clear message instead of a mid-deploy compose
+# error (or, worse, a half-migrated stack).
+REQUIRED_SECRET_ENV=(
+  WREN_OAUTH_PRIVATE_KEY
+  WREN_CLOUDFLARED_CREDENTIALS
+  WREN_ALERTMANAGER_CONFIG
+  WREN_CLOUDFLARED_INGRESS
+  WREN_PROMETHEUS_CONFIG
+  WREN_PROMETHEUS_ALERTS
+  POSTGRES_PASSWORD
+  SESSION_JWT_SECRET
+  INTERNAL_API_TOKEN
+)
+
 # --- Logging & execution helpers --------------------------------------------
-# All human-facing output goes to stderr so command-substitution callers (image
-# derivation, health JSON) capture only real data on stdout.
+# All human-facing output goes to stderr so command-substitution callers
+# (read_deployed_sha, health JSON) capture only real data on stdout.
 
 log() { printf '%s\n' "$*" >&2; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 is_dry_run() { [[ "${DRY_RUN}" == "1" ]]; }
 
-# Run a single command string on the remote host. Command strings are assembled
-# CLIENT-SIDE on purpose (REMOTE_DIR and the compose flags are deploy config);
-# anything that must expand on the box goes through remote_script's quoted
-# heredoc, never here.
+# The ONLY ssh boundary that remains: read/write /opt/wren/.deployed-sha (the
+# settled rollback key). Everything else goes through the Docker Context. Kept a
+# thin wrapper so the deploy_test.sh harness can stub it.
 remote() {
   if is_dry_run; then
     printf '[dry-run][ssh %s] %s\n' "${SSH_TARGET}" "$*" >&2
@@ -75,36 +97,31 @@ remote() {
   ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "$@"
 }
 
-# Run a bash script (read from stdin) on the remote host. Extra args are
-# forwarded as positional params ($1, $2, ...) to the remote script; use a
-# quoted heredoc (<<'REMOTE') so nothing expands locally.
-remote_script() {
+# Run (or, in dry-run, print) a compose command over the context. $1 is the
+# compose prefix (COMPOSE or COMPOSE_TUNNEL); the rest are compose args. Config
+# and secret content is already in this process's environment; Compose transmits
+# it to the remote daemon.
+compose_run() {
+  local prefix="$1"
+  shift
   if is_dry_run; then
-    {
-      printf '[dry-run][ssh %s] bash -s -- %s <<REMOTE\n' "${SSH_TARGET}" "$*"
-      cat
-      printf 'REMOTE\n'
-    } >&2
+    printf '[dry-run] %s %s\n' "${prefix}" "$*" >&2
     return 0
   fi
-  ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s -- "$@"
+  # Word-splitting on ${prefix} is intentional: it is a fixed command prefix.
+  # shellcheck disable=SC2086
+  ${prefix} "$@"
 }
 
-# Copy a local file to the remote host.
-copy_to_remote() {
-  local src="$1" dest="$2"
-  if is_dry_run; then
-    printf '[dry-run][scp] %s -> %s:%s\n' "${src}" "${SSH_TARGET}" "${dest}" >&2
-    return 0
-  fi
-  scp "${SSH_OPTS[@]}" "${src}" "${SSH_TARGET}:${dest}"
-}
-
-# --- Pure helpers (unit-testable without SSH) -------------------------------
+# --- Pure helpers (unit-testable without a daemon) --------------------------
 
 # Read image refs (one per line) on stdin; emit unique first-party image bases
 # (tag stripped). First-party = ghcr.io/<owner>/wren/*, matched by path so a new
-# service is picked up automatically. Never hard-code the service list.
+# service is picked up automatically. No production path calls this after the
+# context rearchitecture (the former internal re-pull rollback was deleted); it is
+# retained per the AC6 contract as the canonical first-party derivation (mirrored
+# by cd.yml's discover-matrix jq) and is covered by a deploy_test.sh case. Keep it
+# and that test in sync; if AC6 is ever relaxed, delete it rather than polish it.
 filter_first_party_images() {
   { grep -E '^ghcr\.io/[^/]+/wren/' || true; } | sed -E 's/:[^:/]*$//' | sort -u
 }
@@ -113,8 +130,8 @@ filter_first_party_images() {
 # `flatten` normalizes both). Print a token for every reason the stack is NOT
 # fully healthy, so an EMPTY stdout is the only signal that all is well:
 #   - empty / unparseable output, or zero services -> "<no-status>" / "<parse-error>"
-#     (a transient SSH blip must never read as healthy: that would suppress the
-#     rollback the gate exists to trigger)
+#     (a transient blip must never read as healthy: that would let the gate pass
+#     and record a bad .deployed-sha)
 #   - any service not in State=running                        -> its .Service
 #     (an exited container with empty Health is caught here, not ignored)
 #   - any service whose Health is defined and not "healthy"   -> its .Service
@@ -133,220 +150,31 @@ gate_unhealthy() {
   ' 2>/dev/null || echo "<parse-error>"
 }
 
-# --- Phase 1: preflight ------------------------------------------------------
+# --- Preflight: required config/secret env vars -----------------------------
 
-preflight_credentials() {
-  log "==> Phase 1: preflight (assert tunnel credentials exist locally)"
-  local f
-  for f in "${CRED_DIR}/credentials.json" "${CRED_DIR}/cert.pem"; do
-    [[ -f "${f}" ]] || die "tunnel credential not found: ${f}
-  Decode CF_TUNNEL_CREDENTIALS / CF_CERT_PEM into deployments/cloudflare/ first.
-  See docs/runbooks/deploy.md."
+assert_secret_env_present() {
+  log "==> Preflight: assert required config/secret env vars are set"
+  local missing=() var
+  for var in "${REQUIRED_SECRET_ENV[@]}"; do
+    [[ -n "${!var:-}" ]] || missing+=("${var}")
   done
-  log "    present: ${CRED_DIR}/{credentials.json,cert.pem}"
-}
-
-# --- Phase 2: ssh probe (and detect whether remote needs sudo) --------------
-
-ssh_probe() {
-  log "==> Phase 2: SSH probe (${SSH_TARGET})"
-  if is_dry_run; then
-    remote "echo ok"
-    SUDO="sudo"
-    return 0
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    die "missing required config/secret env var(s): ${missing[*]}
+  Export these in the runner (from .env.prod + GitHub secrets + rendered files)
+  BEFORE deploy.sh: the migration 'run' materializes configs/secrets exactly like
+  'up', so every one must be set before the first compose call."
   fi
-  ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "echo ok" >/dev/null 2>&1 \
-    || die "cannot SSH into ${SSH_TARGET} (ensure key-based auth is set up)"
-  local uid
-  uid="$(ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "id -u" 2>/dev/null || echo 1000)"
-  if [[ "${uid}" == "0" ]]; then SUDO=""; else SUDO="sudo"; fi
-  log "    connected; privileged prefix: '${SUDO:-<none, root>}'"
+  log "    all ${#REQUIRED_SECRET_ENV[@]} required config/secret env vars present"
 }
 
-# --- Phase 3: idempotent dependency install ---------------------------------
+# --- Pull ------------------------------------------------------------------
 
-install_dependencies() {
-  log "==> Phase 3: idempotent dependency install (docker, git, gettext-base, jq)"
-  remote_script "${SUDO}" <<'REMOTE'
-set -euo pipefail
-SUDO="$1"
-ensure() {
-  # ensure <command> <apt-package>
-  if command -v "$1" >/dev/null 2>&1; then
-    echo "    $1 already installed"
-  else
-    echo "    installing $2 ..."
-    ${SUDO} apt-get update -qq
-    ${SUDO} apt-get install -y -qq "$2"
-  fi
-}
-if command -v docker >/dev/null 2>&1; then
-  echo "    docker already installed"
-else
-  echo "    installing docker ..."
-  curl -fsSL https://get.docker.com | ${SUDO} sh
-fi
-ensure git git
-ensure envsubst gettext-base
-ensure jq jq
-REMOTE
+pull_images() {
+  log "==> Pull images (docker --context compose pull)"
+  compose_run "${COMPOSE_TUNNEL}" pull
 }
 
-# --- Phase 4: docker daemon config (log rotation; restart only if changed) --
-
-configure_docker_daemon() {
-  log "==> Phase 4: docker daemon config (log rotation)"
-  copy_to_remote "${REPO_ROOT}/deployments/docker/daemon.json" "/tmp/wren-daemon.json"
-  remote_script "${SUDO}" <<'REMOTE'
-set -euo pipefail
-SUDO="$1"
-if cmp -s /tmp/wren-daemon.json /etc/docker/daemon.json 2>/dev/null; then
-  rm -f /tmp/wren-daemon.json
-  echo "    daemon.json unchanged; no restart"
-else
-  ${SUDO} mkdir -p /etc/docker
-  ${SUDO} mv /tmp/wren-daemon.json /etc/docker/daemon.json
-  ${SUDO} systemctl restart docker
-  echo "    daemon.json updated; docker restarted"
-fi
-REMOTE
-}
-
-# --- Phase 5: daily docker prune cron ---------------------------------------
-
-install_prune_cron() {
-  log "==> Phase 5: daily docker prune cron"
-  remote_script "${SUDO}" <<'REMOTE'
-set -euo pipefail
-SUDO="$1"
-${SUDO} tee /etc/cron.daily/wren-docker-prune >/dev/null <<'CRON'
-#!/bin/sh
-# Remove images and build cache unused for >72h (installed by scripts/deploy.sh).
-echo "$(date -Is): docker system prune" >> /var/log/wren-docker-prune.log
-docker system prune -af --filter until=72h >> /var/log/wren-docker-prune.log 2>&1
-CRON
-${SUDO} chmod +x /etc/cron.daily/wren-docker-prune
-echo "    /etc/cron.daily/wren-docker-prune installed"
-REMOTE
-}
-
-# --- Phase 6: repo sync (captures the previous SHA for rollback) ------------
-
-sync_repo() {
-  log "==> Phase 6: repo sync (git fetch && reset --hard origin/main)"
-  # The last successfully deployed SHA (its :sha-<prev> images exist in GHCR) is
-  # the rollback target. Capture it before the checkout moves.
-  PREV_SHA="$(remote "cat ${REMOTE_DIR}/.deployed-sha 2>/dev/null || true")"
-  PREV_SHA="$(printf '%s' "${PREV_SHA}" | tr -d '[:space:]')"
-  remote_script "${SUDO}" "${REMOTE_DIR}" "${REPO_URL}" <<'REMOTE'
-set -euo pipefail
-SUDO="$1"; DIR="$2"; URL="$3"
-if [ -d "$DIR/.git" ]; then
-  echo "    repo exists; fetching origin/main"
-  git -C "$DIR" fetch origin
-  git -C "$DIR" reset --hard origin/main
-else
-  echo "    cloning $URL"
-  ${SUDO} mkdir -p "$DIR"
-  ${SUDO} chown "$(id -u):$(id -g)" "$DIR"
-  git clone "$URL" "$DIR"
-fi
-REMOTE
-  CURRENT_SHA="${DEPLOY_SHA:-}"
-  if [[ -z "${CURRENT_SHA}" ]]; then
-    CURRENT_SHA="$(remote "git -C ${REMOTE_DIR} rev-parse HEAD 2>/dev/null || true")"
-    CURRENT_SHA="$(printf '%s' "${CURRENT_SHA}" | tr -d '[:space:]')"
-  fi
-  log "    previous SHA: ${PREV_SHA:-<none>} ; deploying: ${CURRENT_SHA:-<unknown>}"
-}
-
-# --- Phase 7: copy tunnel credentials (chmod 600) ---------------------------
-
-copy_tunnel_credentials() {
-  log "==> Phase 7: copy tunnel credentials (chmod 600)"
-  remote "mkdir -p ${REMOTE_DIR}/deployments/cloudflare"
-  copy_to_remote "${CRED_DIR}/credentials.json" "${REMOTE_DIR}/deployments/cloudflare/credentials.json"
-  copy_to_remote "${CRED_DIR}/cert.pem" "${REMOTE_DIR}/deployments/cloudflare/cert.pem"
-  remote "chmod 600 ${REMOTE_DIR}/deployments/cloudflare/credentials.json ${REMOTE_DIR}/deployments/cloudflare/cert.pem"
-}
-
-# --- Phase 8: assert secrets exist (never created by this script) -----------
-
-assert_secrets_present() {
-  log "==> Phase 8: assert .env + OAuth key exist (never created here)"
-  remote_script "${REMOTE_DIR}" <<'REMOTE'
-set -euo pipefail
-DIR="$1"
-if [ ! -f "$DIR/.env" ]; then
-  echo "ERROR: $DIR/.env not found. Create it at bring-up; deploy.sh never creates it." >&2
-  exit 1
-fi
-set -a; . "$DIR/.env"; set +a
-if [ -z "${OAUTH_PRIVATE_KEY_PATH:-}" ]; then
-  echo "ERROR: OAUTH_PRIVATE_KEY_PATH is not set in $DIR/.env." >&2
-  exit 1
-fi
-if [ ! -f "$OAUTH_PRIVATE_KEY_PATH" ]; then
-  echo "ERROR: OAuth key file missing at $OAUTH_PRIVATE_KEY_PATH (place it at bring-up)." >&2
-  exit 1
-fi
-echo "    .env and OAuth key present"
-REMOTE
-}
-
-# --- Phase 9: render deploy configs (envsubst) + pull -----------------------
-
-render_tunnel_config() {
-  log "==> Phase 9a: render tunnel config (envsubst)"
-  remote_script "${REMOTE_DIR}" <<'REMOTE'
-set -euo pipefail
-cd "$1"
-set -a; . ./.env; set +a
-# Substitute ONLY the tunnel vars so the ingress path regex (which contains $)
-# survives untouched.
-envsubst '${CF_TUNNEL_ID} ${CF_APP_HOSTNAME} ${CF_API_HOSTNAME} ${CF_MCP_HOSTNAME}' \
-  < deployments/cloudflare/config.yml \
-  > deployments/cloudflare/config.rendered.yml
-echo "    rendered deployments/cloudflare/config.rendered.yml"
-REMOTE
-}
-
-render_alertmanager_config() {
-  log "==> Phase 9a: render Alertmanager config (envsubst DISCORD_WEBHOOK_URL)"
-  remote_script "${REMOTE_DIR}" <<'REMOTE'
-set -euo pipefail
-cd "$1"
-set -a; . ./.env; set +a
-# Alertmanager v0.27 EXITS on config load if webhook_url is not a valid URL, and
-# the tunnels profile the deploy activates DOES start alertmanager, so a missing
-# webhook is release-gating: fail here with a clear message rather than let the
-# container crash-loop until the health gate times out and rolls back.
-: "${DISCORD_WEBHOOK_URL:?DISCORD_WEBHOOK_URL must be set in /opt/wren/.env (bring-up)}"
-# Substitute ONLY the webhook token (single-var allow-list) so the Go templating
-# ({{ ... }}) in title/message survives. The rendered file holds a real secret,
-# so chmod 600; it is gitignored and mounted by the alertmanager service.
-envsubst '${DISCORD_WEBHOOK_URL}' \
-  < deployments/alertmanager/alertmanager.yml \
-  > deployments/alertmanager/alertmanager.rendered.yml
-chmod 600 deployments/alertmanager/alertmanager.rendered.yml
-echo "    rendered deployments/alertmanager/alertmanager.rendered.yml (chmod 600)"
-REMOTE
-}
-
-# Render every deploy-time config the stack mounts (tunnel ingress + Alertmanager
-# webhook) from /opt/wren/.env before any `up`.
-render_configs() {
-  render_tunnel_config
-  render_alertmanager_config
-}
-
-render_and_pull() {
-  render_configs
-  log "==> Phase 9b: docker compose pull"
-  remote "cd ${REMOTE_DIR} && ${COMPOSE_TUNNEL} pull"
-}
-
-# --- Phase 10: migrations (explicit, pre-traffic) ---------------------------
+# --- Migrations (explicit, pre-traffic) -------------------------------------
 
 wait_service_healthy() {
   local svc="$1" attempts="${2:-12}" delay="${3:-5}"
@@ -356,7 +184,7 @@ wait_service_healthy() {
   fi
   local i status raw
   for ((i = 1; i <= attempts; i++)); do
-    raw="$(remote "cd ${REMOTE_DIR} && ${COMPOSE} ps --format json ${svc}" 2>/dev/null || true)"
+    raw="$(${COMPOSE} ps --format json "${svc}" 2>/dev/null || true)"
     status="$(printf '%s' "${raw}" | jq -rs 'flatten | .[0].Health // ""' 2>/dev/null || true)"
     if [[ "${status}" == "healthy" ]]; then
       log "    ${svc} healthy"
@@ -369,35 +197,35 @@ wait_service_healthy() {
 }
 
 run_migrations() {
-  log "==> Phase 10: migrations (pre-traffic; postgres -> wait healthy -> alembic upgrade head)"
-  remote "cd ${REMOTE_DIR} && ${COMPOSE} up -d postgres"
+  log "==> Migrations (pre-traffic; postgres -> wait healthy -> alembic upgrade head)"
+  compose_run "${COMPOSE}" up -d postgres
   wait_service_healthy postgres 24 5 \
     || die "postgres did not become healthy; aborting before migrations"
-  remote "cd ${REMOTE_DIR} && ${COMPOSE} run --rm backend alembic upgrade head" \
+  compose_run "${COMPOSE_TUNNEL}" run --rm backend alembic upgrade head \
     || die "migration failed: aborting before app containers start"
   log "    migrations applied"
 }
 
-# --- Phase 11: start --------------------------------------------------------
+# --- Start ------------------------------------------------------------------
 
 start_stack() {
-  log "==> Phase 11: start stack (docker compose --profile tunnels up -d)"
-  remote "cd ${REMOTE_DIR} && ${COMPOSE_TUNNEL} up -d"
+  log "==> Start stack (docker --context compose --profile tunnels up -d)"
+  compose_run "${COMPOSE_TUNNEL}" up -d
 }
 
-# --- Phase 12: health gate (~60s) -------------------------------------------
+# --- Health gate (~60s) -----------------------------------------------------
 
 health_gate() {
-  log "==> Phase 12: health gate (poll 'docker compose ps' health, ~60s)"
+  log "==> Health gate (poll 'docker --context compose ps' health, ~60s)"
   if is_dry_run; then
     log "    [dry-run] would poll all services' health for ~60s"
     return 0
   fi
   local i raw unhealthy=""
   for ((i = 1; i <= 12; i++)); do
-    # `|| true`: a failed/transient SSH call yields empty output, which
-    # gate_unhealthy reports as not-healthy (retry) rather than aborting.
-    raw="$(remote "cd ${REMOTE_DIR} && ${COMPOSE} ps --format json" 2>/dev/null || true)"
+    # `|| true`: a transient error yields empty output, which gate_unhealthy
+    # reports as not-healthy (retry) rather than aborting.
+    raw="$(${COMPOSE} ps --format json 2>/dev/null || true)"
     unhealthy="$(printf '%s' "${raw}" | gate_unhealthy)"
     if [[ -z "${unhealthy}" ]]; then
       log "    all services healthy"
@@ -410,56 +238,43 @@ health_gate() {
   return 1
 }
 
-# --- Phase 13: rollback (image-only, git-consistent) ------------------------
+# --- Rollback target helper (CI-owned rollback; see cd.yml) -----------------
 
-first_party_images() {
-  remote "cd ${REMOTE_DIR} && ${COMPOSE} config --images" | filter_first_party_images
-}
-
-rollback() {
-  local prev="$1"
-  log "==> Phase 13: ROLLBACK to ${prev:-<none>}"
-  if [[ -z "${prev}" ]]; then
-    log "    no previous SHA recorded (.deployed-sha empty); cannot roll back automatically"
+# Echo the previously deployed SHA (the rollback target) on stdout, or REFUSE
+# (non-zero) when none is recorded. cd.yml calls `deploy.sh read-deployed-sha
+# <ip>` on a failed deploy; an empty result means the first deploy has no
+# rollback target and the workflow must fail rather than guess.
+read_deployed_sha() {
+  # `remote`'s command ends in `|| true`, so a non-zero exit here is an SSH/
+  # transport failure, NOT an absent file. Distinguish the two: a transport
+  # failure is transient (a human retries), while an empty read is a genuine
+  # "no rollback target" (e.g. the first deploy). Both refuse (non-zero), so a
+  # bad read can never trigger a rollback to the wrong SHA.
+  local sha rc
+  sha="$(remote "cat ${REMOTE_DIR}/.deployed-sha 2>/dev/null || true")"
+  rc=$?
+  if [[ ${rc} -ne 0 ]]; then
+    log "cannot reach ${SSH_TARGET} to read .deployed-sha (ssh exit ${rc}); cannot roll back"
     return 1
   fi
-  local images
-  images="$(first_party_images)"
-  if [[ -z "${images}" ]] && ! is_dry_run; then
-    die "rollback: no first-party images derived from 'docker compose config'"
+  sha="$(printf '%s' "${sha}" | tr -d '[:space:]')"
+  if [[ -z "${sha}" ]]; then
+    log "no previous .deployed-sha recorded on ${SSH_TARGET}; cannot roll back"
+    return 1
   fi
-  log "    re-pulling :sha-${prev} for all first-party images:"
-  local img
-  while IFS= read -r img; do
-    [[ -z "${img}" ]] && continue
-    log "      ${img}:sha-${prev}"
-    remote "docker pull ${img}:sha-${prev}"
-  done <<< "${images}"
-  log "    pinning git checkout to ${prev}"
-  remote "git -C ${REMOTE_DIR} reset --hard ${prev}"
-  render_configs
-  log "    bringing the stack back up on :sha-${prev}"
-  remote "cd ${REMOTE_DIR} && WREN_IMAGE_TAG=sha-${prev} ${COMPOSE_TUNNEL} up -d"
+  printf '%s\n' "${sha}"
 }
 
-# --- Phase 14: success bookkeeping ------------------------------------------
+# --- Success bookkeeping ----------------------------------------------------
 
 record_deploy() {
-  [[ -z "${CURRENT_SHA}" ]] && return 0
+  if [[ -z "${CURRENT_SHA}" ]]; then
+    log "    no DEPLOY_SHA resolved; skipping .deployed-sha write"
+    return 0
+  fi
+  # The one remaining ssh line: settle the rollback key on the box.
   remote "printf '%s\n' '${CURRENT_SHA}' > ${REMOTE_DIR}/.deployed-sha"
   log "    recorded deployed SHA: ${CURRENT_SHA}"
-}
-
-cleanup() {
-  log "==> Phase 14: cleanup (success path)"
-  # Best-effort: a cleanup failure never fails an already-successful deploy.
-  remote_script <<'REMOTE'
-set -uo pipefail
-docker builder prune -af --filter until=24h >/dev/null 2>&1 || true
-docker image prune -af --filter until=72h >/dev/null 2>&1 || true
-journalctl --vacuum-size=50M >/dev/null 2>&1 || true
-echo "    cleanup done"
-REMOTE
 }
 
 # --- Orchestration ----------------------------------------------------------
@@ -473,34 +288,32 @@ configure() {
 main() {
   set -euo pipefail
   configure "$@"
-  log "=== Wren deploy -> ${SSH_TARGET} (dry-run=${DRY_RUN}) ==="
+  CURRENT_SHA="${DEPLOY_SHA:-$(git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null || echo "")}"
+  log "=== Wren deploy -> context ${CONTEXT_NAME} (${SSH_TARGET}); dry-run=${DRY_RUN} ==="
 
-  preflight_credentials
-  ssh_probe
-  install_dependencies
-  configure_docker_daemon
-  install_prune_cron
-  sync_repo
-  copy_tunnel_credentials
-  assert_secrets_present
-  render_and_pull
+  assert_secret_env_present
+  pull_images
   run_migrations
   start_stack
 
   if ! health_gate; then
-    log "!!! health gate FAILED: initiating rollback"
-    if rollback "${PREV_SHA}"; then
-      die "deploy failed the health gate; rolled back to ${PREV_SHA}"
-    fi
-    die "deploy failed the health gate AND rollback could not proceed"
+    log "!!! health gate FAILED: deploy.sh exits non-zero (CI owns rollback)"
+    die "deploy failed the health gate on context ${CONTEXT_NAME}"
   fi
 
   record_deploy
-  cleanup
-  log "=== Deploy complete: ${CURRENT_SHA:-unknown} on ${SSH_TARGET} ==="
+  log "=== Deploy complete: ${CURRENT_SHA:-unknown} on context ${CONTEXT_NAME} ==="
 }
 
 # Only run when executed directly, so tests can source and exercise functions.
+# `read-deployed-sha <ip> [user]` routes to the rollback-target helper (cd.yml
+# calls it); any other first arg runs a full deploy.
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  main "$@"
+  if [[ "${1:-}" == "read-deployed-sha" ]]; then
+    shift
+    configure "$@"
+    read_deployed_sha
+  else
+    main "$@"
+  fi
 fi

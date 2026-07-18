@@ -1,0 +1,42 @@
+# =============================================================================
+# Deploy overlay — layered by scripts/deploy.sh ON TOP of docker-compose.yml and
+# docker-compose.tunnel.yml at DEPLOY TIME ONLY (never local dev, never e2e).
+#
+#   docker --context wren compose \
+#     -f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.deploy.yml \
+#     --profile tunnels up -d
+#
+# Delivers the production APP config + secrets to the backend and mcp containers
+# over the Docker Context WITHOUT any box file:
+#   - Non-secret prod config: the committed .env.prod, read CLI-side via env_file
+#     (env_file is resolved by the Compose CLI in the runner and transmitted to the
+#     daemon, so nothing lands on the VPS). This is layered ON TOP of the base
+#     file's `env_file: .env` (later file wins), so a deploy sources its config
+#     from .env.prod, never from a stray local dev .env.
+#   - App secrets (SESSION_JWT_SECRET, INTERNAL_API_TOKEN): passed through from the
+#     runner environment (GitHub Actions secrets); `environment:` overrides
+#     env_file, so these win regardless of what any .env/.env.prod contains.
+#
+# The base file keeps `env_file: .env` for the local dev inner loop; this overlay
+# is what makes the box-less deploy actually populate the app processes. Secrets
+# delivered as container env here match the pre-rearchitecture model (the app
+# always read them from env); the OAuth signing key stays a 0400 secret file
+# (Option 2, docker-compose.tunnel.yml), not an env var.
+# =============================================================================
+name: wren
+
+services:
+  backend:
+    env_file:
+      - path: .env.prod
+        required: true
+    environment:
+      SESSION_JWT_SECRET: ${SESSION_JWT_SECRET:?SESSION_JWT_SECRET is required for a deploy}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN is required for a deploy}
+
+  mcp:
+    env_file:
+      - path: .env.prod
+        required: true
+    environment:
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN is required for a deploy}
