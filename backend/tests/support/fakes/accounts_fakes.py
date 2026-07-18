@@ -103,3 +103,13 @@ class MutableClock:
 def build_test_hasher() -> BcryptPasswordHasher:
     """The real bcrypt hasher at a cheap cost for fast tests."""
     return BcryptPasswordHasher(cost=TEST_BCRYPT_COST)
+
+
+class SpyRegistrationNotifier:
+    """Records each ``user_registered`` call so tests can assert AC1/AC3."""
+
+    def __init__(self) -> None:
+        self.calls: list[dict[str, str]] = []
+
+    def user_registered(self, *, username: str, user_id: str) -> None:
+        self.calls.append({"username": username, "user_id": user_id})
