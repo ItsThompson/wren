@@ -173,7 +173,7 @@ test_dry_run_pull_migrate_up_use_overlay_and_profile() {
   overlays="-f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.deploy.yml"
   contains "${out}" "${overlays} --profile tunnels pull" || return 1
   contains "${out}" "${overlays} --profile tunnels run --rm backend alembic upgrade head" || return 1
-  contains "${out}" "${overlays} --profile tunnels up -d" || return 1
+  contains "${out}" "${overlays} --profile tunnels up -d --force-recreate" || return 1
 }
 
 # --- compose overlay / base shape -------------------------------------------
@@ -280,7 +280,7 @@ test_failed_gate_no_internal_redeploy() {
   grep -qx 'pull' "${ccalls}" || { echo "no pull"; rm -f "${ccalls}" "${rcalls}"; return 1; }
   grep -qx 'up -d postgres' "${ccalls}" || { echo "no postgres up"; rm -f "${ccalls}" "${rcalls}"; return 1; }
   grep -qx 'run --rm backend alembic upgrade head' "${ccalls}" || { echo "no migrate"; rm -f "${ccalls}" "${rcalls}"; return 1; }
-  grep -qx 'up -d' "${ccalls}" || { echo "no start"; rm -f "${ccalls}" "${rcalls}"; return 1; }
+  grep -qx 'up -d --force-recreate' "${ccalls}" || { echo "no start"; rm -f "${ccalls}" "${rcalls}"; return 1; }
   # .deployed-sha is NEVER written on a failed gate.
   not_contains "$(cat "${rcalls}")" ".deployed-sha" || { rm -f "${ccalls}" "${rcalls}"; return 1; }
   rm -f "${ccalls}" "${rcalls}"
