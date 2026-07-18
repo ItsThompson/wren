@@ -1,18 +1,12 @@
----
-layout: home
+# Wren
 
-hero:
-  name: Wren
-  text: Learning roadmaps, authored by agents.
-  tagline: Follow and track roadmaps built for you, and connect an AI agent to author them.
-  actions:
-    - theme: brand
-      text: Get Started
-      link: /getting-started
+Wren is a learning-roadmap platform. Start with the
+[Getting Started guide](/getting-started).
 
-features:
-  - title: Follow a roadmap
-    details: Work through a published learning roadmap and track your progress as you go.
-  - title: Connect an agent
-    details: Authorize an MCP client through Wren's consent flow to author roadmaps for you.
----
+<!--
+  Minimal stub: nginx 302s the bare root to /getting-started (see nginx.conf),
+  so visitors never see this page. It exists only so the build still emits
+  index.html, which nginx uses as the history-API fallback for client-side
+  routes. No `layout: home` hero, no meta-refresh (a meta-refresh would wrongly
+  redirect unknown-route fallbacks that are served this index.html).
+-->
