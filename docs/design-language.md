@@ -12,8 +12,8 @@ is fine here; hex/oklch values are not.
 
 | Concern | Canonical source (do not duplicate) |
 |---------|-------------------------------------|
-| Color / radius / font-family tokens | `frontend/src/globals.css` |
-| Font faces (self-hosted, Latin subset) | `frontend/src/fonts.css` |
+| Color / radius / font-family tokens | `shared/theme/tokens.css` |
+| Font faces (self-hosted, Latin subset) | `shared/theme/fonts.css` |
 | Tag hue palette + hash function | `frontend/src/lib/tag-color/tag-color.ts` |
 | Display-type + reading-width utilities | `frontend/src/globals.css` (`display-xl/l/m`, `reading-width`) |
 | Component implementations | `frontend/src/components/**`, `frontend/src/views/**` |
@@ -98,7 +98,7 @@ Tag color is a **domain truth**, not a styling choice. Subsection track tags are
 colored deterministically by hashing the tag string into a fixed muted palette,
 so a given tag renders in the same hue in every view. The hash and palette are
 canonical in `frontend/src/lib/tag-color/tag-color.ts` (mirrored as CSS
-variables in `globals.css`). Import that util everywhere; never re-derive the
+variables in `shared/theme/tokens.css`). Import that util everywhere; never re-derive the
 hash and never reorder the palette.
 
 **Subject tags** (roadmap-level categorization) are the exception: they render as
@@ -110,7 +110,7 @@ the two concepts. Only subsection track tags get a hue.
 Cream-on-terracotta is only safe for larger, heavier labels, so terracotta fills
 carry medium-weight-or-heavier labels only, never long or fine text. Terracotta
 used *as text* (links, emphasis) uses the darker link shade defined in
-`globals.css`, which clears contrast for body copy. Full contrast rules are in
+`shared/theme/tokens.css`, which clears contrast for body copy. Full contrast rules are in
 §8.
 
 ---
@@ -119,7 +119,7 @@ used *as text* (links, emphasis) uses the darker link shade defined in
 
 An editorial-warm pairing: the grotesque carries the interface, the serif is a
 spice used for human moments. Three faces, each with a job. Faces and weights are
-defined in `frontend/src/fonts.css`; the type scale and display utilities live in
+defined in `shared/theme/fonts.css`; the type scale and display utilities live in
 `globals.css`.
 
 | Face | Role |
@@ -219,7 +219,7 @@ This language is deliberately small; that is the point. Before adding a token, a
 hue, or a component variant:
 
 1. Justify it against the principles in §1, and prefer removing over adding.
-2. Add token *values* to `frontend/src/globals.css` only (oklch is canonical
+2. Add token *values* to `shared/theme/tokens.css` only (oklch is canonical
    there); document the new *rule* here, without restating the value.
 3. The tag palette and hash are a frozen contract: extend deliberately and never
    reorder, or existing roadmaps change color.
