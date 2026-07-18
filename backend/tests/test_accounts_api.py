@@ -8,12 +8,15 @@ The service is backed by the in-memory repository; no database is required.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+import httpx
 import pytest
 from fastapi import APIRouter, Depends, FastAPI, Request
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from tests.support.fakes.accounts_fakes import (
     InMemoryAccountRepository,
@@ -22,6 +25,7 @@ from tests.support.fakes.accounts_fakes import (
 )
 from wren.accounts.api import create_accounts_router
 from wren.accounts.config import REFRESH_COOKIE_NAME, CookieConfig
+from wren.accounts.notifications import DiscordRegistrationNotifier
 from wren.accounts.service import AccountService
 from wren.accounts.session import create_session_verifier
 from wren.core.app_factory import create_app
@@ -177,6 +181,49 @@ def test_malformed_email_uses_the_same_problem_json_contract(make_settings: Make
     assert body["code"] == "VALIDATION"
     # RequestValidationError is mapped into the same field-map shape.
     assert any("email" in field for field in body["fields"])
+
+
+async def test_register_makes_exactly_one_discord_post_and_returns_201(
+    make_settings: MakeSettings,
+) -> None:
+    # S3: exercise the REAL POST path end-to-end (not just the spy) via an
+    # ASGITransport client so the fire-and-forget task and the aclose() drain
+    # share one event loop. Assert 201 AND exactly one transport hit.
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(204)
+
+    notifier = DiscordRegistrationNotifier(
+        SecretStr("https://discord.test/webhooks/123/secret"),
+        transport=httpx.MockTransport(handler),
+    )
+    repo = InMemoryAccountRepository()
+
+    def provider() -> AccountService:
+        return AccountService(repo, build_test_hasher(), build_test_codec(), notifier=notifier)
+
+    accounts_router = create_accounts_router(
+        provider, cookie_config=CookieConfig(secure=False, domain=None)
+    )
+    app: FastAPI = create_app(
+        make_settings(), routers=[accounts_router], exception_handlers=build_exception_handlers()
+    )
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/auth/register",
+            json={"username": "ada", "email": "ada@example.com", "password": _PASSWORD},
+        )
+    await notifier.aclose()  # drain the scheduled delivery before asserting
+
+    assert response.status_code == 201, response.text
+    assert len(seen) == 1
+    assert seen[0].method == "POST"
+    assert json.loads(seen[0].content) == {"content": "🎉 New user registered: ada"}
 
 
 # --- login / require_user resolution ----------------------------------------
