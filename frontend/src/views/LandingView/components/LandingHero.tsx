@@ -1,4 +1,4 @@
-import { HERO_SUBHEAD } from '../constants'
+import { HERO_HEADLINE, HERO_SUBHEAD } from '../constants'
 import { HeroRoadmapVisual } from './HeroRoadmapVisual'
 import { StartRoadmapButton } from './StartRoadmapButton'
 
@@ -13,7 +13,7 @@ export function LandingHero() {
     <section className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
       <div>
         <h1 className="display-xl max-w-[15ch] text-balance text-foreground">
-          Learn anything, in the right order.
+          {HERO_HEADLINE}
         </h1>
         <p className="mt-5 max-w-[46ch] text-[19px] leading-relaxed text-muted-foreground">
           {HERO_SUBHEAD}
