@@ -1,4 +1,4 @@
-import { HERO_HEADLINE, HERO_SUBHEAD } from '../constants'
+import { CTA_SETUP_MICROCOPY, HERO_HEADLINE, HERO_SUBHEAD } from '../constants'
 import { HeroRoadmapVisual } from './HeroRoadmapVisual'
 import { StartRoadmapButton } from './StartRoadmapButton'
 
@@ -20,6 +20,7 @@ export function LandingHero() {
         </p>
         <div className="mt-7">
           <StartRoadmapButton />
+          <p className="mt-3 text-sm text-muted-foreground">{CTA_SETUP_MICROCOPY}</p>
         </div>
       </div>
       <HeroRoadmapVisual />
