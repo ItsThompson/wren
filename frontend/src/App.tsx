@@ -3,46 +3,10 @@ import { SWRConfig } from 'swr'
 
 import { ApiClientProvider, swrRevalidationPosture } from '@/api'
 import { AuthProvider } from '@/auth'
-import { AppShell } from '@/components/AppShell'
-import { AuthView } from '@/views/AuthView'
-import { ConnectedClientsView } from '@/views/ConnectedClientsView'
-import { ConsentView } from '@/views/ConsentView'
-import { DashboardView } from '@/views/DashboardView'
-import { LandingView } from '@/views/LandingView'
-import { NotFoundView } from '@/views/NotFoundView'
-import { OnboardingRouteGuard, OnboardingView } from '@/views/OnboardingView'
-import { ProfileView } from '@/views/ProfileView'
-import { RoadmapView } from '@/views/RoadmapView'
-import { TreeView } from '@/views/TreeView'
 
-const router = createBrowserRouter([
-  {
-    // Chrome-free, full-screen: mounted OUTSIDE `AppShell` (no TopBar/gutter).
-    // Its own guard bounces onboarded/anonymous users; the wizard renders only
-    // for a signed-in, un-onboarded user.
-    path: '/onboarding',
-    element: (
-      <OnboardingRouteGuard>
-        <OnboardingView />
-      </OnboardingRouteGuard>
-    ),
-  },
-  {
-    path: '/',
-    element: <AppShell />,
-    children: [
-      { index: true, element: <LandingView /> },
-      { path: 'auth', element: <AuthView /> },
-      { path: 'authorize', element: <ConsentView /> },
-      { path: 'dashboard', element: <DashboardView /> },
-      { path: 'user/:handle', element: <ProfileView /> },
-      { path: 'settings/connections', element: <ConnectedClientsView /> },
-      { path: 'roadmaps/:roadmapId/tree', element: <TreeView /> },
-      { path: 'roadmaps/:roadmapId', element: <RoadmapView /> },
-      { path: '*', element: <NotFoundView /> },
-    ],
-  },
-])
+import { appRoutes } from './routes'
+
+const router = createBrowserRouter(appRoutes)
 
 /**
  * Same-origin by default (dev proxy + MSW); prod points at the API subdomain via
