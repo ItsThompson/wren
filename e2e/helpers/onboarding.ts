@@ -27,8 +27,9 @@ export async function registerNewUser(page: Page, user: TestUser): Promise<void>
 }
 
 /**
- * Navigate a signed-in, un-onboarded user to a gated in-app route and assert the
- * `OnboardingGate` redirects them to the chrome-free `/onboarding` (US-GUARD-01).
+ * Precondition helper: navigate a signed-in, un-onboarded user to a gated in-app
+ * route and assert the `OnboardingGate` redirects them to the chrome-free
+ * `/onboarding`. The specs that use this carry their own story IDs.
  */
 export async function expectRedirectedToOnboarding(page: Page): Promise<void> {
   await page.goto('/dashboard')

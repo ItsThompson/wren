@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 import { expectRedirectedToOnboarding, registerNewUser } from '../helpers/onboarding'
+import type { AuthenticatedUser } from '../helpers/types'
 import { uniqueUser } from '../helpers/users'
 
 /**
@@ -87,7 +88,7 @@ test.describe('onboarding (register -> wizard -> dashboard, no redirect loop)', 
       page.reload(),
     ])
     expect(resume.status()).toBe(200)
-    const resumed = (await resume.json()) as { has_completed_onboarding: boolean }
+    const resumed = (await resume.json()) as AuthenticatedUser
     expect(resumed.has_completed_onboarding).toBe(true)
     await expect(page).toHaveURL(/\/dashboard$/)
     await expect(page.getByRole('heading', { name: /your dashboard/i })).toBeVisible()
