@@ -1,17 +1,22 @@
-import { Button } from '@/components/ui/button'
-
 import type { OnboardingStepProps } from '../types'
+import { StepControls } from './StepControls'
 
 /**
- * The Welcome step: a chrome-free intro to Wren with a primary action and a
- * Skip. It is presentational: it emits navigation intent through the props the
- * orchestrator wires (`onContinue`/`onSkip`) and never touches the network or
- * auth state. In this walking-skeleton slice Welcome is also the last step, so
- * the orchestrator maps `onContinue` to the completion path; `isSubmitting`
- * disables both controls against a double-submit, and `error` surfaces an inline
- * completion failure for retry.
+ * The Welcome step: a chrome-free intro to Wren. It is presentational: it emits
+ * navigation intent through the props the orchestrator wires and never touches
+ * the network or auth state. The Back/Continue/Skip controls and the inline
+ * completion-error alert live in {@link StepControls}; Welcome is the first step,
+ * so Back is absent and Continue advances to the next step.
  */
-export function WelcomeStep({ onContinue, onSkip, isSubmitting, error }: OnboardingStepProps) {
+export function WelcomeStep({
+  onContinue,
+  onBack,
+  onSkip,
+  isFirstStep,
+  isLastStep,
+  isSubmitting,
+  error,
+}: OnboardingStepProps) {
   return (
     <div className="flex flex-col">
       <p className="text-sm font-medium text-muted-foreground">Welcome to Wren</p>
@@ -21,20 +26,16 @@ export function WelcomeStep({ onContinue, onSkip, isSubmitting, error }: Onboard
         agents that author and update it for you.
       </p>
 
-      {error ? (
-        <p role="alert" className="mt-6 text-sm text-destructive">
-          {error}
-        </p>
-      ) : null}
-
-      <div className="mt-8 flex flex-col gap-2">
-        <Button onClick={onContinue} disabled={isSubmitting}>
-          {isSubmitting ? 'Finishing\u2026' : 'Continue'}
-        </Button>
-        <Button variant="ghost" onClick={onSkip} disabled={isSubmitting}>
-          Skip
-        </Button>
-      </div>
+      <StepControls
+        onContinue={onContinue}
+        onBack={onBack}
+        onSkip={onSkip}
+        isFirstStep={isFirstStep}
+        isLastStep={isLastStep}
+        isSubmitting={isSubmitting}
+        error={error}
+        continueLabel="Continue"
+      />
     </div>
   )
 }
