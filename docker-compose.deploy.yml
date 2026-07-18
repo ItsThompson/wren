@@ -33,6 +33,10 @@ services:
     environment:
       SESSION_JWT_SECRET: ${SESSION_JWT_SECRET:?SESSION_JWT_SECRET is required for a deploy}
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN is required for a deploy}
+      # Optional (:-) so the backend stays independently bootable when unset (the
+      # app falls back to the Null notifier); cd.yml already hard-requires the
+      # secret for the Alertmanager render, so it is present in a real deploy.
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
 
   mcp:
     env_file:
