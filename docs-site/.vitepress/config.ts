@@ -1,4 +1,5 @@
 import { defineConfig } from "vitepress";
+import { fileURLToPath } from "node:url";
 
 // Customer-facing docs for docs.usewren.com. Served at the domain root, so
 // base is '/'. Markdown lives in docs/ (srcDir) while .vitepress/ stays at the
@@ -10,6 +11,10 @@ export default defineConfig({
   base: "/",
   srcDir: "docs",
 
+  // Light-only, matching the app (design-language.md §9 defers dark mode).
+  // Removes the appearance toggle from the navbar entirely.
+  appearance: false,
+
   // Clean URLs (/getting-started, no .html) match a modern docs site; nginx
   // resolves them on deep links via a $uri.html probe with an index.html
   // history fallback (see nginx.conf, US-DOCS-01).
@@ -20,11 +25,34 @@ export default defineConfig({
   // build gate intentional.
   ignoreDeadLinks: false,
 
+  // Light Shiki theme only: the app is light-only, so code blocks must not carry
+  // a dark syntax palette.
+  markdown: {
+    theme: "github-light",
+  },
+
+  // The custom theme imports shared/theme/*.css from the repo root (one level
+  // above this package). Allow the dev server to read it, and pin the shared
+  // fonts.css bare `@fontsource-variable/...` url() specifiers to this package's
+  // own node_modules (there is no repo-root node_modules), mirroring the
+  // frontend's Vite config so the woff2 bundle from the single shared file.
+  vite: {
+    server: {
+      fs: {
+        allow: [fileURLToPath(new URL("../../", import.meta.url))],
+      },
+    },
+    resolve: {
+      alias: {
+        "@fontsource-variable": fileURLToPath(
+          new URL("../node_modules/@fontsource-variable", import.meta.url),
+        ),
+      },
+    },
+  },
+
   themeConfig: {
-    nav: [
-      { text: "Home", link: "/" },
-      { text: "Getting Started", link: "/getting-started" },
-    ],
+    nav: [{ text: "Getting Started", link: "/getting-started" }],
     sidebar: [
       {
         text: "Guide",
