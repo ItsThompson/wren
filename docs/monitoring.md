@@ -92,6 +92,36 @@ not start it; Prometheus and node-exporter still run locally. The render runs in
 CI (`cd.yml`) alongside the tunnel-ingress render; provisioning a real
 `DISCORD_WEBHOOK_URL` GitHub secret is a prerequisite of the live bring-up.
 
+## Signup notifications
+
+The backend external app (`:8000`) is a **second consumer** of the same
+`DISCORD_WEBHOOK_URL`. On each successful registration it posts a best-effort,
+fire-and-forget message (`🎉 New user registered: <username>`) to Discord. The
+notification is deliberately not observability: it is a product signal, not an
+alert, and is implemented as an injected `RegistrationNotifier`
+(`backend/src/wren/accounts/notifications.py`) fired after the DB commit.
+
+- **Never blocks or fails registration.** `user_registered` schedules delivery
+  on the event loop and returns; all I/O and every error live in the background
+  task. A failed delivery is swallowed and logged as a coarse category
+  (`discord_notify_failed` with `error_type`/`status`), never the webhook URL
+  (held as `SecretStr`). A rolled-back signup (duplicate/validation) notifies
+  nobody. When the webhook is unset the path is a no-op.
+- **Delivery via `docker-compose.deploy.yml`.** Unlike the Alertmanager consumer
+  (which reads a CI-rendered config), the backend reads `DISCORD_WEBHOOK_URL`
+  straight from its container environment; the deploy overlay passes it through
+  with the optional `:-` form so the backend stays bootable when it is absent.
+
+### Shared-channel tradeoff and escape hatch
+
+Routing both consumers to one webhook mixes routine signup chatter with the P0
+operational alerts in a single Discord channel. This is acceptable on a
+low-signup platform. If the noise grows or an independent on/off is wanted, add
+an optional `DISCORD_SIGNUP_WEBHOOK_URL` that overrides the shared webhook for
+signup notifications (separate channel + independent kill-switch) and falls back
+to `DISCORD_WEBHOOK_URL` when empty. It is intentionally left out of the default
+scope to keep the config surface minimal.
+
 ## Retention and query guards
 
 Configured as Prometheus command flags in `docker-compose.yml`:
