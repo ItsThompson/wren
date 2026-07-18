@@ -74,7 +74,7 @@ class DiscordRegistrationNotifier:
     def user_registered(self, *, username: str, user_id: str) -> None:
         """Schedule the announcement and return immediately (never blocks)."""
         content = f"🎉 New user registered: {username}"
-        task = asyncio.create_task(self._deliver(content))
+        task = asyncio.create_task(self._deliver(content, user_id))
         self._pending.add(task)
         task.add_done_callback(self._pending.discard)
 
@@ -82,7 +82,7 @@ class DiscordRegistrationNotifier:
         """Await all in-flight deliveries (graceful-shutdown hook + test drain)."""
         await asyncio.gather(*self._pending, return_exceptions=True)
 
-    async def _deliver(self, content: str) -> None:
+    async def _deliver(self, content: str, user_id: str) -> None:
         try:
             async with httpx.AsyncClient(
                 timeout=self._timeout, transport=self._transport
@@ -92,11 +92,13 @@ class DiscordRegistrationNotifier:
                 )
                 response.raise_for_status()
         except Exception as exc:  # noqa: BLE001 - best-effort: no delivery error may escape
-            # Log only a coarse category. NEVER str(exc)/the exception object/
-            # exc_info: an httpx error string (or a rendered traceback) embeds the
-            # request URL and would leak the webhook.
+            # Log only a coarse category (plus the opaque user_id for per-event
+            # correlation). NEVER str(exc)/the exception object/exc_info: an httpx
+            # error string (or a rendered traceback) embeds the request URL and
+            # would leak the webhook.
             _log.warning(
                 "discord_notify_failed",
+                user_id=user_id,
                 error_type=type(exc).__name__,
                 status=getattr(getattr(exc, "response", None), "status_code", None),
             )

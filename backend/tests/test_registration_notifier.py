@@ -162,6 +162,21 @@ async def test_the_failure_record_carries_the_correlation_request_id(
     assert _failures(logs)[0]["request_id"] == "corr-signup-1"
 
 
+async def test_the_failure_record_carries_the_user_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The opaque user_id is threaded into the delivery task for per-event
+    # correlation on the failure log.
+    notifier = _notifier(_raising_transport(httpx.ConnectError("unreachable")))
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        monkeypatch.setattr("wren.accounts.notifications._log", structlog.get_logger())
+        notifier.user_registered(username="ada", user_id="user-42")
+        await notifier.aclose()
+
+    assert _failures(logs)[0]["user_id"] == "user-42"
+
+
 async def test_aclose_awaits_delivery_completion() -> None:
     # The observable contract of the drain seam: after aclose the POST has
     # actually happened (the task is not abandoned mid-flight).
