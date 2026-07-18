@@ -158,6 +158,22 @@ describe('useAuthSession register', () => {
   })
 })
 
+describe('useAuthSession applyUser', () => {
+  it('replaces the current user and marks the session authenticated', async () => {
+    server.use(anonymousResume())
+    const { result } = renderSession()
+    await waitFor(() => expect(result.current.status).toBe('anonymous'))
+
+    const onboarded = { ...mockAuthUser, has_completed_onboarding: true }
+    act(() => {
+      result.current.applyUser(onboarded)
+    })
+
+    expect(result.current.status).toBe('authenticated')
+    expect(result.current.user).toEqual(onboarded)
+  })
+})
+
 describe('useAuthSession logout', () => {
   it('clears the session on a successful logout', async () => {
     server.use(

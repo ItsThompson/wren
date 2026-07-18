@@ -245,4 +245,5 @@ export const mockAuthUser: MockAuthenticatedUser = {
   username: OWNER_HANDLE,
   email: 'ada@example.com',
   created_at: '2026-07-15T00:00:00Z',
+  has_completed_onboarding: true,
 }

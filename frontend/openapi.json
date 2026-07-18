@@ -122,6 +122,27 @@
         }
       }
     },
+    "/me/onboarding:complete": {
+      "post": {
+        "tags": [
+          "onboarding"
+        ],
+        "summary": "Complete",
+        "operationId": "complete_me_onboarding_complete_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthenticatedUser"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/roadmaps": {
       "post": {
         "tags": [
@@ -1860,6 +1881,10 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "has_completed_onboarding": {
+            "type": "boolean",
+            "title": "Has Completed Onboarding"
           }
         },
         "type": "object",
@@ -1867,7 +1892,8 @@
           "id",
           "username",
           "email",
-          "created_at"
+          "created_at",
+          "has_completed_onboarding"
         ],
         "title": "AuthenticatedUser",
         "description": "The authenticated user's own view, returned by register/login/refresh.\n\nCarries the private ``email`` (the caller is the account owner) but never the\npassword hash. The public, cross-user projection lives in ``PublicProfile``."

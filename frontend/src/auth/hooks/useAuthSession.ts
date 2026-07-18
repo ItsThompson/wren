@@ -22,6 +22,7 @@ export function useAuthSession(client: SessionClient): SessionState & {
   register: (input: RegisterInput) => Promise<AuthResult>
   login: (input: LoginInput) => Promise<AuthResult>
   logout: () => Promise<void>
+  applyUser: (user: AuthUser) => void
 } {
   const [session, setSession] = useState<SessionState>({ status: 'loading', user: null })
 
@@ -64,6 +65,14 @@ export function useAuthSession(client: SessionClient): SessionState & {
     [client],
   )
 
+  const applyUser = useCallback((user: AuthUser) => {
+    // The caller already holds the authoritative updated user (e.g. the
+    // onboarding completion response), so replace it directly rather than
+    // re-fetching. Setting status keeps the impossible "authenticated with no
+    // user" combination unrepresentable.
+    setSession({ status: 'authenticated', user })
+  }, [])
+
   const logout = useCallback(async () => {
     // Best-effort server revocation; the local session is cleared regardless of
     // whether the logout request succeeds. Swallow any error (rather than
@@ -78,5 +87,5 @@ export function useAuthSession(client: SessionClient): SessionState & {
     setSession(ANONYMOUS)
   }, [client])
 
-  return { ...session, register, login, logout }
+  return { ...session, register, login, logout, applyUser }
 }

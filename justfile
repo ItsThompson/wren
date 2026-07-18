@@ -172,7 +172,7 @@ test-deploy:
 # Preview the rendered Cloudflare tunnel ingress config from the local .env.
 render-tunnel:
     set -a; . ./.env; set +a; \
-    envsubst '$CF_TUNNEL_ID $CF_APP_HOSTNAME $CF_API_HOSTNAME $CF_MCP_HOSTNAME' \
+    envsubst '$CF_TUNNEL_ID $CF_APP_HOSTNAME $CF_API_HOSTNAME $CF_MCP_HOSTNAME $CF_DOCS_HOSTNAME' \
       < deployments/cloudflare/config.yml
 
 # Preview the rendered Alertmanager config from the local .env (substitutes only

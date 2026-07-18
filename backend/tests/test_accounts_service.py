@@ -74,6 +74,28 @@ async def test_registered_password_is_stored_only_as_a_bcrypt_hash() -> None:
     assert stored.password_hash.startswith("$2b$")
 
 
+async def test_new_registrations_start_not_onboarded() -> None:
+    # AC4/US-BACK-02: a freshly minted account is un-onboarded until it completes,
+    # both on the returned session view and on the persisted row.
+    service, repo = _service()
+    session = await service.register("ada", "ada@example.com", _PASSWORD)
+    assert session.user.has_completed_onboarding is False
+    stored = await repo.get_by_email("ada@example.com")
+    assert stored is not None and stored.has_completed_onboarding is False
+
+
+async def test_authenticated_view_maps_a_completed_onboarding_flag() -> None:
+    # _to_authenticated maps the model column through: an account marked onboarded
+    # reports has_completed_onboarding=True on its next session view (login).
+    service, repo = _service()
+    await service.register("ada", "ada@example.com", _PASSWORD)
+    stored = await repo.get_by_email("ada@example.com")
+    assert stored is not None
+    stored.has_completed_onboarding = True
+    session = await service.login("ada@example.com", _PASSWORD)
+    assert session.user.has_completed_onboarding is True
+
+
 async def test_duplicate_email_is_a_field_level_conflict_and_creates_no_user() -> None:
     service, repo = _service()
     await service.register("ada", "ada@example.com", _PASSWORD)
@@ -244,6 +266,43 @@ async def test_profile_for_unknown_handle_is_not_found() -> None:
     service, _ = _service()
     with pytest.raises(NotFound):
         await service.profile("nobody")
+
+
+# --- onboarding completion (AC: flip / idempotent / missing-user) ------------
+
+
+async def test_complete_onboarding_flips_the_flag_and_returns_the_updated_view() -> None:
+    service, repo = _service()
+    registered = await service.register("ada", "ada@example.com", _PASSWORD)
+    assert registered.user.has_completed_onboarding is False
+
+    view = await service.complete_onboarding(registered.user.id)
+    # The returned view reflects the flip and is scoped to the same account.
+    assert view.id == registered.user.id
+    assert view.has_completed_onboarding is True
+    # The write is persisted (visible on a subsequent read) and committed.
+    stored = await repo.get_by_id(registered.user.id)
+    assert stored is not None and stored.has_completed_onboarding is True
+    assert repo.commits == 2  # register + complete
+
+
+async def test_complete_onboarding_is_idempotent() -> None:
+    # Completing an already-onboarded account succeeds again with the same result.
+    service, _ = _service()
+    registered = await service.register("ada", "ada@example.com", _PASSWORD)
+    first = await service.complete_onboarding(registered.user.id)
+    second = await service.complete_onboarding(registered.user.id)
+    assert first.has_completed_onboarding is True
+    assert second.has_completed_onboarding is True
+
+
+async def test_complete_onboarding_for_a_missing_user_is_unauthorized() -> None:
+    # A session that resolves to a deleted account is a stale session, not a 404,
+    # and nothing is committed.
+    service, repo = _service()
+    with pytest.raises(Unauthorized):
+        await service.complete_onboarding("ghost-user")
+    assert repo.commits == 0
 
 
 class _NonUniqueViolation(Exception):

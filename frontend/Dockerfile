@@ -18,10 +18,14 @@ RUN npm ci --legacy-peer-deps
 
 # Build. VITE_API_BASE_URL is baked into the bundle at build time (the SPA reads
 # import.meta.env.VITE_API_BASE_URL); prod passes the API origin (api.usewren.com),
-# empty means same-origin. Supplied by compose build.args.
+# empty means same-origin. VITE_MCP_BASE_URL is likewise baked from MCP_PUBLIC_URL
+# (mcp.usewren.com); the onboarding wizard displays the MCP endpoint derived from
+# it. Both supplied by compose build.args.
 COPY . .
 ARG VITE_API_BASE_URL=""
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ARG VITE_MCP_BASE_URL=""
+ENV VITE_MCP_BASE_URL=$VITE_MCP_BASE_URL
 RUN npm run build
 
 # ---------------------------------------------------------------------------

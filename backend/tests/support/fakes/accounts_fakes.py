@@ -60,6 +60,13 @@ class InMemoryAccountRepository:
                 raise IntegrityError("INSERT INTO users", {}, _UniqueViolation())
         self._by_id[user.id] = user
 
+    async def set_onboarding_complete(self, user_id: str) -> User | None:
+        user = self._by_id.get(user_id)
+        if user is None:
+            return None
+        user.has_completed_onboarding = True
+        return user
+
     async def is_session_revoked(self, jti: str) -> bool:
         return jti in self._revoked
 
