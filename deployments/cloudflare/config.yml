@@ -24,6 +24,16 @@ ingress:
 
   # 2. External API (api.usewren.com) -> backend external app (:8000). The
   #    internal app (:8001) is never routed here (it lives on compute-net only).
+  #    The observability/health surface (/metrics, /healthz, /readyz) is scraped
+  #    and probed over monitoring-net and MUST NOT be tunnel-reachable, so it is
+  #    blocked here at ingress BEFORE the catch-through to the backend (mirrors
+  #    the mcp host's path allow-list below; §08 observability-plane intent).
+  #    /metrics on the AS host would otherwise leak internal Prometheus data
+  #    (oauth_tokens_issued_total, service_method_failures_total, 5xx rates,
+  #    route templates); Prometheus still scrapes backend:8000/:8001 internally.
+  - hostname: ${CF_API_HOSTNAME}
+    path: '^/(metrics|healthz|readyz)/?$'
+    service: http_status:404
   - hostname: ${CF_API_HOSTNAME}
     service: http://backend:8000
 
