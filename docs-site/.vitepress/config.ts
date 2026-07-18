@@ -31,6 +31,14 @@ export default defineConfig({
         items: [{ text: "Getting Started", link: "/getting-started" }],
       },
     ],
+
+    // Surface the guide's H2/H3 sections in the right-hand "On this page"
+    // outline so readers can jump within the guide (US-DOCS-03 navigation).
+    outline: {
+      level: [2, 3],
+      label: "On this page",
+    },
+
     search: {
       provider: "local",
     },
