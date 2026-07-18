@@ -155,9 +155,9 @@ async def test_freshly_registered_account_persists_as_not_onboarded(
 
 
 async def test_complete_onboarding_flips_the_persisted_flag(migrated_postgres_url: str) -> None:
-    # Ticket 5, end to end against Postgres: the UPDATE ... RETURNING path flips the
-    # flag, returns a fully-populated user view, and the write is committed/visible
-    # on a fresh session. Also asserts updated_at advanced past created_at.
+    # Ticket 5, end to end against Postgres with a fresh request-scoped session per
+    # step (as production does): the UPDATE ... RETURNING path flips the flag,
+    # returns a fully-populated user view, commits, and bumps updated_at.
     database = create_database(migrated_postgres_url)
     try:
         async with database.sessionmaker() as session:
@@ -167,8 +167,19 @@ async def test_complete_onboarding_flips_the_persisted_flag(migrated_postgres_ur
             registered = await service.register("onboarduser", "onboard@example.com", _PASSWORD)
             assert registered.user.has_completed_onboarding is False
 
+        # Baseline updated_at from a fresh session after the register commit.
+        async with database.sessionmaker() as session:
+            baseline = await SqlAlchemyAccountRepository(session).get_by_id(registered.user.id)
+            assert baseline is not None
+            registered_updated_at = baseline.updated_at
+
+        async with database.sessionmaker() as session:
+            service = AccountService(
+                SqlAlchemyAccountRepository(session), build_test_hasher(), build_test_codec()
+            )
             view = await service.complete_onboarding(registered.user.id)
-            # RETURNING(User) yields a fully-populated row, not just the flag.
+            # RETURNING(User) yields a fully-populated row, not just the flag, even
+            # though this session never loaded the user first.
             assert view.id == registered.user.id
             assert view.username == "onboarduser"
             assert view.email == "onboard@example.com"
@@ -178,9 +189,44 @@ async def test_complete_onboarding_flips_the_persisted_flag(migrated_postgres_ur
             stored = await SqlAlchemyAccountRepository(session).get_by_email("onboard@example.com")
             assert stored is not None
             assert stored.has_completed_onboarding is True
-            # updated_at was set by the completion UPDATE, after registration wrote
-            # created_at == updated_at in an earlier transaction.
-            assert stored.updated_at >= stored.created_at
+            # The completion UPDATE refreshed updated_at (SET ... updated_at = now()),
+            # so it strictly advanced past the value written at registration.
+            assert stored.updated_at > registered_updated_at
+    finally:
+        await database.engine.dispose()
+
+
+async def test_complete_onboarding_is_idempotent_against_postgres(
+    migrated_postgres_url: str,
+) -> None:
+    # Double-submit against the real UPDATE ... RETURNING, each in its own
+    # request-scoped session: both calls return the row with the flag true, and it
+    # ends true once (the second write is a no-op beyond the timestamp).
+    database = create_database(migrated_postgres_url)
+    try:
+        async with database.sessionmaker() as session:
+            service = AccountService(
+                SqlAlchemyAccountRepository(session), build_test_hasher(), build_test_codec()
+            )
+            registered = await service.register("twiceuser", "twice@example.com", _PASSWORD)
+
+        async with database.sessionmaker() as session:
+            service = AccountService(
+                SqlAlchemyAccountRepository(session), build_test_hasher(), build_test_codec()
+            )
+            first = await service.complete_onboarding(registered.user.id)
+            assert first.has_completed_onboarding is True
+
+        async with database.sessionmaker() as session:
+            service = AccountService(
+                SqlAlchemyAccountRepository(session), build_test_hasher(), build_test_codec()
+            )
+            second = await service.complete_onboarding(registered.user.id)
+            assert second.has_completed_onboarding is True
+
+        async with database.sessionmaker() as session:
+            stored = await SqlAlchemyAccountRepository(session).get_by_email("twice@example.com")
+            assert stored is not None and stored.has_completed_onboarding is True
     finally:
         await database.engine.dispose()
 
