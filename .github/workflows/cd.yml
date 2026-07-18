@@ -90,6 +90,24 @@ jobs:
         id: owner
         run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
 
+      - name: Resolve frontend production build args
+        id: frontend-build-args
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ matrix.service }}" != "frontend" ]]; then
+            exit 0
+          fi
+          set -a
+          source .env.prod
+          set +a
+          {
+            echo 'value<<EOF'
+            echo "VITE_API_BASE_URL=${PUBLIC_BASE_URL:?PUBLIC_BASE_URL is required}"
+            echo "VITE_MCP_BASE_URL=${MCP_PUBLIC_URL:?MCP_PUBLIC_URL is required}"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -109,6 +127,7 @@ jobs:
           tags: |
             ghcr.io/${{ steps.owner.outputs.owner }}/wren/${{ matrix.service }}:latest
             ghcr.io/${{ steps.owner.outputs.owner }}/wren/${{ matrix.service }}:sha-${{ env.DEPLOY_SHA }}
+          build-args: ${{ steps.frontend-build-args.outputs.value }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

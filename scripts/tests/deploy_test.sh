@@ -229,6 +229,17 @@ test_compose_deploy_overlay_feeds_app_env_from_env_prod_and_secrets() {
   contains "${base}" "path: .env" || return 1
 }
 
+test_cd_frontend_image_bakes_prod_api_and_mcp_origins() {
+  local workflow
+  workflow="$(cat "${REPO_DIR}/.github/workflows/cd.yml")"
+  contains "${workflow}" "id: frontend-build-args" || return 1
+  contains "${workflow}" 'if [[ "${{ matrix.service }}" != "frontend" ]]; then' || return 1
+  contains "${workflow}" "source .env.prod" || return 1
+  contains "${workflow}" 'VITE_API_BASE_URL=${PUBLIC_BASE_URL' || return 1
+  contains "${workflow}" 'VITE_MCP_BASE_URL=${MCP_PUBLIC_URL' || return 1
+  contains "${workflow}" 'build-args: ${{ steps.frontend-build-args.outputs.value }}' || return 1
+}
+
 # --- rollback target helper (CI owns rollback) ------------------------------
 
 test_read_deployed_sha_returns_prev_and_refuses_on_empty() {
@@ -345,6 +356,7 @@ main_tests() {
   run_test test_compose_tunnel_overlay_targets_uids_modes_no_file_source
   run_test test_compose_base_declares_environment_sourced_prometheus_configs
   run_test test_compose_deploy_overlay_feeds_app_env_from_env_prod_and_secrets
+  run_test test_cd_frontend_image_bakes_prod_api_and_mcp_origins
   run_test test_read_deployed_sha_returns_prev_and_refuses_on_empty
   run_test test_failed_gate_no_internal_redeploy
   run_test test_failed_gate_nonzero_exit_and_no_deployed_sha_write
