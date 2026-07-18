@@ -24,6 +24,20 @@ describe('AuthView', () => {
     expect(screen.getByRole('button', { name: 'Create account' })).toBeInTheDocument()
   })
 
+  it('opens the register form when the URL asks for register mode', () => {
+    renderWithAuth(<AuthView />, { initialEntries: ['/auth?mode=register'] })
+
+    expect(screen.getByRole('heading', { name: 'Join Wren' })).toBeInTheDocument()
+    expect(screen.getByText('Username')).toBeInTheDocument()
+  })
+
+  it('still defaults to the login form when the mode param is absent', () => {
+    renderWithAuth(<AuthView />, { initialEntries: ['/auth'] })
+
+    expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    expect(screen.queryByText('Username')).not.toBeInTheDocument()
+  })
+
   it('submits entered credentials to login', async () => {
     const login = vi.fn(async () => ({ ok: true }) as const)
     const user = userEvent.setup()

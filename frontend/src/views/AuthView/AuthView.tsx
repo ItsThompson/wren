@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Navigate } from 'react-router'
+import { Navigate, useSearchParams } from 'react-router'
 
 import { useAuth } from '@/auth'
 import { LoginForm } from './components/LoginForm'
@@ -8,12 +8,17 @@ import { RegisterForm } from './components/RegisterForm'
 type AuthMode = 'login' | 'register'
 
 /**
- * Register / login screen. Toggles between the two forms
- * and, once the session resolves to authenticated, redirects home.
+ * Register / login screen. Toggles between the two forms and, once the session
+ * resolves to authenticated, redirects home. The initial form honors a `mode`
+ * URL intent (`/auth?mode=register`), so the landing CTA can open signup
+ * directly; it stays a controlled toggle afterwards.
  */
 export function AuthView() {
   const { status } = useAuth()
-  const [mode, setMode] = useState<AuthMode>('login')
+  const [searchParams] = useSearchParams()
+  const [mode, setMode] = useState<AuthMode>(
+    searchParams.get('mode') === 'register' ? 'register' : 'login',
+  )
 
   if (status === 'authenticated') {
     return <Navigate to="/" replace />
