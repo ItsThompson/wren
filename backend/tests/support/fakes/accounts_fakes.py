@@ -22,6 +22,7 @@ from wren.accounts.tokens import RefreshClaims, SessionTokenCodec
 
 if TYPE_CHECKING:
     from wren.accounts.models import User
+    from wren.accounts.notifications import UserRegistered
 
 # Cheap bcrypt cost for tests: real hashing + verification path, fast. Cost 12 is
 # asserted directly in test_accounts_passwords.
@@ -105,11 +106,14 @@ def build_test_hasher() -> BcryptPasswordHasher:
     return BcryptPasswordHasher(cost=TEST_BCRYPT_COST)
 
 
-class SpyRegistrationNotifier:
-    """Records each ``user_registered`` call so tests can assert AC1/AC3."""
+class SpyEventPublisher:
+    """Records published user-registration events so tests can assert AC1/AC3."""
 
     def __init__(self) -> None:
-        self.calls: list[dict[str, str]] = []
+        self.events: list[UserRegistered] = []
 
-    def user_registered(self, *, username: str, user_id: str) -> None:
-        self.calls.append({"username": username, "user_id": user_id})
+    def publish(self, event: UserRegistered) -> None:
+        self.events.append(event)
+
+    async def aclose(self) -> None:
+        return

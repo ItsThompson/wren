@@ -22,7 +22,11 @@ from sqlalchemy.exc import IntegrityError
 
 from wren.accounts.injection import Clock, OpaqueIdFactory, new_hex_id, utcnow
 from wren.accounts.models import User
-from wren.accounts.notifications import NullRegistrationNotifier, RegistrationNotifier
+from wren.accounts.notifications import (
+    NULL_EVENT_PUBLISHER,
+    EventPublisher,
+    UserRegistered,
+)
 from wren.accounts.passwords import PasswordHasher, validate_password_strength
 from wren.accounts.schemas import AuthenticatedUser, PublicProfile, Session
 from wren.core.db import is_unique_violation
@@ -59,7 +63,7 @@ class AccountService:
         *,
         clock: Clock = utcnow,
         new_id: OpaqueIdFactory = new_hex_id,
-        notifier: RegistrationNotifier | None = None,
+        event_publisher: EventPublisher = NULL_EVENT_PUBLISHER,
     ) -> None:
         self._repo = repo
         self._hasher = hasher
@@ -68,10 +72,9 @@ class AccountService:
         # patching globals; the defaults reproduce the prior ambient calls.
         self._clock = clock
         self._new_id = new_id
-        # Best-effort signup announcement. Defaults to the no-op notifier so every
-        # existing construction (and any non-external wiring) stays inert; the
-        # external entrypoint injects the real Discord notifier when configured.
-        self._notifier = notifier or NullRegistrationNotifier()
+        # Domain events are explicit and fully valid by the time core logic emits
+        # them. The publisher owns all external delivery concerns at the edge.
+        self._events = event_publisher
 
     async def register(self, username: str, email: str, password: str) -> Session:
         """Create a user and start a session, or raise a field-level error.
@@ -105,11 +108,9 @@ class AccountService:
             raise await self._duplicate_conflict(normalized_email) from exc
 
         _log.info("user_registered", user_id=user.id)
-        # Fire-and-forget, after the durable commit: the notifier only schedules
-        # delivery and returns, so it never blocks or fails registration, and the
-        # duplicate/validation paths above return before reaching it (no
-        # notification on a rolled-back signup).
-        self._notifier.user_registered(username=user.username, user_id=user.id)
+        # Emit only after the durable commit: validation and duplicate paths return
+        # before reaching this point, so rolled-back signups publish no event.
+        self._events.publish(UserRegistered(user_id=user.id, username=user.username))
         return self._start_session(user)
 
     async def login(self, email: str, password: str) -> Session:

@@ -1,12 +1,12 @@
-"""DiscordRegistrationNotifier: schedule-and-return, error isolation, log-safety.
+"""Domain-event notifications: schedule-and-return, error isolation, log-safety.
 
 The one genuinely tricky unit in the signup-notification feature (multiple
-failure modes + a security-sensitive logging path), driven out at Level 3. The
-real POST path is exercised through ``httpx.MockTransport`` (no live network);
-each test drains in-flight deliveries via the public ``aclose()`` seam before
-asserting. Logs are asserted by resetting the module ``_log`` to a fresh
-``structlog.get_logger()`` inside a ``capture_logs`` block (module loggers freeze
-their processor chain at import), matching the correlation/identity tests.
+failure modes + a security-sensitive logging path). The real Discord POST path is
+exercised through ``httpx.MockTransport`` (no live network); each test drains
+in-flight deliveries via the public ``aclose()`` seam before asserting. Logs are
+asserted by resetting the module ``_log`` to a fresh ``structlog.get_logger()``
+inside a ``capture_logs`` block (module loggers freeze their processor chain at
+import), matching the correlation/identity tests.
 """
 
 from __future__ import annotations
@@ -23,8 +23,10 @@ from structlog.contextvars import bind_contextvars, clear_contextvars, merge_con
 from structlog.testing import capture_logs
 
 from wren.accounts.notifications import (
-    DiscordRegistrationNotifier,
-    NullRegistrationNotifier,
+    BestEffortEventPublisher,
+    DiscordUserRegisteredHandler,
+    NullEventPublisher,
+    UserRegistered,
 )
 
 if TYPE_CHECKING:
@@ -68,16 +70,22 @@ def _raising_transport(exc: Exception) -> httpx.MockTransport:
     return httpx.MockTransport(handler)
 
 
-def _notifier(transport: httpx.MockTransport) -> DiscordRegistrationNotifier:
-    return DiscordRegistrationNotifier(_WEBHOOK_SECRET, transport=transport)
+def _publisher(transport: httpx.MockTransport) -> BestEffortEventPublisher:
+    return BestEffortEventPublisher(
+        [DiscordUserRegisteredHandler(_WEBHOOK_SECRET, transport=transport)]
+    )
+
+
+def _event(username: str = "ada", user_id: str = "user-1") -> UserRegistered:
+    return UserRegistered(user_id=user_id, username=username)
 
 
 async def test_posts_the_username_as_discord_content() -> None:
     transport, seen = _responding_transport(204)
-    notifier = _notifier(transport)
+    publisher = _publisher(transport)
 
-    notifier.user_registered(username="ada", user_id="user-1")
-    await notifier.aclose()
+    publisher.publish(_event())
+    await publisher.aclose()
 
     assert len(seen) == 1
     request = seen[0]
@@ -88,12 +96,12 @@ async def test_posts_the_username_as_discord_content() -> None:
 
 async def test_204_response_logs_no_failure_warning(monkeypatch: pytest.MonkeyPatch) -> None:
     transport, _ = _responding_transport(204)
-    notifier = _notifier(transport)
+    publisher = _publisher(transport)
 
     with capture_logs(processors=[merge_contextvars]) as logs:
         monkeypatch.setattr("wren.accounts.notifications._log", structlog.get_logger())
-        notifier.user_registered(username="ada", user_id="user-1")
-        await notifier.aclose()
+        publisher.publish(_event())
+        await publisher.aclose()
 
     assert not _failures(logs)
 
@@ -108,18 +116,20 @@ async def test_204_response_logs_no_failure_warning(monkeypatch: pytest.MonkeyPa
 async def test_transport_errors_are_swallowed_and_logged_without_the_url(
     monkeypatch: pytest.MonkeyPatch, exc: Exception, expected_type: str
 ) -> None:
-    notifier = _notifier(_raising_transport(exc))
+    publisher = _publisher(_raising_transport(exc))
 
     with capture_logs(processors=[merge_contextvars]) as logs:
         monkeypatch.setattr("wren.accounts.notifications._log", structlog.get_logger())
         # Neither scheduling nor draining may raise: the delivery error is
         # isolated inside the background task.
-        notifier.user_registered(username="ada", user_id="user-1")
-        await notifier.aclose()
+        publisher.publish(_event())
+        await publisher.aclose()
 
     failures = _failures(logs)
     assert len(failures) == 1
     record = failures[0]
+    assert record["event_type"] == "UserRegistered"
+    assert record["handler"] == "DiscordUserRegisteredHandler"
     assert record["error_type"] == expected_type
     assert record["status"] is None
     _assert_log_safe(record)
@@ -130,17 +140,19 @@ async def test_error_status_is_swallowed_and_logged_with_the_status(
     monkeypatch: pytest.MonkeyPatch, status: int
 ) -> None:
     transport, _ = _responding_transport(status)
-    notifier = _notifier(transport)
+    publisher = _publisher(transport)
 
     with capture_logs(processors=[merge_contextvars]) as logs:
         monkeypatch.setattr("wren.accounts.notifications._log", structlog.get_logger())
-        notifier.user_registered(username="ada", user_id="user-1")
-        await notifier.aclose()
+        publisher.publish(_event())
+        await publisher.aclose()
 
     failures = _failures(logs)
     assert len(failures) == 1
     record = failures[0]
     # raise_for_status turns a 4xx/5xx into an HTTPStatusError carrying the code.
+    assert record["event_type"] == "UserRegistered"
+    assert record["handler"] == "DiscordUserRegisteredHandler"
     assert record["error_type"] == "HTTPStatusError"
     assert record["status"] == status
     _assert_log_safe(record)
@@ -151,13 +163,13 @@ async def test_the_failure_record_carries_the_correlation_request_id(
 ) -> None:
     # asyncio.create_task copies the current context, so the request_id bound on
     # the handler is inherited by the delivery task's log line.
-    notifier = _notifier(_raising_transport(httpx.ConnectError("unreachable")))
+    publisher = _publisher(_raising_transport(httpx.ConnectError("unreachable")))
 
     with capture_logs(processors=[merge_contextvars]) as logs:
         monkeypatch.setattr("wren.accounts.notifications._log", structlog.get_logger())
         bind_contextvars(request_id="corr-signup-1")
-        notifier.user_registered(username="ada", user_id="user-1")
-        await notifier.aclose()
+        publisher.publish(_event())
+        await publisher.aclose()
 
     assert _failures(logs)[0]["request_id"] == "corr-signup-1"
 
@@ -165,14 +177,14 @@ async def test_the_failure_record_carries_the_correlation_request_id(
 async def test_the_failure_record_carries_the_user_id(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The opaque user_id is threaded into the delivery task for per-event
-    # correlation on the failure log.
-    notifier = _notifier(_raising_transport(httpx.ConnectError("unreachable")))
+    # The opaque user_id is threaded into the event for per-event correlation on
+    # the failure log.
+    publisher = _publisher(_raising_transport(httpx.ConnectError("unreachable")))
 
     with capture_logs(processors=[merge_contextvars]) as logs:
         monkeypatch.setattr("wren.accounts.notifications._log", structlog.get_logger())
-        notifier.user_registered(username="ada", user_id="user-42")
-        await notifier.aclose()
+        publisher.publish(_event(user_id="user-42"))
+        await publisher.aclose()
 
     assert _failures(logs)[0]["user_id"] == "user-42"
 
@@ -181,30 +193,30 @@ async def test_aclose_awaits_delivery_completion() -> None:
     # The observable contract of the drain seam: after aclose the POST has
     # actually happened (the task is not abandoned mid-flight).
     transport, seen = _responding_transport(204)
-    notifier = _notifier(transport)
+    publisher = _publisher(transport)
 
-    notifier.user_registered(username="ada", user_id="user-1")
-    await notifier.aclose()
+    publisher.publish(_event())
+    await publisher.aclose()
 
     assert len(seen) == 1
     # A second drain with nothing pending is a no-op and does not hang.
-    await notifier.aclose()
+    await publisher.aclose()
     assert len(seen) == 1
 
 
-async def test_null_notifier_schedules_no_task_and_does_no_io() -> None:
-    notifier = NullRegistrationNotifier()
+async def test_null_publisher_schedules_no_task_and_does_no_io() -> None:
+    publisher = NullEventPublisher()
 
     before = len(asyncio.all_tasks())
-    notifier.user_registered(username="ada", user_id="user-1")
+    publisher.publish(_event())
     # No background task was scheduled (nothing to deliver, no I/O).
     assert len(asyncio.all_tasks()) == before
     # aclose is a no-op that completes immediately.
-    await notifier.aclose()
+    await publisher.aclose()
 
 
 def _failures(logs: list[LogRecord]) -> list[LogRecord]:
-    return [entry for entry in logs if entry.get("event") == "discord_notify_failed"]
+    return [entry for entry in logs if entry.get("event") == "event_delivery_failed"]
 
 
 def _assert_log_safe(record: LogRecord) -> None:

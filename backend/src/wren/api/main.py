@@ -7,6 +7,7 @@ the shared factory with the external service identity injected.
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,7 +21,7 @@ from wren.accounts.config import (
 from wren.accounts.passwords import BcryptPasswordHasher
 from wren.accounts.session import build_revocation_lookup, create_session_verifier
 from wren.accounts.tokens import SessionTokenCodec
-from wren.accounts.wiring import build_account_service_provider, build_registration_notifier
+from wren.accounts.wiring import build_account_service_provider, build_event_publisher
 from wren.core.app_factory import create_app
 from wren.core.db import create_database, create_db_lifespan, db_readiness_check
 from wren.core.errors import build_exception_handlers
@@ -51,6 +52,8 @@ from wren.roadmaps.wiring import (
 from wren.skill.api import create_skill_router
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
     from fastapi import FastAPI
 
 settings = build_app_settings(service=EXTERNAL_SERVICE, port=EXTERNAL_PORT)
@@ -64,8 +67,8 @@ session_config = build_session_config(settings)
 validate_session_secret(session_config, is_dev=settings.is_dev)
 cookie_config = build_cookie_config(settings)
 codec = SessionTokenCodec(session_config)
-notifier = build_registration_notifier(settings)
-service_provider = build_account_service_provider(BcryptPasswordHasher(), codec, notifier)
+event_publisher = build_event_publisher(settings)
+service_provider = build_account_service_provider(BcryptPasswordHasher(), codec, event_publisher)
 accounts_router = create_accounts_router(service_provider, cookie_config=cookie_config)
 
 # Roadmap authoring + reads over the same service layer, resolving identity via
@@ -110,6 +113,16 @@ oauth_router = create_oauth_router(
     token_provider=build_token_service_provider(oauth_config, oauth_codec),
 )
 
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    async with create_db_lifespan(db.engine)(app):
+        try:
+            yield
+        finally:
+            await event_publisher.aclose()
+
+
 app: FastAPI = create_app(
     settings,
     routers=[
@@ -122,7 +135,7 @@ app: FastAPI = create_app(
     ],
     readiness_checks=[db_readiness_check(db.engine)],
     exception_handlers={**build_exception_handlers(), **build_oauth_exception_handlers()},
-    lifespan=create_db_lifespan(db.engine),
+    lifespan=_lifespan,
 )
 app.state.db = db
 # Replace the deny-all default with the real signed-JWT + jti-blacklist

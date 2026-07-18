@@ -15,11 +15,17 @@ from sqlalchemy.exc import IntegrityError
 from tests.support.fakes.accounts_fakes import (
     InMemoryAccountRepository,
     MutableClock,
-    SpyRegistrationNotifier,
+    SpyEventPublisher,
     build_test_codec,
     build_test_hasher,
 )
-from wren.accounts.notifications import DiscordRegistrationNotifier, RegistrationNotifier
+from wren.accounts.notifications import (
+    NULL_EVENT_PUBLISHER,
+    BestEffortEventPublisher,
+    DiscordUserRegisteredHandler,
+    EventPublisher,
+    UserRegistered,
+)
 from wren.accounts.service import AccountService
 from wren.core.errors import Conflict, NotFound, Unauthorized, Validation
 from wren.core.observability import WREN_REGISTRY
@@ -34,11 +40,14 @@ _PASSWORD = "Str0ngPass"
 def _service(
     repo: InMemoryAccountRepository | None = None,
     codec: SessionTokenCodec | None = None,
-    notifier: RegistrationNotifier | None = None,
+    event_publisher: EventPublisher = NULL_EVENT_PUBLISHER,
 ) -> tuple[AccountService, InMemoryAccountRepository]:
     repo = repo or InMemoryAccountRepository()
     service = AccountService(
-        repo, build_test_hasher(), codec or build_test_codec(), notifier=notifier
+        repo,
+        build_test_hasher(),
+        codec or build_test_codec(),
+        event_publisher=event_publisher,
     )
     return service, repo
 
@@ -257,7 +266,7 @@ async def test_register_reraises_a_non_unique_integrity_error() -> None:
     assert repo.rollbacks == 1
 
 
-# --- registration notification (AC1/AC2/AC3) --------------------------------
+# --- user-registered domain event (AC1/AC2/AC3) -----------------------------
 
 
 def _register_failures() -> float:
@@ -267,59 +276,62 @@ def _register_failures() -> float:
     return value or 0.0
 
 
-async def test_successful_register_notifies_once_with_the_username() -> None:
-    spy = SpyRegistrationNotifier()
-    service, _ = _service(notifier=spy)
+async def test_successful_register_publishes_one_user_registered_event() -> None:
+    spy = SpyEventPublisher()
+    service, _ = _service(event_publisher=spy)
     session = await service.register("ada", "ada@example.com", _PASSWORD)
-    # AC1: exactly one notification carrying the new user's public username.
-    assert spy.calls == [{"username": "ada", "user_id": session.user.id}]
+    # AC1: exactly one event carrying the durable user's id and public username.
+    assert spy.events == [UserRegistered(user_id=session.user.id, username="ada")]
 
 
-async def test_weak_password_sends_no_notification() -> None:
-    spy = SpyRegistrationNotifier()
-    service, _ = _service(notifier=spy)
+async def test_weak_password_publishes_no_user_registered_event() -> None:
+    spy = SpyEventPublisher()
+    service, _ = _service(event_publisher=spy)
     with pytest.raises(Validation):
         await service.register("ada", "ada@example.com", "weak")
-    assert spy.calls == []
+    assert spy.events == []
 
 
-async def test_invalid_handle_sends_no_notification() -> None:
-    spy = SpyRegistrationNotifier()
-    service, _ = _service(notifier=spy)
+async def test_invalid_handle_publishes_no_user_registered_event() -> None:
+    spy = SpyEventPublisher()
+    service, _ = _service(event_publisher=spy)
     with pytest.raises(Validation):
         await service.register("ab", "ada@example.com", _PASSWORD)
-    assert spy.calls == []
+    assert spy.events == []
 
 
-async def test_duplicate_registration_sends_no_second_notification() -> None:
+async def test_duplicate_registration_publishes_no_second_event() -> None:
     # AC3: a signup that does not durably create a user (integrity rollback)
-    # notifies nobody. Only the first, committed signup fires.
-    spy = SpyRegistrationNotifier()
-    service, _ = _service(notifier=spy)
+    # publishes nothing. Only the first, committed signup emits an event.
+    spy = SpyEventPublisher()
+    service, _ = _service(event_publisher=spy)
     await service.register("ada", "ada@example.com", _PASSWORD)
     with pytest.raises(Conflict):
         await service.register("ada", "other@example.com", _PASSWORD)  # duplicate username
     with pytest.raises(Conflict):
         await service.register("adalove", "ada@example.com", _PASSWORD)  # duplicate email
-    assert len(spy.calls) == 1
+    assert len(spy.events) == 1
 
 
 async def test_register_succeeds_and_counts_no_failure_when_discord_delivery_fails() -> None:
-    # AC2: the real notifier with an unreachable transport. register must still
-    # return a Session and must not be charged a service-method failure -- the
-    # delivery error is isolated inside the background task.
+    # AC2: the real Discord handler behind best-effort delivery. register must
+    # still return a Session and must not be charged a service-method failure.
     def _unreachable(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("unreachable")
 
-    notifier = DiscordRegistrationNotifier(
-        SecretStr("https://discord.test/webhooks/123/secret"),
-        transport=httpx.MockTransport(_unreachable),
+    event_publisher = BestEffortEventPublisher(
+        [
+            DiscordUserRegisteredHandler(
+                SecretStr("https://discord.test/webhooks/123/secret"),
+                transport=httpx.MockTransport(_unreachable),
+            )
+        ]
     )
     before = _register_failures()
-    service, _ = _service(notifier=notifier)
+    service, _ = _service(event_publisher=event_publisher)
 
     session = await service.register("ada", "ada@example.com", _PASSWORD)
-    await notifier.aclose()  # drain the failed delivery (error swallowed in-task)
+    await event_publisher.aclose()  # drain failed delivery (error swallowed in-task)
 
     assert session.user.username == "ada"
     assert _register_failures() == before
