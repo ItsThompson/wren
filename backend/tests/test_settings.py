@@ -46,23 +46,29 @@ def test_is_dev_true_for_development() -> None:
 
 
 def test_bearer_secrets_are_masked_in_repr_but_recoverable() -> None:
-    """L12: an accidental settings dump/log must not leak the two bearer secrets.
+    """L12: an accidental settings dump/log must not leak the bearer secrets.
     They are ``SecretStr``, so ``repr()``/``str()`` mask them, while
     ``.get_secret_value()`` still yields the real value at the auth use sites."""
     env = EnvSettings(
         internal_api_token=SecretStr("raw-internal-token-value"),
         session_jwt_secret=SecretStr("raw-session-secret-value"),
+        discord_webhook_url=SecretStr("https://discord.test/webhooks/raw-hook-value"),
     )
     settings = build_app_settings(service=EXTERNAL_SERVICE, port=EXTERNAL_PORT, env=env)
 
     for dump in (repr(env), str(env), repr(settings), str(settings)):
         assert "raw-internal-token-value" not in dump
         assert "raw-session-secret-value" not in dump
+        assert "raw-hook-value" not in dump
         assert "**********" in dump
 
-    # The real values are preserved for the auth code paths that unwrap them.
+    # The real values are preserved for the code paths that unwrap them.
     assert settings.internal_api_token.get_secret_value() == "raw-internal-token-value"
     assert settings.session_jwt_secret.get_secret_value() == "raw-session-secret-value"
+    assert (
+        settings.discord_webhook_url.get_secret_value()
+        == "https://discord.test/webhooks/raw-hook-value"
+    )
 
 
 def test_env_file_anchors_to_repo_root() -> None:

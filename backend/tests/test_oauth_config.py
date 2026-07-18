@@ -74,6 +74,7 @@ def test_build_oauth_config_reads_only_pinned_settings() -> None:
         oauth_access_ttl_seconds=900,
         oauth_refresh_ttl_seconds=1000,
         cors_origin="https://usewren.com",
+        discord_webhook_url=SecretStr(""),
     )
     config = build_oauth_config(settings)
     assert config.issuer == "https://api.usewren.com"
