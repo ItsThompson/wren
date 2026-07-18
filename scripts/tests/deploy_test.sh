@@ -168,11 +168,12 @@ test_dry_run_pull_migrate_up_use_overlay_and_profile() {
   source "${DEPLOY}"
   export_required_secret_env
   DRY_RUN=1
-  local out
+  local out overlays
   out="$(main 203.0.113.10 deploy 2>&1)"
-  contains "${out}" "-f docker-compose.yml -f docker-compose.tunnel.yml --profile tunnels pull" || return 1
-  contains "${out}" "-f docker-compose.yml -f docker-compose.tunnel.yml --profile tunnels run --rm backend alembic upgrade head" || return 1
-  contains "${out}" "-f docker-compose.yml -f docker-compose.tunnel.yml --profile tunnels up -d" || return 1
+  overlays="-f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.deploy.yml"
+  contains "${out}" "${overlays} --profile tunnels pull" || return 1
+  contains "${out}" "${overlays} --profile tunnels run --rm backend alembic upgrade head" || return 1
+  contains "${out}" "${overlays} --profile tunnels up -d" || return 1
 }
 
 # --- compose overlay / base shape -------------------------------------------
@@ -210,6 +211,22 @@ test_compose_base_declares_environment_sourced_prometheus_configs() {
   # No bind mount for the Prometheus config files (promdata volume stays).
   not_contains "${base}" "prometheus.yml:/etc/prometheus/prometheus.yml" || return 1
   not_contains "${base}" "alerts.yml:/etc/prometheus/alerts.yml" || return 1
+}
+
+test_compose_deploy_overlay_feeds_app_env_from_env_prod_and_secrets() {
+  local overlay
+  overlay="$(cat "${REPO_DIR}/docker-compose.deploy.yml")"
+  # Non-secret prod config comes from the committed .env.prod (client-side
+  # env_file), NOT a stray local dev .env; both backend and mcp load it.
+  contains "${overlay}" "path: .env.prod" || return 1
+  # App secrets are passed through from the runner env (GitHub secrets).
+  contains "${overlay}" 'SESSION_JWT_SECRET: ${SESSION_JWT_SECRET' || return 1
+  contains "${overlay}" 'INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN' || return 1
+  # The base file's env_file: .env is the local-dev source; .env.prod is layered
+  # on top here for the deploy (base file itself is untouched).
+  local base
+  base="$(cat "${REPO_DIR}/docker-compose.yml")"
+  contains "${base}" "path: .env" || return 1
 }
 
 # --- rollback target helper (CI owns rollback) ------------------------------
@@ -304,6 +321,7 @@ main_tests() {
   run_test test_compose_tunnel_overlay_declares_environment_sourced_secrets_and_ingress
   run_test test_compose_tunnel_overlay_targets_uids_modes_no_file_source
   run_test test_compose_base_declares_environment_sourced_prometheus_configs
+  run_test test_compose_deploy_overlay_feeds_app_env_from_env_prod_and_secrets
   run_test test_read_deployed_sha_returns_prev_and_refuses_on_empty
   run_test test_failed_gate_no_internal_redeploy
   run_test test_failed_gate_nonzero_exit_and_no_deployed_sha_write

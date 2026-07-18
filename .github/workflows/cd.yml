@@ -164,6 +164,7 @@ jobs:
           DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
         run: |
           set -euo pipefail
+          : "${DISCORD_WEBHOOK_URL:?DISCORD_WEBHOOK_URL is required (Alertmanager exits on a blank webhook and fails the gate after migrations)}"
           set -a
           source .env.prod
           # Pull from the same owner build-and-push pushed to (owner-agnostic).
@@ -192,6 +193,7 @@ jobs:
           DEPLOY_SERVER_IP: ${{ secrets.DEPLOY_SERVER_IP }}
         run: |
           set -euo pipefail
+          : "${DISCORD_WEBHOOK_URL:?DISCORD_WEBHOOK_URL is required}"
           prev="$(./scripts/deploy.sh read-deployed-sha "${DEPLOY_SERVER_IP}")" \
             || { echo 'no previous .deployed-sha; cannot roll back'; exit 1; }
           echo "rolling back to ${prev}"

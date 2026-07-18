@@ -46,9 +46,11 @@ REMOTE_DIR="${WREN_REMOTE_DIR:-/opt/wren}"
 CONTEXT_NAME="${WREN_DOCKER_CONTEXT:-wren}"
 
 # Every compose invocation runs over the Docker Context and layers the tunnel
-# overlay (the overlay owns ingress). The tunnels profile keeps cloudflared and
-# alertmanager from starting outside a deploy.
-COMPOSE="docker --context ${CONTEXT_NAME} compose -f docker-compose.yml -f docker-compose.tunnel.yml"
+# overlay (owns ingress) and the deploy overlay (feeds backend/mcp the committed
+# .env.prod + app secrets client-side via env_file/environment:, since the box
+# has no .env). The tunnels profile keeps cloudflared and alertmanager from
+# starting outside a deploy.
+COMPOSE="docker --context ${CONTEXT_NAME} compose -f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.deploy.yml"
 COMPOSE_TUNNEL="${COMPOSE} --profile tunnels"
 
 SSH_OPTS=(-o ConnectTimeout=10 -o BatchMode=yes)
