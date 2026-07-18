@@ -59,9 +59,9 @@ request to finish connecting.
 
 ### 3. Confirm the agent is connected
 
-Once you approve, the authorized agent appears on your connections surface in the
-Wren app, under **Settings → Connections**. If it is listed there, the agent is
-connected and ready to author roadmaps for you.
+Once you approve, the authorized agent appears on your **Connected agents**
+page in the Wren app (reachable from the account menu). If it is listed there,
+the agent is connected and ready to author roadmaps for you.
 
 ## How roadmaps work
 
@@ -78,10 +78,11 @@ Once an agent is connected, this is the lifecycle of a roadmap:
 
 ## Managing connected agents
 
-You stay in control of which agents can author on your account. Open **Settings →
-Connections** in the Wren app to see every agent you have authorized. From there
-you can **revoke** an agent at any time; once revoked, it can no longer author
-roadmaps for you until you authorize it again.
+You stay in control of which agents can author on your account. Open the
+**Connected agents** page in the Wren app (from the account menu) to see every
+agent you have authorized. From there you can **revoke** an agent at any time;
+once revoked, it can no longer author roadmaps for you until you authorize it
+again.
 
 ## Next steps
 
