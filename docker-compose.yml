@@ -28,8 +28,11 @@ services:
   frontend:
     image: ghcr.io/${GHCR_OWNER:-wren-platform}/wren/frontend:${WREN_IMAGE_TAG:-latest}
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      # Repo-root context so the build can reach the shared shared/theme/*.css
+      # (imported by the SPA). The per-package frontend/.dockerignore no longer
+      # applies; the repo-root .dockerignore keeps the context lean.
+      context: .
+      dockerfile: frontend/Dockerfile
       args:
         # Baked into the SPA bundle at build time: the API origin the SPA calls
         # cross-origin (api.usewren.com in prod). Empty means same-origin.
@@ -57,8 +60,10 @@ services:
   docs:
     image: ghcr.io/${GHCR_OWNER:-wren-platform}/wren/docs:${WREN_IMAGE_TAG:-latest}
     build:
-      context: ./docs-site
-      dockerfile: Dockerfile
+      # Repo-root context so the build can reach the shared shared/theme/*.css
+      # (imported by the custom VitePress theme). Same rationale as frontend.
+      context: .
+      dockerfile: docs-site/Dockerfile
     expose:
       - "80"
     networks:
