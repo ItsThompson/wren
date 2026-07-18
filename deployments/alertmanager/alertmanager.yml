@@ -6,12 +6,13 @@
 # firing and the recovery. There is no Grafana at P0; Discord is the only sink.
 #
 # TEMPLATING: `${DISCORD_WEBHOOK_URL}` is a deploy-time placeholder. Alertmanager
-# does not expand environment variables, so scripts/deploy.sh renders this file to
-# alertmanager.rendered.yml on the VPS (envsubst substitutes ONLY that token, then
-# chmod 600), and the compose alertmanager service mounts the rendered file. The
-# single-var envsubst allow-list leaves the Go templating (`{{ ... }}`) in
-# title/message untouched, so those render at alert time. Keep the placeholder in
-# this committed file; the rendered file is gitignored; never commit a real webhook.
+# does not expand environment variables, so CI renders this file with envsubst
+# (substituting ONLY that token) into the WREN_ALERTMANAGER_CONFIG env var, which
+# the compose alertmanager service receives as an environment-sourced Compose
+# secret (0400) at /etc/alertmanager/alertmanager.yml. The single-var envsubst
+# allow-list leaves the Go templating (`{{ ... }}`) in title/message untouched, so
+# those render at alert time. Keep the placeholder in this committed file; no
+# rendered file is written to the box; never commit a real webhook.
 # =============================================================================
 
 global:

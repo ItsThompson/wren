@@ -73,12 +73,13 @@ and routes them through Alertmanager to a single Discord webhook with
 
 `deployments/alertmanager/alertmanager.yml` keeps a `${DISCORD_WEBHOOK_URL}`
 placeholder in the committed file. Alertmanager does not expand environment
-variables, so `scripts/deploy.sh` renders it to `alertmanager.rendered.yml` on the
-VPS at deploy time (`envsubst` substitutes **only** that token, then `chmod 600`)
-and the `alertmanager` service mounts the rendered file; the Go templating
-(`{{ ... }}`) in the title/message is left untouched and renders at alert time.
-Set `DISCORD_WEBHOOK_URL` in the VPS `.env` (see `.env.example`). The rendered
-file is gitignored; never commit a real webhook.
+variables, so CI renders it (`envsubst` substitutes **only** that token) into the
+`WREN_ALERTMANAGER_CONFIG` env var, which the `alertmanager` service receives as
+an environment-sourced Compose secret (`0400`) at
+`/etc/alertmanager/alertmanager.yml`; the Go templating (`{{ ... }}`) in the
+title/message is left untouched and renders at alert time. `DISCORD_WEBHOOK_URL`
+is a GitHub Actions secret (see `deploy.md`). No rendered file is written to the
+box; never commit a real webhook.
 
 **This render is release-gating, not merely "needed for live firing."**
 Alertmanager v0.27 **exits on config load** if `webhook_url` is not a valid URL
@@ -87,10 +88,9 @@ health gate polls *every* service's healthcheck, a deploy that starts
 Alertmanager without a rendered webhook will fail the gate and roll back. To avoid
 crash-looping local dev, the `alertmanager` service is gated behind the `tunnels`
 compose profile (the only profile the deploy activates), so `just up`/`up-dev` do
-not start it; Prometheus and node-exporter still run locally. The render is wired
-into `scripts/deploy.sh` (phase 9a, alongside the tunnel render); provisioning a
-real `DISCORD_WEBHOOK_URL` in the VPS `.env` is a prerequisite of the live
-bring-up.
+not start it; Prometheus and node-exporter still run locally. The render runs in
+CI (`cd.yml`) alongside the tunnel-ingress render; provisioning a real
+`DISCORD_WEBHOOK_URL` GitHub secret is a prerequisite of the live bring-up.
 
 ## Retention and query guards
 
