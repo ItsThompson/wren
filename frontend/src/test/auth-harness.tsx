@@ -13,6 +13,7 @@ export function buildAuthUser(overrides: Partial<AuthUser> = {}): AuthUser {
     username: 'ada',
     email: 'ada@example.com',
     created_at: '2026-07-15T00:00:00Z',
+    has_completed_onboarding: true,
     ...overrides,
   }
 }

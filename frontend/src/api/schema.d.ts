@@ -656,6 +656,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Has Completed Onboarding */
+            has_completed_onboarding: boolean;
         };
         /**
          * AuthorizationContext
