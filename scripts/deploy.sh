@@ -209,8 +209,15 @@ run_migrations() {
 # --- Start ------------------------------------------------------------------
 
 start_stack() {
-  log "==> Start stack (docker --context compose --profile tunnels up -d)"
-  compose_run "${COMPOSE_TUNNEL}" up -d
+  log "==> Start stack (docker --context compose --profile tunnels up -d --force-recreate)"
+  # --force-recreate: all config and secrets are delivered as environment-sourced
+  # Compose configs/secrets, and `up -d` does NOT recreate a service when only
+  # that content changes while its image is unchanged (e.g. the pinned cloudflared
+  # image + a changed ingress, or an alertmanager/prometheus config edit). A
+  # config-only deploy would then silently keep the old config. Force-recreate
+  # re-applies the current config/secrets to every service each deploy; the brief
+  # recreate gap is already accepted at this scale.
+  compose_run "${COMPOSE_TUNNEL}" up -d --force-recreate
 }
 
 # --- Health gate (~60s) -----------------------------------------------------
