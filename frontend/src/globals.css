@@ -2,54 +2,10 @@
 @import 'tw-animate-css';
 
 /*
- * Design tokens: pasted verbatim from the Wren Design Language (§3.6 /
- * spec section 09). oklch is canonical (Tailwind v4 / shadcn store color as
- * oklch). Do NOT re-derive or translate these values. No dark mode this round.
+ * Design tokens (colors, --radius, font-family stacks) live in the shared
+ * single source of truth at shared/theme/tokens.css, imported by main.tsx
+ * BEFORE this file. Do NOT re-declare token values here.
  */
-:root {
-  --radius: 0.625rem;
-
-  --background: oklch(0.9568 0.0119 79.78);
-  --foreground: oklch(0.2244 0.0146 57.43);
-  --card: oklch(0.9853 0.0069 88.64);
-  --card-foreground: oklch(0.2244 0.0146 57.43);
-  --popover: oklch(0.9853 0.0069 88.64);
-  --popover-foreground: oklch(0.2244 0.0146 57.43);
-
-  --primary: oklch(0.6093 0.1342 42.36);
-  --primary-foreground: oklch(0.9773 0.0102 81.80);
-  --secondary: oklch(0.9123 0.0207 81.78);
-  --secondary-foreground: oklch(0.2244 0.0146 57.43);
-  --muted: oklch(0.9269 0.0190 83.06);
-  --muted-foreground: oklch(0.4984 0.0225 72.31);
-  --accent: oklch(0.9072 0.0283 55.31);
-  --accent-foreground: oklch(0.5437 0.1196 42.56);
-  --destructive: oklch(0.5223 0.1565 28.81);
-  --destructive-foreground: oklch(0.9773 0.0102 81.80);
-
-  --border: oklch(0.8793 0.0266 82.38);
-  --input: oklch(0.8670 0.0267 82.38);
-  --ring: oklch(0.6093 0.1342 42.36);
-
-  /* semantic extensions (beyond default shadcn) */
-  --success: oklch(0.6092 0.0856 121.19);
-  --success-foreground: oklch(0.9773 0.0102 81.80);
-  --warning: oklch(0.6869 0.1250 80.64);
-  --warning-foreground: oklch(0.2244 0.0146 57.43);
-  --espresso: oklch(0.2336 0.0180 62.95);
-
-  /* tag palette (hash-assigned; do not reorder) */
-  --tag-1: oklch(0.5933 0.1046 48.93);
-  --tag-2: oklch(0.6539 0.1178 77.40);
-  --tag-3: oklch(0.6077 0.0945 117.44);
-  --tag-4: oklch(0.5934 0.0898 142.49);
-  --tag-5: oklch(0.5883 0.0784 184.10);
-  --tag-6: oklch(0.5715 0.0820 247.80);
-  --tag-7: oklch(0.5615 0.1030 280.58);
-  --tag-8: oklch(0.5426 0.1058 319.43);
-  --tag-9: oklch(0.5768 0.1144 3.57);
-  --tag-10: oklch(0.6020 0.0259 75.70);
-}
 
 @theme inline {
   --color-background: var(--background);
@@ -74,9 +30,9 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  --font-serif: "Fraunces", Georgia, "Times New Roman", serif;
-  --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
+  --font-serif: var(--font-serif-stack);
+  --font-sans: var(--font-sans-stack);
+  --font-mono: var(--font-mono-stack);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

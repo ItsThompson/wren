@@ -1,0 +1,108 @@
+/*
+ * VitePress theme override: map the --vp-* variable family onto the canonical
+ * Wren app tokens (from shared/theme/tokens.css). Values are var() references
+ * only, so the docs site consumes the exact same token values as the app: no
+ * re-declared hex/oklch, no invented hues. Light-only.
+ */
+
+:root {
+  /* surfaces */
+  --vp-c-bg: var(--background); /* cream */
+  --vp-c-bg-alt: var(--secondary); /* nav / sidebar ground */
+  --vp-c-bg-elv: var(--card); /* elevated (menus, code copy) */
+  --vp-c-bg-soft: var(--muted); /* soft blocks */
+
+  /* ink */
+  --vp-c-text-1: var(--foreground); /* espresso */
+  --vp-c-text-2: var(--muted-foreground);
+  --vp-c-text-3: var(--muted-foreground);
+
+  /* structure */
+  --vp-c-border: var(--border);
+  --vp-c-divider: var(--border);
+  --vp-c-gutter: var(--border);
+
+  /* brand (terracotta), identical to app usage: link text -> --primary,
+     hover -> the existing darker terracotta (--accent-foreground). */
+  --vp-c-brand-1: var(--primary); /* link text / active */
+  --vp-c-brand-2: var(--accent-foreground); /* hover */
+  --vp-c-brand-3: var(--primary); /* solid button bg */
+  --vp-c-brand-soft: var(--accent); /* light terracotta tint */
+
+  /* button label = cream on terracotta (design-language §3.4 contrast) */
+  --vp-button-brand-text: var(--primary-foreground);
+  --vp-button-brand-hover-text: var(--primary-foreground);
+  --vp-button-brand-active-text: var(--primary-foreground);
+  --vp-button-brand-bg: var(--primary);
+  --vp-button-brand-hover-bg: var(--accent-foreground);
+  --vp-button-brand-active-bg: var(--accent-foreground);
+  --vp-button-brand-border: var(--primary);
+  --vp-button-brand-hover-border: var(--accent-foreground);
+  --vp-button-brand-active-border: var(--accent-foreground);
+
+  /* semantic: olive / ochre / brick. "soft" container backgrounds are a tint
+     derived from the same token via color-mix (a shade of an existing token,
+     not a new hue). */
+  --vp-c-success-1: var(--success);
+  --vp-c-success-2: var(--success);
+  --vp-c-success-3: var(--success);
+  --vp-c-success-soft: color-mix(in oklch, var(--success) 12%, var(--background));
+
+  --vp-c-warning-1: var(--warning);
+  --vp-c-warning-2: var(--warning);
+  --vp-c-warning-3: var(--warning);
+  --vp-c-warning-soft: color-mix(in oklch, var(--warning) 14%, var(--background));
+
+  --vp-c-danger-1: var(--destructive);
+  --vp-c-danger-2: var(--destructive);
+  --vp-c-danger-3: var(--destructive);
+  --vp-c-danger-soft: color-mix(in oklch, var(--destructive) 12%, var(--background));
+
+  /* tip / note custom blocks default to brand: leave inheriting --vp-c-brand-*. */
+
+  /* fonts: the neutral shared stacks (Hanken body, JetBrains code). */
+  --vp-font-family-base: var(--font-sans-stack);
+  --vp-font-family-mono: var(--font-mono-stack);
+
+  /* warm code surface instead of the default cool gray */
+  --vp-code-block-bg: var(--muted);
+}
+
+/*
+ * Typography + shape + a11y parity with the app.
+ */
+
+/* One Fraunces display moment: the guide's H1. H2/H3 + body stay Hanken. */
+.vp-doc h1 {
+  font-family: var(--font-serif-stack);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+/* Soft radius from the token (buttons, code blocks). */
+.VPButton {
+  border-radius: var(--radius);
+}
+
+.vp-doc div[class*='language-'] {
+  border-radius: var(--radius);
+}
+
+/* Accessibility: always-visible 2px terracotta focus ring with 2px offset,
+   mirroring the app's globals.css base layer. */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Honor reduced-motion, mirroring the app. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
