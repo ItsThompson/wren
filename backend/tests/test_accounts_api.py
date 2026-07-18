@@ -25,7 +25,7 @@ from tests.support.fakes.accounts_fakes import (
 )
 from wren.accounts.api import create_accounts_router
 from wren.accounts.config import REFRESH_COOKIE_NAME, CookieConfig
-from wren.accounts.notifications import DiscordRegistrationNotifier
+from wren.accounts.notifications import BestEffortEventPublisher, DiscordUserRegisteredHandler
 from wren.accounts.service import AccountService
 from wren.accounts.session import create_session_verifier
 from wren.core.app_factory import create_app
@@ -195,14 +195,23 @@ async def test_register_makes_exactly_one_discord_post_and_returns_201(
         seen.append(request)
         return httpx.Response(204)
 
-    notifier = DiscordRegistrationNotifier(
-        SecretStr("https://discord.test/webhooks/123/secret"),
-        transport=httpx.MockTransport(handler),
+    event_publisher = BestEffortEventPublisher(
+        [
+            DiscordUserRegisteredHandler(
+                SecretStr("https://discord.test/webhooks/123/secret"),
+                transport=httpx.MockTransport(handler),
+            )
+        ]
     )
     repo = InMemoryAccountRepository()
 
     def provider() -> AccountService:
-        return AccountService(repo, build_test_hasher(), build_test_codec(), notifier=notifier)
+        return AccountService(
+            repo,
+            build_test_hasher(),
+            build_test_codec(),
+            event_publisher=event_publisher,
+        )
 
     accounts_router = create_accounts_router(
         provider, cookie_config=CookieConfig(secure=False, domain=None)
@@ -218,7 +227,7 @@ async def test_register_makes_exactly_one_discord_post_and_returns_201(
             "/auth/register",
             json={"username": "ada", "email": "ada@example.com", "password": _PASSWORD},
         )
-    await notifier.aclose()  # drain the scheduled delivery before asserting
+    await event_publisher.aclose()  # drain the scheduled delivery before asserting
 
     assert response.status_code == 201, response.text
     assert len(seen) == 1

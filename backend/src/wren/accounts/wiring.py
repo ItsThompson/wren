@@ -13,9 +13,10 @@ from typing import TYPE_CHECKING
 from fastapi import Depends
 
 from wren.accounts.notifications import (
-    DiscordRegistrationNotifier,
-    NullRegistrationNotifier,
-    RegistrationNotifier,
+    NULL_EVENT_PUBLISHER,
+    BestEffortEventPublisher,
+    DiscordUserRegisteredHandler,
+    EventPublisher,
 )
 from wren.accounts.repository import SqlAlchemyAccountRepository
 from wren.accounts.service import AccountService
@@ -31,33 +32,35 @@ if TYPE_CHECKING:
     from wren.core.settings import AppSettings
 
 
-def build_registration_notifier(settings: AppSettings) -> RegistrationNotifier:
-    """Discord notifier when a webhook is configured, else the no-op Null notifier.
+def build_event_publisher(settings: AppSettings) -> EventPublisher:
+    """Build process-wide event delivery for the external app.
 
-    Built once at boot (a process-wide singleton) so the concrete Discord notifier
-    owns a single in-flight-task set across every request. When no webhook is set
-    the notification path is inert (AC5).
+    When no webhook is set the publisher is a null object. When Discord is
+    configured, the best-effort publisher owns scheduling/error isolation and the
+    Discord handler owns only message formatting + HTTP delivery.
     """
-    if settings.discord_webhook_url.get_secret_value():
-        return DiscordRegistrationNotifier(settings.discord_webhook_url)
-    return NullRegistrationNotifier()
+    if not settings.discord_webhook_url.get_secret_value():
+        return NULL_EVENT_PUBLISHER
+    return BestEffortEventPublisher([DiscordUserRegisteredHandler(settings.discord_webhook_url)])
 
 
 def build_account_service_provider(
     hasher: PasswordHasher,
     codec: SessionTokenCodec,
-    notifier: RegistrationNotifier | None = None,
+    event_publisher: EventPublisher = NULL_EVENT_PUBLISHER,
 ) -> Callable[[AsyncSession], AccountService]:
     """A FastAPI dependency that builds a request-scoped :class:`AccountService`.
 
-    ``notifier`` defaults to the no-op Null notifier (via a None sentinel that
-    ``AccountService`` resolves), so callers that do not wire a notifier -- the
-    existing 2-arg call sites -- keep the notification path inert.
+    ``event_publisher`` defaults to the null publisher, so callers that do not
+    wire external delivery keep the event path inert.
     """
 
     def provider(session: AsyncSession = Depends(get_session)) -> AccountService:
         return AccountService(
-            SqlAlchemyAccountRepository(session), hasher, codec, notifier=notifier
+            SqlAlchemyAccountRepository(session),
+            hasher,
+            codec,
+            event_publisher=event_publisher,
         )
 
     return provider
