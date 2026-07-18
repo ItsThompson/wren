@@ -51,6 +51,28 @@ services:
           memory: 128M
     restart: unless-stopped
 
+  docs:
+    image: ghcr.io/${GHCR_OWNER:-wren-platform}/wren/docs:${WREN_IMAGE_TAG:-latest}
+    build:
+      context: ./docs-site
+      dockerfile: Dockerfile
+    expose:
+      - "80"
+    networks:
+      - edge-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:80/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+    restart: unless-stopped
+
   # ---------------------------------------------------------------------------
   # Compute tier
   # ---------------------------------------------------------------------------
