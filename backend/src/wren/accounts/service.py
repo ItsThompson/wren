@@ -97,6 +97,7 @@ class AccountService:
             password_hash=await asyncio.to_thread(self._hasher.hash, password),
             created_at=now,
             updated_at=now,
+            has_completed_onboarding=False,
         )
         try:
             await self._repo.add_user(user)
@@ -193,4 +194,5 @@ def _to_authenticated(user: User) -> AuthenticatedUser:
         username=user.username,
         email=user.email,
         created_at=user.created_at,
+        has_completed_onboarding=user.has_completed_onboarding,
     )
