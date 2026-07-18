@@ -306,6 +306,29 @@ test_failed_gate_nonzero_exit_and_no_deployed_sha_write() {
   rm -f "${rcalls}"
 }
 
+# --- ingress posture (observability surface not tunnel-routed) --------------
+
+test_api_ingress_blocks_observability_surface_before_backend() {
+  local cfg
+  cfg="${REPO_DIR}/deployments/cloudflare/config.yml"
+  # The AS host (api.usewren.com) must block the observability/health surface at
+  # ingress so internal Prometheus data is never tunnel-reachable (mirrors the
+  # mcp host; §08). cloudflared is first-match, so the block MUST precede the
+  # unrestricted api -> backend:8000 rule, else /metrics routes through to :8000.
+  grep -Fq 'metrics|healthz|readyz' "${cfg}" || { echo "no api observability-block rule"; return 1; }
+  local block_line backend_line
+  block_line="$(grep -n 'metrics|healthz|readyz' "${cfg}" | head -1 | cut -d: -f1)"
+  backend_line="$(grep -n 'service: http://backend:8000' "${cfg}" | head -1 | cut -d: -f1)"
+  [[ -n "${block_line}" && -n "${backend_line}" && "${block_line}" -lt "${backend_line}" ]] \
+    || { echo "block(${block_line}) must precede api->backend(${backend_line})"; return 1; }
+  # The block resolves to a 404, not a service route.
+  grep -A1 'metrics|healthz|readyz' "${cfg}" | grep -q 'http_status:404' \
+    || { echo "observability block is not http_status:404"; return 1; }
+  # Regression guard: the mcp host still allow-lists only /mcp + the PRM doc
+  # (so its /metrics stays blocked too).
+  grep -Fq 'oauth-protected-resource)$' "${cfg}" || { echo "mcp allow-list changed"; return 1; }
+}
+
 # --- run all ----------------------------------------------------------------
 
 main_tests() {
@@ -325,6 +348,7 @@ main_tests() {
   run_test test_read_deployed_sha_returns_prev_and_refuses_on_empty
   run_test test_failed_gate_no_internal_redeploy
   run_test test_failed_gate_nonzero_exit_and_no_deployed_sha_write
+  run_test test_api_ingress_blocks_observability_surface_before_backend
 
   echo "-----------------------------------------------------------------------"
   printf '%d passed, %d failed\n' "${PASS}" "${FAIL}"
