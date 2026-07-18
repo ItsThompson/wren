@@ -154,6 +154,51 @@ async def test_freshly_registered_account_persists_as_not_onboarded(
         await database.engine.dispose()
 
 
+async def test_complete_onboarding_flips_the_persisted_flag(migrated_postgres_url: str) -> None:
+    # Ticket 5, end to end against Postgres: the UPDATE ... RETURNING path flips the
+    # flag, returns a fully-populated user view, and the write is committed/visible
+    # on a fresh session. Also asserts updated_at advanced past created_at.
+    database = create_database(migrated_postgres_url)
+    try:
+        async with database.sessionmaker() as session:
+            service = AccountService(
+                SqlAlchemyAccountRepository(session), build_test_hasher(), build_test_codec()
+            )
+            registered = await service.register("onboarduser", "onboard@example.com", _PASSWORD)
+            assert registered.user.has_completed_onboarding is False
+
+            view = await service.complete_onboarding(registered.user.id)
+            # RETURNING(User) yields a fully-populated row, not just the flag.
+            assert view.id == registered.user.id
+            assert view.username == "onboarduser"
+            assert view.email == "onboard@example.com"
+            assert view.has_completed_onboarding is True
+
+        async with database.sessionmaker() as session:
+            stored = await SqlAlchemyAccountRepository(session).get_by_email("onboard@example.com")
+            assert stored is not None
+            assert stored.has_completed_onboarding is True
+            # updated_at was set by the completion UPDATE, after registration wrote
+            # created_at == updated_at in an earlier transaction.
+            assert stored.updated_at >= stored.created_at
+    finally:
+        await database.engine.dispose()
+
+
+async def test_set_onboarding_complete_returns_none_for_a_missing_user(
+    migrated_postgres_url: str,
+) -> None:
+    # No row matches the id, so the UPDATE ... RETURNING resolves to None (the
+    # service maps this to Unauthorized).
+    database = create_database(migrated_postgres_url)
+    try:
+        async with database.sessionmaker() as session:
+            repo = SqlAlchemyAccountRepository(session)
+            assert await repo.set_onboarding_complete("does-not-exist") is None
+    finally:
+        await database.engine.dispose()
+
+
 async def _admin_execute(admin_url: str, statement: str) -> None:
     """Run one autocommit statement (CREATE/DROP DATABASE cannot run in a txn)."""
     engine = create_async_engine(admin_url, isolation_level="AUTOCOMMIT")

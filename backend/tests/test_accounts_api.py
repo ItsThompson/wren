@@ -26,6 +26,7 @@ from tests.support.fakes.accounts_fakes import (
 from wren.accounts.api import create_accounts_router
 from wren.accounts.config import REFRESH_COOKIE_NAME, CookieConfig
 from wren.accounts.notifications import BestEffortEventPublisher, DiscordUserRegisteredHandler
+from wren.accounts.onboarding_api import create_onboarding_router
 from wren.accounts.service import AccountService
 from wren.accounts.session import create_session_verifier
 from wren.core.app_factory import create_app
@@ -62,6 +63,9 @@ def _build_client(
     accounts_router = create_accounts_router(
         provider, cookie_config=cookie_config or CookieConfig(secure=False, domain=None)
     )
+    # Mounted on the same in-memory-backed provider so an authenticated session
+    # (from register/login) can exercise POST /me/onboarding:complete.
+    onboarding_router = create_onboarding_router(provider, identity=require_user)
 
     # A protected route to observe what require_user resolves and whether a
     # spoofed X-User-ID survived to the handler.
@@ -75,7 +79,7 @@ def _build_client(
 
     app: FastAPI = create_app(
         make_settings(),
-        routers=[accounts_router, protected],
+        routers=[accounts_router, onboarding_router, protected],
         exception_handlers=build_exception_handlers(),
     )
     app.state.session_verifier = create_session_verifier(codec, repo.is_session_revoked)
@@ -364,3 +368,50 @@ def test_a_revoked_refresh_cannot_mint_a_new_access_token(make_settings: MakeSet
     client.cookies.clear()
     response = client.post("/auth/refresh", cookies={REFRESH_COOKIE_NAME: refresh_before})
     assert response.status_code == 401
+
+
+# --- onboarding completion --------------------------------------------------
+
+
+def test_complete_onboarding_returns_200_with_the_flag_flipped(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings)
+    _register(client)  # a new account starts un-onboarded
+
+    response = client.post("/me/onboarding:complete")
+    assert response.status_code == 200, response.text
+    assert response.json()["has_completed_onboarding"] is True
+
+
+def test_complete_onboarding_without_a_session_is_401(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings)
+    response = client.post("/me/onboarding:complete")
+    assert response.status_code == 401
+    assert response.json()["code"] == "UNAUTHORIZED"
+
+
+def test_complete_onboarding_is_idempotent(make_settings: MakeSettings) -> None:
+    # Double-submit (retry or a second click): both calls 200, flag ends true once.
+    client, _ = _build_client(make_settings)
+    _register(client)
+
+    first = client.post("/me/onboarding:complete")
+    second = client.post("/me/onboarding:complete")
+    assert first.status_code == 200 and second.status_code == 200
+    assert first.json()["has_completed_onboarding"] is True
+    assert second.json()["has_completed_onboarding"] is True
+
+
+def test_complete_onboarding_uses_the_session_identity_not_a_body(
+    make_settings: MakeSettings,
+) -> None:
+    # The route takes no body: a client-supplied user_id is ignored and the
+    # cookie-resolved identity is the account that gets marked onboarded.
+    client, _ = _build_client(make_settings)
+    _register(client, username="ada", email="ada@example.com")
+    ada_id = client.get("/me/whoami").json()["user_id"]
+
+    response = client.post("/me/onboarding:complete", json={"user_id": "someone-else"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == ada_id
+    assert body["has_completed_onboarding"] is True

@@ -268,6 +268,43 @@ async def test_profile_for_unknown_handle_is_not_found() -> None:
         await service.profile("nobody")
 
 
+# --- onboarding completion (AC: flip / idempotent / missing-user) ------------
+
+
+async def test_complete_onboarding_flips_the_flag_and_returns_the_updated_view() -> None:
+    service, repo = _service()
+    registered = await service.register("ada", "ada@example.com", _PASSWORD)
+    assert registered.user.has_completed_onboarding is False
+
+    view = await service.complete_onboarding(registered.user.id)
+    # The returned view reflects the flip and is scoped to the same account.
+    assert view.id == registered.user.id
+    assert view.has_completed_onboarding is True
+    # The write is persisted (visible on a subsequent read) and committed.
+    stored = await repo.get_by_id(registered.user.id)
+    assert stored is not None and stored.has_completed_onboarding is True
+    assert repo.commits == 2  # register + complete
+
+
+async def test_complete_onboarding_is_idempotent() -> None:
+    # Completing an already-onboarded account succeeds again with the same result.
+    service, _ = _service()
+    registered = await service.register("ada", "ada@example.com", _PASSWORD)
+    first = await service.complete_onboarding(registered.user.id)
+    second = await service.complete_onboarding(registered.user.id)
+    assert first.has_completed_onboarding is True
+    assert second.has_completed_onboarding is True
+
+
+async def test_complete_onboarding_for_a_missing_user_is_unauthorized() -> None:
+    # A session that resolves to a deleted account is a stale session, not a 404,
+    # and nothing is committed.
+    service, repo = _service()
+    with pytest.raises(Unauthorized):
+        await service.complete_onboarding("ghost-user")
+    assert repo.commits == 0
+
+
 class _NonUniqueViolation(Exception):
     """An integrity error that is NOT a unique-constraint breach (e.g. a NOT NULL)."""
 
