@@ -1,0 +1,112 @@
+name: Healthcheck
+
+# =============================================================================
+# External production uptime check for Wren.
+#
+# This is an EXTERNALLY-originated probe that runs from GitHub's public runners
+# and hits the same public surfaces a browser would. It complements the
+# in-cluster Prometheus/Alertmanager `ServiceDown` alert by catching failures
+# internal scraping cannot see: DNS, the Cloudflare edge, the tunnel, and
+# per-host ingress routing. If usewren.com is unreachable to a browser while the
+# containers are healthy on monitoring-net, only an external probe notices.
+#
+# Three already-public, unauthenticated, static surfaces are probed for HTTP 200
+# (deliberately NOT the edge-blocked /healthz|/readyz|/metrics observability
+# path, per deployments/cloudflare/config.yml):
+#   - https://usewren.com/                                              (SPA via nginx)
+#   - https://api.usewren.com/.well-known/oauth-authorization-server    (OAuth AS metadata)
+#   - https://mcp.usewren.com/.well-known/oauth-protected-resource      (MCP PRM discovery)
+#
+# On failure (after retries) it posts one message to the existing Discord P0
+# webhook and fails the job, so GitHub's native failure email/UI also fires.
+# No application or infrastructure change: this workflow is the whole feature.
+# =============================================================================
+on:
+  schedule:
+    - cron: "0 */12 * * *"
+  workflow_dispatch:
+
+# One in-flight run at a time; an uptime heartbeat is never cancelled mid-flight.
+concurrency:
+  group: healthcheck
+  cancel-in-progress: false
+
+# Read-only: no repo checkout is needed and Discord uses a secret, not GITHUB_TOKEN.
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # probe: hit the three public surfaces, retry each up to 3x with linear
+  # backoff, and count a surface UP only on HTTP 200. Writes the DOWN list to the
+  # step output before failing so the notify step can name the failed target(s).
+  # ---------------------------------------------------------------------------
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe production surfaces
+        id: probe
+        run: |
+          # GitHub's default run: shell is `bash --noprofile --norc -eo pipefail`,
+          # so errexit is ON. Disable it explicitly so a non-200 curl cannot abort
+          # the retry loop mid-flight; the final pass/fail is driven by `exit` below.
+          set +e
+
+          # Single source of truth for the probed surfaces. Adding or removing a
+          # surface is a one-line change. The MCP PRM path is trailing-slash
+          # sensitive (the tunnel ingress allow-list has no optional slash), so
+          # keep it exactly as written.
+          urls=(
+            "https://usewren.com/"
+            "https://api.usewren.com/.well-known/oauth-authorization-server"
+            "https://mcp.usewren.com/.well-known/oauth-protected-resource"
+          )
+
+          # Probe one URL up to 3 times with linear backoff (5s, 10s). Returns 0
+          # (UP) on the first HTTP 200, 1 (DOWN) only after all attempts fail.
+          check() {
+            local url="$1" attempt code
+            for attempt in 1 2 3; do
+              code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "$url")" || code=000
+              echo "attempt ${attempt}: ${code}  ${url}"
+              [ "$code" = "200" ] && return 0
+              # Skip the backoff after the final attempt: it only delays the result.
+              [ "$attempt" -lt 3 ] && sleep $(( attempt * 5 ))
+            done
+            return 1
+          }
+
+          failed=()
+          for url in "${urls[@]}"; do
+            if ! check "$url"; then
+              failed+=("$url")
+            fi
+          done
+
+          # Write the DOWN list BEFORE exiting non-zero so the failure-guarded
+          # notify step can read it from this step's output.
+          echo "failed=${failed[*]}" >> "$GITHUB_OUTPUT"
+
+          if (( ${#failed[@]} )); then
+            echo "DOWN after retries: ${failed[*]}"
+            exit 1
+          fi
+          echo "All surfaces UP."
+
+      # -----------------------------------------------------------------------
+      # notify: only on a failed probe. Posts exactly one Discord message naming
+      # the DOWN surface(s) and linking the run. The secret is passed via a
+      # step-level env: block and referenced as $DISCORD_WEBHOOK_URL (masked),
+      # never interpolated into the run: text (mirrors cd.yml). The payload is
+      # built with jq --arg so a target string can never break out of the JSON.
+      # -----------------------------------------------------------------------
+      - name: Notify Discord on failure
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          FAILED: ${{ steps.probe.outputs.failed }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          payload="$(jq -n --arg content "🚨 Wren uptime check failed: ${FAILED:-unknown} (run: ${RUN_URL})" '{content: $content}')"
+          curl -sS -H 'Content-Type: application/json' -d "$payload" "$DISCORD_WEBHOOK_URL"
