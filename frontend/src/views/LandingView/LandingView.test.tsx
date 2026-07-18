@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react'
 
 import { buildAuthUser, buildAuthValue, renderWithAuth } from '@/test/auth-harness'
-import { VALUE_PULL_QUOTE } from './constants'
+import { CTA_SETUP_MICROCOPY, VALUE_PULL_QUOTE } from './constants'
 import { LandingView } from './LandingView'
 
 describe('LandingView', () => {
@@ -23,6 +23,11 @@ describe('LandingView', () => {
     const pullQuote = screen.getByText(VALUE_PULL_QUOTE)
     expect(pullQuote).not.toHaveClass('font-serif')
     expect(pullQuote.className).not.toMatch(/display-/)
+  })
+
+  it('AC8: the hero shows subordinate connect-your-agent setup microcopy near the CTA', () => {
+    renderWithAuth(<LandingView />)
+    expect(screen.getByText(CTA_SETUP_MICROCOPY)).toBeInTheDocument()
   })
 
   it('AC5: the subhead names the product category in plain language', () => {
@@ -81,9 +86,9 @@ describe('LandingView', () => {
 
     // How it works: heading + all three steps.
     expect(screen.getByRole('heading', { name: /how it works/i })).toBeInTheDocument()
-    expect(screen.getByText(/tell wren what you already know/i)).toBeInTheDocument()
-    expect(screen.getByText(/get a sequenced roadmap/i)).toBeInTheDocument()
-    expect(screen.getByText(/learn in the right order/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Connect your AI agent' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Get a roadmap built for you' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Learn in the right order' })).toBeInTheDocument()
 
     // Dual audience: the two tracks (exact names; "For you" is a prefix of
     // "For your AI agent", so a substring regex would match both).

@@ -2,8 +2,9 @@ import { DUAL_AUDIENCE_TRACKS } from '../constants'
 import { AudienceTrack } from './AudienceTrack'
 
 /**
- * Two parallel tracks on one roadmap: a human learns in the web app while an AI
- * agent follows the same plan. Conceptual framing only (no links or snippet).
+ * Two parallel tracks on one roadmap: a human learns in the web app while their
+ * AI agent builds that roadmap and can drive study from the same plan.
+ * Conceptual framing only (no links or snippet).
  */
 export function DualAudienceBand() {
   return (

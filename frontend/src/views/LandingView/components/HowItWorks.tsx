@@ -2,8 +2,8 @@ import { HOW_IT_WORKS_STEPS } from '../constants'
 import { HowItWorksStep } from './HowItWorksStep'
 
 /**
- * The explainer band: three steps taking a visitor from "what I already know"
- * to a sequenced roadmap. Grotesque headings; no serif moment here.
+ * The explainer band: three steps taking a visitor from connecting their AI
+ * agent to learning in the right order. Grotesque headings; no serif moment here.
  */
 export function HowItWorks() {
   return (
