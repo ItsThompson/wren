@@ -1,13 +1,13 @@
 name: CI
 
-# Runs on every push and on PRs into main. The
+# Runs after changes land on main and on PRs targeting any branch. The
 # lint job runs first and gates the three test jobs; codegen-drift is
 # independent. Coverage gates are hard: backend 80%, frontend 70%.
 on:
   push:
-    branches: ["**"]
-  pull_request:
     branches: [main]
+  pull_request:
+    branches: ["**"]
 
 # One in-flight run per ref; a new push cancels the previous run.
 concurrency:
