@@ -2,6 +2,12 @@ import { Bot, GraduationCap, MessageSquare, User, Waypoints } from 'lucide-react
 
 import type { AudienceTrackData, FaqItemData, HowItWorksStepData } from './types'
 
+/**
+ * The brand headline: the single Fraunces display moment (hero H1) and the
+ * footer tagline share this one string.
+ */
+export const HERO_HEADLINE = 'Learn anything, in the right order.'
+
 /** Plain-language category line for the hero: names what Wren *is* (AC5). */
 export const HERO_SUBHEAD =
   'Wren is a learning-roadmap tool: tell it what you already know, and it builds the sequenced, prerequisite-aware path of what to learn next. Built for you and your AI agent.'
@@ -73,5 +79,3 @@ export const FAQ_ITEMS: FaqItemData[] = [
       "Yes. The roadmap is yours: mark what you already know and Wren re-sequences what's left so it always starts from where you are.",
   },
 ]
-
-export const FOOTER_TAGLINE = 'Sequenced learning for you and your AI agent.'
