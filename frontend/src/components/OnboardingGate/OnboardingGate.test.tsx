@@ -9,7 +9,7 @@ import { buildAuthUser, buildAuthValue, renderWithAuth } from '@/test/auth-harne
 import { OnboardingGate } from './OnboardingGate'
 
 /**
- * A stand-in for a guarded view. It records a render-time "fetch" so tests can
+ * A stand-in for a guarded view. It signals a mount-effect "fetch" so tests can
  * prove the gate short-circuits BEFORE the guarded view mounts (its data
  * fetching never begins) on an un-onboarded redirect.
  */
