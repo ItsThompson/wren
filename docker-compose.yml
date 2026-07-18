@@ -177,9 +177,12 @@ services:
       - "--query.timeout=30s"
     expose:
       - "9090"
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
+      - source: prometheus_alerts
+        target: /etc/prometheus/alerts.yml
     volumes:
-      - ./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./deployments/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - promdata:/prometheus
     networks:
       - monitoring-net
@@ -276,3 +279,20 @@ networks:
 volumes:
   pgdata:
   promdata:
+
+# -----------------------------------------------------------------------------
+# Configs (environment-sourced; delivered CLI-side, never bind-mounted)
+#
+# Prometheus config + alerts are non-secret but must reach the container without
+# a bind mount: over an SSH Docker Context a file:/bind source resolves on the
+# daemon host (the VPS has no checkout). The content is read CLI-side and
+# transmitted to the daemon. Locally and in CI the recipes populate
+# WREN_PROMETHEUS_CONFIG/_ALERTS from the committed deployments/prometheus/*.yml
+# files (`just up`/`up-dev`/`e2e-up`; the CI e2e job exports them explicitly), so
+# the base stack stays bootable against a local daemon.
+# -----------------------------------------------------------------------------
+configs:
+  prometheus_config:
+    environment: WREN_PROMETHEUS_CONFIG
+  prometheus_alerts:
+    environment: WREN_PROMETHEUS_ALERTS

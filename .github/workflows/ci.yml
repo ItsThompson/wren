@@ -206,10 +206,26 @@ jobs:
     timeout-minutes: 25
     # docker compose reads COMPOSE_FILE natively (':'-separated), so every
     # `docker compose ...` below layers the e2e overlay without repeating -f.
+    # Prometheus reads its config via an environment-sourced Compose config
+    # (docker-compose.yml), which both the `up` and the migration `run` below
+    # materialize, so WREN_PROMETHEUS_CONFIG/_ALERTS must be set for both. They
+    # are exported into $GITHUB_ENV once (non-secret; the committed files) so
+    # every subsequent step inherits them.
     env:
       COMPOSE_FILE: docker-compose.yml:e2e/docker-compose.e2e.yml
     steps:
       - uses: actions/checkout@v4
+
+      - name: Export Prometheus config env (environment-sourced Compose config)
+        run: |
+          {
+            echo 'WREN_PROMETHEUS_CONFIG<<WREN_EOF'
+            cat deployments/prometheus/prometheus.yml
+            echo 'WREN_EOF'
+            echo 'WREN_PROMETHEUS_ALERTS<<WREN_EOF'
+            cat deployments/prometheus/alerts.yml
+            echo 'WREN_EOF'
+          } >> "$GITHUB_ENV"
 
       - uses: actions/setup-node@v4
         with:

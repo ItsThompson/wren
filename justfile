@@ -76,9 +76,13 @@ sync-skill:
 build:
     docker compose build
 
-# Run the production-shaped stack locally (expose-only; tunnel added at deploy time)
+# Run the production-shaped stack locally (expose-only; tunnel added at deploy time).
+# Prometheus reads its config via an environment-sourced Compose config, so
+# populate the vars from the committed files (same mechanism as the deploy).
 up:
-    docker compose up -d --build
+    WREN_PROMETHEUS_CONFIG="$(cat deployments/prometheus/prometheus.yml)" \
+      WREN_PROMETHEUS_ALERTS="$(cat deployments/prometheus/alerts.yml)" \
+      docker compose up -d --build
 
 # Stop the production-shaped stack (keeps named volumes)
 down:
@@ -86,7 +90,9 @@ down:
 
 # Run the full stack locally in dev mode (bind mounts, --reload, relaxed cookies)
 up-dev:
-    docker compose {{dev_compose}} up -d --build
+    WREN_PROMETHEUS_CONFIG="$(cat deployments/prometheus/prometheus.yml)" \
+      WREN_PROMETHEUS_ALERTS="$(cat deployments/prometheus/alerts.yml)" \
+      docker compose {{dev_compose}} up -d --build
 
 # Stop the dev stack (keeps named volumes)
 down-dev:
@@ -185,7 +191,13 @@ setup-e2e:
     cd e2e && npm ci && npx playwright install --with-deps chromium
 
 # Build + boot the e2e stack (published ports) and run pre-traffic migrations.
+# Both `up` and the migration `run` materialize the environment-sourced
+# Prometheus config, so export the vars for the whole recipe.
 e2e-up:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export WREN_PROMETHEUS_CONFIG="$(cat deployments/prometheus/prometheus.yml)"
+    export WREN_PROMETHEUS_ALERTS="$(cat deployments/prometheus/alerts.yml)"
     docker compose {{e2e_compose}} up -d --build
     docker compose {{e2e_compose}} run --rm backend alembic upgrade head
 
