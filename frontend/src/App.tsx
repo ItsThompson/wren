@@ -10,11 +10,23 @@ import { ConsentView } from '@/views/ConsentView'
 import { DashboardView } from '@/views/DashboardView'
 import { LandingView } from '@/views/LandingView'
 import { NotFoundView } from '@/views/NotFoundView'
+import { OnboardingRouteGuard, OnboardingView } from '@/views/OnboardingView'
 import { ProfileView } from '@/views/ProfileView'
 import { RoadmapView } from '@/views/RoadmapView'
 import { TreeView } from '@/views/TreeView'
 
 const router = createBrowserRouter([
+  {
+    // Chrome-free, full-screen: mounted OUTSIDE `AppShell` (no TopBar/gutter).
+    // Its own guard bounces onboarded/anonymous users; the wizard renders only
+    // for a signed-in, un-onboarded user.
+    path: '/onboarding',
+    element: (
+      <OnboardingRouteGuard>
+        <OnboardingView />
+      </OnboardingRouteGuard>
+    ),
+  },
   {
     path: '/',
     element: <AppShell />,
