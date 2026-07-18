@@ -1,8 +1,14 @@
 /*
- * Self-hosted fonts, Latin subset only.
+ * Self-hosted fonts, Latin subset only. Shared single source of truth consumed
+ * by BOTH the app (frontend/) and the docs site (docs-site/).
  * Family names match the design-token vocabulary (§09 `--font-serif/sans/mono`)
  * so shadcn/ui and Tailwind utilities resolve them without an alias.
  * woff2 files ship from the @fontsource-variable packages (bundled by Vite).
+ *
+ * The bare `@fontsource-variable/...` url() specifiers resolve against each
+ * consuming package's own node_modules (there is no repo-root node_modules),
+ * so both frontend and docs-site must depend on the three @fontsource-variable
+ * packages.
  */
 
 /* Fraunces: variable display serif (opsz + wght). Latin subset. */
