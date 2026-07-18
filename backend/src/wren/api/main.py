@@ -20,7 +20,7 @@ from wren.accounts.config import (
 from wren.accounts.passwords import BcryptPasswordHasher
 from wren.accounts.session import build_revocation_lookup, create_session_verifier
 from wren.accounts.tokens import SessionTokenCodec
-from wren.accounts.wiring import build_account_service_provider
+from wren.accounts.wiring import build_account_service_provider, build_registration_notifier
 from wren.core.app_factory import create_app
 from wren.core.db import create_database, create_db_lifespan, db_readiness_check
 from wren.core.errors import build_exception_handlers
@@ -64,7 +64,8 @@ session_config = build_session_config(settings)
 validate_session_secret(session_config, is_dev=settings.is_dev)
 cookie_config = build_cookie_config(settings)
 codec = SessionTokenCodec(session_config)
-service_provider = build_account_service_provider(BcryptPasswordHasher(), codec)
+notifier = build_registration_notifier(settings)
+service_provider = build_account_service_provider(BcryptPasswordHasher(), codec, notifier)
 accounts_router = create_accounts_router(service_provider, cookie_config=cookie_config)
 
 # Roadmap authoring + reads over the same service layer, resolving identity via

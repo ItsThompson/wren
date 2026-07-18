@@ -54,6 +54,7 @@ def make_settings() -> MakeSettings:
             "oauth_access_ttl_seconds": 900,
             "oauth_refresh_ttl_seconds": 2_592_000,
             "cors_origin": "https://usewren.com",
+            "discord_webhook_url": "",
         }
         base.update(overrides)
         return AppSettings(**base)  # type: ignore[arg-type]

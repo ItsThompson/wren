@@ -22,6 +22,7 @@ from sqlalchemy.exc import IntegrityError
 
 from wren.accounts.injection import Clock, OpaqueIdFactory, new_hex_id, utcnow
 from wren.accounts.models import User
+from wren.accounts.notifications import NullRegistrationNotifier, RegistrationNotifier
 from wren.accounts.passwords import PasswordHasher, validate_password_strength
 from wren.accounts.schemas import AuthenticatedUser, PublicProfile, Session
 from wren.core.db import is_unique_violation
@@ -58,6 +59,7 @@ class AccountService:
         *,
         clock: Clock = utcnow,
         new_id: OpaqueIdFactory = new_hex_id,
+        notifier: RegistrationNotifier | None = None,
     ) -> None:
         self._repo = repo
         self._hasher = hasher
@@ -66,6 +68,10 @@ class AccountService:
         # patching globals; the defaults reproduce the prior ambient calls.
         self._clock = clock
         self._new_id = new_id
+        # Best-effort signup announcement. Defaults to the no-op notifier so every
+        # existing construction (and any non-external wiring) stays inert; the
+        # external entrypoint injects the real Discord notifier when configured.
+        self._notifier = notifier or NullRegistrationNotifier()
 
     async def register(self, username: str, email: str, password: str) -> Session:
         """Create a user and start a session, or raise a field-level error.
@@ -99,6 +105,11 @@ class AccountService:
             raise await self._duplicate_conflict(normalized_email) from exc
 
         _log.info("user_registered", user_id=user.id)
+        # Fire-and-forget, after the durable commit: the notifier only schedules
+        # delivery and returns, so it never blocks or fails registration, and the
+        # duplicate/validation paths above return before reaching it (no
+        # notification on a rolled-back signup).
+        self._notifier.user_registered(username=user.username, user_id=user.id)
         return self._start_session(user)
 
     async def login(self, email: str, password: str) -> Session:

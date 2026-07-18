@@ -84,6 +84,12 @@ class EnvSettings(BaseSettings):
     # (CORS). Empty falls back to `app_public_url`; prod pins
     # https://usewren.com so the cross-subdomain cookie flow works.
     cors_origin: str = ""
+    # Discord Incoming Webhook the external app posts to on a successful signup
+    # (best-effort, fire-and-forget). Empty by default so the notification path
+    # is a no-op when unconfigured; the app boots and registers users normally.
+    # SecretStr so any settings dump/log masks it (the webhook is a bearer URL);
+    # read via .get_secret_value() only inside the notifier's delivery task.
+    discord_webhook_url: SecretStr = SecretStr("")
 
 
 class AppSettings(BaseModel):
@@ -106,6 +112,7 @@ class AppSettings(BaseModel):
     oauth_access_ttl_seconds: int
     oauth_refresh_ttl_seconds: int
     cors_origin: str
+    discord_webhook_url: SecretStr
 
     @property
     def is_dev(self) -> bool:
@@ -146,4 +153,5 @@ def build_app_settings(*, service: str, port: int, env: EnvSettings | None = Non
         oauth_access_ttl_seconds=env.oauth_access_ttl_seconds,
         oauth_refresh_ttl_seconds=env.oauth_refresh_ttl_seconds,
         cors_origin=env.cors_origin,
+        discord_webhook_url=env.discord_webhook_url,
     )
