@@ -134,6 +134,10 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     # roadmaps (no draft/private/archived or social-graph leak). Both are mounted
     # on the external app only.
     RouteKey(method="GET", path="/me/dashboard"): AccessLevel.EXTERNAL_COOKIE,
+    # One-time onboarding completion: flips the per-account flag, resolving the
+    # human session via require_user (idempotent, no request body). External-app
+    # only, mirroring the /me/dashboard and /me/clients cookie routes.
+    RouteKey(method="POST", path="/me/onboarding:complete"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="GET", path="/users/{handle}"): AccessLevel.PUBLIC,
     # Shipped SKILL.md authoring guidance. PUBLIC:
     # generic agent guidance served for download/copy, not user data, so it

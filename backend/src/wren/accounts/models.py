@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, String, func
+from sqlalchemy import Boolean, DateTime, String, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from wren.core.orm import Base
@@ -30,6 +30,12 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    # Per-account onboarding completion. Server default false so new rows start
+    # un-onboarded; the 0006 migration backfills pre-existing rows to true and
+    # register sets it false explicitly at the ORM level (see accounts.service).
+    has_completed_onboarding: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
     )
 
 

@@ -8,7 +8,7 @@
 # /etc/cloudflared/config.yml. No rendered file is written to the box; the
 # credentials are delivered the same way (a GitHub secret).
 #
-# One named tunnel, three ingress rules, outbound-only (zero inbound ports).
+# One named tunnel, four routed hosts, outbound-only (zero inbound ports).
 # TLS terminates at the Cloudflare edge; origin traffic inside Docker is
 # plaintext http:// on edge-net.
 #
@@ -49,5 +49,16 @@ ingress:
   - hostname: ${CF_MCP_HOSTNAME}
     service: http_status:404
 
-  # 4. Catch-all: everything else is refused at the edge.
+  # 4. docs (docs.usewren.com) -> static docs site. /healthz is local-only to the
+  #    container's compose health gate and MUST NOT be tunnel-reachable, so it is
+  #    blocked here BEFORE the catch-through to the docs origin (mirrors the api
+  #    and mcp hosts). Rules are first-match top-to-bottom, so both docs rules sit
+  #    before the terminal per-host 404 below (S6).
+  - hostname: ${CF_DOCS_HOSTNAME}
+    path: '^/healthz/?$'
+    service: http_status:404
+  - hostname: ${CF_DOCS_HOSTNAME}
+    service: http://docs:80
+
+  # 5. Catch-all: everything else is refused at the edge.
   - service: http_status:404

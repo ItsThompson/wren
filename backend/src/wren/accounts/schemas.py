@@ -48,6 +48,7 @@ class AuthenticatedUser(BaseModel):
     username: str
     email: str
     created_at: datetime
+    has_completed_onboarding: bool
 
 
 class PublicProfile(BaseModel):

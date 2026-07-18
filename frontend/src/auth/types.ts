@@ -32,4 +32,11 @@ export interface AuthContextValue {
   register: (input: RegisterInput) => Promise<AuthResult>
   login: (input: LoginInput) => Promise<AuthResult>
   logout: () => Promise<void>
+  /**
+   * Replace the current session user, marking the session authenticated. The
+   * onboarding wizard uses this to push the completion endpoint's fresh
+   * `AuthenticatedUser` (flag now `true`) into context *before* it navigates, so
+   * the route guard sees the updated flag and does not bounce the user back.
+   */
+  applyUser: (user: AuthUser) => void
 }

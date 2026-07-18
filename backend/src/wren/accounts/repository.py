@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from wren.accounts.models import RevokedSession, User
@@ -37,6 +37,8 @@ class AccountRepository(Protocol):
     async def get_by_id(self, user_id: str) -> User | None: ...
 
     async def add_user(self, user: User) -> None: ...
+
+    async def set_onboarding_complete(self, user_id: str) -> User | None: ...
 
     async def is_session_revoked(self, jti: str) -> bool: ...
 
@@ -67,6 +69,23 @@ class SqlAlchemyAccountRepository:
         # Flush so a unique-constraint breach surfaces as an IntegrityError now,
         # inside the service's try/except, rather than at commit time.
         await self._session.flush()
+
+    async def set_onboarding_complete(self, user_id: str) -> User | None:
+        """Flip the onboarding flag for one user and return the updated row.
+
+        A single ``UPDATE ... RETURNING`` so the service uses the returned ``User``
+        directly (no follow-up read). ``updated_at`` is set explicitly, which also
+        suppresses the column's ``onupdate`` so the returned row's timestamp matches
+        what was persisted. Resolves to ``None`` when the id no longer exists. Does
+        not commit: the service owns the transaction boundary.
+        """
+        result = await self._session.execute(
+            update(User)
+            .where(User.id == user_id)
+            .values(has_completed_onboarding=True, updated_at=func.now())
+            .returning(User)
+        )
+        return result.scalar_one_or_none()
 
     async def is_session_revoked(self, jti: str) -> bool:
         found = await fetch_optional(

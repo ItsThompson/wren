@@ -97,6 +97,7 @@ class AccountService:
             password_hash=await asyncio.to_thread(self._hasher.hash, password),
             created_at=now,
             updated_at=now,
+            has_completed_onboarding=False,
         )
         try:
             await self._repo.add_user(user)
@@ -151,6 +152,24 @@ class AccountService:
         await self._repo.commit()
         _log.info("user_logged_out", user_id=claims.user_id)
 
+    async def complete_onboarding(self, user_id: str) -> AuthenticatedUser:
+        """Mark the resolved account onboarded and return its updated view.
+
+        Idempotent: completing an already-onboarded account is a no-op beyond the
+        timestamp. ``user_id`` is the session-resolved identity, never a
+        client-supplied id. Owns the transaction boundary (``get_session`` is
+        yield-only): commit on success; on failure the exception propagates and the
+        request-scoped session rolls back when it closes.
+        """
+        user = await self._repo.set_onboarding_complete(user_id)
+        if user is None:
+            # The session resolved to a user id that no longer exists (deleted
+            # mid-session): a stale session, not a 404.
+            raise Unauthorized("Session expired or revoked; log in again.")
+        await self._repo.commit()
+        _log.info("onboarding_completed", user_id=user_id)
+        return _to_authenticated(user)
+
     async def profile(self, handle: str) -> PublicProfile:
         """Public profile by handle (stubbed; a later slice adds public roadmaps)."""
         user = await self._repo.get_by_username(handle)
@@ -193,4 +212,5 @@ def _to_authenticated(user: User) -> AuthenticatedUser:
         username=user.username,
         email=user.email,
         created_at=user.created_at,
+        has_completed_onboarding=user.has_completed_onboarding,
     )

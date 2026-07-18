@@ -18,6 +18,7 @@ from wren.accounts.config import (
     build_session_config,
     validate_session_secret,
 )
+from wren.accounts.onboarding_api import create_onboarding_router
 from wren.accounts.passwords import BcryptPasswordHasher
 from wren.accounts.session import build_revocation_lookup, create_session_verifier
 from wren.accounts.tokens import SessionTokenCodec
@@ -70,6 +71,11 @@ codec = SessionTokenCodec(session_config)
 event_publisher = build_event_publisher(settings)
 service_provider = build_account_service_provider(BcryptPasswordHasher(), codec, event_publisher)
 accounts_router = create_accounts_router(service_provider, cookie_config=cookie_config)
+
+# One-time onboarding completion: POST /me/onboarding:complete flips the
+# per-account flag, resolving the human session via require_user and reusing the
+# same account service provider. External app only.
+onboarding_router = create_onboarding_router(service_provider, identity=require_user)
 
 # Roadmap authoring + reads over the same service layer, resolving identity via
 # the human session cookie (require_user). The external app mounts the three
@@ -127,6 +133,7 @@ app: FastAPI = create_app(
     settings,
     routers=[
         accounts_router,
+        onboarding_router,
         roadmaps_router,
         listing_router,
         progress_router,
