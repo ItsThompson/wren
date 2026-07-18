@@ -34,6 +34,9 @@ services:
         # Baked into the SPA bundle at build time: the API origin the SPA calls
         # cross-origin (api.usewren.com in prod). Empty means same-origin.
         VITE_API_BASE_URL: ${PUBLIC_BASE_URL:-}
+        # The MCP server origin (mcp.usewren.com in prod); the onboarding wizard
+        # displays the MCP endpoint derived from it.
+        VITE_MCP_BASE_URL: ${MCP_PUBLIC_URL:-}
     expose:
       - "80"
     networks:
