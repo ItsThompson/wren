@@ -74,6 +74,28 @@ async def test_registered_password_is_stored_only_as_a_bcrypt_hash() -> None:
     assert stored.password_hash.startswith("$2b$")
 
 
+async def test_new_registrations_start_not_onboarded() -> None:
+    # AC4/US-BACK-02: a freshly minted account is un-onboarded until it completes,
+    # both on the returned session view and on the persisted row.
+    service, repo = _service()
+    session = await service.register("ada", "ada@example.com", _PASSWORD)
+    assert session.user.has_completed_onboarding is False
+    stored = await repo.get_by_email("ada@example.com")
+    assert stored is not None and stored.has_completed_onboarding is False
+
+
+async def test_authenticated_view_maps_a_completed_onboarding_flag() -> None:
+    # _to_authenticated maps the model column through: an account marked onboarded
+    # reports has_completed_onboarding=True on its next session view (login).
+    service, repo = _service()
+    await service.register("ada", "ada@example.com", _PASSWORD)
+    stored = await repo.get_by_email("ada@example.com")
+    assert stored is not None
+    stored.has_completed_onboarding = True
+    session = await service.login("ada@example.com", _PASSWORD)
+    assert session.user.has_completed_onboarding is True
+
+
 async def test_duplicate_email_is_a_field_level_conflict_and_creates_no_user() -> None:
     service, repo = _service()
     await service.register("ada", "ada@example.com", _PASSWORD)

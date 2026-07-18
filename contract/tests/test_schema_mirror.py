@@ -41,6 +41,7 @@ from typing import Any
 
 import pytest
 from pydantic import BaseModel, TypeAdapter
+from wren.accounts import schemas as backend_accounts
 from wren.core import errors as backend_errors
 from wren.core import read_contract as backend_read_contract
 from wren.progress import schemas as backend_progress
@@ -420,3 +421,23 @@ def test_excluded_mcp_only_types_have_no_backend_mirror() -> None:
         assert name not in backend_types, (
             f"{name} now has a backend mirror; move it out of EXCLUDED."
         )
+
+
+# --------------------------------------------------------------------------- #
+# Accounts wire contract: the onboarding flag (US-BACK-02)                    #
+# --------------------------------------------------------------------------- #
+#
+# ``AuthenticatedUser`` is the caller's own view returned by register/login/
+# refresh (and the onboarding-complete endpoint). It is not an MCP mirror -- the
+# resource server exposes no auth surface -- so it carries no Group-A/B/C entry
+# above. This guards the one field the onboarding slice adds to that wire schema,
+# which flows to the frontend generated types via ``just codegen``.
+
+
+def test_authenticated_user_carries_the_onboarding_flag() -> None:
+    """``AuthenticatedUser`` exposes ``has_completed_onboarding`` as a required bool."""
+    schema = backend_accounts.AuthenticatedUser.model_json_schema()
+    prop = schema.get("properties", {}).get("has_completed_onboarding")
+    assert prop is not None, "AuthenticatedUser must expose has_completed_onboarding."
+    assert prop.get("type") == "boolean"
+    assert "has_completed_onboarding" in schema.get("required", [])

@@ -8,6 +8,8 @@ automatically when Docker is unavailable.
 
 from __future__ import annotations
 
+import asyncio
+import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -15,6 +17,8 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import text
+from sqlalchemy.engine import make_url
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from tests.support.fakes.accounts_fakes import build_test_codec, build_test_hasher
 from wren.accounts.repository import SqlAlchemyAccountRepository
@@ -126,3 +130,106 @@ async def test_logout_revocation_is_visible_to_the_revocation_lookup(
         assert await is_revoked(sid) is True
     finally:
         await database.engine.dispose()
+
+
+async def test_freshly_registered_account_persists_as_not_onboarded(
+    migrated_postgres_url: str,
+) -> None:
+    # AC4/US-BACK-02, end to end against Postgres: register writes the ORM default
+    # (false), so a new account's persisted flag is false despite the DDL's
+    # server_default being a backfill safety net rather than the new-user path.
+    database = create_database(migrated_postgres_url)
+    try:
+        async with database.sessionmaker() as session:
+            service = AccountService(
+                SqlAlchemyAccountRepository(session), build_test_hasher(), build_test_codec()
+            )
+            created = await service.register("freshuser", "fresh@example.com", _PASSWORD)
+            assert created.user.has_completed_onboarding is False
+
+        async with database.sessionmaker() as session:
+            stored = await SqlAlchemyAccountRepository(session).get_by_email("fresh@example.com")
+            assert stored is not None and stored.has_completed_onboarding is False
+    finally:
+        await database.engine.dispose()
+
+
+async def _admin_execute(admin_url: str, statement: str) -> None:
+    """Run one autocommit statement (CREATE/DROP DATABASE cannot run in a txn)."""
+    engine = create_async_engine(admin_url, isolation_level="AUTOCOMMIT")
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text(statement))
+    finally:
+        await engine.dispose()
+
+
+async def _seed_pre_onboarding_user(url: str, user_id: str) -> None:
+    """Insert a user row in the pre-0006 schema (no onboarding column yet)."""
+    engine = create_async_engine(url)
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "INSERT INTO users (id, username, email, password_hash) "
+                    "VALUES (:id, :username, :email, :password_hash)"
+                ),
+                {
+                    "id": user_id,
+                    "username": "legacy",
+                    "email": "legacy@example.com",
+                    "password_hash": "$2b$04$legacyhashplaceholder000000000000000000000",
+                },
+            )
+    finally:
+        await engine.dispose()
+
+
+async def _read_onboarding_flag(url: str, user_id: str) -> bool | None:
+    engine = create_async_engine(url)
+    try:
+        async with engine.connect() as conn:
+            result = await conn.scalar(
+                text("SELECT has_completed_onboarding FROM users WHERE id = :id"),
+                {"id": user_id},
+            )
+            return None if result is None else bool(result)
+    finally:
+        await engine.dispose()
+
+
+def test_migration_backfills_existing_accounts_to_onboarded(postgres_url: str) -> None:
+    """US-GUARD-04: accounts that existed before 0006 are backfilled to true.
+
+    Runs on an isolated database in the same container so the staged upgrade
+    (0005 -> seed a legacy row -> 0006) is independent of the shared session
+    database other integration tests bring straight to head. ``command.upgrade``
+    is synchronous (its env.py drives its own asyncio loop), so this is a sync
+    test that wraps each direct DB step in ``asyncio.run``.
+    """
+    import os
+
+    db_name = f"onboarding_backfill_{uuid.uuid4().hex[:12]}"
+    asyncio.run(_admin_execute(postgres_url, f'CREATE DATABASE "{db_name}"'))
+    target_url = make_url(postgres_url).set(database=db_name).render_as_string(hide_password=False)
+
+    config = Config(str(BACKEND_DIR / "alembic.ini"))
+    config.set_main_option("script_location", str(BACKEND_DIR / "alembic"))
+    config.set_main_option("sqlalchemy.url", target_url)
+    previous = os.environ.get("DATABASE_URL")
+    os.environ["DATABASE_URL"] = target_url
+    try:
+        # Bring the isolated DB to just before onboarding, then seed a legacy row.
+        command.upgrade(config, "0005_progress")
+        asyncio.run(_seed_pre_onboarding_user(target_url, "legacy-user-1"))
+        # Applying 0006 adds the column (server_default false) and backfills to true.
+        command.upgrade(config, "0006_onboarding")
+        assert asyncio.run(_read_onboarding_flag(target_url, "legacy-user-1")) is True
+    finally:
+        if previous is None:
+            os.environ.pop("DATABASE_URL", None)
+        else:
+            os.environ["DATABASE_URL"] = previous
+        asyncio.run(
+            _admin_execute(postgres_url, f'DROP DATABASE IF EXISTS "{db_name}" WITH (FORCE)')
+        )
