@@ -11,11 +11,11 @@ import { useStartDestination } from '../hooks/useStartDestination'
  * visitor is not bounced through `/auth`. Keeps the default terracotta variant.
  */
 export function StartRoadmapButton() {
-  const { destination } = useStartDestination()
+  const destination = useStartDestination()
 
   if (destination === null) {
     return (
-      <Button size="lg" disabled aria-disabled>
+      <Button size="lg" disabled>
         Start a roadmap
         <ArrowRight />
       </Button>
