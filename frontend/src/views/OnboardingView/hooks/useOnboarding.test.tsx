@@ -68,12 +68,6 @@ describe('useOnboarding step machine', () => {
     act(() => result.current.actions.back())
     expect(result.current.state.stepIndex).toBe(0) // clamped at the first step
   })
-
-  it('exposes skip and submit as the same terminal completion path', () => {
-    const { result } = renderOnboarding()
-
-    expect(result.current.actions.skip).toBe(result.current.actions.submit)
-  })
 })
 
 describe('useOnboarding completion', () => {

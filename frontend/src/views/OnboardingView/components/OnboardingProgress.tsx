@@ -14,7 +14,7 @@ interface OnboardingProgressProps {
  */
 export function OnboardingProgress({ stepIndex, stepCount }: OnboardingProgressProps) {
   return (
-    <div className="flex items-center gap-2" aria-label={`Step ${stepIndex + 1} of ${stepCount}`}>
+    <div className="flex items-center gap-2">
       {Array.from({ length: stepCount }, (_, index) => (
         <span
           key={index}

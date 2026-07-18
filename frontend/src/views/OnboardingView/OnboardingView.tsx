@@ -6,6 +6,11 @@ import { useOnboarding } from './hooks/useOnboarding'
 import { STEPS } from './steps'
 import { OnboardingStepId, type OnboardingStepProps } from './types'
 
+/** Exhaustiveness guard: a compile error here means a step `id` has no case. */
+function assertNever(value: never): never {
+  throw new Error(`Unhandled onboarding step: ${String(value)}`)
+}
+
 /**
  * OnboardingView: the thin orchestrator. It composes the state-machine hook with
  * the progress indicator and the active step, and renders a chrome-free
@@ -37,6 +42,8 @@ export function OnboardingView() {
     case OnboardingStepId.WELCOME:
       activeStep = <WelcomeStep {...stepProps} />
       break
+    default:
+      activeStep = assertNever(step.id)
   }
 
   return (

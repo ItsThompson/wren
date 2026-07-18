@@ -40,7 +40,7 @@ describe('OnboardingView', () => {
     renderOnboardingView()
 
     expect(screen.getByText('Welcome to Wren')).toBeInTheDocument()
-    expect(screen.getByLabelText('Step 1 of 1')).toBeInTheDocument()
+    expect(screen.getByText('Step 1 of 1')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument()
   })
 
