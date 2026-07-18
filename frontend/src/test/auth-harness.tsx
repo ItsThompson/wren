@@ -26,6 +26,7 @@ export function buildAuthValue(overrides: Partial<AuthContextValue> = {}): AuthC
     register: vi.fn(async () => ({ ok: true }) as const),
     login: vi.fn(async () => ({ ok: true }) as const),
     logout: vi.fn(async () => {}),
+    applyUser: vi.fn(),
     ...overrides,
   }
 }
