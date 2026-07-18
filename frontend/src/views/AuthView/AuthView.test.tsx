@@ -95,6 +95,28 @@ describe('AuthView', () => {
     )
   })
 
+  it('does not duplicate register errors that are already attached to a field', async () => {
+    const passwordError =
+      'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a digit.'
+    const register = vi.fn(async () => ({
+      ok: false as const,
+      message: passwordError,
+      fields: { password: passwordError },
+    }))
+    const user = userEvent.setup()
+    renderWithAuth(<AuthView />, { authValue: buildAuthValue({ register }) })
+
+    await user.click(screen.getByRole('button', { name: 'Create an account' }))
+    await user.type(screen.getByLabelText('Username'), 'ada')
+    await user.type(screen.getByLabelText('Email'), 'ada@example.com')
+    await user.type(screen.getByLabelText('Password'), 'password')
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
+
+    await waitFor(() => expect(screen.getAllByText(passwordError)).toHaveLength(1))
+    expect(screen.getByLabelText('Password')).toHaveFocus()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('redirects into the app once authenticated', () => {
     renderWithAuth(
       <Routes>
