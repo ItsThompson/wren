@@ -75,11 +75,17 @@ services:
         gid: "${WREN_ALERTMANAGER_GID:-65534}"
         mode: 0400
 
-# edge-net is defined in the base file; redeclared here (identical) so the
-# overlay is self-consistent when merged.
+# edge-net is defined in the base file with a PINNED ipam subnet. Compose deep-
+# merges network definitions across overlays, so the base subnet carries through;
+# it is replicated here (identical, same EDGE_NET_SUBNET source) so the merged
+# deploy stack is self-consistent and cloudflared's IP demonstrably lands inside
+# the trusted-proxy CIDR the apps honor.
 networks:
   edge-net:
     driver: bridge
+    ipam:
+      config:
+        - subnet: ${EDGE_NET_SUBNET:-172.20.0.0/24}
 
 # All sources are environment: (never file:). Over an SSH Docker Context a file:
 # source resolves on the daemon host (the VPS, which has no checkout) and fails;

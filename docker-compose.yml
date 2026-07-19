@@ -99,6 +99,10 @@ services:
       # stack the DB is reached by service name, never localhost.
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-wren}:${POSTGRES_PASSWORD:-wren}@postgres:5432/${POSTGRES_DB:-wren}
       HOST: 0.0.0.0
+      # Trust the edge tier (cloudflared) for X-Forwarded-Proto so the external
+      # app sees https behind the tunnel. Pinned to the edge-net subnet; the
+      # internal app inherits it but never mounts the proxy middleware.
+      TRUSTED_PROXIES: ${EDGE_NET_SUBNET:-172.20.0.0/24}
     expose:
       - "8000"  # external app (tunnel-routed as api.usewren.com)
       - "8001"  # internal app (compute-net only; never tunnel-routed)
@@ -142,6 +146,10 @@ services:
       # in-network for a self-contained local stack.
       BACKEND_INTERNAL_URL: http://backend:8001
       HOST: 0.0.0.0
+      # Trust the edge tier (cloudflared) for X-Forwarded-Proto behind the tunnel.
+      # Distinct name from uvicorn's FORWARDED_ALLOW_IPS on purpose (see
+      # settings.py); pinned to the edge-net subnet below.
+      MCP_TRUSTED_PROXIES: ${EDGE_NET_SUBNET:-172.20.0.0/24}
     expose:
       - "9000"  # PRM + /mcp transport tunnel-routed; /metrics + health are not.
     networks:
@@ -293,8 +301,18 @@ services:
     restart: unless-stopped
 
 networks:
+  # edge-net carries a PINNED subnet so cloudflared's container IP is known to
+  # land inside the trusted-proxy CIDR the mcp/backend apps honor for
+  # X-Forwarded-Proto (TRUSTED_PROXIES / MCP_TRUSTED_PROXIES above, both derived
+  # from EDGE_NET_SUBNET). Caveat: this base file is inherited by BOTH the `wren`
+  # (`just up`) and `wren-dev` (`just up-dev`) projects, so running both on one
+  # host without `just down` in between collides on this subnet: tear one down
+  # first. Override EDGE_NET_SUBNET if it clashes with another daemon network.
   edge-net:
     driver: bridge
+    ipam:
+      config:
+        - subnet: ${EDGE_NET_SUBNET:-172.20.0.0/24}
   compute-net:
     driver: bridge
   data-net:
