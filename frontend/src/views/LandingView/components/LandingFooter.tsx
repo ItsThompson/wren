@@ -2,11 +2,10 @@ import { HERO_HEADLINE } from '../constants'
 
 /**
  * Slim brand footer: the Fraunces wordmark (the brand signature, exempt from
- * the one-serif-moment rule), a one-line tagline, the year, and the
- * t-industri.es parent-brand attribution. No nav links.
+ * the one-serif-moment rule), a one-line tagline, and the t-industri.es
+ * parent-brand attribution. No nav links.
  */
 export function LandingFooter() {
-  const year = new Date().getFullYear()
   return (
     <footer className="grid gap-6 border-t border-border pt-8 text-sm text-muted-foreground sm:grid-cols-3 sm:items-start">
       <p className="font-serif text-xl font-medium lowercase tracking-[-0.01em] text-foreground">
@@ -14,7 +13,6 @@ export function LandingFooter() {
       </p>
       <p className="sm:justify-self-center sm:text-center">{HERO_HEADLINE}</p>
       <div className="space-y-1 sm:justify-self-end sm:text-right">
-        <p>© {year} Wren</p>
         <p>
           A{' '}
           <a
