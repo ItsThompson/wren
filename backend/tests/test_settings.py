@@ -45,6 +45,20 @@ def test_is_dev_true_for_development() -> None:
     assert settings.is_dev is True
 
 
+def test_trusted_proxies_parses_the_comma_separated_env() -> None:
+    # TRUSTED_PROXIES is a comma-separated CIDR/IP list; blanks (e.g. a trailing
+    # comma) are dropped so an empty literal can never be trusted.
+    env = EnvSettings(trusted_proxies="172.20.0.0/24, 10.0.0.1 ,")
+    settings = build_app_settings(service=EXTERNAL_SERVICE, port=EXTERNAL_PORT, env=env)
+    assert settings.trusted_proxies == ["172.20.0.0/24", "10.0.0.1"]
+
+
+def test_trusted_proxies_defaults_empty() -> None:
+    # Empty in dev, so the external entrypoint mounts no ProxyHeadersMiddleware.
+    settings = build_app_settings(service=EXTERNAL_SERVICE, port=EXTERNAL_PORT, env=EnvSettings())
+    assert settings.trusted_proxies == []
+
+
 def test_bearer_secrets_are_masked_in_repr_but_recoverable() -> None:
     """L12: an accidental settings dump/log must not leak the bearer secrets.
     They are ``SecretStr``, so ``repr()``/``str()`` mask them, while

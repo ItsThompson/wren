@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 import pytest
+from fastapi import Request  # noqa: TC002 - FastAPI reads this route param annotation at runtime
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
@@ -60,6 +61,66 @@ def _build(
     provider = key_provider or RemoteKeyProvider(ISSUER, make_fetch(public_jwks(key or new_key())))
     app = create_rs_app(make_settings(), key_provider=provider, internal_client=_internal_client())
     return TestClient(app)
+
+
+_TOOLS_LIST = {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
+_MCP_HEADERS = {
+    "Accept": "application/json, text/event-stream",
+    "Content-Type": "application/json",
+}
+# Registered tool surface: seven write tools + seven read tools.
+_TOOL_COUNT = 14
+
+
+def _authed_client(make_settings: MakeSettings) -> tuple[TestClient, dict[str, str]]:
+    """An RS app plus a valid bearer for the registered tool surface.
+
+    Boots one app instance (one session manager, ``run()`` once per instance), so
+    a caller probes both ``/mcp`` and ``/mcp/`` within a single TestClient
+    context."""
+    key = new_key()
+    app = create_rs_app(
+        make_settings(),
+        key_provider=RemoteKeyProvider(ISSUER, make_fetch(public_jwks(key))),
+        internal_client=_internal_client(),
+    )
+    headers = {"Authorization": f"Bearer {mint(key)}", **_MCP_HEADERS}
+    return TestClient(app, base_url=RESOURCE), headers
+
+
+def _tool_names(response: httpx.Response) -> set[str]:
+    return {tool["name"] for tool in response.json()["result"]["tools"]}
+
+
+# The pinned edge-net CIDR the trusted-proxy tests exercise (see docker-compose).
+_TRUSTED_CIDR = "10.89.0.0/24"
+_TRUSTED_IP = ("10.89.0.5", 12345)
+_UNTRUSTED_IP = ("10.9.9.9", 12345)
+
+
+def _scheme_probe_client(
+    make_settings: MakeSettings,
+    *,
+    trusted_proxies: list[str],
+    client: tuple[str, int],
+) -> TestClient:
+    """An RS app with a GET /scheme route echoing ``request.url.scheme``.
+
+    ``client`` sets the connecting IP the ProxyHeadersMiddleware trust-checks;
+    TestClient's default (``("testclient", 50000)``) is a non-IP literal that no
+    CIDR matches, so the trust cases MUST override it with an in/out-of-CIDR IP.
+    """
+    app = create_rs_app(
+        make_settings(trusted_proxies=trusted_proxies),
+        key_provider=RemoteKeyProvider(ISSUER, make_fetch(public_jwks(new_key()))),
+        internal_client=_internal_client(),
+    )
+
+    @app.get("/scheme")
+    async def scheme(request: Request) -> dict[str, str]:
+        return {"scheme": request.url.scheme}
+
+    return TestClient(app, client=client)
 
 
 def test_prm_is_served_from_pinned_config(make_settings: MakeSettings) -> None:
@@ -196,28 +257,86 @@ def test_production_does_not_allow_the_mcp_inspector_origin(
 
 
 def test_valid_bearer_passes_the_boundary(make_settings: MakeSettings) -> None:
-    # A valid token clears the auth boundary and reaches the now-mounted MCP tool
+    # A valid token clears the auth boundary and reaches the now-routed MCP tool
     # transport; tools/list returns the registered write tools.
-    key = new_key()
-    app = create_rs_app(
-        make_settings(),
-        key_provider=RemoteKeyProvider(ISSUER, make_fetch(public_jwks(key))),
-        internal_client=_internal_client(),
-    )
-    with TestClient(app, base_url=RESOURCE) as client:
-        response = client.post(
-            f"{MCP_PATH}/",
-            json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
-            headers={
-                "Authorization": f"Bearer {mint(key)}",
-                "Accept": "application/json, text/event-stream",
-                "Content-Type": "application/json",
-            },
-        )
+    client, headers = _authed_client(make_settings)
+    with client:
+        response = client.post(f"{MCP_PATH}/", json=_TOOLS_LIST, headers=headers)
 
     assert response.status_code == 200
-    names = {tool["name"] for tool in response.json()["result"]["tools"]}
-    assert "create_roadmap_draft" in names
+    assert "create_roadmap_draft" in _tool_names(response)
+
+
+def test_authenticated_post_mcp_no_slash_is_served_directly(make_settings: MakeSettings) -> None:
+    # AC1 (decisive): the authenticated POST /mcp (no slash) is served directly
+    # (200, no Location, no 307), identical to POST /mcp/. The old outer Mount
+    # 307-redirected /mcp -> /mcp/, stalling https->http MCP clients (~30s). An
+    # UNAUTH probe cannot catch this: BearerAuth 401s /mcp before routing, so the
+    # redirect only ever fired on the authenticated path.
+    client, headers = _authed_client(make_settings)
+    with client:
+        no_slash = client.post(MCP_PATH, json=_TOOLS_LIST, headers=headers, follow_redirects=False)
+        with_slash = client.post(
+            f"{MCP_PATH}/", json=_TOOLS_LIST, headers=headers, follow_redirects=False
+        )
+
+    assert no_slash.status_code == 200
+    assert "Location" not in no_slash.headers
+    assert with_slash.status_code == 200
+    # Parity: the no-slash path resolves the identical tool surface as /mcp/.
+    assert _tool_names(no_slash) == _tool_names(with_slash)
+    assert "create_roadmap_draft" in _tool_names(no_slash)
+
+
+def test_all_tools_are_callable_over_both_mcp_paths(make_settings: MakeSettings) -> None:
+    # AC4: the full 14-tool surface is reachable over both /mcp and /mcp/.
+    client, headers = _authed_client(make_settings)
+    with client:
+        no_slash = client.post(MCP_PATH, json=_TOOLS_LIST, headers=headers)
+        with_slash = client.post(f"{MCP_PATH}/", json=_TOOLS_LIST, headers=headers)
+
+    assert len(_tool_names(no_slash)) == _TOOL_COUNT
+    assert len(_tool_names(with_slash)) == _TOOL_COUNT
+
+
+def test_unauthenticated_post_mcp_is_401_with_no_location(make_settings: MakeSettings) -> None:
+    # AC2: both /mcp and /mcp/ reject an unauthenticated POST at the boundary with
+    # the PRM-pointing challenge and never emit a Location.
+    client = _build(make_settings)
+    for path in (MCP_PATH, f"{MCP_PATH}/"):
+        response = client.post(path, follow_redirects=False)
+        assert response.status_code == 401
+        challenge = response.headers["WWW-Authenticate"]
+        assert challenge == f'Bearer resource_metadata="{RESOURCE}{PRM_PATH}"'
+        assert "Location" not in response.headers
+
+
+def test_trusted_proxy_forwarded_scheme_is_honored(make_settings: MakeSettings) -> None:
+    # AC5: from an IP inside the pinned edge-net CIDR, X-Forwarded-Proto: https is
+    # trusted, so the app sees request.url.scheme == "https".
+    client = _scheme_probe_client(
+        make_settings, trusted_proxies=[_TRUSTED_CIDR], client=_TRUSTED_IP
+    )
+    response = client.get("/scheme", headers={"X-Forwarded-Proto": "https"})
+    assert response.json()["scheme"] == "https"
+
+
+def test_untrusted_proxy_forwarded_scheme_is_ignored(make_settings: MakeSettings) -> None:
+    # AC5: from an IP outside the CIDR the forwarded header is ignored; the scheme
+    # stays http even though the same header is sent.
+    client = _scheme_probe_client(
+        make_settings, trusted_proxies=[_TRUSTED_CIDR], client=_UNTRUSTED_IP
+    )
+    response = client.get("/scheme", headers={"X-Forwarded-Proto": "https"})
+    assert response.json()["scheme"] == "http"
+
+
+def test_empty_trusted_proxies_leaves_the_scheme_untouched(make_settings: MakeSettings) -> None:
+    # Dev: with trusted_proxies empty the middleware is not mounted, so even from
+    # an in-CIDR IP the forwarded scheme is never honored.
+    client = _scheme_probe_client(make_settings, trusted_proxies=[], client=_TRUSTED_IP)
+    response = client.get("/scheme", headers={"X-Forwarded-Proto": "https"})
+    assert response.json()["scheme"] == "http"
 
 
 def test_app_exposes_the_tool_layer_seams(make_settings: MakeSettings) -> None:
