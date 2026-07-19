@@ -93,8 +93,8 @@ def _tool_names(response: httpx.Response) -> set[str]:
 
 
 # The pinned edge-net CIDR the trusted-proxy tests exercise (see docker-compose).
-_TRUSTED_CIDR = "172.20.0.0/24"
-_TRUSTED_IP = ("172.20.0.5", 12345)
+_TRUSTED_CIDR = "10.89.0.0/24"
+_TRUSTED_IP = ("10.89.0.5", 12345)
 _UNTRUSTED_IP = ("10.9.9.9", 12345)
 
 

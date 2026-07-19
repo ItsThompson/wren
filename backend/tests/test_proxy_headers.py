@@ -39,8 +39,8 @@ def _middleware_class_names(app: FastAPI) -> set[str]:
 
 
 # The pinned edge-net CIDR (see docker-compose) and IPs in/outside it.
-_TRUSTED_CIDR = "172.20.0.0/24"
-_TRUSTED_IP = ("172.20.0.5", 12345)
+_TRUSTED_CIDR = "10.89.0.0/24"
+_TRUSTED_IP = ("10.89.0.5", 12345)
 _UNTRUSTED_IP = ("10.9.9.9", 12345)
 
 

@@ -100,9 +100,11 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-wren}:${POSTGRES_PASSWORD:-wren}@postgres:5432/${POSTGRES_DB:-wren}
       HOST: 0.0.0.0
       # Trust the edge tier (cloudflared) for X-Forwarded-Proto so the external
-      # app sees https behind the tunnel. Pinned to the edge-net subnet; the
-      # internal app inherits it but never mounts the proxy middleware.
-      TRUSTED_PROXIES: ${EDGE_NET_SUBNET:-172.20.0.0/24}
+      # app sees https behind the tunnel. Matches the edge-net subnet the tunnel
+      # overlay pins at deploy (EDGE_NET_SUBNET); inert in local/e2e (no proxy
+      # fronts the app). The internal app inherits it but never mounts the
+      # middleware.
+      TRUSTED_PROXIES: ${EDGE_NET_SUBNET:-10.89.0.0/24}
     expose:
       - "8000"  # external app (tunnel-routed as api.usewren.com)
       - "8001"  # internal app (compute-net only; never tunnel-routed)
@@ -148,8 +150,9 @@ services:
       HOST: 0.0.0.0
       # Trust the edge tier (cloudflared) for X-Forwarded-Proto behind the tunnel.
       # Distinct name from uvicorn's FORWARDED_ALLOW_IPS on purpose (see
-      # settings.py); pinned to the edge-net subnet below.
-      MCP_TRUSTED_PROXIES: ${EDGE_NET_SUBNET:-172.20.0.0/24}
+      # settings.py); matches the edge-net subnet the tunnel overlay pins at
+      # deploy (EDGE_NET_SUBNET); inert in local/e2e.
+      MCP_TRUSTED_PROXIES: ${EDGE_NET_SUBNET:-10.89.0.0/24}
     expose:
       - "9000"  # PRM + /mcp transport tunnel-routed; /metrics + health are not.
     networks:
@@ -301,18 +304,18 @@ services:
     restart: unless-stopped
 
 networks:
-  # edge-net carries a PINNED subnet so cloudflared's container IP is known to
-  # land inside the trusted-proxy CIDR the mcp/backend apps honor for
-  # X-Forwarded-Proto (TRUSTED_PROXIES / MCP_TRUSTED_PROXIES above, both derived
-  # from EDGE_NET_SUBNET). Caveat: this base file is inherited by BOTH the `wren`
-  # (`just up`) and `wren-dev` (`just up-dev`) projects, so running both on one
-  # host without `just down` in between collides on this subnet: tear one down
-  # first. Override EDGE_NET_SUBNET if it clashes with another daemon network.
+  # edge-net is auto-assigned by Docker in the local/e2e stacks (NO ipam here).
+  # Pinning a /24 in this base file made every project (wren, wren-dev, wren-e2e)
+  # demand the same pool, which collides with the sibling networks Docker
+  # auto-allocates whole /16s to (e.g. monitoring-net -> 172.20.0.0/16 overlaps a
+  # pinned 172.20.0.0/24, breaking `docker compose up`). The subnet is pinned ONLY
+  # by the tunnel overlay at deploy, where cloudflared needs a known IP range
+  # inside the trusted-proxy CIDR (TRUSTED_PROXIES / MCP_TRUSTED_PROXIES, derived
+  # from EDGE_NET_SUBNET). The deploy default sits outside Docker's auto pool so it
+  # cannot overlap an auto-assigned sibling. In local/e2e the trust env is inert
+  # (no proxy fronts the apps).
   edge-net:
     driver: bridge
-    ipam:
-      config:
-        - subnet: ${EDGE_NET_SUBNET:-172.20.0.0/24}
   compute-net:
     driver: bridge
   data-net:
