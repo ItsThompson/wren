@@ -21,7 +21,7 @@ None of these can be produced by the codebase or CI; the operator provides them:
    **Chosen box: Hetzner CX33** (x86 shared vCPU, 4 vCPU / 8 GB RAM / 80 GB NVMe).
    Select a Hetzner Cloud EU location and the current Ubuntu LTS image at order.
    Why CX33:
-   - **8 GB RAM** clears the ~3.75 GiB sum of compose memory ceilings with OS +
+   - **8 GB RAM** clears the ~3.9 GiB sum of compose memory ceilings with OS +
      Docker-daemon + burst headroom; a 4 GB box sits *below* that sum and risks
      OOM under the always-on Postgres + Prometheus tenants.
    - **x86_64** is a drop-in for the current amd64-only first-party images: no
@@ -151,6 +151,7 @@ cloudflared tunnel create wren                 # prints the tunnel UUID and writ
 cloudflared tunnel route dns wren usewren.com
 cloudflared tunnel route dns wren api.usewren.com
 cloudflared tunnel route dns wren mcp.usewren.com
+cloudflared tunnel route dns wren docs.usewren.com
 ```
 
 Record the **tunnel UUID** → set `CF_TUNNEL_ID` in the committed `.env.prod`
@@ -255,7 +256,7 @@ set -a
 source .env.prod
 WREN_PROMETHEUS_CONFIG="$(cat deployments/prometheus/prometheus.yml)"
 WREN_PROMETHEUS_ALERTS="$(cat deployments/prometheus/alerts.yml)"
-WREN_CLOUDFLARED_INGRESS="$(envsubst '$CF_TUNNEL_ID $CF_APP_HOSTNAME $CF_API_HOSTNAME $CF_MCP_HOSTNAME' < deployments/cloudflare/config.yml)"
+WREN_CLOUDFLARED_INGRESS="$(envsubst '$CF_TUNNEL_ID $CF_APP_HOSTNAME $CF_API_HOSTNAME $CF_MCP_HOSTNAME $CF_DOCS_HOSTNAME' < deployments/cloudflare/config.yml)"
 WREN_ALERTMANAGER_CONFIG="$(DISCORD_WEBHOOK_URL='<webhook>' envsubst '$DISCORD_WEBHOOK_URL' < deployments/alertmanager/alertmanager.yml)"
 WREN_OAUTH_PRIVATE_KEY="$(cat oauth_private.pem)"
 WREN_CLOUDFLARED_CREDENTIALS="$(cat ~/.cloudflared/<UUID>.json)"
@@ -305,12 +306,13 @@ covers them. `WREN_ALERTMANAGER_CONFIG` is rendered in CI from
 `DISCORD_WEBHOOK_URL`; a blank webhook makes Alertmanager exit on config load and
 the health gate fails, so a green deploy means the webhook rendered.
 
-### F2. All three hostnames reachable through the tunnel
+### F2. All four hostnames reachable through the tunnel
 
 ```sh
 curl -sI https://usewren.com | head -1                                    # SPA (frontend)
 curl -sI https://api.usewren.com/.well-known/oauth-authorization-server   # AS metadata (backend :8000)
 curl -sI https://mcp.usewren.com/.well-known/oauth-protected-resource     # PRM (mcp :9000)
+curl -sI https://docs.usewren.com | head -1                               # docs site (docs :80)
 ```
 
 Confirm the **internal `:8001` boundary holds**: the internal app is
@@ -319,6 +321,7 @@ the `/mcp` transport (any other path → 404 at ingress):
 
 ```sh
 curl -sI https://mcp.usewren.com/metrics    # expect 404 (never tunnel-exposed)
+curl -sI https://docs.usewren.com/healthz   # expect 404 (local-only compose health gate)
 ```
 
 ### F3. Live end-to-end smoke

@@ -30,10 +30,12 @@ rebuilds the draft:
 - Any node that carries a `proposed_id` **keeps it** (validated, slugified, and
   de-duped like `create`).
 - Every node **without** a `proposed_id` is **re-minted** from its title.
-- `owner` and `created_at` are preserved; `revision` is bumped.
+- `owner` and `created_at` are preserved, `visibility` is taken from the stored
+  draft (never the imported document), and `revision` is bumped.
 
 The response is the full rebuilt roadmap plus a `remap` of any `proposed_id ->
-minted_id` that had to be de-duped, so the caller can reconcile its references.
+minted_id` that changed (de-dup **or** normalization), so the caller can
+reconcile its references.
 The input shapes live in `backend/src/wren/roadmaps/schemas.py`; the mint-then-
 resolve rebuild is the shared pure module `backend/src/wren/roadmaps/assembly.py`.
 

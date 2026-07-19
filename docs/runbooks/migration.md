@@ -6,7 +6,7 @@ image-only rollback (see `rollback.md`) safe.
 ## Migrations are an explicit, pre-traffic deploy step
 
 Alembic migrations run as a distinct step **before** the app containers start,
-never at app startup. `scripts/deploy.sh` (phase 10) does:
+never at app startup. `scripts/deploy.sh` does, pre-traffic (deploy step 3 of 6):
 
 ```
 docker compose up -d postgres      # bring the DB up, wait until healthy

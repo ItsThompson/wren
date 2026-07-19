@@ -33,6 +33,7 @@ Both apps are assembled from one factory (`wren.core.app_factory.create_app`) an
 ## Layout
 
 - `backend/`: Python backend (uv-managed); `src/wren/core` shared kit, `src/wren/api` external app, `src/wren/api_internal` internal app.
+- `mcp/`: Python MCP server (uv-managed) that agents connect to; it calls the internal app.
 - `frontend/`: React SPA.
 - `deployments/`, `scripts/`: operational assets.
 
@@ -45,7 +46,7 @@ just setup             # install backend dependencies
 just dev-api           # boot the external app on http://127.0.0.1:8000
 just dev-api-internal  # boot the internal app on http://127.0.0.1:8001
 just test-backend      # run tests with coverage
-just lint-backend      # ruff + mypy
+just lint-backend      # ruff check + format check + mypy
 ```
 
 Health and metrics are available on both apps: `GET /healthz` (liveness), `GET /readyz` (readiness), and `GET /metrics` (Prometheus).
