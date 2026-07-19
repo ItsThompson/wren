@@ -12,20 +12,18 @@ export function LandingFooter() {
         wren
       </p>
       <p className="sm:justify-self-center sm:text-center">{HERO_HEADLINE}</p>
-      <div className="space-y-1 sm:justify-self-end sm:text-right">
-        <p>
-          A{' '}
-          <a
-            href="https://t-industri.es/"
-            target="_blank"
-            rel="noreferrer"
-            className="text-primary underline-offset-4 hover:underline"
-          >
-            t-industri.es
-          </a>{' '}
-          project
-        </p>
-      </div>
+      <p className="sm:justify-self-end sm:text-right">
+        A{' '}
+        <a
+          href="https://t-industri.es/"
+          target="_blank"
+          rel="noreferrer"
+          className="text-primary underline-offset-4 hover:underline"
+        >
+          t-industri.es
+        </a>{' '}
+        project
+      </p>
     </footer>
   )
 }
