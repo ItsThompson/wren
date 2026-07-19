@@ -25,6 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from mcp.server.fastmcp.server import StreamableHTTPASGIApp
 from starlette.routing import Route
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from wren_mcp.auth import BearerAuthMiddleware
 from wren_mcp.client import InternalApiClient, create_internal_http_client
@@ -164,10 +165,12 @@ def create_rs_app(
     )
     instrument(app)
 
-    # Correlation is mounted last in production so it is the outermost middleware:
-    # request_id is bound before the metrics middleware, the bearer guard, and the
-    # tool layer run, so the non-guarded paths (/health, /metrics, PRM) are
-    # correlated too.
+    # Correlation is mounted here so it is outermost among the always-on
+    # middleware: request_id is bound before the metrics middleware, the bearer
+    # guard, and the tool layer run, so the non-guarded paths (/health, /metrics,
+    # PRM) are correlated too. In production ProxyHeadersMiddleware is added after
+    # this and becomes the true outermost layer, rewriting the scheme before
+    # correlation runs.
     app.add_middleware(CorrelationMiddleware, service=settings.service)
     if settings.allowed_cors_origins:
         # Dev-only (see ``RsSettings.allowed_cors_origins``): the browser MCP
@@ -179,6 +182,18 @@ def create_rs_app(
             allow_origins=settings.allowed_cors_origins,
             allow_methods=["*"],
             allow_headers=["*"],
+        )
+    if settings.trusted_proxies:
+        # Behind the Cloudflare tunnel uvicorn receives plaintext http and does not
+        # trust the tunnel's X-Forwarded-Proto, so any request-derived absolute URL
+        # is emitted as http. Trust the pinned edge-net CIDR only (never ``*``):
+        # rewrite scope scheme/client from X-Forwarded-* solely when the connecting
+        # IP is in that CIDR; from any other IP it is a pass-through. Added last so
+        # it is the outermost middleware and rewrites the scheme before correlation
+        # or the bearer guard read the request. Empty in dev -> not mounted.
+        app.add_middleware(
+            ProxyHeadersMiddleware,
+            trusted_hosts=settings.trusted_proxies,
         )
 
     log.info(

@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 import pytest
+from fastapi import Request  # noqa: TC002 - FastAPI reads this route param annotation at runtime
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
@@ -89,6 +90,37 @@ def _authed_client(make_settings: MakeSettings) -> tuple[TestClient, dict[str, s
 
 def _tool_names(response: httpx.Response) -> set[str]:
     return {tool["name"] for tool in response.json()["result"]["tools"]}
+
+
+# The pinned edge-net CIDR the trusted-proxy tests exercise (see docker-compose).
+_TRUSTED_CIDR = "172.20.0.0/24"
+_TRUSTED_IP = ("172.20.0.5", 12345)
+_UNTRUSTED_IP = ("10.9.9.9", 12345)
+
+
+def _scheme_probe_client(
+    make_settings: MakeSettings,
+    *,
+    trusted_proxies: list[str],
+    client: tuple[str, int],
+) -> TestClient:
+    """An RS app with a GET /scheme route echoing ``request.url.scheme``.
+
+    ``client`` sets the connecting IP the ProxyHeadersMiddleware trust-checks;
+    TestClient's default (``("testclient", 50000)``) is a non-IP literal that no
+    CIDR matches, so the trust cases MUST override it with an in/out-of-CIDR IP.
+    """
+    app = create_rs_app(
+        make_settings(trusted_proxies=trusted_proxies),
+        key_provider=RemoteKeyProvider(ISSUER, make_fetch(public_jwks(new_key()))),
+        internal_client=_internal_client(),
+    )
+
+    @app.get("/scheme")
+    async def scheme(request: Request) -> dict[str, str]:
+        return {"scheme": request.url.scheme}
+
+    return TestClient(app, client=client)
 
 
 def test_prm_is_served_from_pinned_config(make_settings: MakeSettings) -> None:
@@ -277,6 +309,34 @@ def test_unauthenticated_post_mcp_is_401_with_no_location(make_settings: MakeSet
         challenge = response.headers["WWW-Authenticate"]
         assert challenge == f'Bearer resource_metadata="{RESOURCE}{PRM_PATH}"'
         assert "Location" not in response.headers
+
+
+def test_trusted_proxy_forwarded_scheme_is_honored(make_settings: MakeSettings) -> None:
+    # AC5: from an IP inside the pinned edge-net CIDR, X-Forwarded-Proto: https is
+    # trusted, so the app sees request.url.scheme == "https".
+    client = _scheme_probe_client(
+        make_settings, trusted_proxies=[_TRUSTED_CIDR], client=_TRUSTED_IP
+    )
+    response = client.get("/scheme", headers={"X-Forwarded-Proto": "https"})
+    assert response.json()["scheme"] == "https"
+
+
+def test_untrusted_proxy_forwarded_scheme_is_ignored(make_settings: MakeSettings) -> None:
+    # AC5: from an IP outside the CIDR the forwarded header is ignored; the scheme
+    # stays http even though the same header is sent.
+    client = _scheme_probe_client(
+        make_settings, trusted_proxies=[_TRUSTED_CIDR], client=_UNTRUSTED_IP
+    )
+    response = client.get("/scheme", headers={"X-Forwarded-Proto": "https"})
+    assert response.json()["scheme"] == "http"
+
+
+def test_empty_trusted_proxies_leaves_the_scheme_untouched(make_settings: MakeSettings) -> None:
+    # Dev: with trusted_proxies empty the middleware is not mounted, so even from
+    # an in-CIDR IP the forwarded scheme is never honored.
+    client = _scheme_probe_client(make_settings, trusted_proxies=[], client=_TRUSTED_IP)
+    response = client.get("/scheme", headers={"X-Forwarded-Proto": "https"})
+    assert response.json()["scheme"] == "http"
 
 
 def test_app_exposes_the_tool_layer_seams(make_settings: MakeSettings) -> None:

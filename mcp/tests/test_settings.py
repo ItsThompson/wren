@@ -48,6 +48,18 @@ def test_is_dev_true_in_development() -> None:
     assert build_rs_settings(EnvSettings(environment="development")).is_dev is True
 
 
+def test_trusted_proxies_parses_the_comma_separated_env() -> None:
+    # MCP_TRUSTED_PROXIES is a comma-separated CIDR/IP list; blanks (e.g. a
+    # trailing comma) are dropped so an empty literal can never be trusted.
+    env = EnvSettings(mcp_trusted_proxies="172.20.0.0/24, 10.0.0.1 ,")
+    assert build_rs_settings(env).trusted_proxies == ["172.20.0.0/24", "10.0.0.1"]
+
+
+def test_trusted_proxies_defaults_empty() -> None:
+    # Empty in dev, so create_rs_app mounts no ProxyHeadersMiddleware.
+    assert build_rs_settings(EnvSettings()).trusted_proxies == []
+
+
 def test_env_file_anchors_to_repo_root() -> None:
     """`just dev-mcp` cd's into mcp/ before launching uvicorn, so env_file must
     resolve to the canonical repo-root .env, not an mcp-relative path that

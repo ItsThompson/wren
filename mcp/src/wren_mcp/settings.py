@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import BaseModel, SecretStr
+from pydantic import BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from wren_mcp.config import MCP_INSPECTOR_ORIGIN
@@ -57,6 +57,14 @@ class EnvSettings(BaseSettings):
     # SecretStr so an accidental settings dump/log masks it (L12); read via
     # .get_secret_value() only when the internal-token header is constructed.
     internal_api_token: SecretStr = SecretStr("")
+    # Comma-separated proxy IPs/CIDRs the app-level ProxyHeadersMiddleware trusts
+    # for X-Forwarded-* (the pinned edge-net subnet). A DISTINCT name from
+    # uvicorn's native FORWARDED_ALLOW_IPS on purpose: reusing that would move
+    # proxy trust into uvicorn's server layer, whereas the app layer is the single
+    # source of truth (uvicorn's layer stays a 127.0.0.1-only no-op since
+    # cloudflared is not localhost). Empty in dev, so the middleware is not
+    # mounted and request scheme is untouched.
+    mcp_trusted_proxies: str = ""
 
 
 class RsSettings(BaseModel):
@@ -71,6 +79,9 @@ class RsSettings(BaseModel):
     resource: str  # expected token ``aud`` + PRM ``resource`` (pinned)
     backend_internal_url: str
     internal_api_token: SecretStr
+    # Trusted proxy IPs/CIDRs for the app-level ProxyHeadersMiddleware; empty
+    # disables it (dev). Populated from MCP_TRUSTED_PROXIES (see EnvSettings).
+    trusted_proxies: list[str] = Field(default_factory=list)
 
     @property
     def is_dev(self) -> bool:
@@ -101,4 +112,11 @@ def build_rs_settings(env: EnvSettings | None = None) -> RsSettings:
         resource=env.mcp_public_url,
         backend_internal_url=env.backend_internal_url,
         internal_api_token=env.internal_api_token,
+        trusted_proxies=_parse_trusted_proxies(env.mcp_trusted_proxies),
     )
+
+
+def _parse_trusted_proxies(raw: str) -> list[str]:
+    """Split the comma-separated MCP_TRUSTED_PROXIES env into trimmed entries,
+    dropping blanks so a trailing comma cannot trust an empty literal."""
+    return [item.strip() for item in raw.split(",") if item.strip()]
