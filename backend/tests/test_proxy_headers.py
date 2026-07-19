@@ -1,10 +1,10 @@
 """Proxy-header trust: the external app honors X-Forwarded-Proto from a trusted
-edge-net IP; the internal app never does.
+app-net IP; the internal app never does.
 
 Behind the Cloudflare tunnel uvicorn receives plaintext http, so the external
 app mounts uvicorn's ``ProxyHeadersMiddleware`` (gated on ``trusted_proxies``) to
 adopt the tunnel's ``X-Forwarded-Proto`` when the connecting IP is in the pinned
-edge-net CIDR. The behavior is asserted on an external-shaped app (mirroring the
+app-net CIDR. The behavior is asserted on an external-shaped app (mirroring the
 external entrypoint's proxy wiring, as ``test_identity`` mirrors its identity
 wiring) and on the internal-shaped app, which never mounts it. The security-
 critical invariant (the real internal app trusts no proxy headers) is also
@@ -38,7 +38,7 @@ def _middleware_class_names(app: FastAPI) -> set[str]:
     return {getattr(mw.cls, "__name__", "") for mw in app.user_middleware}
 
 
-# The pinned edge-net CIDR (see docker-compose) and IPs in/outside it.
+# The pinned app-net CIDR (see docker-compose) and IPs in/outside it.
 _TRUSTED_CIDR = "10.89.0.0/24"
 _TRUSTED_IP = ("10.89.0.5", 12345)
 _UNTRUSTED_IP = ("10.9.9.9", 12345)

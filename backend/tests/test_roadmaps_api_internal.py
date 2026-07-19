@@ -128,7 +128,7 @@ def _build_client(
 
 
 def _trusted(user_id: str = _USER) -> dict[str, str]:
-    """The header pair a compute-net caller (the MCP server) sends."""
+    """The header pair an app-net caller (the MCP server) sends."""
     return {INTERNAL_TOKEN_HEADER: _INTERNAL_TOKEN, USER_ID_HEADER: user_id}
 
 

@@ -38,7 +38,7 @@ services:
         gid: "${WREN_CLOUDFLARED_GID:-65532}"
         mode: 0400
     networks:
-      - edge-net
+      - app-net
     depends_on:
       - frontend
       - backend
@@ -75,19 +75,19 @@ services:
         gid: "${WREN_ALERTMANAGER_GID:-65534}"
         mode: 0400
 
-# edge-net is auto-assigned in the base/local/e2e stacks; it is PINNED here in the
+# app-net is auto-assigned in the base/local/e2e stacks; it is PINNED here in the
 # tunnel (deploy) overlay ONLY, so cloudflared's container IP lands in a known
 # range inside the trusted-proxy CIDR the apps honor (TRUSTED_PROXIES /
-# MCP_TRUSTED_PROXIES, same EDGE_NET_SUBNET source). The default subnet sits
+# MCP_TRUSTED_PROXIES, same APP_NET_SUBNET source). The default subnet sits
 # outside Docker's default auto-allocation pool (172.16/12, 192.168/16) so it can
 # never overlap a sibling network Docker auto-assigns a /16 to. Compose deep-merges
-# this ipam onto the base edge-net definition.
+# this ipam onto the base app-net definition.
 networks:
-  edge-net:
+  app-net:
     driver: bridge
     ipam:
       config:
-        - subnet: ${EDGE_NET_SUBNET:-10.89.0.0/24}
+        - subnet: ${APP_NET_SUBNET:-10.89.0.0/24}
 
 # All sources are environment: (never file:). Over an SSH Docker Context a file:
 # source resolves on the daemon host (the VPS, which has no checkout) and fails;

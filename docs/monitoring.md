@@ -16,8 +16,8 @@ Canonical sources:
 
 Both the backend and MCP expose `GET /metrics`. Each app serves its private HTTP
 registry concatenated with a shared registry of the custom families below, so one
-scrape sees everything. `/metrics` is reachable only over `monitoring-net`
-(never the Cloudflare tunnel).
+scrape sees everything. `/metrics` stays private via the Cloudflare ingress path
+allow-list (which refuses it at the edge), not network isolation.
 
 | Metric | Type | Labels | Emitted by |
 |--------|------|--------|-----------|
@@ -133,10 +133,11 @@ TSDB persists to the `promdata` named volume.
 
 ## Topology
 
-Prometheus, node-exporter, and Alertmanager run on `monitoring-net` **only**,
-never on `edge-net`, so none is reachable through the tunnel. The backend is
-scraped on both its external (`:8000`) and internal (`:8001`) apps; MCP is scraped
-on `:9000` over `monitoring-net`, never via `mcp.usewren.com` (which path-exposes
-only the PRM document and the `/mcp` transport at ingress). Alertmanager is
-additionally gated behind the `tunnels` compose profile (see the webhook note
+Prometheus, node-exporter, and Alertmanager run on `app-net` alongside the other
+first-party services; none is reachable through the tunnel because the Cloudflare
+ingress allow-list refuses their surfaces at the edge, not because of network
+isolation. The backend is scraped on both its external (`:8000`) and internal
+(`:8001`) apps; MCP is scraped on `:9000` in-network, never via `mcp.usewren.com`
+(which path-exposes only the PRM document and the `/mcp` transport at ingress).
+Alertmanager is additionally gated behind the `tunnels` compose profile (see the webhook note
 above); Prometheus and node-exporter are ungated and run in local dev.

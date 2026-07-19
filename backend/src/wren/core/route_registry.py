@@ -145,7 +145,7 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     # can discover it. Mounted on the external app only.
     RouteKey(method="GET", path="/skill"): AccessLevel.PUBLIC,
 }
-# Internal app routes (:8001), reachable only by the MCP server on compute-net.
+# Internal app routes (:8001), non-tunnel-routed on app-net, gated by the token.
 # Every route resolves identity via require_internal_user (the trusted X-User-ID
 # header behind INTERNAL_API_TOKEN), so all are INTERNAL_TRUSTED. These mirror the
 # external roadmap surface op-for-op (see wren.roadmaps.router, mounted with

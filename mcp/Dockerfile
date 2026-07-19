@@ -9,7 +9,7 @@
 #
 # Note (tracked from Ticket 20 review): /metrics, /healthz and /readyz are NOT
 # tunnel-exposed. Only PRM + the /mcp transport are public (mcp.usewren.com);
-# /metrics is scraped over monitoring-net and health is probed in-container.
+# /metrics is scraped in-network (app-net) and health is probed in-container.
 # The tunnel ingress rules that enforce this land in Ticket 29.
 # =============================================================================
 

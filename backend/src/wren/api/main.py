@@ -170,7 +170,7 @@ app.add_middleware(
 if settings.trusted_proxies:
     # Tunnel-facing external app: behind cloudflared uvicorn receives plaintext
     # http and does not trust the tunnel's X-Forwarded-Proto, so a request-derived
-    # absolute URL would be emitted as http. Trust the pinned edge-net CIDR only
+    # absolute URL would be emitted as http. Trust the pinned app-net CIDR only
     # (never ``*``): rewrite the scheme/client from X-Forwarded-* solely when the
     # connecting IP is in that CIDR. Added last so it is the outermost middleware.
     # The internal app (api_internal) deliberately omits this: trusting proxy

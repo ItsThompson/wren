@@ -4,7 +4,7 @@
 # Wren backend image (spec sections 08/11).
 #
 # One image serves both ASGI apps: the external app (:8000, internet-facing via
-# the tunnel) and the internal app (:8001, compute-net only). Multi-stage uv
+# the tunnel) and the internal app (:8001, app-net, token-gated). Multi-stage uv
 # build: a builder resolves the locked dependency graph into a venv; the runtime
 # stage copies only that venv plus source and runs as a non-root user.
 #

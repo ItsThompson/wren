@@ -92,7 +92,7 @@ def _tool_names(response: httpx.Response) -> set[str]:
     return {tool["name"] for tool in response.json()["result"]["tools"]}
 
 
-# The pinned edge-net CIDR the trusted-proxy tests exercise (see docker-compose).
+# The pinned app-net CIDR the trusted-proxy tests exercise (see docker-compose).
 _TRUSTED_CIDR = "10.89.0.0/24"
 _TRUSTED_IP = ("10.89.0.5", 12345)
 _UNTRUSTED_IP = ("10.9.9.9", 12345)
@@ -312,7 +312,7 @@ def test_unauthenticated_post_mcp_is_401_with_no_location(make_settings: MakeSet
 
 
 def test_trusted_proxy_forwarded_scheme_is_honored(make_settings: MakeSettings) -> None:
-    # AC5: from an IP inside the pinned edge-net CIDR, X-Forwarded-Proto: https is
+    # AC5: from an IP inside the pinned app-net CIDR, X-Forwarded-Proto: https is
     # trusted, so the app sees request.url.scheme == "https".
     client = _scheme_probe_client(
         make_settings, trusted_proxies=[_TRUSTED_CIDR], client=_TRUSTED_IP

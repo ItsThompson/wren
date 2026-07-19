@@ -1,7 +1,7 @@
 # =============================================================================
 # Prometheus scrape + alerting config for the Wren stack.
 #
-# Prometheus runs on monitoring-net only; backend, mcp and node-exporter are all
+# Prometheus runs on app-net; backend, mcp and node-exporter are all
 # reachable there by service name. Retention (3d / 2GB) and the query
 # concurrency/timeout guards are set as command flags in docker-compose.yml
 # (--storage.tsdb.retention.time/.size, --query.max-concurrency, --query.timeout);
@@ -30,13 +30,13 @@ scrape_configs:
       - targets: ["localhost:9090"]
 
   # Backend exposes /metrics on both the external (:8000) and internal (:8001)
-  # apps; both are on monitoring-net.
+  # apps; both are on app-net.
   - job_name: backend
     metrics_path: /metrics
     static_configs:
       - targets: ["backend:8000", "backend:8001"]
 
-  # MCP /metrics is scraped here over monitoring-net, never via the tunnel:
+  # MCP /metrics is scraped here over app-net, never via the tunnel:
   # mcp.usewren.com only path-exposes the PRM doc + /mcp transport at ingress,
   # so /metrics is unreachable publicly.
   - job_name: mcp

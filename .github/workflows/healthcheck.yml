@@ -8,7 +8,7 @@ name: Healthcheck
 # in-cluster Prometheus/Alertmanager `ServiceDown` alert by catching failures
 # internal scraping cannot see: DNS, the Cloudflare edge, the tunnel, and
 # per-host ingress routing. If usewren.com is unreachable to a browser while the
-# containers are healthy on monitoring-net, only an external probe notices.
+# containers are healthy on app-net, only an external probe notices.
 #
 # Three already-public, unauthenticated, static surfaces are probed for HTTP 200
 # (deliberately NOT the edge-blocked /healthz|/readyz|/metrics observability

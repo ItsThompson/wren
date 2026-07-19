@@ -46,9 +46,9 @@ class EnvSettings(BaseSettings):
     # docker-compose.dev.yml published to localhost; prod injects the in-network
     # `@postgres:5432` form via the VPS.env.
     database_url: str = "postgresql+asyncpg://wren:wren@localhost:5432/wren"
-    # Shared secret the MCP server sends to reach the internal app;
-    # defense-in-depth behind compute-net isolation. Empty by default so an
-    # unconfigured internal app fail-safe denies (`require_internal_user`).
+    # Shared secret the MCP server sends to reach the internal app; the primary
+    # boundary on :8001 (non-tunnel-routed, non-host-published). Empty by default
+    # so an unconfigured internal app fail-safe denies (`require_internal_user`).
     # SecretStr so an accidental settings dump/log masks it (L12); read via
     # .get_secret_value() only at the constant-time compare in identity.py.
     internal_api_token: SecretStr = SecretStr("")
@@ -91,7 +91,7 @@ class EnvSettings(BaseSettings):
     # read via .get_secret_value() only inside the notifier's delivery task.
     discord_webhook_url: SecretStr = SecretStr("")
     # Comma-separated proxy IPs/CIDRs the external app's ProxyHeadersMiddleware
-    # trusts for X-Forwarded-* (the pinned edge-net subnet). A DISTINCT name from
+    # trusts for X-Forwarded-* (the pinned app-net subnet). A DISTINCT name from
     # uvicorn's native FORWARDED_ALLOW_IPS on purpose: reusing that would move
     # proxy trust into uvicorn's server layer, whereas the app layer is the single
     # source of truth (uvicorn's layer stays a 127.0.0.1-only no-op since

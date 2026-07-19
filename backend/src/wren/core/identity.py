@@ -11,8 +11,8 @@ identity differently, and this module is the single place that difference lives:
   :data:`SessionVerifier`, so the real JWT logic is supplied through this same
   contract without reworking the seam.
 - **Internal (:8001)** **trusts ``X-User-ID``** and additionally requires the
-  shared ``INTERNAL_API_TOKEN`` header as defense-in-depth behind ``compute-net``
-  network isolation.
+  shared ``INTERNAL_API_TOKEN`` header as the primary boundary on the internal
+  app (non-tunnel-routed, non-host-published on ``app-net``).
 
 These are FastAPI dependencies; later route slices declare
 ``Depends(require_user)`` / ``Depends(require_internal_user)``.
