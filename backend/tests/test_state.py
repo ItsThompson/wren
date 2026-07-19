@@ -1,4 +1,4 @@
-"""Typed accessors for the auth-boundary ``app.state`` seams (F11).
+"""Typed accessors for the auth-boundary ``app.state`` seams.
 
 Each accessor centralizes the ``getattr`` plus a runtime type check for one seam
 and returns the fail-safe default on a missing OR wrong-type attribute, so the

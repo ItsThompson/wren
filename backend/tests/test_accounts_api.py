@@ -118,7 +118,7 @@ def test_register_payload_reports_not_yet_onboarded(make_settings: MakeSettings)
         json={"username": "ada", "email": "ada@example.com", "password": _PASSWORD},
     )
     assert response.status_code == 201
-    # US-BACK-02: the flag is on the wire so the client can route on onboarding state.
+    # the flag is on the wire so the client can route on onboarding state.
     assert response.json()["has_completed_onboarding"] is False
 
 

@@ -9,22 +9,22 @@ import { RouteLoading } from '@/components/states'
  * (parent) route, so it either renders `<Outlet/>` (the matched child view) or
  * redirects.
  *
- * Decisions (see §07 "Redirect decision rules"):
- * - `loading` → neutral full-screen loader (US-GUARD-05: never misroute or flash
+ * Decisions:
+ * - `loading` → neutral full-screen loader (never misroute or flash
  *   the guarded view while the session resolves)
  * - `anonymous` → pass through; the target view self-gates on auth (this guard is
  *   not the auth boundary)
  * - `authenticated` + flag explicitly `false` → redirect to `/onboarding`
- *   (US-GUARD-01); returned instead of `<Outlet/>`, so the guarded view never
+ *   returned instead of `<Outlet/>`, so the guarded view never
  *   mounts and its data fetching never begins
  * - `authenticated` + flag `true` OR missing/`undefined` → render the route
  *
  * The missing/`undefined` case fails **open** (treated as onboarded): it only
  * arises in a backend/frontend version-skew window, where redirecting every user
  * to a wizard whose completion endpoint may be gone would trap them. Failing open
- * degrades safely (§08 rollback safety).
+ * degrades safely (rollback safety).
  *
- * The `/authorize` OAuth-consent exemption (US-GUARD-03) is **structural**: that
+ * The `/authorize` OAuth-consent exemption is **structural**: that
  * route is mounted outside this gate in the route tree, so the gate performs no
  * location check. `replace` avoids leaving the redirect in history.
  */

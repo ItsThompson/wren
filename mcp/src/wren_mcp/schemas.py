@@ -1,22 +1,15 @@
 """MCP write-tool contract schemas (frozen).
 
-The MCP server is a separate image with no backend-code dependency, so the
-authoring wire shapes are re-declared here as the **frozen MCP contract** (the
-same "duplicated domain truth kept in sync by contract" pattern as
-:mod:`wren_mcp.config`'s header names). A snapshot test freezes the generated
-JSON Schemas on the MCP side (the MCP analog of the OpenAPI drift check), and the
-cross-package ``contract-drift`` check (``contract/tests/test_schema_mirror.py``)
-asserts this mirror stays equal to the backend source types: field-for-field for
-the shared shapes, and a fields-subset check for the deliberately-lean write
-results. Together they make the mirror sync-by-test, not sync-by-discipline.
-
-Inputs mirror the backend authoring types (ordered arrays + optional
+Frozen MCP authoring contract, re-declared here because the MCP server ships as
+a separate image with no backend-code dependency (the same "duplicated domain
+truth kept in sync by contract" pattern as :mod:`wren_mcp.config`'s header
+names). Inputs mirror the backend authoring types (ordered arrays + optional
 ``proposed_id``, key-addressed, never index-addressed). Outputs are **lean**
-projections (summary-first, within MCP token guidance): a small
-``patch`` returns ~50 tokens of changed-node ids, and ``create``/``replace``
-return identity + the ``proposed_id -> minted_id`` remap rather than the whole
-document. ``visibility`` is intentionally absent from the authoring inputs:
-visibility is a web-only lifecycle control with no agent tool.
+summary-first projections: a small ``patch`` returns ~50 tokens of changed-node
+ids, and ``create``/``replace`` return identity + the ``proposed_id ->
+minted_id`` remap rather than the whole document. ``visibility`` is web-only, so
+it has no authoring input. Enforced by the schema snapshot and the cross-package
+``contract-drift`` mirror test (``contract/tests/test_schema_mirror.py``).
 """
 
 from __future__ import annotations
@@ -151,12 +144,9 @@ class RoadmapDraftInput(BaseModel):
 # ---------- Patch operation grammar (canonical dispatch) ----------------------
 #
 # One ``operations[]`` array applied atomically. Every op is key-addressed by
-# slug ID; ordering uses ``before_id``/``after_id`` (never an array resend). The
-# ``op`` literal is the Pydantic discriminator, so the union parses unambiguously
-# and renders as a discriminated ``oneOf`` in the frozen schema. ``add_*`` ops
-# accept an optional ``proposed_id`` (directly on ``add_item``/``add_section``,
-# via the nested ``*Input`` on ``add_subsection``/``set_resources``); the server
-# mints one otherwise and echoes a ``proposed_id -> minted_id`` remap on de-dup.
+# slug ID; ordering uses ``before_id``/``after_id`` (never an array resend).
+# ``add_*`` ops may carry an optional ``proposed_id``; the server mints one
+# otherwise and echoes a ``proposed_id -> minted_id`` remap on de-dup.
 
 
 class AddSubsectionOp(BaseModel):
@@ -486,12 +476,8 @@ class MetadataResult(BaseModel):
 # These mirror the backend read projections (``wren.roadmaps.read_schemas`` /
 # ``wren.progress.schemas``) field-for-field, so each read tool validates the
 # backend body straight into the frozen MCP shape (``model_validate``) with no
-# field renaming. They are re-declared here (not imported) because the MCP server
-# is a separate image with no backend-code dependency: the same "duplicated domain
-# truth kept in sync by contract" pattern as the authoring inputs above, frozen by
-# the schema snapshot and asserted equal to the backend read projections by the
-# ``contract-drift`` schema-mirror test. Design rules encoded: summary-first (no
-# item bodies on ``Overview``), resource links never inlined bodies, and the
+# field renaming. Design rules encoded: summary-first (no item bodies on
+# ``Overview``), resource links never inlined bodies, and the
 # ``concise | detailed`` switch (the verbose ``description`` / ``path_position``
 # is present only under detailed).
 

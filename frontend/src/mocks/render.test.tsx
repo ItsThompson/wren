@@ -9,11 +9,9 @@ import { handlers } from './handlers'
 import { mockRoadmap } from './data'
 
 /**
- * A runtime proof that the dev:mock fixtures render populated views: mounts the
- * real RoadmapView against the actual MSW handlers + fixtures. The fixtures
- * previously used a pre-schema array shape, so `sections[id]` was undefined and
- * dev:mock rendered empty; this locks in that the generated-schema fixtures paint
- * real content.
+ * Runtime proof that the dev:mock fixtures render populated views: mounts the
+ * real RoadmapView against the actual MSW handlers + fixtures and asserts real
+ * content (not empty states) from the generated-schema ID-keyed maps.
  */
 const BASE = 'https://api.test'
 const server = setupServer(...handlers)

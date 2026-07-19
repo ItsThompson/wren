@@ -74,11 +74,10 @@ export function useAuthSession(client: SessionClient): SessionState & {
   }, [])
 
   const logout = useCallback(async () => {
-    // Best-effort server revocation; the local session is cleared regardless of
-    // whether the logout request succeeds. Swallow any error (rather than
-    // try/finally, which re-propagates): a failed/rejected POST must neither
-    // strand the user authenticated, nor surface as an unhandled rejection, nor
-    // skip the caller's post-logout navigation.
+    // Best-effort server revocation: clear the local session regardless of
+    // whether the logout POST succeeds. Swallow any error so a failed POST
+    // neither strands the user authenticated, surfaces as an unhandled
+    // rejection, nor skips the caller's post-logout navigation.
     try {
       await client.POST('/auth/logout')
     } catch {

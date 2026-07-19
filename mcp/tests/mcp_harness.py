@@ -1,11 +1,11 @@
-"""Test harness: drive the mounted MCP write tools over the real transport.
+"""Test harness: drive the mounted MCP tools (read + write) over the real transport.
 
 Builds the actual Resource-Server app (:func:`create_rs_app`) with a faked JWKS
 provider and a ``MockTransport``-backed internal client, then issues MCP
 ``tools/call`` / ``tools/list`` requests over the mounted Streamable HTTP
 transport with a real minted bearer. This exercises the whole path the way an
 agent hits it (bearer boundary -> identity on request.state -> tool dispatch ->
-one internal HTTP call -> structured output), mocking only the true external
+one or more internal HTTP calls -> structured output), mocking only the true external
 boundary: the backend internal API.
 """
 

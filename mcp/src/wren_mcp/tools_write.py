@@ -4,9 +4,10 @@ Seven workflow-shaped write tools, registered on the shared FastMCP server
 (:mod:`wren_mcp.mcp_server`) that :mod:`wren_mcp.app` mounts under the
 bearer-guarded ``/mcp`` prefix. Each tool is a **thin adapter**: it resolves the
 single ``user_id`` the request is scoped to (from the identity the bearer
-boundary stashed on the request, never from a tool argument), makes one call to
-the backend internal API via :class:`~wren_mcp.client.InternalApiClient`, and
-maps the response to a lean, structured output. Backend failures surface as
+boundary stashed on the request, never from a tool argument), makes one backend
+call via :class:`~wren_mcp.client.InternalApiClient` (``replace_roadmap_draft``
+reads the current revision first, so it makes two), and maps the response to a
+lean, structured output. Backend failures surface as
 model-recoverable :class:`ToolError`\\s (:mod:`wren_mcp.tool_errors`).
 
 Annotations follow MCP guidance:

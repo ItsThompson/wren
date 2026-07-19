@@ -6,28 +6,13 @@ import { firstNextSubsectionId, patchCheckedIds, patchDeadline } from '../util/p
 import type { ProgressNotice } from '../types'
 
 /**
- * Fetch and mutate the caller's progress for one published roadmap. The two
- * reads derive from {@link useApiQuery} on the shared session client (credentials
- * + transparent refresh), so the record resolves for the signed-in user and is
- * scoped to them server-side; both are best-effort (a failure leaves an unstarted
- * checklist / nothing highlighted, never a fatal view error).
- *
- * `keys.progress(id)` (the detailed snapshot) seeds `checkedIds` and the per-user
- * `deadline`; `keys.next(id)` (`GET /next`) seeds the current "next" subsection
- * (highlighted in the list view) plus the `complete` flag (the calm all-caught-up
- * state). Sharing these exact keys with the tree/roadmap reads means a co-mounted
- * view de-duplicates onto one request and one cache entry.
- *
- * The writes are the only genuinely optimistic slice. `toggle` reflects the
- * check/uncheck instantly via SWR `optimisticData` on `keys.progress(id)`, persists
- * the explicit-set via `POST /progress`, and reconciles BOTH the progress and next
- * keys from the single response; on failure `rollbackOnError` reverts the checked
- * set and a `notice` is surfaced (a 409 stale-revision becomes the re-read prompt,
- * anything else a quiet inline notice) instead of failing silently. `setDeadline`
- * mirrors this on the deadline (folded into the same cached snapshot so the two
- * optimistic surfaces share one entry), and `reload` refetches both keys for the
- * re-read recovery. The client base URL comes from `ApiClientProvider`, so the
- * hook threads no `baseUrl`.
+ * Fetch and mutate the caller's progress for one published roadmap. Both reads
+ * (`keys.progress(id)`, `keys.next(id)`) go through {@link useApiQuery} and are
+ * best-effort: a failure degrades to an unstarted checklist, never a fatal view
+ * error. Sharing those keys with the tree/roadmap reads de-duplicates onto one
+ * request and cache entry. Writes are optimistic: `toggle`/`setDeadline` update
+ * the cached snapshot via SWR `optimisticData` with `rollbackOnError`; a 409
+ * stale-revision surfaces the re-read prompt, any other failure a quiet notice.
  */
 export function useProgress(roadmapId: string): {
   checkedIds: Set<string>

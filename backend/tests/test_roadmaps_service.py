@@ -55,9 +55,8 @@ def _service(
 
 
 async def _read(repo: InMemoryRoadmapRepository, user_id: str, roadmap_id: str) -> Roadmap:
-    """Read a roadmap back through the split-out :class:`RoadmapReadService` over
-    the same repo: reads no longer live on :class:`RoadmapService`, so a write test
-    verifies persisted state via the canonical read path."""
+    """Read a roadmap back through :class:`RoadmapReadService` over the same repo,
+    so a write test verifies persisted state via the canonical read path."""
     return await RoadmapReadService(repo).get(user_id, roadmap_id)
 
 

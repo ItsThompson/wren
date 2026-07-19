@@ -37,7 +37,7 @@ describe('runQuery', () => {
     const data = await runQuery(() => widgetClient().GET('/widget'))
 
     expect(data).toEqual({ id: 'w1' })
-    // AC7: `data` is inferred from the path literal, not `any`/`unknown`.
+    // `data` is inferred from the path literal, not `any`/`unknown`.
     expectTypeOf(data).toEqualTypeOf<{ id: string }>()
   })
 

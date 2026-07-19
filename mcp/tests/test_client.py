@@ -224,7 +224,7 @@ async def test_update_progress_posts_the_explicit_set_batch() -> None:
     assert request.headers[USER_ID_HEADER] == "user-ada"
 
 
-# ---------- request-id propagation (F4) ----------
+# ---------- request-id propagation ----------
 
 
 async def test_request_forwards_the_bound_request_id() -> None:
@@ -251,7 +251,7 @@ async def test_request_omits_x_request_id_when_none_is_bound() -> None:
     assert REQUEST_ID_HEADER not in captured[0].headers
 
 
-# ---------- transport-failure translation (F15) ----------
+# ---------- transport-failure translation ----------
 
 
 def _client_with_transport(

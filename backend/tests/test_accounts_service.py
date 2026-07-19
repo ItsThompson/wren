@@ -75,7 +75,7 @@ async def test_registered_password_is_stored_only_as_a_bcrypt_hash() -> None:
 
 
 async def test_new_registrations_start_not_onboarded() -> None:
-    # AC4/US-BACK-02: a freshly minted account is un-onboarded until it completes,
+    # a freshly minted account is un-onboarded until it completes,
     # both on the returned session view and on the persisted row.
     service, repo = _service()
     session = await service.register("ada", "ada@example.com", _PASSWORD)
@@ -234,7 +234,7 @@ async def test_refresh_for_a_deleted_user_is_401() -> None:
 
 
 async def test_session_expiry_and_rotation_under_a_pinned_clock() -> None:
-    # US-DI-02: assert session-token expiry and refresh rotation against a pinned
+    # assert session-token expiry and refresh rotation against a pinned
     # clock via the injected SessionTokenCodec clock -- no sleep, no negative TTL.
     clock = MutableClock(datetime(2024, 1, 1, tzinfo=UTC))
     codec = build_test_codec(
@@ -325,7 +325,7 @@ async def test_register_reraises_a_non_unique_integrity_error() -> None:
     assert repo.rollbacks == 1
 
 
-# --- user-registered domain event (AC1/AC2/AC3) -----------------------------
+# --- user-registered domain event -----------------------------
 
 
 def _register_failures() -> float:
@@ -339,7 +339,7 @@ async def test_successful_register_publishes_one_user_registered_event() -> None
     spy = SpyEventPublisher()
     service, _ = _service(event_publisher=spy)
     session = await service.register("ada", "ada@example.com", _PASSWORD)
-    # AC1: exactly one event carrying the durable user's id and public username.
+    # exactly one event carrying the durable user's id and public username.
     assert spy.events == [UserRegistered(user_id=session.user.id, username="ada")]
 
 
@@ -360,7 +360,7 @@ async def test_invalid_handle_publishes_no_user_registered_event() -> None:
 
 
 async def test_duplicate_registration_publishes_no_second_event() -> None:
-    # AC3: a signup that does not durably create a user (integrity rollback)
+    # a signup that does not durably create a user (integrity rollback)
     # publishes nothing. Only the first, committed signup emits an event.
     spy = SpyEventPublisher()
     service, _ = _service(event_publisher=spy)
@@ -373,7 +373,7 @@ async def test_duplicate_registration_publishes_no_second_event() -> None:
 
 
 async def test_register_succeeds_and_counts_no_failure_when_discord_delivery_fails() -> None:
-    # AC2: the real Discord handler behind best-effort delivery. register must
+    # the real Discord handler behind best-effort delivery. register must
     # still return a Session and must not be charged a service-method failure.
     def _unreachable(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("unreachable")

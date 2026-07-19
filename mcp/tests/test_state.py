@@ -1,4 +1,4 @@
-"""Typed accessors for the RS's ``app.state`` / ``request.state`` seams (F11).
+"""Typed accessors for the RS's ``app.state`` / ``request.state`` seams.
 
 :class:`RsDeps` is the typed façade over the three injected ``app.state`` seams;
 the request accessor centralizes the ``getattr`` + ``isinstance`` for the resolved

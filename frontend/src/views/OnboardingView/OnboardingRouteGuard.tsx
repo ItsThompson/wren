@@ -13,7 +13,7 @@ interface OnboardingRouteGuardProps {
  * sends anonymous visitors to auth, so only a signed-in, un-onboarded user sees
  * the wizard.
  *
- * Decisions (see §07 "Redirect decision rules"):
+ * Decisions:
  * - `loading` → neutral full-screen loader (no misroute while the session resolves)
  * - `anonymous` → redirect to `/auth` (cannot onboard without a session)
  * - `authenticated` + flag explicitly `false` → render the wizard

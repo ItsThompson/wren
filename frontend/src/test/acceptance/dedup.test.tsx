@@ -10,15 +10,13 @@ import { useRoadmap } from '@/views/RoadmapView/hooks/useRoadmap'
 import { useTreeData } from '@/views/TreeView/hooks/useTreeData'
 
 /**
- * AC3 / VC3 (de-duplication). The roadmap route and the tree route both read
+ * De-duplication. The roadmap route and the tree route both read
  * `keys.roadmap(id)` and `keys.progress(id)`. This mounts the exact read hooks
  * each route uses (`useRoadmap` + `useProgress` for the roadmap route,
  * `useTreeData` for the tree route) into ONE SWR cache and asserts, via an MSW
  * request counter matched by URL, that each shared key fires exactly one network
- * request while both routes are mounted. This is the cross-view guarantee no
- * single migration ticket could prove: it exercises the shared cache identity
- * established across #9 (`useTreeData`), #10 (`useRoadmap`), and #11
- * (`useProgress`).
+ * request while both routes are mounted, proving the shared cache identity
+ * across the tree, roadmap, and progress reads.
  */
 
 const BASE = 'https://api.test'

@@ -14,7 +14,7 @@ const GENERIC_ERROR = 'Something went wrong. Please try again.'
  * resolve (no fetch) or a decision reported the parked request gone (404); both
  * collapse to the expired presentation the view renders for `error`. Any read
  * error maps to the generic `error` phase: the hook does not branch on the
- * read's status ("expired" is a view-render concern, matching today).
+ * read's status ("expired" is a view-render concern).
  */
 function toConsentContextState(
   hasLiveRequest: boolean,

@@ -14,7 +14,7 @@ import {
 /**
  * Account control on the top bar. While the session resolves it renders nothing;
  * anonymous visitors get a "Log in" link; authenticated users get the terracotta
- * avatar menu with their handle, account destinations, and logout.
+ * avatar menu with their username, account destinations, and logout.
  */
 export function AvatarMenu() {
   const { status, user, logout } = useAuth()

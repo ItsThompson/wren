@@ -12,9 +12,10 @@
  */
 
 /**
- * djb2-style string hash. The `| 0` coerces the accumulator back to a 32-bit
- * signed integer on every step (matching the reference implementation's
- * overflow behavior); `Math.abs` folds the sign so the result indexes a palette.
+ * A ×31 string hash (seed 0), the same shape as Java's `String.hashCode()`.
+ * The `| 0` coerces the accumulator back to a 32-bit signed integer each step
+ * (matching 32-bit int overflow); `Math.abs` folds the sign so the result
+ * indexes a palette.
  */
 export function hashString(str: string): number {
   let hash = 0

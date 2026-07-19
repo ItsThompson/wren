@@ -9,7 +9,7 @@ import { useProgress } from '@/views/RoadmapView/hooks/useProgress'
 import { useRoadmap } from '@/views/RoadmapView/hooks/useRoadmap'
 
 /**
- * AC4 / VC4 (single-refresh lock). `useRoadmap` and `useProgress` co-mounted read
+ * Single-refresh lock. `useRoadmap` and `useProgress` co-mounted read
  * through the ONE shared session client built by `ApiClientProvider`. When their
  * reads all 401 concurrently, the client's `refreshOnce` in-flight-promise
  * coalesces them into a single `POST /auth/refresh`, and every original request

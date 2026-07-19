@@ -51,7 +51,7 @@ describe('App route tree gating', () => {
   })
 
   it('does NOT wrap /authorize in OnboardingGate (structural OAuth-consent exemption)', () => {
-    // US-GUARD-03: `/authorize` is exempt purely by placement. It is a direct
+    // `/authorize` is exempt purely by placement. It is a direct
     // child of the shell (sibling of the gate), never inside the gate's subtree,
     // so an un-onboarded user mid agent-authorization is never bounced away.
     const authorizeRoute = shellChildren.find((route) => route.path === 'authorize')

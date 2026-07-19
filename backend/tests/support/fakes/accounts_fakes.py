@@ -114,7 +114,7 @@ def build_test_hasher() -> BcryptPasswordHasher:
 
 
 class SpyEventPublisher:
-    """Records published user-registration events so tests can assert AC1/AC3."""
+    """Records published user-registration events so tests can assert them."""
 
     def __init__(self) -> None:
         self.events: list[UserRegistered] = []

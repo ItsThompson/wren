@@ -210,7 +210,7 @@ def test_why_now_names_the_completed_prerequisites() -> None:
 
 
 # Words that would betray a pedagogical / ZPD judgement (which must live in the
-# agent, never in the app): why_now states mechanical facts only (spec 01/07).
+# agent, never in the app): why_now states mechanical facts only.
 _PEDAGOGICAL_WORDS = (
     "difficult",
     "difficulty",

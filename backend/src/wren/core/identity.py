@@ -14,7 +14,7 @@ identity differently, and this module is the single place that difference lives:
   shared ``INTERNAL_API_TOKEN`` header as the primary boundary on the internal
   app (non-tunnel-routed, non-host-published on ``app-net``).
 
-These are FastAPI dependencies; later route slices declare
+These are FastAPI dependencies; route modules declare
 ``Depends(require_user)`` / ``Depends(require_internal_user)``.
 """
 

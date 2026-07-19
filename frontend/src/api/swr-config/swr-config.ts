@@ -1,7 +1,7 @@
 import type { SWRConfiguration } from 'swr'
 
 /**
- * The pinned global SWR revalidation posture (spec section 07). This is a
+ * The pinned global SWR revalidation posture. This is a
  * behavior-preservation choice, not a tuning exercise: today's hooks fetch once
  * on mount and never background-revalidate, so `revalidateIfStale:false` +
  * `revalidateOnMount:true` reproduces that exactly while enabling the new shared

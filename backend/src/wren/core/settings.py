@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # `just dev-api`/`dev-api-internal` cd into backend/ before launching uvicorn, so
-# a package-relative ".env" silently misses the canonical repo-root .env (F27).
+# a package-relative ".env" silently misses the canonical repo-root .env.
 # Anchor it to the repo root from this file's location so the host inner loop
 # loads it regardless of CWD. Compose/CD inject real env vars, which always win
 # over env_file, so this affects only the host-run inner loop.

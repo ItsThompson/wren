@@ -30,7 +30,7 @@ def test_build_rs_settings_maps_pinned_config() -> None:
 
 
 def test_internal_api_token_is_masked_in_repr_but_recoverable() -> None:
-    """L12: an accidental settings dump/log must not leak the shared internal
+    """An accidental settings dump/log must not leak the shared internal
     token. It is ``SecretStr``, so ``repr()``/``str()`` mask it, while
     ``.get_secret_value()`` still yields the real value where the internal-token
     header is constructed."""
@@ -63,7 +63,7 @@ def test_trusted_proxies_defaults_empty() -> None:
 def test_env_file_anchors_to_repo_root() -> None:
     """`just dev-mcp` cd's into mcp/ before launching uvicorn, so env_file must
     resolve to the canonical repo-root .env, not an mcp-relative path that
-    silently misses it (F27). Compose/CD inject real env vars, which win over
+    silently misses it. Compose/CD inject real env vars, which win over
     env_file regardless."""
     env_file = EnvSettings.model_config["env_file"]
 

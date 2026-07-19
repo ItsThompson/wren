@@ -242,7 +242,7 @@ async def handle_unexpected(request: Request, exc: Exception) -> Response:
     event carrying ``exc_info`` (revives ``format_exc_info`` in the log chain) and
     the request path. The response body is generic so no stack trace or original
     exception message leaks to the client. ``request_id`` is added later by the
-    §05 correlation contextvars binding, which the log chain merges automatically.
+    correlation contextvars binding, which the log chain merges automatically.
     """
     _log.error("unhandled_exception", exc_info=exc, path=request.url.path)
     return _render(

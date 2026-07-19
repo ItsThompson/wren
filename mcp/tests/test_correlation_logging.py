@@ -1,4 +1,4 @@
-"""MCP correlation hop + tool-layer logging + auth-rejection logging (F4, F12, F13).
+"""MCP correlation hop + tool-layer logging + auth-rejection logging.
 
 Sociable tests driven through the real mounted transport (:mod:`mcp_harness`):
 the bearer boundary mints a per-action ``request_id``, the tool layer logs
@@ -47,7 +47,7 @@ def _one(logs: list[MutableMapping[str, Any]], event: str) -> MutableMapping[str
     return matches[0]
 
 
-# ---------- request-id propagation across the MCP -> backend hop (F4) ----------
+# ---------- request-id propagation across the MCP -> backend hop ----------
 
 
 def test_client_request_id_is_the_correlated_id_and_backend_honorable(
@@ -66,15 +66,13 @@ def test_client_request_id_is_the_correlated_id_and_backend_honorable(
     sent = harness.captured[0].headers[REQUEST_ID_HEADER]
     assert sent == mcp_request_id
 
-    # Cross-package invariant this suite CAN own: the minted id satisfies the
-    # backend's documented X-Request-ID wire constraint, so the backend
-    # CorrelationMiddleware HONORS it (rather than re-minting) and the same id
-    # lands in the backend's log lines. The backend-side honoring itself is
-    # exercised by Item 5's test_inbound_request_id_is_honored (separate image).
+    # The minted id satisfies the backend's X-Request-ID wire constraint, so the
+    # backend CorrelationMiddleware honors it instead of re-minting and one id
+    # spans the hop.
     assert _BACKEND_HONORS_RE.fullmatch(sent)
 
 
-# ---------- tool-layer logging (F12) ----------
+# ---------- tool-layer logging ----------
 
 
 def test_tool_invoked_and_tool_failed_carry_tool_and_correlation(
@@ -143,7 +141,7 @@ def test_no_raw_bearer_token_is_logged_on_a_tool_call(monkeypatch: pytest.Monkey
     assert raw_token not in repr(logs)
 
 
-# ---------- MCP auth-rejection logging (F13) ----------
+# ---------- MCP auth-rejection logging ----------
 
 
 def test_missing_bearer_logs_agent_token_rejected(monkeypatch: pytest.MonkeyPatch) -> None:

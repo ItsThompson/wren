@@ -10,7 +10,7 @@ import type { Roadmap } from '@/views/RoadmapView/types'
 import { useRoadmap } from '@/views/RoadmapView/hooks/useRoadmap'
 
 /**
- * AC5 (revalidate-after-write). Every write that returns the updated resource
+ * Revalidate-after-write. Every write that returns the updated resource
  * (publish / editMetadata / visibility / archive) reconciles the read cache in
  * place via `mutate(returned, { revalidate: false })`, so the view reflects the
  * new server state with NO stale flash (the phase never returns to `loading`

@@ -788,7 +788,7 @@ async def test_cleanup_stale_clients_without_grants_is_a_plain_delete() -> None:
 
 
 async def test_pinned_clock_expires_access_but_keeps_refresh_valid() -> None:
-    # F5/US-DI-01: mint at t0, advance the pinned clock past the access TTL, and
+    # mint at t0, advance the pinned clock past the access TTL, and
     # assert "access expired, refresh still valid" -- no sleep, no negative TTL.
     clock = MutableClock(datetime(2024, 1, 1, tzinfo=UTC))
     h = _harness(clock=clock, access_ttl=timedelta(minutes=15), refresh_ttl=timedelta(days=30))
@@ -809,7 +809,7 @@ async def test_pinned_clock_expires_access_but_keeps_refresh_valid() -> None:
 
 
 async def test_issuance_counter_fires_once_post_commit() -> None:
-    # F23/US-DI-03: issuance is counted via the injected counter (no business
+    # issuance is counted via the injected counter (no business
     # method names the global), exactly once, and only after the commit.
     fired: list[tuple[str, int]] = []
     h = _harness(issued_counter=lambda grant_type: fired.append((grant_type, h.repo.commits)))
@@ -825,7 +825,7 @@ async def test_issuance_counter_fires_once_post_commit() -> None:
 
 
 async def test_list_connected_clients_skips_a_deleted_client() -> None:
-    # F29/US-DI-05: a still-active grant whose client row was deleted is a map
+    # a still-active grant whose client row was deleted is a map
     # miss in the batch read and is skipped rather than surfaced.
     h = _harness()
     kept = await _register(h.auth, scope="roadmaps:read")
@@ -840,7 +840,7 @@ async def test_list_connected_clients_skips_a_deleted_client() -> None:
 
 
 async def test_list_connected_clients_issues_one_batch_query() -> None:
-    # F29: one batch get_clients read replaces the per-grant serial get_client N+1.
+    # one batch get_clients read replaces the per-grant serial get_client N+1.
     h = _harness()
     first = await _register(h.auth, scope="roadmaps:read")
     second = await _register(h.auth, scope="roadmaps:write")

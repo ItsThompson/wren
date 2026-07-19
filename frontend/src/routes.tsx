@@ -16,8 +16,8 @@ import { TreeView } from '@/views/TreeView'
 /**
  * The application route tree. Kept separate from `App` (the provider composition)
  * so a routing-config test can assert the structural invariants: notably that
- * `/authorize` lives OUTSIDE the `OnboardingGate` (US-GUARD-03) and the in-app
- * authenticated routes live inside it (US-GUARD-01), without rendering the views.
+ * `/authorize` lives OUTSIDE the `OnboardingGate` and the in-app
+ * authenticated routes live inside it, without rendering the views.
  */
 export const appRoutes: RouteObject[] = [
   {
@@ -36,14 +36,14 @@ export const appRoutes: RouteObject[] = [
     element: <AppShell />,
     children: [
       // Ungated (public or exempt). `/authorize` is the OAuth-consent surface:
-      // its placement OUTSIDE `OnboardingGate` is the mechanism for US-GUARD-03
-      // (an un-onboarded user mid agent-authorization is never bounced away).
+      // its placement OUTSIDE `OnboardingGate` is the mechanism that keeps
+      // an un-onboarded user mid agent-authorization from being bounced away.
       { index: true, element: <LandingView /> },
       { path: 'auth', element: <AuthView /> },
       { path: 'authorize', element: <ConsentView /> },
 
       // Gated: an authenticated, un-onboarded user is redirected to /onboarding
-      // before the matched view mounts (US-GUARD-01).
+      // before the matched view mounts.
       {
         element: <OnboardingGate />,
         children: [

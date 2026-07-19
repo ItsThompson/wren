@@ -13,7 +13,7 @@ import { TEST_API_BASE } from './test-api-base'
 /**
  * The SWR posture for tests. `provider: () => new Map()` hands each mounted
  * `SWRConfig` a FRESH cache so SWR's module-level cache cannot leak between tests
- * (the top false-green risk, VC2). The revalidate/dedupe fields come from the
+ * (the top false-green risk). The revalidate/dedupe fields come from the
  * SAME {@link swrRevalidationPosture} constant the production `SWRConfig` binds at
  * the app root, so test behavior matches production and cannot drift. The
  * `provider` factory is invoked once per mounted `SWRConfig`, so sharing this
