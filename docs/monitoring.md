@@ -32,10 +32,14 @@ allow-list (which refuses it at the edge), not network isolation.
 ### Service-method failures: what counts
 
 `service_method_failures_total` counts only faults that would surface as **5xx**.
-A `WrenError` (the model-recoverable 4xx domain outcomes: `NotFound`, `Conflict`,
-`Validation`, `Unauthorized`) is an expected result, not a failure, and is
-deliberately **not** counted, so this metric correlates with the `HighErrorRate`
-alert instead of being diluted by normal 404s/409s. Instrumentation is a
+Classification is by HTTP status over the `ExpectedError` base (which covers both
+`WrenError` and the OAuth `OAuthError`): an `ExpectedError` with `status < 500` is
+an expected result, not a failure, and is deliberately **not** counted, while one
+with `status >= 500` (e.g. OAuth `server_error`) and any other exception is. So
+the model-recoverable 4xx domain outcomes (`NotFound`, `Conflict`, `Validation`,
+`Unauthorized`) and OAuth 4xx (`invalid_grant`/`invalid_client`) are excluded,
+which keeps this metric correlated with the `HighErrorRate` alert instead of
+being diluted by normal 404s/409s. Instrumentation is a
 cross-cutting class decorator (`track_failures`); each public service method is
 counted once (private helpers are not wrapped, and the service layer has no
 public-to-public calls, so there is no double-counting). Thin delegating methods
@@ -67,7 +71,8 @@ and routes them through Alertmanager to a single Discord webhook with
 | `HostDiskAlmostFull` | filesystem available < 10% (non-tmpfs/overlay) | 2m |
 | `HighErrorRate` | 5xx ratio of `http_requests_total` > 5% over 5m | 5m |
 
-`node-exporter` provides the host disk/memory series `HostDiskAlmostFull` reads.
+`node-exporter` provides the host filesystem series `HostDiskAlmostFull` reads
+(memory series are exposed but unused at P0).
 
 ### Discord webhook templating (required for Alertmanager to start)
 
@@ -98,13 +103,16 @@ The backend external app (`:8000`) is a **second consumer** of the same
 `DISCORD_WEBHOOK_URL`. On each successful registration it posts a best-effort,
 fire-and-forget message (`🎉 New user registered: <username>`) to Discord. The
 notification is deliberately not observability: it is a product signal, not an
-alert, and is implemented as an injected `RegistrationNotifier`
-(`backend/src/wren/accounts/notifications.py`) fired after the DB commit.
+alert, and is implemented as an injected `EventPublisher`
+(`BestEffortEventPublisher` + `DiscordUserRegisteredHandler` in
+`backend/src/wren/accounts/notifications.py`) fired after the DB commit.
 
-- **Never blocks or fails registration.** `user_registered` schedules delivery
-  on the event loop and returns; all I/O and every error live in the background
-  task. A failed delivery is swallowed and logged as a coarse category
-  (`discord_notify_failed` with `error_type`/`status`), never the webhook URL
+- **Never blocks or fails registration.** After the commit
+  `AccountService.register` calls `EventPublisher.publish(...)`, which schedules
+  delivery via `asyncio.create_task` and returns; all I/O and every error live in
+  the background task. A failed delivery is swallowed and logged as a coarse
+  category (`event_delivery_failed` with
+  `event_type`/`handler`/`user_id`/`error_type`/`status`), never the webhook URL
   (held as `SecretStr`). A rolled-back signup (duplicate/validation) notifies
   nobody. When the webhook is unset the path is a no-op.
 - **Delivery via `docker-compose.deploy.yml`.** Unlike the Alertmanager consumer

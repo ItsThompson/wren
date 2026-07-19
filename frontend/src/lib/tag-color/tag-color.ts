@@ -6,7 +6,7 @@
  * renders in the same hue across every view. Import `colorForTag` everywhere;
  * never re-derive the hash and never reorder `TAG_PALETTE` (IDs and colors must
  * stay stable). The same hues live as the `--tag-1..10` CSS variables in
- * globals.css; this module is their canonical source in TypeScript.
+ * shared/theme/tokens.css; this module is their canonical source in TypeScript.
  *
  * Do not "improve" the algorithm.
  */

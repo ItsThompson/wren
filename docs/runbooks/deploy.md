@@ -48,14 +48,15 @@ containers recreate, accepted at this scale (~5 users).
 
 The tunnel is the only ingress (zero inbound ports). CI renders
 `deployments/cloudflare/config.yml` via `envsubst` (substituting `CF_TUNNEL_ID` +
-the three `CF_*_HOSTNAME` vars from `.env.prod`) into the `WREN_CLOUDFLARED_INGRESS`
+the four `CF_*_HOSTNAME` vars from `.env.prod`) into the `WREN_CLOUDFLARED_INGRESS`
 env var, and `docker-compose.tunnel.yml` delivers it as an environment-sourced
 Compose `config` mounted at `/etc/cloudflared/config.yml` (no file on the box);
-`cloudflared` runs against it under the `tunnels` profile. Three ingress rules:
+`cloudflared` runs against it under the `tunnels` profile. Four ingress rules:
 `usewren.com` → frontend, `api.usewren.com` → backend `:8000`, `mcp.usewren.com`
-→ mcp `:9000`. The MCP host publicly exposes **only** the PRM discovery document
-and the `/mcp` transport; `/metrics`, `/healthz` and `/readyz` are refused at
-ingress (scraped in-network only). Preview the rendered config with
+→ mcp `:9000`, `docs.usewren.com` → docs `:80`. The MCP host publicly exposes
+**only** the PRM discovery document and the `/mcp` transport; `/metrics`,
+`/healthz` and `/readyz` are refused at ingress (scraped in-network only), and the
+docs host refuses `/healthz` at the edge. Preview the rendered config with
 `just render-tunnel`.
 
 ## Secrets and config
