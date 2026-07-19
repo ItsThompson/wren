@@ -62,6 +62,35 @@ def _build(
     return TestClient(app)
 
 
+_TOOLS_LIST = {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
+_MCP_HEADERS = {
+    "Accept": "application/json, text/event-stream",
+    "Content-Type": "application/json",
+}
+# Registered tool surface: seven write tools + seven read tools.
+_TOOL_COUNT = 14
+
+
+def _authed_client(make_settings: MakeSettings) -> tuple[TestClient, dict[str, str]]:
+    """An RS app plus a valid bearer for the registered tool surface.
+
+    Boots one app instance (one session manager, ``run()`` once per instance), so
+    a caller probes both ``/mcp`` and ``/mcp/`` within a single TestClient
+    context."""
+    key = new_key()
+    app = create_rs_app(
+        make_settings(),
+        key_provider=RemoteKeyProvider(ISSUER, make_fetch(public_jwks(key))),
+        internal_client=_internal_client(),
+    )
+    headers = {"Authorization": f"Bearer {mint(key)}", **_MCP_HEADERS}
+    return TestClient(app, base_url=RESOURCE), headers
+
+
+def _tool_names(response: httpx.Response) -> set[str]:
+    return {tool["name"] for tool in response.json()["result"]["tools"]}
+
+
 def test_prm_is_served_from_pinned_config(make_settings: MakeSettings) -> None:
     client = _build(make_settings)
 
@@ -196,28 +225,58 @@ def test_production_does_not_allow_the_mcp_inspector_origin(
 
 
 def test_valid_bearer_passes_the_boundary(make_settings: MakeSettings) -> None:
-    # A valid token clears the auth boundary and reaches the now-mounted MCP tool
+    # A valid token clears the auth boundary and reaches the now-routed MCP tool
     # transport; tools/list returns the registered write tools.
-    key = new_key()
-    app = create_rs_app(
-        make_settings(),
-        key_provider=RemoteKeyProvider(ISSUER, make_fetch(public_jwks(key))),
-        internal_client=_internal_client(),
-    )
-    with TestClient(app, base_url=RESOURCE) as client:
-        response = client.post(
-            f"{MCP_PATH}/",
-            json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
-            headers={
-                "Authorization": f"Bearer {mint(key)}",
-                "Accept": "application/json, text/event-stream",
-                "Content-Type": "application/json",
-            },
-        )
+    client, headers = _authed_client(make_settings)
+    with client:
+        response = client.post(f"{MCP_PATH}/", json=_TOOLS_LIST, headers=headers)
 
     assert response.status_code == 200
-    names = {tool["name"] for tool in response.json()["result"]["tools"]}
-    assert "create_roadmap_draft" in names
+    assert "create_roadmap_draft" in _tool_names(response)
+
+
+def test_authenticated_post_mcp_no_slash_is_served_directly(make_settings: MakeSettings) -> None:
+    # AC1 (decisive): the authenticated POST /mcp (no slash) is served directly
+    # (200, no Location, no 307), identical to POST /mcp/. The old outer Mount
+    # 307-redirected /mcp -> /mcp/, stalling https->http MCP clients (~30s). An
+    # UNAUTH probe cannot catch this: BearerAuth 401s /mcp before routing, so the
+    # redirect only ever fired on the authenticated path.
+    client, headers = _authed_client(make_settings)
+    with client:
+        no_slash = client.post(MCP_PATH, json=_TOOLS_LIST, headers=headers, follow_redirects=False)
+        with_slash = client.post(
+            f"{MCP_PATH}/", json=_TOOLS_LIST, headers=headers, follow_redirects=False
+        )
+
+    assert no_slash.status_code == 200
+    assert "Location" not in no_slash.headers
+    assert with_slash.status_code == 200
+    # Parity: the no-slash path resolves the identical tool surface as /mcp/.
+    assert _tool_names(no_slash) == _tool_names(with_slash)
+    assert "create_roadmap_draft" in _tool_names(no_slash)
+
+
+def test_all_tools_are_callable_over_both_mcp_paths(make_settings: MakeSettings) -> None:
+    # AC4: the full 14-tool surface is reachable over both /mcp and /mcp/.
+    client, headers = _authed_client(make_settings)
+    with client:
+        no_slash = client.post(MCP_PATH, json=_TOOLS_LIST, headers=headers)
+        with_slash = client.post(f"{MCP_PATH}/", json=_TOOLS_LIST, headers=headers)
+
+    assert len(_tool_names(no_slash)) == _TOOL_COUNT
+    assert len(_tool_names(with_slash)) == _TOOL_COUNT
+
+
+def test_unauthenticated_post_mcp_is_401_with_no_location(make_settings: MakeSettings) -> None:
+    # AC2: both /mcp and /mcp/ reject an unauthenticated POST at the boundary with
+    # the PRM-pointing challenge and never emit a Location.
+    client = _build(make_settings)
+    for path in (MCP_PATH, f"{MCP_PATH}/"):
+        response = client.post(path, follow_redirects=False)
+        assert response.status_code == 401
+        challenge = response.headers["WWW-Authenticate"]
+        assert challenge == f'Bearer resource_metadata="{RESOURCE}{PRM_PATH}"'
+        assert "Location" not in response.headers
 
 
 def test_app_exposes_the_tool_layer_seams(make_settings: MakeSettings) -> None:

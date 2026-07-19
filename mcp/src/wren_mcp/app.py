@@ -7,7 +7,7 @@ client are injected so tests substitute the network; ``build_app`` composes the
 production graph (httpx-backed JWKS discovery + internal client) and manages their
 lifecycle.
 
-The MCP tool transport that sits behind the bearer boundary is mounted here: the
+The MCP tool transport that sits behind the bearer boundary is routed here: the
 write tools via:func:`register_write_tools` and the read tools
  via:func:`register_read_tools`, registered alongside onto the same
 server.
@@ -23,6 +23,8 @@ import httpx
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from mcp.server.fastmcp.server import StreamableHTTPASGIApp
+from starlette.routing import Route
 
 from wren_mcp.auth import BearerAuthMiddleware
 from wren_mcp.client import InternalApiClient, create_internal_http_client
@@ -58,7 +60,7 @@ def _compose_lifespan(
 ) -> Lifespan[FastAPI]:
     """Wrap the MCP session manager's lifecycle around any injected lifespan.
 
-    The mounted Streamable HTTP transport requires its session manager running
+    The routed Streamable HTTP transport requires its session manager running
     for the lifetime of the app; ``build_app`` additionally injects a lifespan
     that closes the httpx clients on shutdown."""
 
@@ -111,13 +113,15 @@ def create_rs_app(
     verifier = AgentTokenVerifier(key_provider, issuer=settings.issuer, resource=settings.resource)
 
     # The MCP tool surface: register the write + read tools onto the shared server,
-    # then mount its Streamable HTTP transport under the bearer-guarded MCP prefix.
-    # Building the ASGI app up front lets the app lifespan drive the session
-    # manager it requires.
+    # then route its Streamable HTTP transport under the bearer-guarded MCP prefix.
+    # Calling streamable_http_app() has the side effect of creating the session
+    # manager (its property raises otherwise); the returned sub-app is not mounted
+    # (a Mount would 307-redirect /mcp -> /mcp/, see the explicit routes below).
     mcp = create_mcp_server(settings)
     register_write_tools(mcp, internal_client)
     register_read_tools(mcp, internal_client)
-    mcp_transport = mcp.streamable_http_app()
+    mcp.streamable_http_app()
+    transport = StreamableHTTPASGIApp(mcp.session_manager)
 
     app = FastAPI(
         title=f"wren ({settings.service})",
@@ -139,7 +143,15 @@ def create_rs_app(
 
     app.include_router(_create_prm_router(settings))
     app.include_router(create_health_router([jwks_readiness_check(key_provider)]))
-    app.mount(MCP_PATH, mcp_transport)
+    # Serve POST /mcp (no slash) directly, matching /mcp/. Two explicit full-match
+    # routes bound to the bare ASGI transport: an outer Mount only PARTIAL-matches
+    # /mcp, so redirect_slashes emits a 307 -> /mcp/ that stalls https->http MCP
+    # clients (~30s). StreamableHTTPASGIApp ignores the leftover path, so both
+    # routes delegate identically to the session manager. Route objects are
+    # appended directly (not app.add_route, which mypy --strict rejects: the ASGI3
+    # callable does not match its Request-endpoint signature).
+    app.router.routes.append(Route(MCP_PATH, transport))
+    app.router.routes.append(Route(f"{MCP_PATH}/", transport))
 
     # The agent trust boundary: guard the MCP transport prefix. Added before
     # instrument() so the metrics middleware wraps it and counts the boundary's

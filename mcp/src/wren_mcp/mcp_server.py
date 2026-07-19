@@ -1,7 +1,7 @@
 """MCP tool server bootstrap.
 
 Builds the ``FastMCP`` instance the write tools and read tools register onto,
-and that :mod:`wren_mcp.app` mounts under the
+and whose Streamable HTTP transport :mod:`wren_mcp.app` routes under the
 bearer-guarded ``/mcp`` transport prefix. The server is a **thin dispatcher**:
 tool execution, schema generation, and the Streamable HTTP protocol are the MCP
 framework's job (validate tool shapes against MCP guidance,
@@ -27,8 +27,10 @@ from mcp.server.transport_security import TransportSecuritySettings
 if TYPE_CHECKING:
     from wren_mcp.settings import RsSettings
 
-# Served at the mount root so the transport endpoint is exactly the guarded
-# MCP_PATH (``/mcp``) rather than ``/mcp/mcp``.
+# The FastMCP sub-app is no longer mounted (``wren_mcp.app`` binds the bare
+# transport to explicit ``/mcp`` + ``/mcp/`` routes to avoid the Mount 307). This
+# streamable_http_path only shapes the discarded sub-app's own route, so its exact
+# value is now irrelevant to the served endpoint; kept at root for clarity.
 _TRANSPORT_ROOT = "/"
 
 _INSTRUCTIONS = (

@@ -41,9 +41,11 @@ def test_development_relaxes_protection_for_the_inspector() -> None:
     assert security.enable_dns_rebinding_protection is False
 
 
-def test_create_mcp_server_is_stateless_json_and_mounts_at_root() -> None:
+def test_create_mcp_server_is_stateless_json_with_root_transport_path() -> None:
     mcp = create_mcp_server(_settings("production"))
     assert mcp.settings.stateless_http is True
     assert mcp.settings.json_response is True
-    # Served at the mount root so the endpoint is exactly the guarded MCP_PATH.
+    # The sub-app is not mounted (wren_mcp.app binds the bare transport to explicit
+    # /mcp + /mcp/ routes), so this path only shapes the discarded sub-app; kept at
+    # root for clarity.
     assert mcp.settings.streamable_http_path == "/"
