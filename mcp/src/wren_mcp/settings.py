@@ -19,7 +19,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from wren_mcp.config import MCP_INSPECTOR_ORIGIN
 
 # `just dev-mcp` cd's into mcp/ before launching uvicorn, so a package-relative
-# ".env" silently misses the canonical repo-root .env (F27). Anchor it to the
+# ".env" silently misses the canonical repo-root .env. Anchor it to the
 # repo root from this file's location so the host inner loop loads it regardless
 # of CWD. Compose/CD inject real env vars, which always win over env_file, so
 # this affects only the host-run inner loop.
@@ -54,16 +54,13 @@ class EnvSettings(BaseSettings):
     backend_internal_url: str = "http://localhost:8001"
     # Shared secret the internal app requires (the primary boundary on :8001,
     # non-tunnel-routed). Empty by default; the internal app fail-safe denies without it.
-    # SecretStr so an accidental settings dump/log masks it (L12); read via
+    # SecretStr so an accidental settings dump/log masks it; read via
     # .get_secret_value() only when the internal-token header is constructed.
     internal_api_token: SecretStr = SecretStr("")
     # Comma-separated proxy IPs/CIDRs the app-level ProxyHeadersMiddleware trusts
-    # for X-Forwarded-* (the pinned app-net subnet). A DISTINCT name from
-    # uvicorn's native FORWARDED_ALLOW_IPS on purpose: reusing that would move
-    # proxy trust into uvicorn's server layer, whereas the app layer is the single
-    # source of truth (uvicorn's layer stays a 127.0.0.1-only no-op since
-    # cloudflared is not localhost). Empty in dev, so the middleware is not
-    # mounted and request scheme is untouched.
+    # for X-Forwarded-* (the pinned app-net subnet). Deliberately not uvicorn's
+    # FORWARDED_ALLOW_IPS: the app layer is the single source of proxy trust.
+    # Empty in dev, so the middleware is not mounted and request scheme is untouched.
     mcp_trusted_proxies: str = ""
 
 

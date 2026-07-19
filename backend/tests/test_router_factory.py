@@ -1,7 +1,7 @@
 """Router-factory tests for the collapsed roadmaps + progress adapters.
 
-Ticket 12 replaced the external/internal forked routers (byte-identical handler
-bodies differing only by the identity dependency) with one factory per domain,
+One factory per domain replaces the external/internal forked routers
+(byte-identical handler bodies differing only by the identity dependency),
 parameterized by the injected ``identity`` dependency and, for roadmaps, an
 ``include_web_lifecycle`` flag. These tests guard the seams that collapse
 introduced, complementing the per-app contract suites (``test_roadmaps_api*`` /

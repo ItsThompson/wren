@@ -211,7 +211,7 @@ def test_internal_unconfigured_token_denies_all(make_settings: MakeSettings) -> 
     assert response.status_code == 401
 
 
-# --- request correlation: user_id binding + auth-rejection logging (F13, F14) --
+# --- request correlation: user_id binding + auth-rejection logging --
 #
 # The rejection warnings are emitted by identity.py itself, so the existing
 # clients suffice; user_id binding is confirmed through a route that logs after

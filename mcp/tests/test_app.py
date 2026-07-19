@@ -258,7 +258,8 @@ def test_production_does_not_allow_the_mcp_inspector_origin(
 
 def test_valid_bearer_passes_the_boundary(make_settings: MakeSettings) -> None:
     # A valid token clears the auth boundary and reaches the now-routed MCP tool
-    # transport; tools/list returns the registered write tools.
+    # transport; tools/list returns the registered tools (here we assert a
+    # representative write tool is present).
     client, headers = _authed_client(make_settings)
     with client:
         response = client.post(f"{MCP_PATH}/", json=_TOOLS_LIST, headers=headers)
@@ -268,11 +269,9 @@ def test_valid_bearer_passes_the_boundary(make_settings: MakeSettings) -> None:
 
 
 def test_authenticated_post_mcp_no_slash_is_served_directly(make_settings: MakeSettings) -> None:
-    # AC1 (decisive): the authenticated POST /mcp (no slash) is served directly
-    # (200, no Location, no 307), identical to POST /mcp/. The old outer Mount
-    # 307-redirected /mcp -> /mcp/, stalling https->http MCP clients (~30s). An
-    # UNAUTH probe cannot catch this: BearerAuth 401s /mcp before routing, so the
-    # redirect only ever fired on the authenticated path.
+    # Authenticated POST /mcp (no slash) is served directly (200, no Location,
+    # no 307), identical to POST /mcp/. Guards against a Mount reintroducing the
+    # 307 that stalls https->http MCP clients (~30s).
     client, headers = _authed_client(make_settings)
     with client:
         no_slash = client.post(MCP_PATH, json=_TOOLS_LIST, headers=headers, follow_redirects=False)
@@ -289,7 +288,7 @@ def test_authenticated_post_mcp_no_slash_is_served_directly(make_settings: MakeS
 
 
 def test_all_tools_are_callable_over_both_mcp_paths(make_settings: MakeSettings) -> None:
-    # AC4: the full 14-tool surface is reachable over both /mcp and /mcp/.
+    # The full 14-tool surface is reachable over both /mcp and /mcp/.
     client, headers = _authed_client(make_settings)
     with client:
         no_slash = client.post(MCP_PATH, json=_TOOLS_LIST, headers=headers)
@@ -300,7 +299,7 @@ def test_all_tools_are_callable_over_both_mcp_paths(make_settings: MakeSettings)
 
 
 def test_unauthenticated_post_mcp_is_401_with_no_location(make_settings: MakeSettings) -> None:
-    # AC2: both /mcp and /mcp/ reject an unauthenticated POST at the boundary with
+    # Both /mcp and /mcp/ reject an unauthenticated POST at the boundary with
     # the PRM-pointing challenge and never emit a Location.
     client = _build(make_settings)
     for path in (MCP_PATH, f"{MCP_PATH}/"):
@@ -312,7 +311,7 @@ def test_unauthenticated_post_mcp_is_401_with_no_location(make_settings: MakeSet
 
 
 def test_trusted_proxy_forwarded_scheme_is_honored(make_settings: MakeSettings) -> None:
-    # AC5: from an IP inside the pinned app-net CIDR, X-Forwarded-Proto: https is
+    # From an IP inside the pinned app-net CIDR, X-Forwarded-Proto: https is
     # trusted, so the app sees request.url.scheme == "https".
     client = _scheme_probe_client(
         make_settings, trusted_proxies=[_TRUSTED_CIDR], client=_TRUSTED_IP
@@ -322,7 +321,7 @@ def test_trusted_proxy_forwarded_scheme_is_honored(make_settings: MakeSettings) 
 
 
 def test_untrusted_proxy_forwarded_scheme_is_ignored(make_settings: MakeSettings) -> None:
-    # AC5: from an IP outside the CIDR the forwarded header is ignored; the scheme
+    # From an IP outside the CIDR the forwarded header is ignored; the scheme
     # stays http even though the same header is sent.
     client = _scheme_probe_client(
         make_settings, trusted_proxies=[_TRUSTED_CIDR], client=_UNTRUSTED_IP

@@ -67,12 +67,12 @@ describe('LandingView', () => {
     renderWithAuth(<LandingView />, { authValue: buildAuthValue({ status: 'anonymous' }) })
 
     const ctas = screen.getAllByRole('link', { name: /start a roadmap/i })
-    // AC6/repetition: the primary CTA appears in the hero AND the final band.
+    // repetition: the primary CTA appears in the hero AND the final band.
     expect(ctas).toHaveLength(2)
     for (const cta of ctas) {
       expect(cta).toHaveAttribute('href', '/auth?mode=register')
     }
-    // AC3 + adapted terracotta assertion: real link carrying the primary fill.
+    // adapted terracotta assertion: real link carrying the primary fill.
     expect(ctas[0]).toHaveClass('bg-primary', 'text-primary-foreground')
   })
 

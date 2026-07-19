@@ -131,7 +131,7 @@ def create_rs_app(
     )
     app.state.settings = settings
     app.state.log = log
-    # The injected seams the RS exposes, behind one typed façade (F11): the JWKS
+    # The injected seams the RS exposes, behind one typed façade: the JWKS
     # key provider, the bearer verifier, and the internal client the tools call.
     set_rs_deps(
         app,
@@ -148,9 +148,7 @@ def create_rs_app(
     # routes bound to the bare ASGI transport: an outer Mount only PARTIAL-matches
     # /mcp, so redirect_slashes emits a 307 -> /mcp/ that stalls https->http MCP
     # clients (~30s). StreamableHTTPASGIApp ignores the leftover path, so both
-    # routes delegate identically to the session manager. Route objects are
-    # appended directly (not app.add_route, which mypy --strict rejects: the ASGI3
-    # callable does not match its Request-endpoint signature).
+    # routes delegate identically to the session manager.
     app.router.routes.append(Route(MCP_PATH, transport))
     app.router.routes.append(Route(f"{MCP_PATH}/", transport))
 
@@ -184,13 +182,10 @@ def create_rs_app(
             allow_headers=["*"],
         )
     if settings.trusted_proxies:
-        # Behind the Cloudflare tunnel uvicorn receives plaintext http and does not
-        # trust the tunnel's X-Forwarded-Proto, so any request-derived absolute URL
-        # is emitted as http. Trust the pinned app-net CIDR only (never ``*``):
-        # rewrite scope scheme/client from X-Forwarded-* solely when the connecting
-        # IP is in that CIDR; from any other IP it is a pass-through. Added last so
-        # it is the outermost middleware and rewrites the scheme before correlation
-        # or the bearer guard read the request. Empty in dev -> not mounted.
+        # Trust X-Forwarded-* only from the pinned app-net CIDR (never ``*``) so
+        # the tunnel's plaintext http is rewritten to https for absolute URLs.
+        # Added last, so it is outermost and runs before correlation and the
+        # bearer guard. Empty in dev -> not mounted.
         app.add_middleware(
             ProxyHeadersMiddleware,
             trusted_hosts=settings.trusted_proxies,
@@ -232,8 +227,6 @@ def build_app(settings: RsSettings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         yield
-        # Two independent clients (JWKS discovery + internal API); close them
-        # concurrently on shutdown.
         await asyncio.gather(discovery_client.aclose(), internal_http.aclose())
 
     return create_rs_app(

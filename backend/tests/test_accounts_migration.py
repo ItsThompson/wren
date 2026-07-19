@@ -135,7 +135,7 @@ async def test_logout_revocation_is_visible_to_the_revocation_lookup(
 async def test_freshly_registered_account_persists_as_not_onboarded(
     migrated_postgres_url: str,
 ) -> None:
-    # AC4/US-BACK-02, end to end against Postgres: register writes the ORM default
+    # end to end against Postgres: register writes the ORM default
     # (false), so a new account's persisted flag is false despite the DDL's
     # server_default being a backfill safety net rather than the new-user path.
     database = create_database(migrated_postgres_url)
@@ -155,7 +155,7 @@ async def test_freshly_registered_account_persists_as_not_onboarded(
 
 
 async def test_complete_onboarding_flips_the_persisted_flag(migrated_postgres_url: str) -> None:
-    # Ticket 5, end to end against Postgres with a fresh request-scoped session per
+    # end to end against Postgres with a fresh request-scoped session per
     # step (as production does): the UPDATE ... RETURNING path flips the flag,
     # returns a fully-populated user view, commits, and bumps updated_at.
     database = create_database(migrated_postgres_url)
@@ -290,7 +290,7 @@ async def _read_onboarding_flag(url: str, user_id: str) -> bool | None:
 
 
 def test_migration_backfills_existing_accounts_to_onboarded(postgres_url: str) -> None:
-    """US-GUARD-04: accounts that existed before 0006 are backfilled to true.
+    """Accounts that existed before 0006 are backfilled to true.
 
     Runs on an isolated database in the same container so the staged upgrade
     (0005 -> seed a legacy row -> 0006) is independent of the shared session

@@ -8,7 +8,7 @@ import type { AudienceTrackData, FaqItemData, HowItWorksStepData } from './types
  */
 export const HERO_HEADLINE = 'Learn anything, in the right order.'
 
-/** Plain-language category line for the hero: names what Wren *is* (AC5). */
+/** Plain-language category line for the hero: names what Wren *is*. */
 export const HERO_SUBHEAD =
   'Wren is a learning-roadmap tool that considers what you already know and gives you the exact order to learn what you want next.'
 

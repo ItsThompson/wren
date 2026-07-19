@@ -10,9 +10,9 @@ import { mockProgress, mockRoadmap } from '@/mocks/data'
 import { renderWithProviders } from '@/test/renderWithProviders'
 
 /**
- * AC-CACHE-04 (SWR posture). Two assertions:
+ * SWR posture. Two assertions:
  *
- * 1. The pinned global posture (spec section 07) is exactly as specified. This is
+ * 1. The pinned global posture is exactly as specified. This is
  *    the single source of truth `App.tsx` and `renderWithProviders` both bind.
  * 2. The posture's observable effect on cross-route cache reuse: a WARM key (one
  *    a prior route already fetched) is served from cache with NO background

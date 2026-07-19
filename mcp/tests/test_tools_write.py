@@ -1,7 +1,8 @@
 """MCP write-tool behavior, annotations, and error surfacing.
 
 Drives the tools through the real mounted transport (:mod:`mcp_harness`): the
-bearer boundary resolves identity, the tool makes one internal call, and the
+bearer boundary resolves identity, the tool makes one internal call
+(``replace_roadmap_draft`` reads the current revision first, so two), and the
 backend HTTP boundary is mocked. Asserts each tool maps to the right internal
 call with the resolved ``X-User-ID`` (never a tool argument), optimistic
 concurrency propagates as ``If-Match``, and backend problem+json failures surface

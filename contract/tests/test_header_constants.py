@@ -1,4 +1,4 @@
-"""Cross-package internal-boundary header-constant equality (F18c, F17).
+"""Cross-package internal-boundary header-constant equality.
 
 The backend internal app (:8001) and the MCP resource server ship as separate
 images with no shared code, so the internal-boundary header names are a

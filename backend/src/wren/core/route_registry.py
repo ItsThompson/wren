@@ -43,7 +43,7 @@ class RouteKey:
 
 RouteRegistry = Mapping[RouteKey, AccessLevel]
 
-# Declarative per-app registries. Product routes are declared here by the slice
+# Declarative per-app registries. Product routes are declared here by the module
 # that mounts them (accounts, roadmaps, OAuth). The coverage test fails
 # safe (deny) the moment a mounted product route is missing an entry.
 #

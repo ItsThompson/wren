@@ -21,8 +21,8 @@ afterAll(() => server.close())
 
 /**
  * A fresh SWR cache (own `Map`) per render so state never leaks between tests,
- * wrapping the shared-client provider these hooks bind to. The full cross-test
- * harness lands in ticket #4; these unit tests stay self-contained.
+ * wrapping the shared-client provider these hooks bind to. These unit tests
+ * stay self-contained (no shared cross-test harness).
  */
 function wrapper({ children }: { children: ReactNode }) {
   return (
@@ -44,7 +44,7 @@ describe('useApiQuery', () => {
     await waitFor(() => expect(result.current.data).toEqual(mockDashboard))
     expect(result.current.error).toBeUndefined()
 
-    // AC7: `data` is inferred from the schema (no `any`/`unknown` leak); `error`
+    // `data` is inferred from the schema (no `any`/`unknown` leak); `error`
     // is a `Problem`.
     expectTypeOf(result.current.data).not.toBeAny()
     expectTypeOf(result.current.data).not.toBeUnknown()

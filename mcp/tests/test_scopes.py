@@ -89,7 +89,7 @@ def test_require_scope_fails_closed_without_a_request() -> None:
         require_scope(_ctx_with(None), scope=SCOPE_ROADMAPS_READ)
 
 
-# --- request correlation: user_id binding + auth-rejection logging (F13, F14) --
+# --- request correlation: user_id binding + auth-rejection logging --
 #
 # user_id is bound once identity resolves so every subsequent line for the tool
 # call carries it via merge_contextvars; rejections are logged at warning with a

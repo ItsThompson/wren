@@ -40,8 +40,8 @@ if TYPE_CHECKING:
 _log = get_logger("wren-oauth")
 _BEARER = "Bearer"
 
-# grant_type -> increment. Injected so no business method names the global metric
-# (F23); the default keeps the metric name/labels stable.
+# grant_type -> increment. Injected so no business method names the global
+# metric; the default keeps the metric name/labels stable.
 IssuedCounter = Callable[[str], None]
 
 
@@ -74,7 +74,7 @@ class TokenService:
         # Raw refresh-token secret (url-safe); grant/audit surrogate keys (hex).
         self._new_id = new_id
         self._new_record_id = new_record_id
-        # Counts issuance post-commit; default binds OAUTH_TOKENS_ISSUED (F23).
+        # Counts issuance post-commit; default binds OAUTH_TOKENS_ISSUED.
         self._issued_counter = issued_counter
 
     async def exchange(self, request: TokenRequest) -> TokenResponse:

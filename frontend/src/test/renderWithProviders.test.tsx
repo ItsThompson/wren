@@ -12,7 +12,7 @@ import { renderWithProviders } from './renderWithProviders'
 /**
  * A public read probe: renders the profile `display_name` for a handle through
  * the real `usePublicApiQuery` + `keys` + `runQuery` stack. Used to prove cache
- * isolation (VC2) without migrating any view hook.
+ * isolation without migrating any view hook.
  */
 function ProfileProbe({ handle }: { handle: string }) {
   const { data, error, isLoading } = usePublicApiQuery(keys.profile(handle), (client) =>
@@ -40,7 +40,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
-// Deliberately module-scoped and NOT reset between the two VC2 tests: the point
+// Deliberately module-scoped and NOT reset between the two tests: the point
 // is to observe whether the second render fires its own network request or is
 // served from a leaked module-level SWR cache.
 let profileFetches = 0

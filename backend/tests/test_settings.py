@@ -88,7 +88,7 @@ def test_bearer_secrets_are_masked_in_repr_but_recoverable() -> None:
 def test_env_file_anchors_to_repo_root() -> None:
     """`just dev-api`/`dev-api-internal` cd into backend/ before launching
     uvicorn, so env_file must resolve to the canonical repo-root .env, not a
-    backend-relative path that silently misses it (F27). Compose/CD inject real
+    backend-relative path that silently misses it. Compose/CD inject real
     env vars, which win over env_file regardless."""
     env_file = EnvSettings.model_config["env_file"]
 

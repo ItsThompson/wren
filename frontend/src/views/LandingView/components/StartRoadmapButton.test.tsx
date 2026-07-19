@@ -9,7 +9,7 @@ describe('StartRoadmapButton', () => {
 
     const cta = screen.getByRole('link', { name: /start a roadmap/i })
     expect(cta).toHaveAttribute('href', '/auth?mode=register')
-    // asChild renders the Slot styling onto the anchor (VC1).
+    // asChild renders the Slot styling onto the anchor.
     expect(cta).toHaveClass('bg-primary', 'text-primary-foreground')
   })
 

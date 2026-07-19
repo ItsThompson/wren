@@ -9,8 +9,8 @@ import { uniqueUser } from '../helpers/users'
  * onboarding -> step/skip through the wizard -> complete -> land on the dashboard
  * and STAY there on reload. This is the one layer that proves, against the real
  * backend + a real session resume, the behaviors unit tests cannot: the
- * redirect-loop invariant (US-WIZ-07), the skip==submit terminal path
- * (US-WIZ-06), and the structural guard exemptions (US-GUARD-02/03). Each test
+ * redirect-loop invariant, the skip==submit terminal path,
+ * and the structural guard exemptions. Each test
  * mints its own unique user in an isolated browser context.
  */
 test.describe('onboarding (register -> wizard -> dashboard, no redirect loop)', () => {
@@ -20,7 +20,7 @@ test.describe('onboarding (register -> wizard -> dashboard, no redirect loop)', 
     await registerNewUser(page, uniqueUser('onb'))
     await expectRedirectedToOnboarding(page)
 
-    // US-WIZ-01: the wizard is full-screen and chrome-free (no AppShell top bar),
+    // the wizard is full-screen and chrome-free (no AppShell top bar),
     // opening on Welcome as step 1 of 3.
     await expect(page.getByRole('banner')).toHaveCount(0)
     await expect(page.getByText('Welcome to Wren')).toBeVisible()
@@ -51,7 +51,7 @@ test.describe('onboarding (register -> wizard -> dashboard, no redirect loop)', 
     await expect(page.getByRole('button', { name: 'Get started' })).toBeVisible()
     await page.getByRole('button', { name: 'Get started' }).click()
 
-    // US-WIZ-07: `applyUser` runs before navigate, so the just-onboarded user
+    // `applyUser` runs before navigate, so the just-onboarded user
     // lands on the dashboard and the gate does NOT bounce them to /onboarding.
     await expect(page).toHaveURL(/\/dashboard$/)
     await expect(page.getByRole('heading', { name: /your dashboard/i })).toBeVisible()
@@ -70,7 +70,7 @@ test.describe('onboarding (register -> wizard -> dashboard, no redirect loop)', 
     await expectRedirectedToOnboarding(page)
     await expect(page.getByText('Welcome to Wren')).toBeVisible()
 
-    // US-WIZ-06: Skip is the same terminal path as submit, so skipping from the
+    // Skip is the same terminal path as submit, so skipping from the
     // first step ends onboarding and lands on the dashboard.
     await page.getByRole('button', { name: 'Skip' }).click()
     await expect(page).toHaveURL(/\/dashboard$/)
@@ -100,7 +100,7 @@ test.describe('onboarding (register -> wizard -> dashboard, no redirect loop)', 
     await page.getByRole('button', { name: 'Skip' }).click()
     await expect(page).toHaveURL(/\/dashboard$/)
 
-    // US-GUARD-02: the /onboarding route guard bounces an already-onboarded user
+    // the /onboarding route guard bounces an already-onboarded user
     // (flag resolved true on the session resume) straight to the dashboard.
     await page.goto('/onboarding')
     await expect(page).toHaveURL(/\/dashboard$/)
@@ -110,7 +110,7 @@ test.describe('onboarding (register -> wizard -> dashboard, no redirect loop)', 
   test('an un-onboarded user on /authorize sees consent, not onboarding', async ({ page }) => {
     await registerNewUser(page, uniqueUser('consent'))
 
-    // US-GUARD-03: /authorize is mounted OUTSIDE the OnboardingGate, so an
+    // /authorize is mounted OUTSIDE the OnboardingGate, so an
     // un-onboarded user is never bounced to /onboarding. Without a live
     // auth_request_id the consent surface shows its expired state; the assertion
     // under test is the structural exemption (no redirect), not the full card.

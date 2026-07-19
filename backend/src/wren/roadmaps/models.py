@@ -3,7 +3,7 @@
 The authoritative roadmap is the nested document, stored whole in the
 ``document`` JSONB column; the scalar columns (``owner``, ``status``,
 ``visibility``, ``revision``, ``title``) are a write-derived denormalized index
-for the owner-scoping and listing queries later slices need, never a second
+for the owner-scoping and listing queries, never a second
 source of truth. The repository is the only writer, so it derives every column
 from the domain :class:`~wren.roadmaps.schemas.Roadmap` and they cannot drift.
 

@@ -79,12 +79,9 @@ export function useRoadmap(roadmapId: string): {
 
   const state = toRoadmapViewState(roadmap, readError, isLoading)
 
-  // Sub-state reset invariant (R2). React Router keeps the same RoadmapView
-  // instance mounted across a `:roadmapId` change (fork -> navigate, or
-  // navigating between roadmaps), so these plain-`useState` sub-states would
-  // otherwise leak from roadmap A onto roadmap B. The read effect that used to
-  // reset them is gone (the read is now derived from `useApiQuery`), so the
-  // reset is re-homed here, keyed on `roadmapId`.
+  // Sub-state reset invariant (R2): the same RoadmapView instance stays mounted
+  // across a `:roadmapId` change, so reset these useState sub-states on change
+  // or they leak from roadmap A onto roadmap B.
   useEffect(() => {
     setPublishState({ phase: 'idle' })
     setMetadataState({ phase: 'idle' })

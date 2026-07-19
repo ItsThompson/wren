@@ -150,13 +150,13 @@ def test_catch_all_500_log_carries_the_request_id(
     client = TestClient(_app(make_settings), raise_server_exceptions=False)
     with capture_logs(processors=[merge_contextvars]) as logs:
         # Reset the frozen module logger to a fresh proxy so capture_logs (with
-        # merge_contextvars) intercepts the §04 fault log and shows request_id.
+        # merge_contextvars) intercepts the fault log and shows request_id.
         monkeypatch.setattr("wren.core.errors._log", structlog.get_logger())
         response = client.get("/boom", headers={REQUEST_ID_HEADER: "boom-corr-1"})
 
     assert response.status_code == 500
     fault = _one(logs, "unhandled_exception")
-    # F4 x F3: the §04 fault log is correlated to the faulting request.
+    # the fault log is correlated to the faulting request.
     assert fault["request_id"] == "boom-corr-1"
     assert fault["path"] == "/boom"
 
@@ -165,7 +165,7 @@ def test_500_log_keeps_request_id_when_correlation_is_not_outermost(
     make_settings: MakeSettings, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Mirror the external app: StripInbound (and, in prod, CORS) sit OUTSIDE
-    # CorrelationMiddleware. request_id must still reach the §04 fault log, which
+    # CorrelationMiddleware. request_id must still reach the fault log, which
     # runs in the outermost ServerErrorMiddleware, because a pure-ASGI middleware's
     # contextvar bindings persist up the call stack (BaseHTTPMiddleware would not).
     app = _app(make_settings)

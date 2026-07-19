@@ -22,7 +22,7 @@ def test_provider_builds_a_service_for_a_session() -> None:
 
 
 def test_event_publisher_is_null_without_a_webhook(make_settings: MakeSettings) -> None:
-    # AC5: unconfigured webhook -> the notification path is a no-op and the app boots.
+    # unconfigured webhook -> the notification path is a no-op and the app boots.
     publisher = build_event_publisher(make_settings(discord_webhook_url=""))
     assert isinstance(publisher, NullEventPublisher)
 

@@ -19,12 +19,10 @@ import { uniqueUser } from '../helpers/users'
  */
 test.describe('study spine (register -> create -> publish -> follow -> track)', () => {
   test('a follower can study a published roadmap end to end', async ({ playwright }) => {
-    // register + create + publish (author)
     const author = await createAuthedContext(playwright.request, uniqueUser('author'))
     const roadmapId = await createPublishableRoadmap(author)
     await publishRoadmap(author, roadmapId)
 
-    // follow (a distinct, unique follower)
     const follower = await createAuthedContext(playwright.request, uniqueUser('follower'))
     await followRoadmap(follower, roadmapId)
 

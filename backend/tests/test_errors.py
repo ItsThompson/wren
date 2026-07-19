@@ -170,7 +170,7 @@ def test_request_validation_error_uses_the_same_field_map_shape() -> None:
     assert "violations" not in body
 
 
-# --- catch-all 500 handler (F2) ---------------------------------------------
+# --- catch-all 500 handler ---------------------------------------------
 
 
 @pytest.mark.parametrize("make_handlers", _HANDLER_MAPS)
@@ -218,7 +218,7 @@ def test_unhandled_exception_leaks_no_internal_detail(
     assert "Traceback" not in raw
 
 
-# --- single structured fault log (F3) ---------------------------------------
+# --- single structured fault log ---------------------------------------
 
 
 def _bare_boom_client() -> TestClient:

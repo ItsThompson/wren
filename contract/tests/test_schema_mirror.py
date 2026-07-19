@@ -1,13 +1,9 @@
-"""Cross-package schema-mirror drift test (F18b, US-CON-01).
+"""Cross-package schema-mirror drift test.
 
-The MCP resource server re-declares ~35 backend types in :mod:`wren_mcp.schemas`
-(a deliberately frozen contract: the RS is a separate image with no backend-code
-dependency, per section 12). Before this test the mirror was sync-by-discipline:
-the MCP snapshot froze only the MCP side, the OpenAPI drift check froze only the
-backend side, and nothing asserted the two agreed. This test makes the mirror
-sync-by-*test*, and can only live here in the dev/test-only ``contract`` project
-because it is the sole interpreter where both ``wren.*`` and ``wren_mcp.*`` import
-together.
+``wren_mcp.schemas`` re-declares ~50 backend types as a frozen contract (the RS
+is a separate image with no backend-code dependency). This test asserts the two
+agree and can only live in the dev/test-only ``contract`` project, the sole
+interpreter that imports both ``wren.*`` and ``wren_mcp.*``.
 
 The mirrored types fall into three groups, treated differently:
 
@@ -25,11 +21,8 @@ The mirrored types fall into three groups, treated differently:
 
 :data:`INTENTIONAL_DELTAS` is the allowlist of the deliberate Group-A
 divergences. The only remaining entry is ``RoadmapDraftInput`` omitting
-``visibility`` (a web-only lifecycle control with no agent tool). The
-input-hardening slice (Ticket 14) aligned ``Violation.ids`` (now required on both
-sides) and added ``extra="forbid"`` to both mirrors together, dropping the
-``Violation`` allowlist entry and regenerating the MCP snapshot in the same
-change. :func:`test_intentional_deltas_are_load_bearing` fails if an allowlist
+``visibility`` (a web-only lifecycle control with no agent tool).
+:func:`test_intentional_deltas_are_load_bearing` fails if an allowlist
 entry ever stops describing a real divergence, keeping the allowlist honest.
 """
 
@@ -208,8 +201,8 @@ ASSERT_EQUAL: list[tuple[type, type]] = [
     (backend.RemoveSectionOp, mcp.RemoveSectionOp),
     # Changed-node echo (field-identical, so asserted equal rather than subset).
     (backend.ChangedNode, mcp.ChangedNode),
-    # Structural-rule violation (aligned in Ticket 14: ids is required on both
-    # sides now, so the pair is asserted fully field-equal with no delta).
+    # Structural-rule violation: ids is required on both sides, so the pair is
+    # asserted fully field-equal with no delta.
     (backend_errors.Violation, mcp.Violation),
     # Read projections (roadmaps).
     (backend_read.ResourceRef, mcp.ResourceRef),
@@ -235,8 +228,8 @@ PATCH_OP_UNION: tuple[object, object] = (backend.PatchOp, mcp.PatchOp)
 
 # Allowlist of deliberate Group-A divergences, keyed by MCP class name. Applied
 # to the *backend* side (the stricter mirror) so it matches the frozen MCP
-# contract. Ticket 14 aligned ``Violation.ids`` and removed that entry; the
-# ``RoadmapDraftInput`` visibility omission is a permanent, intentional delta.
+# contract. The ``RoadmapDraftInput`` visibility omission is a permanent,
+# intentional delta.
 INTENTIONAL_DELTAS: dict[str, dict[str, tuple[str, ...]]] = {
     # visibility is a web-only lifecycle control with no agent tool.
     "RoadmapDraftInput": {"omit": ("visibility",)},
@@ -332,9 +325,8 @@ _GROUP_A_MCP_BY_NAME = {m.__name__: (b, m) for b, m in ASSERT_EQUAL}
 def test_intentional_deltas_are_load_bearing(mcp_name: str) -> None:
     """Each allowlist entry must describe a *real* divergence.
 
-    Without the delta the pair must drift; otherwise the entry is stale (e.g.
-    Ticket 14 aligned the field but forgot to drop the allowlist) and should be
-    removed. Keeps the allowlist honest.
+    Without the delta the pair must drift; otherwise the entry is stale and
+    should be removed. Keeps the allowlist honest.
     """
     backend_cls, mcp_cls = _GROUP_A_MCP_BY_NAME[mcp_name]
     assert _canonical(mcp_cls) != _canonical(backend_cls), (
@@ -424,13 +416,13 @@ def test_excluded_mcp_only_types_have_no_backend_mirror() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Accounts wire contract: the onboarding flag (US-BACK-02)                    #
+# Accounts wire contract: the onboarding flag                    #
 # --------------------------------------------------------------------------- #
 #
 # ``AuthenticatedUser`` is the caller's own view returned by register/login/
 # refresh (and the onboarding-complete endpoint). It is not an MCP mirror -- the
 # resource server exposes no auth surface -- so it carries no Group-A/B/C entry
-# above. This guards the one field the onboarding slice adds to that wire schema,
+# above. This guards the one field onboarding adds to that wire schema,
 # which flows to the frontend generated types via ``just codegen``.
 
 

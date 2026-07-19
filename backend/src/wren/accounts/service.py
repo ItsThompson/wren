@@ -171,7 +171,7 @@ class AccountService:
         return _to_authenticated(user)
 
     async def profile(self, handle: str) -> PublicProfile:
-        """Public profile by handle (stubbed; a later slice adds public roadmaps)."""
+        """Public profile by handle (stubbed)."""
         user = await self._repo.get_by_username(handle)
         if user is None:
             raise NotFound(f"No profile for handle '{handle}'.")

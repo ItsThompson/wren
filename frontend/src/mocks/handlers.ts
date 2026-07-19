@@ -17,7 +17,7 @@ import type { MockProgressUpdateResult } from './types'
  * and are prefixed with `*` so they match regardless of the client's API base
  * URL (relative in dev, absolute against `api.usewren.com` in prod).
  *
- * This is a representative read surface plus one write; feature slices extend it
+ * This is a representative read surface plus one write; later features extend it
  * as their views land. A modest fixed latency lets loading/skeleton states
  * render realistically in dev.
  */

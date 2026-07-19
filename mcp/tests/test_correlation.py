@@ -2,8 +2,8 @@
 
 Mirrors the backend's ``test_correlation`` shape but asserts the MCP-side policy:
 the middleware is mounted app-wide (so non-guarded paths like ``/healthz`` and
-``/metrics`` are correlated too, not only the bearer-guarded ``/mcp`` prefix that
-Ticket 7's interim mint covered), and it always MINTS a fresh id (the RS is the
+``/metrics`` are correlated too, not only the bearer-guarded ``/mcp`` prefix),
+and it always MINTS a fresh id (the RS is the
 origin of an agent action and never honors an inbound ``X-Request-ID`` from the
 internet-facing agent surface).
 

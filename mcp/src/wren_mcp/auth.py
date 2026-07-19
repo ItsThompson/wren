@@ -88,11 +88,9 @@ class BearerAuthMiddleware:
         # Boundary guarantee: the handler receives a resolved identity, never the
         # raw token. The token is exchanged for X-User-ID by the internal client.
         set_request_agent(request, principal)
-        # Identity is resolved here, so bind the actor onto the correlation context
-        # (started app-wide by CorrelationMiddleware): this puts user_id on the
-        # tool-entry line (tool_invoked) too. require_scope re-binds the same value
-        # (idempotent) as the canonical tool-layer site, so the off-transport gate
-        # path stays covered.
+        # Identity is resolved here, so bind the actor onto the app-wide
+        # correlation context: this puts user_id on the tool-entry line
+        # (tool_invoked). require_scope re-binds it idempotently at the tool layer.
         structlog.contextvars.bind_contextvars(user_id=principal.user_id)
         await self.app(scope, receive, send)
 
