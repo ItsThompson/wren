@@ -1,7 +1,8 @@
 """Internal app entrypoint (:8001).
 
-Never tunnel-routed and never host-published: reachable only by containers on
-``compute-net`` (i.e. the MCP server). Trusts the ``X-User-ID`` header. Built from
+Never tunnel-routed and never host-published: reachable in-network by first-party
+``app-net`` containers and gated by the shared ``INTERNAL_API_TOKEN`` (the MCP
+server is its intended caller). Trusts the ``X-User-ID`` header. Built from
 the shared factory with the internal service identity injected, differing from the
 external app only by these settings.
 

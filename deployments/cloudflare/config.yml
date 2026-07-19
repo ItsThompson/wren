@@ -10,7 +10,7 @@
 #
 # One named tunnel, four routed hosts, outbound-only (zero inbound ports).
 # TLS terminates at the Cloudflare edge; origin traffic inside Docker is
-# plaintext http:// on edge-net.
+# plaintext http:// on app-net.
 #
 # Rule order matters: cloudflared evaluates top-to-bottom, first match wins.
 # =============================================================================
@@ -23,9 +23,10 @@ ingress:
     service: http://frontend:80
 
   # 2. External API (api.usewren.com) -> backend external app (:8000). The
-  #    internal app (:8001) is never routed here (it lives on compute-net only).
+  #    internal app (:8001) is never routed here (it stays non-tunnel-routed on
+  #    app-net, token-gated).
   #    The observability/health surface (/metrics, /healthz, /readyz) is scraped
-  #    and probed over monitoring-net and MUST NOT be tunnel-reachable, so it is
+  #    and probed in-network and MUST NOT be tunnel-reachable, so it is
   #    blocked here at ingress BEFORE the catch-through to the backend (mirrors
   #    the mcp host's path allow-list below; §08 observability-plane intent).
   #    /metrics on the AS host would otherwise leak internal Prometheus data
@@ -39,7 +40,7 @@ ingress:
 
   # 3. MCP (mcp.usewren.com): PUBLICLY expose ONLY the PRM discovery document
   #    (/.well-known/oauth-protected-resource) and the /mcp transport. The MCP
-  #    server's /metrics, /healthz and /readyz are scraped over monitoring-net
+  #    server's /metrics, /healthz and /readyz are scraped in-network
   #    and MUST NOT be reachable through the tunnel. The path allow-list is
   #    enforced here at ingress: any other path
   #    on this hostname falls through to the per-host 404 rule below.

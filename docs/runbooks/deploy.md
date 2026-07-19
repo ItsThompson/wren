@@ -55,7 +55,7 @@ Compose `config` mounted at `/etc/cloudflared/config.yml` (no file on the box);
 `usewren.com` → frontend, `api.usewren.com` → backend `:8000`, `mcp.usewren.com`
 → mcp `:9000`. The MCP host publicly exposes **only** the PRM discovery document
 and the `/mcp` transport; `/metrics`, `/healthz` and `/readyz` are refused at
-ingress (scraped over `monitoring-net` only). Preview the rendered config with
+ingress (scraped in-network only). Preview the rendered config with
 `just render-tunnel`.
 
 ## Secrets and config

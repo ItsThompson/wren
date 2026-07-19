@@ -49,16 +49,16 @@ class EnvSettings(BaseSettings):
     # This RS's own public URL (mcp.usewren.com): the expected token ``aud`` and
     # the PRM ``resource`` value. Agent tokens are audience-bound to it.
     mcp_public_url: str = "http://localhost:9000"
-    # Backend internal app base (compute-net only, e.g. http://backend:8001). Tool
+    # Backend internal app base (app-net, e.g. http://backend:8001). Tool
     # calls are forwarded here with the resolved X-User-ID.
     backend_internal_url: str = "http://localhost:8001"
-    # Shared secret the internal app requires (defense-in-depth behind compute-net
-    # isolation). Empty by default; the internal app fail-safe denies without it.
+    # Shared secret the internal app requires (the primary boundary on :8001,
+    # non-tunnel-routed). Empty by default; the internal app fail-safe denies without it.
     # SecretStr so an accidental settings dump/log masks it (L12); read via
     # .get_secret_value() only when the internal-token header is constructed.
     internal_api_token: SecretStr = SecretStr("")
     # Comma-separated proxy IPs/CIDRs the app-level ProxyHeadersMiddleware trusts
-    # for X-Forwarded-* (the pinned edge-net subnet). A DISTINCT name from
+    # for X-Forwarded-* (the pinned app-net subnet). A DISTINCT name from
     # uvicorn's native FORWARDED_ALLOW_IPS on purpose: reusing that would move
     # proxy trust into uvicorn's server layer, whereas the app layer is the single
     # source of truth (uvicorn's layer stays a 127.0.0.1-only no-op since

@@ -186,7 +186,7 @@ def create_rs_app(
     if settings.trusted_proxies:
         # Behind the Cloudflare tunnel uvicorn receives plaintext http and does not
         # trust the tunnel's X-Forwarded-Proto, so any request-derived absolute URL
-        # is emitted as http. Trust the pinned edge-net CIDR only (never ``*``):
+        # is emitted as http. Trust the pinned app-net CIDR only (never ``*``):
         # rewrite scope scheme/client from X-Forwarded-* solely when the connecting
         # IP is in that CIDR; from any other IP it is a pass-through. Added last so
         # it is the outermost middleware and rewrites the scheme before correlation

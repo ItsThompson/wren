@@ -1,7 +1,7 @@
 """Thin client of the backend internal API (:8001).
 
 Each MCP tool call becomes one HTTP call to the backend internal
-app over ``compute-net``. This client owns the one security-critical invariant of
+app over ``app-net``. This client owns the one security-critical invariant of
 that hop: **every** request carries the resolved ``X-User-ID`` plus the shared
 ``INTERNAL_API_TOKEN``, and the agent's bearer token is **never** forwarded
 (confused-deputy defense). The trusted headers are set last so a
