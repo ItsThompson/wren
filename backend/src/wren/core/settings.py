@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import BaseModel, SecretStr
+from pydantic import BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # `just dev-api`/`dev-api-internal` cd into backend/ before launching uvicorn, so
@@ -90,6 +90,14 @@ class EnvSettings(BaseSettings):
     # SecretStr so any settings dump/log masks it (the webhook is a bearer URL);
     # read via .get_secret_value() only inside the notifier's delivery task.
     discord_webhook_url: SecretStr = SecretStr("")
+    # Comma-separated proxy IPs/CIDRs the external app's ProxyHeadersMiddleware
+    # trusts for X-Forwarded-* (the pinned edge-net subnet). A DISTINCT name from
+    # uvicorn's native FORWARDED_ALLOW_IPS on purpose: reusing that would move
+    # proxy trust into uvicorn's server layer, whereas the app layer is the single
+    # source of truth (uvicorn's layer stays a 127.0.0.1-only no-op since
+    # cloudflared is not localhost). Read by both apps' env, but only the external
+    # entrypoint mounts the middleware; empty disables it (dev).
+    trusted_proxies: str = ""
 
 
 class AppSettings(BaseModel):
@@ -113,6 +121,10 @@ class AppSettings(BaseModel):
     oauth_refresh_ttl_seconds: int
     cors_origin: str
     discord_webhook_url: SecretStr
+    # Trusted proxy IPs/CIDRs for the external app's ProxyHeadersMiddleware; empty
+    # disables it (dev). Populated from TRUSTED_PROXIES (see EnvSettings). The
+    # internal app carries the same value but never mounts the middleware.
+    trusted_proxies: list[str] = Field(default_factory=list)
 
     @property
     def is_dev(self) -> bool:
@@ -154,4 +166,11 @@ def build_app_settings(*, service: str, port: int, env: EnvSettings | None = Non
         oauth_refresh_ttl_seconds=env.oauth_refresh_ttl_seconds,
         cors_origin=env.cors_origin,
         discord_webhook_url=env.discord_webhook_url,
+        trusted_proxies=_parse_trusted_proxies(env.trusted_proxies),
     )
+
+
+def _parse_trusted_proxies(raw: str) -> list[str]:
+    """Split the comma-separated TRUSTED_PROXIES env into trimmed entries, dropping
+    blanks so a trailing comma cannot trust an empty literal."""
+    return [item.strip() for item in raw.split(",") if item.strip()]

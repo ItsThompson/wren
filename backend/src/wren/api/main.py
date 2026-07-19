@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
 from fastapi.middleware.cors import CORSMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from wren.accounts.api import create_accounts_router
 from wren.accounts.config import (
@@ -166,6 +167,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+if settings.trusted_proxies:
+    # Tunnel-facing external app: behind cloudflared uvicorn receives plaintext
+    # http and does not trust the tunnel's X-Forwarded-Proto, so a request-derived
+    # absolute URL would be emitted as http. Trust the pinned edge-net CIDR only
+    # (never ``*``): rewrite the scheme/client from X-Forwarded-* solely when the
+    # connecting IP is in that CIDR. Added last so it is the outermost middleware.
+    # The internal app (api_internal) deliberately omits this: trusting proxy
+    # headers there would let its caller spoof the client IP. Empty in dev -> not
+    # mounted.
+    app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=settings.trusted_proxies)
 
 
 def main() -> None:  # pragma: no cover - process entrypoint
