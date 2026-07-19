@@ -3,8 +3,9 @@
 #
 # Every service is expose-only (NO host `ports:`): the Cloudflare tunnel is the
 # only ingress and is added by the tunnel overlay (locally the stack runs
-# without it). Four segmented bridge networks isolate the tiers; Postgres lives
-# on data-net alone and the internal app (:8001) is never on edge-net.
+# without it). Two bridge networks: app-net carries every first-party service,
+# and data-net isolates Postgres (backend is the only service on both). The
+# internal app (:8001) stays non-tunnel-routed and token-gated.
 #
 # Local development layers docker-compose.dev.yml on top (bind mounts, --reload,
 # relaxed cookies, in-network public URLs, host-published Postgres): see
@@ -43,7 +44,7 @@ services:
     expose:
       - "80"
     networks:
-      - edge-net
+      - app-net
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:80/healthz"]
       interval: 10s
@@ -67,7 +68,7 @@ services:
     expose:
       - "80"
     networks:
-      - edge-net
+      - app-net
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:80/healthz"]
       interval: 10s
@@ -100,19 +101,17 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-wren}:${POSTGRES_PASSWORD:-wren}@postgres:5432/${POSTGRES_DB:-wren}
       HOST: 0.0.0.0
       # Trust the edge tier (cloudflared) for X-Forwarded-Proto so the external
-      # app sees https behind the tunnel. Matches the edge-net subnet the tunnel
-      # overlay pins at deploy (EDGE_NET_SUBNET); inert in local/e2e (no proxy
+      # app sees https behind the tunnel. Matches the app-net subnet the tunnel
+      # overlay pins at deploy (APP_NET_SUBNET); inert in local/e2e (no proxy
       # fronts the app). The internal app inherits it but never mounts the
       # middleware.
-      TRUSTED_PROXIES: ${EDGE_NET_SUBNET:-10.89.0.0/24}
+      TRUSTED_PROXIES: ${APP_NET_SUBNET:-10.89.0.0/24}
     expose:
       - "8000"  # external app (tunnel-routed as api.usewren.com)
-      - "8001"  # internal app (compute-net only; never tunnel-routed)
+      - "8001"  # internal app (app-net; never tunnel-routed, token-gated)
     networks:
-      - edge-net
-      - compute-net
+      - app-net
       - data-net
-      - monitoring-net
     depends_on:
       postgres:
         condition: service_healthy
@@ -142,7 +141,7 @@ services:
       - path: .env
         required: false
     environment:
-      # Tool calls forward to the internal app over compute-net by service name.
+      # Tool calls forward to the internal app over app-net by service name.
       # Token issuer/audience (PUBLIC_BASE_URL / MCP_PUBLIC_URL) stay the pinned
       # public URLs from .env in production; the dev overlay points them
       # in-network for a self-contained local stack.
@@ -150,15 +149,13 @@ services:
       HOST: 0.0.0.0
       # Trust the edge tier (cloudflared) for X-Forwarded-Proto behind the tunnel.
       # Distinct name from uvicorn's FORWARDED_ALLOW_IPS on purpose (see
-      # settings.py); matches the edge-net subnet the tunnel overlay pins at
-      # deploy (EDGE_NET_SUBNET); inert in local/e2e.
-      MCP_TRUSTED_PROXIES: ${EDGE_NET_SUBNET:-10.89.0.0/24}
+      # settings.py); matches the app-net subnet the tunnel overlay pins at
+      # deploy (APP_NET_SUBNET); inert in local/e2e.
+      MCP_TRUSTED_PROXIES: ${APP_NET_SUBNET:-10.89.0.0/24}
     expose:
       - "9000"  # PRM + /mcp transport tunnel-routed; /metrics + health are not.
     networks:
-      - edge-net
-      - compute-net
-      - monitoring-net
+      - app-net
     depends_on:
       backend:
         condition: service_healthy
@@ -203,7 +200,8 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
-  # Observability tier (monitoring-net only; never edge).
+  # Observability tier (on app-net; /metrics stays non-tunnel-reachable via the
+  # cloudflared ingress path allow-list, not network isolation).
   # Containers + networks + volumes land here; the scrape/alert config lives in
   # deployments/prometheus and deployments/alertmanager.
   # ---------------------------------------------------------------------------
@@ -226,7 +224,7 @@ services:
     volumes:
       - promdata:/prometheus
     networks:
-      - monitoring-net
+      - app-net
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/healthy"]
       interval: 15s
@@ -255,7 +253,7 @@ services:
     expose:
       - "9100"
     networks:
-      - monitoring-net
+      - app-net
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9100/metrics"]
       interval: 15s
@@ -287,7 +285,7 @@ services:
     expose:
       - "9093"
     networks:
-      - monitoring-net
+      - app-net
     depends_on:
       - prometheus
     healthcheck:
@@ -304,23 +302,20 @@ services:
     restart: unless-stopped
 
 networks:
-  # edge-net is auto-assigned by Docker in the local/e2e stacks (NO ipam here).
-  # Pinning a /24 in this base file made every project (wren, wren-dev, wren-e2e)
-  # demand the same pool, which collides with the sibling networks Docker
-  # auto-allocates whole /16s to (e.g. monitoring-net -> 172.20.0.0/16 overlaps a
-  # pinned 172.20.0.0/24, breaking `docker compose up`). The subnet is pinned ONLY
-  # by the tunnel overlay at deploy, where cloudflared needs a known IP range
-  # inside the trusted-proxy CIDR (TRUSTED_PROXIES / MCP_TRUSTED_PROXIES, derived
-  # from EDGE_NET_SUBNET). The deploy default sits outside Docker's auto pool so it
-  # cannot overlap an auto-assigned sibling. In local/e2e the trust env is inert
-  # (no proxy fronts the apps).
-  edge-net:
+  # app-net carries every first-party service except postgres. Left auto-assigned
+  # in the base/local/e2e stacks (NO ipam here): a base-file pin forces every
+  # project (wren, wren-dev, wren-e2e) onto the SAME fixed subnet, and Docker
+  # subnets are daemon-global, so two stacks up at once cannot both allocate it.
+  # It is pinned ONLY by the tunnel overlay at deploy, where a single stack runs
+  # and cloudflared needs a known IP inside the trusted-proxy CIDR (TRUSTED_PROXIES
+  # / MCP_TRUSTED_PROXIES, from APP_NET_SUBNET). 10.89.0.0/24 also sits outside
+  # Docker's default auto pool (172.16/12, 192.168/16), so even the deploy pin
+  # never overlaps the auto-assigned data-net.
+  app-net:
     driver: bridge
-  compute-net:
-    driver: bridge
+  # data-net isolates Postgres: only backend joins it. This is the one boundary
+  # kept when collapsing the former four nets to two.
   data-net:
-    driver: bridge
-  monitoring-net:
     driver: bridge
 
 # -----------------------------------------------------------------------------
