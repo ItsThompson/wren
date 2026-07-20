@@ -7,10 +7,17 @@ modules, :func:`create_roadmaps_router` takes the identity resolution as an
 injected dependency (the standards' "inject strategy, don't fork on context"):
 
 - **External (:8000)** passes ``identity=require_user`` (the human session cookie;
-  a spoofed ``X-User-ID`` is stripped upstream) and ``include_web_lifecycle=True``.
+  a spoofed ``X-User-ID`` is stripped upstream).
 - **Internal (:8001)** passes ``identity=require_internal_user`` (the trusted
-  ``X-User-ID`` behind the shared ``INTERNAL_API_TOKEN``) and leaves
-  ``include_web_lifecycle`` at its default ``False``.
+  ``X-User-ID`` behind the shared ``INTERNAL_API_TOKEN``).
+
+The three web-only lifecycle routes (``PUT /roadmaps/{id}/visibility``,
+``POST /roadmaps/{id}:archive``, ``DELETE /roadmaps/{id}``) live in a separate
+factory, :func:`create_roadmaps_web_lifecycle_router`, that only the external
+entrypoint mounts. Composing the surface difference at the mount site keeps each
+factory free of a "which app am I" branch: the internal app (which the MCP server
+calls) never builds these routes, so they have no internal-app route and no MCP
+tool.
 
 Thin handlers: each resolves the caller via the injected ``identity`` dependency,
 calls one :class:`RoadmapService` / :class:`RoadmapReadService` method, and lets
@@ -25,11 +32,10 @@ hard-blocks with a 422 carrying the ``Violation`` list, while ``validate`` alway
 returns 200 with a (possibly empty) list and ``fork`` returns 201 with the new
 draft. ``PATCH /roadmaps/{id}/metadata`` is the presentation-only edit that stays
 allowed post-publish (not ``If-Match``-guarded). The three web-only lifecycle
-actions (``PUT /roadmaps/{id}/visibility``, ``POST /roadmaps/{id}:archive``,
-``DELETE /roadmaps/{id}``) mount only when ``include_web_lifecycle`` is set, so the
-internal app (which the MCP server calls) never exposes them: they have no
-internal-app route and no MCP tool. Delete is guarded by a zero-followers check
-(409 ``DELETE_HAS_FOLLOWERS`` otherwise); archive is the safe retirement path.
+actions live in :func:`create_roadmaps_web_lifecycle_router`, which the external
+entrypoint mounts alongside the core router. Delete is guarded by a zero-followers
+check (409 ``DELETE_HAS_FOLLOWERS`` otherwise); archive is the safe retirement
+path.
 """
 
 from __future__ import annotations
@@ -76,18 +82,17 @@ def create_roadmaps_router(
     read_service_provider: RoadmapReadServiceProvider,
     *,
     identity: Identity,
-    include_web_lifecycle: bool = False,
 ) -> APIRouter:
-    """Build the /roadmaps router, parameterized by the injected identity.
+    """Build the core /roadmaps router, parameterized by the injected identity.
 
     Injects the authoring/lifecycle service provider (writes + lifecycle), the read
     service provider (the study-time reads, each request-scoped), and the
     ``identity`` dependency every handler resolves ``user_id`` from. The service
     scopes every query to that user, so the internal app can trust the injected
-    identity without a route ever reaching another user's roadmap. When
-    ``include_web_lifecycle`` is set (external app only), the three web-only
-    lifecycle routes (visibility / archive / delete) are mounted; otherwise they
-    are absent, so the internal app never exposes them.
+    identity without a route ever reaching another user's roadmap. The three
+    web-only lifecycle routes (visibility / archive / delete) are built by
+    :func:`create_roadmaps_web_lifecycle_router` and mounted by the external
+    entrypoint only, so this router is identical on both apps.
     """
     router = APIRouter(prefix=ROADMAPS_PATH, tags=["roadmaps"])
 
@@ -227,23 +232,22 @@ def create_roadmaps_router(
             user_id, roadmap_id, body.title, body.description, body.subject_tags
         )
 
-    if include_web_lifecycle:
-        _mount_web_lifecycle(router, service_provider, identity)
-
     return router
 
 
-def _mount_web_lifecycle(
-    router: APIRouter, service_provider: RoadmapServiceProvider, identity: Identity
-) -> None:
-    """Mount the three web-only lifecycle routes (visibility / archive / delete).
+def create_roadmaps_web_lifecycle_router(
+    service_provider: RoadmapServiceProvider, *, identity: Identity
+) -> APIRouter:
+    """Build the three web-only lifecycle routes (visibility / archive / delete).
 
-    Kept behind :func:`create_roadmaps_router`'s ``include_web_lifecycle`` flag so
-    the internal app (the MCP surface) never exposes them: there is no internal-app
-    route and no MCP tool for visibility / archive / delete. All three resolve the
-    caller via the same injected ``identity`` dependency and are owner-scoped in the
-    service (a non-owner is a 404, no existence leak).
+    Mounted by the external entrypoint only, alongside
+    :func:`create_roadmaps_router`, so the internal app (the MCP surface) never
+    exposes them: there is no internal-app route and no MCP tool for visibility /
+    archive / delete. All three resolve the caller via the same injected
+    ``identity`` dependency and are owner-scoped in the service (a non-owner is a
+    404, no existence leak).
     """
+    router = APIRouter(prefix=ROADMAPS_PATH, tags=["roadmaps"])
 
     @router.put("/{roadmap_id}/visibility")
     async def set_roadmap_visibility(
@@ -279,3 +283,5 @@ def _mount_web_lifecycle(
         # route and no MCP tool. Guarded by a zero-followers check in the service; a
         # roadmap with followers is a 409 DELETE_HAS_FOLLOWERS steering to archive.
         await service.delete(user_id, roadmap_id)
+
+    return router

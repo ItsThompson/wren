@@ -2,16 +2,18 @@
 
 One factory per domain replaces the external/internal forked routers
 (byte-identical handler bodies differing only by the identity dependency),
-parameterized by the injected ``identity`` dependency and, for roadmaps, an
-``include_web_lifecycle`` flag. These tests guard the seams that collapse
-introduced, complementing the per-app contract suites (``test_roadmaps_api*`` /
-``test_progress_api*``) which still exercise each mode's full behavior:
+parameterized by the injected ``identity`` dependency. The three web-only
+lifecycle routes live in a separate factory
+(``create_roadmaps_web_lifecycle_router``) the external entrypoint composes. These
+tests guard the seams that collapse introduced, complementing the per-app contract
+suites (``test_roadmaps_api*`` / ``test_progress_api*``) which still exercise each
+mode's full behavior:
 
 - the one factory serves BOTH identity modes (a parameterized suite): the injected
   identity dependency denies an anonymous caller and resolves an authenticated one;
-- the three web-only lifecycle routes mount only when ``include_web_lifecycle`` is
-  set, so the internal app (:8001) never exposes them while the external app
-  (:8000) does;
+- the three web-only lifecycle routes are built only by the separate
+  web-lifecycle factory and are absent from the core factory, so the internal app
+  (:8001) never exposes them while the external app (:8000) does;
 - the per-app mounted ``/roadmaps`` route set (paths + methods) is exactly the
   HEAD surface, so the collapse is byte-for-byte route-preserving (the
   ``route_registry`` access map is re-verified by ``test_route_registry``).
@@ -57,7 +59,10 @@ from wren.core.settings import AppSettings
 from wren.progress.router import create_progress_router
 from wren.progress.service import ProgressService
 from wren.roadmaps.read_service import RoadmapReadService
-from wren.roadmaps.router import create_roadmaps_router
+from wren.roadmaps.router import (
+    create_roadmaps_router,
+    create_roadmaps_web_lifecycle_router,
+)
 from wren.roadmaps.service import RoadmapService
 
 if TYPE_CHECKING:
@@ -135,7 +140,7 @@ def _roadmap_surface(app: FastAPI) -> set[RouteKey]:
     return {key for key in mounted_product_routes(app) if key.path.startswith("/roadmaps")}
 
 
-# --- include_web_lifecycle flag: the three web-only routes are gated ---------
+# --- composed web-lifecycle router: the three web-only routes are separate ----
 
 
 def _dummy_provider() -> object:  # pragma: no cover - never invoked (build-time only)
@@ -152,18 +157,13 @@ def _roadmap_route_keys(router_routes: object) -> set[RouteKey]:
     return keys
 
 
-def test_include_web_lifecycle_mounts_the_three_web_only_routes() -> None:
-    router = create_roadmaps_router(
-        _dummy_provider,
-        _dummy_provider,
-        identity=require_user,
-        include_web_lifecycle=True,
-    )
+def test_web_lifecycle_factory_builds_only_the_three_web_only_routes() -> None:
+    router = create_roadmaps_web_lifecycle_router(_dummy_provider, identity=require_user)
     keys = _roadmap_route_keys(router.routes)
-    assert keys >= _WEB_LIFECYCLE_ROUTES
+    assert keys == _WEB_LIFECYCLE_ROUTES
 
 
-def test_web_lifecycle_absent_when_flag_is_false() -> None:
+def test_core_roadmaps_router_omits_the_web_only_routes() -> None:
     router = create_roadmaps_router(
         _dummy_provider,
         _dummy_provider,
@@ -266,9 +266,8 @@ def _external_harness(make_settings: MakeSettings) -> _Harness:
             create_accounts_router(
                 account_provider, cookie_config=CookieConfig(secure=False, domain=None)
             ),
-            create_roadmaps_router(
-                roadmap_provider, read_provider, identity=require_user, include_web_lifecycle=True
-            ),
+            create_roadmaps_router(roadmap_provider, read_provider, identity=require_user),
+            create_roadmaps_web_lifecycle_router(roadmap_provider, identity=require_user),
             create_progress_router(progress_provider, identity=require_user),
         ],
         exception_handlers=build_exception_handlers(),

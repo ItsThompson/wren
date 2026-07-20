@@ -33,7 +33,10 @@ from wren.core.settings import AppSettings
 from wren.progress.router import create_progress_router
 from wren.progress.wiring import build_progress_service_provider
 from wren.roadmaps.listing_api import create_listing_router
-from wren.roadmaps.router import create_roadmaps_router
+from wren.roadmaps.router import (
+    create_roadmaps_router,
+    create_roadmaps_web_lifecycle_router,
+)
 from wren.roadmaps.wiring import (
     build_listing_service_provider,
     build_roadmap_read_service_provider,
@@ -138,7 +141,10 @@ def _external_app(database_url: str, settings: AppSettings) -> FastAPI:
         build_roadmap_service_provider(),
         build_roadmap_read_service_provider(),
         identity=require_user,
-        include_web_lifecycle=True,
+    )
+    roadmaps_web_lifecycle_router = create_roadmaps_web_lifecycle_router(
+        build_roadmap_service_provider(),
+        identity=require_user,
     )
     progress_router = create_progress_router(
         build_progress_service_provider(), identity=require_user
@@ -146,7 +152,13 @@ def _external_app(database_url: str, settings: AppSettings) -> FastAPI:
     listing_router = create_listing_router(build_listing_service_provider())
     app = create_app(
         settings,
-        routers=[accounts_router, roadmaps_router, progress_router, listing_router],
+        routers=[
+            accounts_router,
+            roadmaps_router,
+            roadmaps_web_lifecycle_router,
+            progress_router,
+            listing_router,
+        ],
         exception_handlers=build_exception_handlers(),
     )
     app.state.db = database

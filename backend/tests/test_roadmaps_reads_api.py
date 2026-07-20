@@ -98,9 +98,7 @@ def _build_client(
         make_settings(),
         routers=[
             accounts_router,
-            create_roadmaps_router(
-                roadmap_provider, read_provider, identity=require_user, include_web_lifecycle=True
-            ),
+            create_roadmaps_router(roadmap_provider, read_provider, identity=require_user),
             create_progress_router(progress_provider, identity=require_user),
         ],
         exception_handlers=build_exception_handlers(),

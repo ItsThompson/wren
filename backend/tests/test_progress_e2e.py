@@ -106,7 +106,6 @@ def _external_app(database_url: str, settings: AppSettings) -> FastAPI:
         build_roadmap_service_provider(),
         build_roadmap_read_service_provider(),
         identity=require_user,
-        include_web_lifecycle=True,
     )
     progress_router = create_progress_router(
         build_progress_service_provider(), identity=require_user

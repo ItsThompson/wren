@@ -9,9 +9,10 @@ external app only by these settings.
 Mounts the roadmap + progress routers as thin adapters over the same service
 layer the external app uses (:mod:`wren.roadmaps.router`,
 :mod:`wren.progress.router`), differing only in that ``identity`` resolves the
-trusted ``X-User-ID`` header (``require_internal_user``) instead of the cookie and
-the web-only lifecycle routes are never mounted. These are the endpoints the MCP
-write/read tools call, one HTTP call per tool.
+trusted ``X-User-ID`` header (``require_internal_user``) instead of the cookie.
+The web-only lifecycle routes live in a separate factory the external entrypoint
+mounts, so they are never built here. These are the endpoints the MCP write/read
+tools call, one HTTP call per tool.
 """
 
 from __future__ import annotations
@@ -37,10 +38,11 @@ if TYPE_CHECKING:
 settings = build_app_settings(service=INTERNAL_SERVICE, port=INTERNAL_PORT)
 db = create_database(settings.database_url)
 
-# Roadmap authoring/reading over the trusted identity: the same factories the
+# Roadmap authoring/reading over the trusted identity: the same core factory the
 # external app binds, differing only in that require_internal_user resolves the
-# user from the trusted X-User-ID header and include_web_lifecycle stays False, so
-# the web-only visibility / archive / delete routes are never mounted here.
+# user from the trusted X-User-ID header. The web-only visibility / archive /
+# delete routes live in a separate factory the external entrypoint mounts, so they
+# are never built here.
 internal_roadmaps_router = create_roadmaps_router(
     build_roadmap_service_provider(),
     build_roadmap_read_service_provider(),

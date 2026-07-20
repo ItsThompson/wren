@@ -34,7 +34,10 @@ from wren.core.errors import build_exception_handlers
 from wren.core.identity import USER_ID_HEADER, StripInboundIdentityMiddleware, require_user
 from wren.core.settings import AppSettings
 from wren.roadmaps.read_service import RoadmapReadService
-from wren.roadmaps.router import create_roadmaps_router
+from wren.roadmaps.router import (
+    create_roadmaps_router,
+    create_roadmaps_web_lifecycle_router,
+)
 from wren.roadmaps.service import RoadmapService
 
 if TYPE_CHECKING:
@@ -136,13 +139,14 @@ def _build_client(
     accounts_router = create_accounts_router(
         account_provider, cookie_config=CookieConfig(secure=False, domain=None)
     )
-    roadmaps_router = create_roadmaps_router(
-        roadmap_provider, read_provider, identity=require_user, include_web_lifecycle=True
+    roadmaps_router = create_roadmaps_router(roadmap_provider, read_provider, identity=require_user)
+    roadmaps_web_lifecycle_router = create_roadmaps_web_lifecycle_router(
+        roadmap_provider, identity=require_user
     )
 
     app: FastAPI = create_app(
         make_settings(),
-        routers=[accounts_router, roadmaps_router],
+        routers=[accounts_router, roadmaps_router, roadmaps_web_lifecycle_router],
         exception_handlers=build_exception_handlers(),
     )
     app.state.session_verifier = create_session_verifier(codec, account_repo.is_session_revoked)

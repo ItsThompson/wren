@@ -47,7 +47,10 @@ from wren.oauth.wiring import (
 from wren.progress.router import create_progress_router
 from wren.progress.wiring import build_progress_service_provider
 from wren.roadmaps.listing_api import create_listing_router
-from wren.roadmaps.router import create_roadmaps_router
+from wren.roadmaps.router import (
+    create_roadmaps_router,
+    create_roadmaps_web_lifecycle_router,
+)
 from wren.roadmaps.wiring import (
     build_listing_service_provider,
     build_roadmap_read_service_provider,
@@ -81,14 +84,17 @@ accounts_router = create_accounts_router(service_provider, cookie_config=cookie_
 onboarding_router = create_onboarding_router(service_provider, identity=require_user)
 
 # Roadmap authoring + reads over the same service layer, resolving identity via
-# the human session cookie (require_user). The external app mounts the three
-# web-only lifecycle routes (visibility / archive / delete) via
-# include_web_lifecycle; the internal app never does.
+# the human session cookie (require_user). The external app also mounts the three
+# web-only lifecycle routes (visibility / archive / delete) via a separate
+# factory; the internal app never mounts that router.
 roadmaps_router = create_roadmaps_router(
     build_roadmap_service_provider(),
     build_roadmap_read_service_provider(),
     identity=require_user,
-    include_web_lifecycle=True,
+)
+roadmaps_web_lifecycle_router = create_roadmaps_web_lifecycle_router(
+    build_roadmap_service_provider(),
+    identity=require_user,
 )
 
 # Dashboard + public profile: the private
@@ -148,6 +154,7 @@ app: FastAPI = create_app(
         accounts_router,
         onboarding_router,
         roadmaps_router,
+        roadmaps_web_lifecycle_router,
         listing_router,
         progress_router,
         oauth_router,
