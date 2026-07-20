@@ -1,4 +1,10 @@
-"""Health router: liveness always ok; readiness aggregates injected checks."""
+"""Health seam: liveness is unconditional; readiness aggregates injected checks.
+
+The behavioral fork the move preserves: readiness checks are injected as a
+``Sequence[ReadinessCheck]`` and the aggregator is defensive. A check that
+returns ``ok=False`` and a check that *raises* both degrade readiness to 503
+(never 500), so one misbehaving probe cannot crash the endpoint for the others.
+"""
 
 from __future__ import annotations
 
@@ -25,46 +31,46 @@ def test_healthz_is_always_ok() -> None:
     assert response.json() == {"status": "ok"}
 
 
-def test_readyz_ready_with_no_checks() -> None:
+def test_readyz_is_ready_with_no_checks() -> None:
     response = _client().get("/readyz")
     assert response.status_code == 200
     assert response.json() == {"status": "ready", "checks": {}}
 
 
-def test_readyz_ready_when_all_checks_pass() -> None:
-    async def db_ok() -> CheckResult:
-        return CheckResult(name="db", ok=True)
+def test_readyz_is_ready_when_all_injected_checks_pass() -> None:
+    async def dep_ok() -> CheckResult:
+        return CheckResult(name="dep", ok=True)
 
-    response = _client([db_ok]).get("/readyz")
+    response = _client([dep_ok]).get("/readyz")
     assert response.status_code == 200
-    assert response.json()["checks"]["db"] == {"ok": True, "detail": None}
+    assert response.json()["checks"]["dep"] == {"ok": True, "detail": None}
 
 
-def test_readyz_503_when_any_check_fails() -> None:
+def test_readyz_is_503_when_any_injected_check_fails() -> None:
     async def cache_ok() -> CheckResult:
         return CheckResult(name="cache", ok=True)
 
-    async def db_down() -> CheckResult:
-        return CheckResult(name="db", ok=False, detail="unreachable")
+    async def dep_down() -> CheckResult:
+        return CheckResult(name="dep", ok=False, detail="unreachable")
 
-    response = _client([cache_ok, db_down]).get("/readyz")
+    response = _client([cache_ok, dep_down]).get("/readyz")
     assert response.status_code == 503
     body = response.json()
     assert body["status"] == "not_ready"
-    assert body["checks"]["db"] == {"ok": False, "detail": "unreachable"}
+    assert body["checks"]["dep"] == {"ok": False, "detail": "unreachable"}
     assert body["checks"]["cache"]["ok"] is True
 
 
-def test_readyz_503_when_a_check_raises() -> None:
-    # Seam hardening: a check that raises must degrade to 503, not 500,
-    # so one misbehaving probe cannot crash readiness for the others.
+def test_readyz_degrades_to_503_when_a_check_raises() -> None:
+    # A raising check must degrade to 503, not 500, so one misbehaving probe
+    # cannot crash readiness for the others.
     async def cache_ok() -> CheckResult:
         return CheckResult(name="cache", ok=True)
 
-    async def db_boom() -> CheckResult:
+    async def dep_boom() -> CheckResult:
         raise RuntimeError("pool exhausted")
 
-    response = _client([cache_ok, db_boom]).get("/readyz")
+    response = _client([cache_ok, dep_boom]).get("/readyz")
     assert response.status_code == 503
     body = response.json()
     assert body["status"] == "not_ready"

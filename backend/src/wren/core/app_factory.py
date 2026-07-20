@@ -19,8 +19,8 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from wren.core.correlation import CorrelationMiddleware
-from wren.core.health import ReadinessCheck, create_health_router
 from wren.core.observability import WREN_REGISTRY
+from wren_common.health import ReadinessCheck, create_health_router
 from wren_common.logging import configure_logging, get_logger
 from wren_common.metrics import instrument
 

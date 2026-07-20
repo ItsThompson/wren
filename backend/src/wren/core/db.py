@@ -34,8 +34,8 @@ from sqlalchemy.ext.asyncio import (
 # parameter instead of treating ``request`` as a validated query field.
 from starlette.requests import Request  # noqa: TC002
 
-from wren.core.health import CheckResult, ReadinessCheck
 from wren.core.observability import ACTIVE_CONNECTIONS, DB_QUERY_DURATION
+from wren_common.health import CheckResult, ReadinessCheck
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator

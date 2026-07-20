@@ -1,19 +1,13 @@
-"""Liveness and readiness endpoints for the MCP server.
+"""Liveness and readiness endpoints shared by every Wren service.
 
 - ``GET /healthz`` is liveness: the process is up. Always 200.
 - ``GET /readyz`` is readiness: every registered dependency check passes. Returns
-  503 if any fails. The deploy health gate polls ``/readyz``.
+  503 if any fails.
 
-Readiness checks are injected, so this module stays dependency-free. The RS wires
-a JWKS check (:func:`jwks_readiness_check`): the RS cannot validate any token
-without the AS public keys, so unreachable JWKS is "not ready".
-
-Kept in sync with :mod:`wren.core.health` by hand: the shared core
-(``CheckResult``, the ``ReadinessCheck`` contract, the aggregator,
-:func:`create_health_router`) is identical; this copy adds exactly one MCP-only
-:func:`jwks_readiness_check`. Any change to the shared core here MUST be mirrored
-there. See ``docs/infra-duplication.md`` for the `wren-common` deferral and
-drift checklist.
+Readiness checks are injected as a ``Sequence[ReadinessCheck]``, so this module
+stays dependency-free: each caller supplies its own app-specific checks through
+the ``readiness_checks`` seam (for example the backend's Postgres connectivity
+check or the MCP's JWKS reachability check).
 """
 
 from __future__ import annotations
@@ -21,17 +15,12 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-if TYPE_CHECKING:
-    from wren_mcp.keys import KeyProvider
-
 HEALTHZ_ENDPOINT = "/healthz"
 READYZ_ENDPOINT = "/readyz"
-JWKS_CHECK_NAME = "as_jwks"
 
 
 @dataclass(frozen=True)
@@ -43,9 +32,10 @@ class CheckResult:
     detail: str | None = None
 
 
-# A readiness check resolves to a CheckResult. A well-behaved check reports
-# failure as ``CheckResult(ok=False)`` rather than raising, but the aggregator is
-# defensive: a check that raises is degraded to a 503 (not a 500).
+# Contract: a readiness check resolves to a CheckResult. A well-behaved check
+# reports failure as ``CheckResult(ok=False)`` rather than raising, but the
+# aggregator below is defensive: a check that raises is still degraded to a 503
+# (not a 500), so one misbehaving dependency probe cannot mask readiness.
 ReadinessCheck = Callable[[], Awaitable[CheckResult]]
 
 
@@ -76,20 +66,3 @@ def create_health_router(readiness_checks: Sequence[ReadinessCheck] = ()) -> API
         return JSONResponse(payload, status_code=200 if ready else 503)
 
     return router
-
-
-def jwks_readiness_check(key_provider: KeyProvider) -> ReadinessCheck:
-    """Readiness check that confirms the AS public JWKS is reachable and parseable.
-
-    Never raises: a discovery/fetch failure resolves to a failed CheckResult, so
-    the RS reports "not ready" (503) rather than crashing when the AS is down.
-    """
-
-    async def check() -> CheckResult:
-        try:
-            await key_provider.load()
-        except Exception as exc:  # noqa: BLE001 - any fetch/parse error is "not ready"
-            return CheckResult(name=JWKS_CHECK_NAME, ok=False, detail=str(exc))
-        return CheckResult(name=JWKS_CHECK_NAME, ok=True)
-
-    return check
