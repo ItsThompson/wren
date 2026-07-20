@@ -15,10 +15,12 @@ services:
       MCP_PUBLIC_URL: http://localhost:9000
     volumes:
       # Bind source over the image's editable install so --reload picks up edits.
-      # Paths mirror the image layout (/app/backend) now that the build context
-      # is the repo root.
+      # Paths mirror the image layout (/app/backend, /app/shared) now that the
+      # build context is the repo root. wren-common is editable-installed too, so
+      # mount its src as well or shared-infra edits would need an image rebuild.
       - ./backend/src:/app/backend/src
       - ./backend/alembic:/app/backend/alembic
+      - ./shared/wren-common/src:/app/shared/wren-common/src
 
   mcp:
     # Run uvicorn with --reload directly (the prod CMD is the non-reload console
@@ -30,6 +32,7 @@ services:
       MCP_PUBLIC_URL: http://localhost:9000
     volumes:
       - ./mcp/src:/app/mcp/src
+      - ./shared/wren-common/src:/app/shared/wren-common/src
 
   postgres:
     # Publish to the host so host-run recipes (just dev-api, just migrate, the

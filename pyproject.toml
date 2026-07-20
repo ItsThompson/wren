@@ -10,7 +10,13 @@
 #   shared/wren-common -> shared infra (logging, metrics, health) both apps consume
 #
 # Sync model:
-#   uv sync --all-packages          one shared root .venv with every member (dev/CI)
-#   uv sync --frozen --package <m>  a lean per-member set (the Docker images)
+#   Dev/CI: `uv sync --all-packages` builds one shared root .venv with every
+#     member (CI syncs once, then runs each member's tools with `uv run --no-sync`).
+#   Images: uv resolves ONE shared environment, so a plain `uv sync --package <m>`
+#     installs EVERY member and would break the backend<->MCP firewall (the backend
+#     image would gain the mcp SDK + wren_mcp; the MCP image asyncpg/alembic/wren).
+#     Each Dockerfile instead runs `uv export --frozen --no-emit-workspace
+#     --package <m>` for the member's locked third-party set, then editable-installs
+#     only that member + wren-common. See docs/packaging.md.
 [tool.uv.workspace]
 members = ["backend", "mcp", "contract", "shared/wren-common"]
