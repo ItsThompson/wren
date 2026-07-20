@@ -85,8 +85,10 @@ class EnvSettings(BaseSettings):
     # clients whose registration is older than the max age (cascade-revoking each
     # reaped client's grant + refresh chain). Interval is how often the sweep
     # runs; a non-positive interval disables it (e.g. when reaped out of band).
-    # Age defaults to the refresh TTL so a registration outlives at most one
-    # refresh lifetime.
+    # Max age is an independent knob: its 30-day default matches the refresh-TTL
+    # default but is not derived from it. The reap is by registration age
+    # (created_at), which rotation does not move, so an actively-refreshing client
+    # older than the max age is still reaped.
     oauth_client_cleanup_interval_seconds: int = 21_600
     oauth_stale_client_max_age_seconds: int = 2_592_000
     # Allowed browser origin for the SPA's credentialed consent/login XHRs

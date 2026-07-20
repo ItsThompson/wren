@@ -54,9 +54,10 @@ def build_stale_client_sweep(
 async def run_cleanup_loop(sweep: Sweep, *, interval: timedelta) -> None:
     """Run ``sweep`` once per ``interval``, forever, until cancelled.
 
-    Sleeps first so app startup is never blocked on a sweep. A sweep failure is
-    logged and the loop continues: a transient DB error must not kill the reaper.
-    Cancellation propagates so the lifespan can stop the task cleanly.
+    Sleeps first so the initial reap is deferred past app startup rather than
+    firing during boot. A sweep failure is logged and the loop continues: a
+    transient DB error must not kill the reaper. Cancellation propagates so the
+    lifespan can stop the task cleanly.
     """
     interval_seconds = interval.total_seconds()
     while True:
