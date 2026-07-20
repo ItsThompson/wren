@@ -69,8 +69,8 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # codegen-drift: regenerate the OpenAPI document from the live FastAPI app and
-  # the TS client from it, then fail if the committed client is stale (sections
-  # 06/13). Independent of lint: it guards a frozen contract, not code style.
+  # the TS client from it, then fail if the committed client is stale.
+  # Independent of lint: it guards a frozen contract, not code style.
   # Mirrors `just codegen`.
   # ---------------------------------------------------------------------------
   codegen-drift:
@@ -111,8 +111,8 @@ jobs:
   # ---------------------------------------------------------------------------
   # contract-drift: run the dev/test-only `contract/` uv project, the only
   # interpreter where `wren.*` and `wren_mcp.*` import together (it editable
-  # path-installs both packages; neither deployable depends on the other, per
-  # section 12). It guards the cross-package frozen contract: the internal-
+  # path-installs both packages; neither deployable depends on the other). It
+  # guards the cross-package frozen contract: the internal-
   # boundary header constants (X-User-ID, X-Internal-Api-Token) plus the
   # X-Request-ID correlation header, and the backend<->MCP schema mirror (Group A
   # shapes asserted field-equal, the lean write results asserted a fields-subset).

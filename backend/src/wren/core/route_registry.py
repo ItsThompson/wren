@@ -175,16 +175,21 @@ INTERNAL_ROUTE_ACCESS: RouteRegistry = {
         method="GET", path="/roadmaps/{roadmap_id}/sections/{section_id}"
     ): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/search"): AccessLevel.INTERNAL_TRUSTED,
-    # Progress surface, mirrored on the internal app so the MCP progress
-    # tools call it: follow / snapshot / explicit-set / next, each
-    # resolving the trusted X-User-ID and scoped to that user.
+    # Progress surface, mirrored on the internal app by the shared progress-router
+    # factory. The MCP progress tools call the snapshot / next / explicit-set
+    # endpoints (GET /progress, GET /next, POST /progress), each resolving the
+    # trusted X-User-ID and scoped to that user. POST /follow is mounted for parity
+    # but no MCP tool calls it: following is created implicitly by the first
+    # progress write (see ProgressService.update).
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}/follow"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/progress"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}/progress"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/next"): AccessLevel.INTERNAL_TRUSTED,
-    # Per-user deadline set/clear, mirrored on the internal app so the MCP
-    # progress tools can call it: resolves the trusted X-User-ID and
-    # is scoped to that user's progress record (countdown only, no pacing).
+    # Per-user deadline set/clear, mounted on the internal app by the same factory.
+    # Deadline is web-only today: no MCP tool sets it (DeadlineRequest / Progress
+    # are deliberately unmirrored in the MCP contract, see contract/), so this
+    # route is reached only through the external app. It resolves the trusted
+    # X-User-ID and is scoped to that user's record (countdown only, no pacing).
     RouteKey(method="PUT", path="/roadmaps/{roadmap_id}/deadline"): AccessLevel.INTERNAL_TRUSTED,
 }
 

@@ -37,8 +37,9 @@ _INSTRUCTIONS = (
     "Wren roadmap authoring and study tools. Author roadmaps as drafts: create, "
     "iteratively patch by slug ID, validate, then publish (one-way; published "
     "roadmaps are immutable except presentation metadata: fork to change "
-    "structure). Retrieve the authoring guidance (SKILL.md, served at GET /skill) "
-    "before authoring."
+    "structure). Retrieve the authoring guidance (SKILL.md) before authoring: the "
+    "Wren backend serves it at GET /skill on its API origin (the OAuth "
+    "authorization-server host), not on this MCP server."
 )
 
 
