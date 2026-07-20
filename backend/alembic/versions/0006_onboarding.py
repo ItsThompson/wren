@@ -3,7 +3,7 @@
 Adds the ``users.has_completed_onboarding`` boolean. The column is added with a
 non-null ``server_default false`` so the DDL is safe on the already-populated
 table; the backfill then flips every pre-existing row to ``true`` (existing
-accounts are treated as already onboarded, US-GUARD-04). New rows inserted after
+accounts are treated as already onboarded). New rows inserted after
 this migration default to ``false`` at the ORM level (``register`` sets it
 explicitly), so the server default is a safety net, not the new-user path.
 Chained after the progress migration to keep a single linear head.

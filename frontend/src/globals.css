@@ -88,7 +88,7 @@
 }
 
 /*
- * Fraunces display moments (§4.1 type scale). Used sparingly: one Fraunces
+ * Fraunces display moments (type scale). Used sparingly: one Fraunces
  * moment per dense view. Numerals in progress/countdown use tabular-nums.
  */
 @utility display-xl {

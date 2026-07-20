@@ -1,16 +1,16 @@
 # syntax=docker/dockerfile:1
 
 # =============================================================================
-# Wren MCP server image (spec sections 07/08/11).
+# Wren MCP server image.
 #
 # OAuth 2.1 Resource Server (PRM + bearer validation) and thin client of the
 # backend internal API (:8001). Single ASGI app on :9000. Multi-stage uv build,
 # non-root runtime, mirroring the backend image.
 #
-# Note (tracked from Ticket 20 review): /metrics, /healthz and /readyz are NOT
-# tunnel-exposed. Only PRM + the /mcp transport are public (mcp.usewren.com);
-# /metrics is scraped in-network (app-net) and health is probed in-container.
-# The tunnel ingress rules that enforce this land in Ticket 29.
+# Note: /metrics, /healthz and /readyz are NOT tunnel-exposed. Only PRM + the
+# /mcp transport are public (mcp.usewren.com); /metrics is scraped in-network
+# (app-net) and health is probed in-container. The tunnel ingress rules
+# (deployments/cloudflare/config.yml) enforce this.
 # =============================================================================
 
 FROM python:3.12-slim-bookworm AS builder

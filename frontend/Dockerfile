@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # =============================================================================
-# Wren frontend image (spec sections 10/11): build the Vite SPA, then serve the
+# Wren frontend image: build the Vite SPA, then serve the
 # static bundle from nginx with a history-API fallback. Two stages so node and
 # the build toolchain never ship in the runtime image.
 #

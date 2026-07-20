@@ -1,7 +1,7 @@
 /*
  * Canonical Wren design tokens: the single source of truth consumed by BOTH
  * the app (frontend/) and the docs site (docs-site/). Pasted verbatim from the
- * Wren Design Language (§3.6 / spec section 09). oklch is canonical (Tailwind
+ * Wren Design Language. oklch is canonical (Tailwind
  * v4 / shadcn store color as oklch). Do NOT re-derive or translate these
  * values. No dark mode this round.
  *

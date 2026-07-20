@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # =============================================================================
-# Wren backend image (spec sections 08/11).
+# Wren backend image.
 #
 # One image serves both ASGI apps: the external app (:8000, internet-facing via
 # the tunnel) and the internal app (:8001, app-net, token-gated). Multi-stage uv
@@ -10,7 +10,7 @@
 #
 # The image also carries Alembic (alembic/ + alembic.ini) so the pre-traffic
 # migration step runs as `docker compose run --rm backend alembic upgrade head`,
-# which cleanly overrides the default two-app CMD (spec section 11).
+# which cleanly overrides the default two-app CMD.
 # =============================================================================
 
 FROM python:3.12-slim-bookworm AS builder
