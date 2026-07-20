@@ -96,7 +96,7 @@ Install the prerequisites:
 Boot the backend and frontend inner loops:
 
 ```sh
-just setup             # install backend dependencies
+just setup             # sync the Python workspace venv (all members)
 just dev-infra         # start local Postgres in Docker
 just dev-api           # boot the external app on http://127.0.0.1:8000
 just dev-api-internal  # boot the internal app on http://127.0.0.1:8001
@@ -119,7 +119,7 @@ See `docs/development.md` for the full development guide.
 
 | Command | Description |
 |---------|-------------|
-| `just setup` | Install backend dependencies |
+| `just setup` | Sync the Python workspace venv (all members) |
 | `just dev-api` | Boot the external app on `:8000` |
 | `just dev-api-internal` | Boot the internal app on `:8001` |
 | `just test-backend` | Run backend tests with coverage |

@@ -19,6 +19,7 @@ This guide describes the test layers, how to run each one, the main patterns, an
 | Frontend acceptance | The SWR data layer against a mock backend | vitest plus MSW | `just test-frontend` |
 | Contract drift | Cross-package header constants and the backend-to-MCP schema mirror | pytest in the `contract/` project | (CI `contract-drift` job) |
 | MCP | Tool registration, the internal client, the bearer boundary, the frozen tool-schema snapshot | pytest, 80% coverage gate | `just test-mcp` |
+| wren-common seams | The logging/metrics/health injection seams (metrics registry, readiness checks) | pytest | `cd shared/wren-common && uv run pytest` (also in CI `test-backend`) |
 | E2E | The full spine and UI smoke against the running stack | Playwright | `just test-e2e` |
 
 The contract project is the only interpreter where the backend and MCP packages import together. Run it with `cd contract && uv run pytest`, or let the CI `contract-drift` job run it.

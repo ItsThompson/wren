@@ -158,7 +158,7 @@ Canonical source: `tool_errors.py`. The error contract itself has one canonical 
 
 ## RS-served endpoints
 
-Canonical source: `app.py`, `health.py`, `metrics.py`, `prm.py`.
+Canonical source: `app.py`, `wren_common.health`, `wren_common.metrics`, `prm.py`.
 
 | Endpoint | Purpose | Exposure |
 |----------|---------|----------|
@@ -173,7 +173,7 @@ Warning: the tunnel ingress (`mcp.usewren.com`) exposes only the PRM document an
 
 ## Metrics
 
-Canonical source: `tool_metrics.py`, `metrics.py`; full detail in `monitoring.md`. The RS emits `mcp_tool_invocations_total{tool,outcome}` on a dedicated `TOOL_METRICS_REGISTRY`, plus the shared `http_requests_total` / `http_request_duration_seconds` families on its private registry. `/metrics` serves both registries concatenated.
+Canonical source: `tool_metrics.py`, `wren_common.metrics`; full detail in `monitoring.md`. The RS emits `mcp_tool_invocations_total{tool,outcome}` on a dedicated `TOOL_METRICS_REGISTRY`, plus the shared `http_requests_total` / `http_request_duration_seconds` families on its private registry. `/metrics` serves both registries concatenated.
 
 ## Cross-surface notes
 
