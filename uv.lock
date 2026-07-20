@@ -2008,12 +2008,28 @@ dependencies = [
     { name = "structlog" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "httpx" },
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "ruff" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115.0,<1" },
     { name = "prometheus-client", specifier = ">=0.21.0,<1" },
     { name = "prometheus-fastapi-instrumentator", specifier = ">=7.0.0,<9" },
     { name = "structlog", specifier = ">=24.4.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "httpx", specifier = ">=0.27.0,<1" },
+    { name = "mypy", specifier = ">=1.13.0,<3" },
+    { name = "pytest", specifier = ">=8.3.0,<10" },
+    { name = "ruff", specifier = ">=0.8.0,<1" },
 ]
 
 [[package]]

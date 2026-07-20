@@ -1,11 +1,11 @@
 """Domain, service, and DB-pool metric families.
 
-Complements the HTTP request metrics in :mod:`wren.core.metrics`. Where those
+Complements the HTTP request metrics in :mod:`wren_common.metrics`. Where those
 count traffic at the edge, these count the things the three P0 alerts and future
 dashboards need below the edge: unexpected service-method failures, OAuth token
 issuance, and database-pool health. Every family is a process-global singleton
 registered on the dedicated :data:`WREN_REGISTRY`, which
-:func:`wren.core.metrics.instrument` exposes on ``/metrics`` alongside each app's
+:func:`wren_common.metrics.instrument` exposes on ``/metrics`` alongside each app's
 private HTTP registry.
 
 Metric names and labels follow a stable convention so alert
@@ -27,7 +27,7 @@ rules and dashboards can be dropped in later:
   events in :mod:`wren.core.db`, which owns the engine.
 
 This module is a leaf: it must not import :mod:`wren.core.errors` at module scope
-(``errors`` -> ``app_factory`` -> ``metrics`` -> here would cycle). The one place
+(``errors`` -> ``app_factory`` -> here would cycle). The one place
 that needs ``WrenError`` imports it lazily on the failure path.
 """
 
@@ -123,7 +123,7 @@ def _is_unexpected(exc: BaseException) -> bool:
     declares it at class level while ``OAuthError`` sets it per-instance.
 
     ``ExpectedError`` is imported lazily here (only on the failure path) so this
-    leaf module stays free of the ``errors`` -> ``app_factory`` -> ``metrics``
+    leaf module stays free of the ``errors`` -> ``app_factory``
     import chain at module load.
     """
     from wren.core.errors import ExpectedError

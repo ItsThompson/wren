@@ -53,3 +53,17 @@ def test_each_app_owns_an_isolated_registry(make_settings: MakeSettings) -> None
 
     assert TestClient(app_a).get("/metrics").status_code == 200
     assert TestClient(app_b).get("/metrics").status_code == 200
+
+
+def test_metrics_include_the_injected_wren_registry_families(
+    make_settings: MakeSettings,
+) -> None:
+    # The backend injects WREN_REGISTRY into instrument(); its domain/service/
+    # DB-pool families are concatenated onto the same scrape as the private HTTP
+    # registry, so one /metrics scrape sees both the edge and the domain metrics.
+    client = TestClient(create_app(make_settings()))
+
+    body = client.get("/metrics").text
+
+    assert "service_method_failures_total" in body
+    assert "db_query_duration_seconds" in body
