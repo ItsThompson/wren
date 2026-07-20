@@ -324,7 +324,7 @@ test_api_ingress_blocks_observability_surface_before_backend() {
   cfg="${REPO_DIR}/deployments/cloudflare/config.yml"
   # The AS host (api.usewren.com) must block the observability/health surface at
   # ingress so internal Prometheus data is never tunnel-reachable (mirrors the
-  # mcp host; §08). cloudflared is first-match, so the block MUST precede the
+  # mcp host). cloudflared is first-match, so the block MUST precede the
   # unrestricted api -> backend:8000 rule, else /metrics routes through to :8000.
   grep -Fq 'metrics|healthz|readyz' "${cfg}" || { echo "no api observability-block rule"; return 1; }
   local block_line backend_line

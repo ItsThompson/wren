@@ -119,9 +119,9 @@ compose_run() {
 # (tag stripped). First-party = ghcr.io/<owner>/wren/*, matched by path so a new
 # service is picked up automatically. No production path calls this after the
 # context rearchitecture (the former internal re-pull rollback was deleted); it is
-# retained per the AC6 contract as the canonical first-party derivation (mirrored
-# by cd.yml's discover-matrix jq) and is covered by a deploy_test.sh case. Keep it
-# and that test in sync; if AC6 is ever relaxed, delete it rather than polish it.
+# retained as the canonical first-party derivation (mirrored by cd.yml's
+# discover-matrix jq) and is covered by a deploy_test.sh case. Keep it and that
+# test in sync.
 filter_first_party_images() {
   { grep -E '^ghcr\.io/[^/]+/wren/' || true; } | sed -E 's/:[^:/]*$//' | sort -u
 }

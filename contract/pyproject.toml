@@ -2,7 +2,7 @@
 # Dev/test-only cross-package contract harness. NEVER shipped: no image builds
 # from it. It is the only interpreter where both `wren.*` and `wren_mcp.*`
 # import together, so the cross-package coupling lives HERE and nowhere else.
-# Neither deployable (backend/mcp) gains a dependency on the other (§12).
+# Neither deployable (backend/mcp) gains a dependency on the other.
 name = "wren-contract-tests"
 version = "0"
 requires-python = ">=3.12"

@@ -4,8 +4,8 @@ Adds the ``progress`` table: one row per
 ``(user_id, roadmap_id)`` holding the explicit-set ``checked`` map as JSONB plus
 an optional per-user ``deadline``. The composite primary key enforces the
 one-record-per-(user, roadmap) rule, so follow and every update upsert the same
-row. An index on ``roadmap_id`` backs the follower-count query a later slice
-needs (the delete-only-if-zero-followers guard). Chained after the OAuth
+row. An index on ``roadmap_id`` backs the follower-count query behind the
+delete-only-if-zero-followers guard. Chained after the OAuth
 migration to keep a single linear head.
 
 Revision ID: 0005_progress

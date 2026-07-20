@@ -11,17 +11,17 @@ export default defineConfig({
   base: "/",
   srcDir: "docs",
 
-  // Light-only, matching the app (design-language.md §9 defers dark mode).
+  // Light-only, matching the app; dark mode is deferred.
   // Removes the appearance toggle from the navbar entirely.
   appearance: false,
 
   // Clean URLs (/getting-started, no .html) match a modern docs site; nginx
   // resolves them on deep links via a $uri.html probe with an index.html
-  // history fallback (see nginx.conf, US-DOCS-01).
+  // history fallback (see nginx.conf).
   cleanUrls: true,
 
   // Dead links fail the build so broken internal links or missing pages cannot
-  // ship (US-DOCS-04). This is the VitePress default; set explicitly to make the
+  // ship. This is the VitePress default; set explicitly to make the
   // build gate intentional.
   ignoreDeadLinks: false,
 
@@ -61,7 +61,7 @@ export default defineConfig({
     ],
 
     // Surface the guide's H2/H3 sections in the right-hand "On this page"
-    // outline so readers can jump within the guide (US-DOCS-03 navigation).
+    // outline so readers can jump within the guide.
     outline: {
       level: [2, 3],
       label: "On this page",

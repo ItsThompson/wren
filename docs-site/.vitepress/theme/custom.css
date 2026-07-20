@@ -29,7 +29,7 @@
   --vp-c-brand-3: var(--primary); /* solid button bg */
   --vp-c-brand-soft: var(--accent); /* light terracotta tint */
 
-  /* button label = cream on terracotta (design-language §3.4 contrast) */
+  /* button label = cream on terracotta (contrast) */
   --vp-button-brand-text: var(--primary-foreground);
   --vp-button-brand-hover-text: var(--primary-foreground);
   --vp-button-brand-active-text: var(--primary-foreground);

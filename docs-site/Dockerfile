@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # =============================================================================
-# Wren docs-site image (spec section 04): build the VitePress static site, then
+# Wren docs-site image: build the VitePress static site, then
 # serve the static bundle from nginx with a history-API fallback. Two stages so
 # node and the build toolchain never ship in the runtime image. Mirrors
 # frontend/Dockerfile.

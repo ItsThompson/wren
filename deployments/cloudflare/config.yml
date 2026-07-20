@@ -28,7 +28,7 @@ ingress:
   #    The observability/health surface (/metrics, /healthz, /readyz) is scraped
   #    and probed in-network and MUST NOT be tunnel-reachable, so it is
   #    blocked here at ingress BEFORE the catch-through to the backend (mirrors
-  #    the mcp host's path allow-list below; §08 observability-plane intent).
+  #    the mcp host's path allow-list below; observability-plane intent).
   #    /metrics on the AS host would otherwise leak internal Prometheus data
   #    (oauth_tokens_issued_total, service_method_failures_total, 5xx rates,
   #    route templates); Prometheus still scrapes backend:8000/:8001 internally.
