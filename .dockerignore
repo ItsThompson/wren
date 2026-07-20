@@ -1,15 +1,20 @@
-# Repo-root build context excludes. Applies to the two builds whose compose
-# context is the repo root: frontend (frontend/Dockerfile) and docs
-# (docs-site/Dockerfile). It SUPERSEDES frontend/.dockerignore and
-# docs-site/.dockerignore for those builds, so it must reproduce their excludes.
-# The backend/mcp images keep their own package-scoped contexts and .dockerignore.
+# Repo-root build-context excludes. This is the SINGLE source for all four image
+# builds whose compose context is the repo root: frontend (frontend/Dockerfile),
+# docs (docs-site/Dockerfile), backend (backend/Dockerfile), and mcp
+# (mcp/Dockerfile). It supersedes the former per-package .dockerignore files
+# (backend, mcp, frontend, docs-site), which are deleted.
 #
-# Keep only what the two image builds COPY: frontend/, docs-site/, shared/
-# (each package's package-lock.json + nginx.conf included). Everything below is
-# rebuilt inside the image, is another package, or is tooling/secrets that must
-# never enter the context.
+# Each Dockerfile selectively COPYs only what it needs (its own package + shared,
+# plus the workspace metadata for the Python builds). This file keeps every
+# context lean and, critically, keeps secrets (.env*) and rebuilt artifacts out.
+#
+# backend/, mcp/, and contract/ are NOT excluded: they are uv workspace members
+# whose pyproject.toml the backend/mcp resolve layer must read. The side effect is
+# that the frontend/docs contexts now also carry the Python packages; the
+# venv/cache/test excludes below cap that, and those Dockerfiles COPY only their
+# own dirs regardless.
 
-# Rebuilt inside the image
+# Rebuilt inside the image (JS toolchain)
 **/node_modules
 **/dist
 **/.vitepress/cache
@@ -17,22 +22,34 @@
 **/*.tsbuildinfo
 .turbo
 
+# Rebuilt inside the image (Python toolchain) — backend/mcp now enter the context
+**/.venv
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.hypothesis
+**/.coverage
+**/.coverage.*
+**/htmlcov
+**/coverage.xml
+
+# Tests never ship in an image
+**/tests
+
 # VCS, CI, and secrets (.env* keeps the committed .env.prod out of the context)
 .git
 .gitignore
 .github
 .env*
 
-# Other packages / not needed by the frontend or docs builds
-backend
-mcp
+# Dirs no image build COPYs
 e2e
-contract
 skill
 deployments
 scripts
 docs
-.ruff_cache
 
 # Root tooling and scratch
 docker-compose*.yml

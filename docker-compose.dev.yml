@@ -15,8 +15,10 @@ services:
       MCP_PUBLIC_URL: http://localhost:9000
     volumes:
       # Bind source over the image's editable install so --reload picks up edits.
-      - ./backend/src:/app/src
-      - ./backend/alembic:/app/alembic
+      # Paths mirror the image layout (/app/backend) now that the build context
+      # is the repo root.
+      - ./backend/src:/app/backend/src
+      - ./backend/alembic:/app/backend/alembic
 
   mcp:
     # Run uvicorn with --reload directly (the prod CMD is the non-reload console
@@ -27,7 +29,7 @@ services:
       PUBLIC_BASE_URL: http://backend:8000    # reach the AS JWKS in-network
       MCP_PUBLIC_URL: http://localhost:9000
     volumes:
-      - ./mcp/src:/app/src
+      - ./mcp/src:/app/mcp/src
 
   postgres:
     # Publish to the host so host-run recipes (just dev-api, just migrate, the
