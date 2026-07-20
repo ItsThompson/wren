@@ -23,7 +23,6 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 
 from wren.core.errors import Conflict, ErrorCode, NotFound, Validation, Violation
-from wren.core.logging import get_logger
 from wren.core.observability import track_failures
 from wren.roadmaps import patch, slugs
 from wren.roadmaps.assembly import assemble_draft, assemble_fork
@@ -42,6 +41,7 @@ from wren.roadmaps.schemas import (
     Visibility,
 )
 from wren.roadmaps.validation import validate_structure
+from wren_common.logging import get_logger
 
 _log = get_logger("wren-roadmaps")
 

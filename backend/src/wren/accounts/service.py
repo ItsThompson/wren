@@ -31,8 +31,8 @@ from wren.accounts.passwords import PasswordHasher, validate_password_strength
 from wren.accounts.schemas import AuthenticatedUser, PublicProfile, Session
 from wren.core.db import is_unique_violation
 from wren.core.errors import Conflict, NotFound, Unauthorized, Validation
-from wren.core.logging import get_logger
 from wren.core.observability import track_failures
+from wren_common.logging import get_logger
 
 if TYPE_CHECKING:
     from wren.accounts.repository import AccountRepository

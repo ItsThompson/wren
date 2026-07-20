@@ -24,9 +24,9 @@ from wren.core.errors import (
     Violation,
     build_exception_handlers,
 )
-from wren.core.logging import _build_processors
 from wren.core.settings import AppSettings
 from wren.oauth.errors import build_oauth_exception_handlers
+from wren_common.logging import _build_processors
 
 MakeSettings = Callable[..., AppSettings]
 MakeHandlers = Callable[[], dict[ExceptionKey, ExceptionHandler]]

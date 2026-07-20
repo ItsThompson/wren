@@ -9,8 +9,8 @@ from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
 from wren.core.app_factory import create_app
-from wren.core.health import CheckResult
 from wren.core.settings import AppSettings
+from wren_common.health import CheckResult
 
 MakeSettings = Callable[..., AppSettings]
 

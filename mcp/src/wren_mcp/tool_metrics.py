@@ -2,7 +2,7 @@
 
 Counts every agent tool call as ``mcp_tool_invocations_total{tool,outcome}`` so
 the operator can see authoring/study activity and per-tool error rates. Kept on a
-dedicated registry that :func:`wren_mcp.metrics.instrument` exposes on
+dedicated registry that :func:`wren_common.metrics.instrument` exposes on
 ``/metrics`` alongside the private HTTP registry, mirroring the backend split
 (names/labels follow a stable convention so rules/dashboards drop in later).
 
@@ -20,7 +20,7 @@ from typing import Any
 
 from prometheus_client import CollectorRegistry, Counter
 
-from wren_mcp.logging import get_logger
+from wren_common.logging import get_logger
 from wren_mcp.settings import SERVICE
 from wren_mcp.tool_errors import BackendToolError
 

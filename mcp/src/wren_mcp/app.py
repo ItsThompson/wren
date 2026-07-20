@@ -27,19 +27,20 @@ from mcp.server.fastmcp.server import StreamableHTTPASGIApp
 from starlette.routing import Route
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
+from wren_common.health import create_health_router
+from wren_common.logging import configure_logging, get_logger
+from wren_common.metrics import instrument
 from wren_mcp.auth import BearerAuthMiddleware
 from wren_mcp.client import InternalApiClient, create_internal_http_client
 from wren_mcp.config import MCP_PATH, PRM_PATH
 from wren_mcp.correlation import CorrelationMiddleware
-from wren_mcp.health import create_health_router, jwks_readiness_check
-from wren_mcp.keys import JsonFetch, KeyProvider, RemoteKeyProvider
-from wren_mcp.logging import configure_logging, get_logger
+from wren_mcp.keys import JsonFetch, KeyProvider, RemoteKeyProvider, jwks_readiness_check
 from wren_mcp.mcp_server import create_mcp_server
-from wren_mcp.metrics import instrument
 from wren_mcp.prm import build_prm_document
 from wren_mcp.settings import RsSettings, build_rs_settings
 from wren_mcp.state import RsDeps, set_rs_deps
 from wren_mcp.tokens import AgentTokenVerifier
+from wren_mcp.tool_metrics import TOOL_METRICS_REGISTRY
 from wren_mcp.tools_read import register_read_tools
 from wren_mcp.tools_write import register_write_tools
 
@@ -161,7 +162,7 @@ def create_rs_app(
         resource=settings.resource,
         protected_prefix=MCP_PATH,
     )
-    instrument(app)
+    instrument(app, TOOL_METRICS_REGISTRY)
 
     # Correlation is mounted here so it is outermost among the always-on
     # middleware: request_id is bound before the metrics middleware, the bearer

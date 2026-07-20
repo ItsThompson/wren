@@ -21,11 +21,15 @@ from typing import Any, Protocol, cast
 from joserfc.errors import InvalidKeyIdError
 from joserfc.jwk import KeySet, KeySetSerialization
 
+from wren_common.health import CheckResult, ReadinessCheck
 from wren_mcp.config import AS_METADATA_PATH
 
 # Fetches and parses a JSON document from a URL. Injected so tests substitute the
 # network without touching the discovery/caching logic.
 JsonFetch = Callable[[str], Awaitable[dict[str, Any]]]
+
+# The readiness-check name the RS reports for AS JWKS reachability.
+JWKS_CHECK_NAME = "as_jwks"
 
 _DEFAULT_REFRESH_COOLDOWN_SECONDS = 10.0
 
@@ -102,3 +106,20 @@ class RemoteKeyProvider:
         self._key_set = KeySet.import_key_set(cast("KeySetSerialization", jwks))
         self._last_refresh = self._clock()
         return self._key_set
+
+
+def jwks_readiness_check(key_provider: KeyProvider) -> ReadinessCheck:
+    """Readiness check that confirms the AS public JWKS is reachable and parseable.
+
+    Never raises: a discovery/fetch failure resolves to a failed CheckResult, so
+    the RS reports "not ready" (503) rather than crashing when the AS is down.
+    """
+
+    async def check() -> CheckResult:
+        try:
+            await key_provider.load()
+        except Exception as exc:  # noqa: BLE001 - any fetch/parse error is "not ready"
+            return CheckResult(name=JWKS_CHECK_NAME, ok=False, detail=str(exc))
+        return CheckResult(name=JWKS_CHECK_NAME, ok=True)
+
+    return check

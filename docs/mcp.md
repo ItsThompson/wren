@@ -2,7 +2,7 @@
 
 The MCP server is wren's AI-agent front door. It exposes roadmap authoring and study tools over the Model Context Protocol (MCP) so an agent can create, publish, and study roadmaps. It is a separate deployable image (`wren-mcp`) and an OAuth 2.1 Resource Server (RS).
 
-The server is a thin dispatcher. It holds no roadmap logic and imports no backend code. Each tool body is one authenticated call to the backend internal app (`:8001`), so the rules live in one place (the shared `RoadmapService`). The package re-declares the wire truths it shares with the backend (header names, scopes, schema shapes) and keeps them in sync by contract tests, not by import. See `infra-duplication.md` for the duplication model and its drift gate.
+The server is a thin dispatcher. It holds no roadmap logic and imports no backend domain code. Each tool body is one authenticated call to the backend internal app (`:8001`), so the rules live in one place (the shared `RoadmapService`). Shared infrastructure (logging, metrics, health) comes from the `wren-common` package; the wire truths it shares with the backend (header names, scopes, schema shapes) are re-declared here and kept in sync by contract tests, not by import. See `packaging.md` for the workspace and the shared-infra-versus-mirrored-wire-truth boundary.
 
 Canonical sources: `mcp/src/wren_mcp/`. This doc cites the module for each claim.
 
@@ -158,7 +158,7 @@ Canonical source: `tool_errors.py`. The error contract itself has one canonical 
 
 ## RS-served endpoints
 
-Canonical source: `app.py`, `health.py`, `metrics.py`, `prm.py`.
+Canonical source: `app.py`, `wren_common.health`, `wren_common.metrics`, `prm.py`.
 
 | Endpoint | Purpose | Exposure |
 |----------|---------|----------|
@@ -173,7 +173,7 @@ Warning: the tunnel ingress (`mcp.usewren.com`) exposes only the PRM document an
 
 ## Metrics
 
-Canonical source: `tool_metrics.py`, `metrics.py`; full detail in `monitoring.md`. The RS emits `mcp_tool_invocations_total{tool,outcome}` on a dedicated `TOOL_METRICS_REGISTRY`, plus the shared `http_requests_total` / `http_request_duration_seconds` families on its private registry. `/metrics` serves both registries concatenated.
+Canonical source: `tool_metrics.py`, `wren_common.metrics`; full detail in `monitoring.md`. The RS emits `mcp_tool_invocations_total{tool,outcome}` on a dedicated `TOOL_METRICS_REGISTRY`, plus the shared `http_requests_total` / `http_request_duration_seconds` families on its private registry. `/metrics` serves both registries concatenated.
 
 ## Cross-surface notes
 
@@ -187,7 +187,7 @@ These record intentional design, verified against the current source. Read them 
 
 - Token model, audience binding, and discovery: `auth.md`.
 - REST route catalog and the error contract: `api.md`.
-- Cross-package duplication and its drift gate: `infra-duplication.md`.
+- The uv workspace, per-member images, and the backend/MCP boundary: `packaging.md`.
 - Metrics, alerts, and retention: `monitoring.md`.
 - Shared authoring rules and the immutability boundary: `authoring.md`.
 - Follow and study-loop semantics: `progress.md`.

@@ -16,7 +16,7 @@ publish, and study roadmaps.
 
 ## Architecture
 
-- The RS imports no backend code. It ships as a separate image.
+- The RS imports no backend domain code; shared infrastructure (logging, metrics, health) comes from the `wren-common` workspace package. It ships as a separate image.
 - Wire truths it shares with the backend (the internal-boundary header names, the
   OAuth scopes, the tool schema shapes) are re-declared here and kept in sync by
   contract tests, not by import.
@@ -35,7 +35,7 @@ All recipes run from the repo root and change into `mcp/`.
 
 | Command | Purpose |
 |---------|---------|
-| `just setup-mcp` | Install dependencies into `mcp/.venv` from `uv.lock` |
+| `just setup-mcp` | Sync the shared workspace venv from the root `uv.lock` |
 | `just dev-mcp` | Run the RS (`:9000`) with autoreload; the MCP Inspector attaches here |
 | `just test-mcp` | Run the test suite with coverage |
 | `just lint-mcp` | Ruff check, format check, and mypy |
@@ -52,5 +52,5 @@ not duplicate it here.
 
 - MCP transport, tools, and boundary contract: `../docs/mcp.md`
 - Token model and OAuth: `../docs/auth.md`
-- Cross-package duplication and its drift gate: `../docs/infra-duplication.md`
+- The uv workspace, per-member images, and the backend/MCP boundary: `../docs/packaging.md`
 - Metrics and alerts: `../docs/monitoring.md`

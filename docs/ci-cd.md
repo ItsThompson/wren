@@ -25,14 +25,16 @@ CI runs on every pull request and on pushes to `main`. CD runs after CI conclude
 
 | Job | Gates | Notes |
 |-----|-------|-------|
-| `lint` | Format, style, and types for all three packages | Ruff and mypy for backend and MCP; `tsc` and oxlint for the frontend. Gates the test jobs. |
+| `lint` | Format, style, and types for the Python workspace and the frontend | Ruff and mypy for backend, MCP, and wren-common; `tsc` and oxlint for the frontend. Gates the test jobs. |
 | `codegen-drift` | The frozen frontend REST client | Regenerates the OpenAPI document and the TS client, then fails on a stale committed client. Independent of `lint`. |
-| `contract-drift` | Cross-package wire contracts | Runs the `contract/` project: the internal-boundary header constants and the backend-to-MCP schema mirror. Needs `lint`. |
-| `test-backend` | Backend and MCP behavior | pytest with the 80% backend coverage gate, then the MCP suite with its 80% gate. Real Postgres per test via testcontainers. Needs `lint`. |
+| `contract-drift` | Cross-package wire contracts | Runs the `contract/` project: the internal-boundary header constants, the OAuth scope constants, and the backend-to-MCP schema mirror. Needs `lint`. |
+| `test-backend` | Backend and MCP behavior | pytest with the 80% backend coverage gate, then the MCP suite with its 80% gate, then the wren-common seam tests. Real Postgres per test via testcontainers. Needs `lint`. |
 | `test-frontend` | Frontend behavior | vitest with the 70% coverage gate. Needs `lint`. |
 | `e2e` | The full spine | Builds and boots the Compose stack with the e2e overlay, runs pre-traffic migrations, then runs Playwright. Needs `lint`. |
 
 Route coverage is not a separate job. The `test_route_registry.py` coverage check runs inside the backend pytest suite.
+
+Every `uv` job resolves against the single root `uv.lock`: it syncs the shared workspace venv once with `uv sync --all-packages --frozen`, then runs each member's tools with `uv run --no-sync`. There are no per-package lockfiles. See `docs/packaging.md`.
 
 ## Merge gates
 
@@ -56,6 +58,8 @@ CD deploys the whole stack to the single VPS over an SSH Docker Context. The Com
 | Rollback (on failure) | CI-owned. Read the previous `.deployed-sha`, check it out, re-export env, and re-run the deploy pinned to the previous images and config. |
 
 `scripts/deploy.sh` runs a fixed sequence: assert every required config and secret env var is set, pull images, run migrations pre-traffic, start the stack under the `tunnels` profile, health-gate every service for about 60 seconds, then record the deployed SHA on success. See `docs/runbooks/deploy.md` and `docs/runbooks/rollback.md` for the operator view.
+
+The backend and MCP images build from the repo-root context (like `frontend`/`docs`), each selecting a member `dockerfile:` in `docker-compose.yml`; `discover` parses the context and dockerfile from `docker compose config`. See `docs/packaging.md` for the per-member build.
 
 ## Required secrets
 

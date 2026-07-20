@@ -6,12 +6,15 @@
 ## Repository structure
 
 - `backend/`: Python modular-monolith backend (uv). A shared `core` kit, the external app (`api`), and the internal app (`api_internal`) over one service layer.
-- `mcp/`: Python MCP server (uv). An OAuth 2.1 Resource Server that calls the backend internal app and imports no backend code.
+- `mcp/`: Python MCP server (uv). An OAuth 2.1 Resource Server that calls the backend internal app and imports no backend domain code.
 - `frontend/`: React SPA (npm) that talks to the external app over a typed REST client.
 - `contract/`: the dev/test-only cross-package test project (the only interpreter where both Python packages import together).
+- `shared/wren-common/`: shared backend/MCP infrastructure (logging, metrics, health), consumed by both Python deployables.
 - `shared/theme/`: the design tokens the SPA and the docs site share.
 - `docs-site/`: the customer-facing VitePress site. It is not internal documentation.
 - Ops assets: `docker-compose*.yml`, `scripts/`, `deployments/`, `justfile`.
+
+The four Python packages (`backend`, `mcp`, `contract`, `shared/wren-common`) form a uv workspace with a single root `uv.lock`. See `docs/packaging.md`.
 
 
 ## Docker / Deployment (Hetzner CX33: 4 vCPU, 8 GB RAM, 80 GB NVMe)

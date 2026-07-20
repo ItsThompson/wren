@@ -18,7 +18,6 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from wren.core.errors import NotFound
-from wren.core.logging import get_logger
 from wren.core.observability import OAUTH_TOKENS_ISSUED, track_failures
 from wren.oauth.config import (
     GRANT_TYPE_AUTHORIZATION_CODE,
@@ -31,6 +30,7 @@ from wren.oauth.models import OAuthRefreshToken
 from wren.oauth.pkce import is_valid_s256
 from wren.oauth.schemas import ConnectedClient, OAuthEvent, TokenRequest, TokenResponse
 from wren.oauth.tokens import AccessTokenCodec, hash_token, mint_refresh_token
+from wren_common.logging import get_logger
 
 if TYPE_CHECKING:
     from datetime import datetime, timedelta

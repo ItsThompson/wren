@@ -4,7 +4,7 @@ Wren's P0 observability: what is measured, what alerts, and how long data is kep
 
 Canonical sources:
 
-- Instrumentation: `backend/src/wren/core/` (HTTP, domain/service/pool families, pool events), `mcp/src/wren_mcp/` (MCP).
+- Instrumentation: `shared/wren-common/src/wren_common/metrics.py` (shared HTTP families), `backend/src/wren/core/` (domain/service/pool families, pool events), `mcp/src/wren_mcp/` (MCP tool counter).
 - Scrape + alert rules: `deployments/prometheus/prometheus.yml`, `deployments/prometheus/alerts.yml`.
 - Alert routing: `deployments/alertmanager/alertmanager.yml`.
 - Container topology, retention flags, and network placement: `docker-compose.yml`.

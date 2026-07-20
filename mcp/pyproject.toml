@@ -17,7 +17,13 @@ dependencies = [
     "httpx>=0.27.0,<1",
     "joserfc>=1.0.0,<2",
     "mcp>=1.27,<2",
+    "wren-common",
 ]
+
+[tool.uv.sources]
+# Shared infra (logging, metrics, health) resolved from the workspace member,
+# never published. Both deployables consume the one source of truth.
+wren-common = { workspace = true }
 
 [project.scripts]
 wren-mcp = "wren_mcp.main:main"

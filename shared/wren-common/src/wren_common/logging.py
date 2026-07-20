@@ -1,13 +1,10 @@
-"""structlog configuration for the MCP server.
+"""structlog configuration shared by every Wren service.
 
-Mirrors the backend's logging setup (dev -> human console, everything else ->
-JSON) so MCP logs land in the same aggregated, queryable shape.
-Configured once per process; the ``service`` field is bound via :func:`get_logger`.
-
-Kept in sync with :mod:`wren.core.logging` by hand: the two copies are
-**code-identical** (only docstrings differ). Any processor added to the
-chain here MUST be added there too. See ``docs/infra-duplication.md`` for the
-`wren-common` deferral and the full drift checklist.
+Configured once per process. In development, logs render as a human-readable
+console stream; everywhere else they render as JSON. The ``service`` field is
+bound per app via :func:`get_logger`, so traffic from different apps stays
+distinguishable even when several run in one process (for example the backend's
+external and internal apps, or the two-app smoke test).
 """
 
 from __future__ import annotations
@@ -48,7 +45,11 @@ def _build_processors(*, is_dev: bool) -> list[structlog.types.Processor]:
 
 
 def configure_logging(*, environment: str, log_level: str) -> None:
-    """Configure structlog once per process. Subsequent calls are no-ops."""
+    """Configure structlog once per process. Subsequent calls are no-ops.
+
+    Both apps share one deployment environment and log level, so the first call
+    wins and later calls (e.g. the second app in a two-app process) are ignored.
+    """
     global _configured
     if _configured:
         return

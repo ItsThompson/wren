@@ -18,7 +18,6 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlencode, urlsplit
 
 from wren.core.errors import NotFound
-from wren.core.logging import get_logger
 from wren.core.observability import track_failures
 from wren.oauth.config import (
     CODE_CHALLENGE_METHOD_S256,
@@ -40,6 +39,7 @@ from wren.oauth.schemas import (
     ClientRegistrationResponse,
     OAuthEvent,
 )
+from wren_common.logging import get_logger
 
 if TYPE_CHECKING:
     from datetime import datetime

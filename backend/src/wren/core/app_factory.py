@@ -19,9 +19,10 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from wren.core.correlation import CorrelationMiddleware
-from wren.core.health import ReadinessCheck, create_health_router
-from wren.core.logging import configure_logging, get_logger
-from wren.core.metrics import instrument
+from wren.core.observability import WREN_REGISTRY
+from wren_common.health import ReadinessCheck, create_health_router
+from wren_common.logging import configure_logging, get_logger
+from wren_common.metrics import instrument
 
 if TYPE_CHECKING:
     from starlette.types import Lifespan
@@ -56,7 +57,7 @@ def create_app(
     for router in routers:
         app.include_router(router)
 
-    instrument(app)
+    instrument(app, WREN_REGISTRY)
 
     # Correlation is mounted last so it is the outermost factory-added middleware:
     # request_id is bound before the router (and the metrics middleware) runs, and

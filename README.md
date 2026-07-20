@@ -96,7 +96,7 @@ Install the prerequisites:
 Boot the backend and frontend inner loops:
 
 ```sh
-just setup             # install backend dependencies
+just setup             # sync the Python workspace venv (all members)
 just dev-infra         # start local Postgres in Docker
 just dev-api           # boot the external app on http://127.0.0.1:8000
 just dev-api-internal  # boot the internal app on http://127.0.0.1:8001
@@ -119,7 +119,7 @@ See `docs/development.md` for the full development guide.
 
 | Command | Description |
 |---------|-------------|
-| `just setup` | Install backend dependencies |
+| `just setup` | Sync the Python workspace venv (all members) |
 | `just dev-api` | Boot the external app on `:8000` |
 | `just dev-api-internal` | Boot the internal app on `:8001` |
 | `just test-backend` | Run backend tests with coverage |
@@ -139,11 +139,11 @@ Configuration comes from environment variables. See `.env.example` for the canon
 The monorepo holds four concerns:
 
 - A Python **backend** package: a shared core kit plus two apps (external and internal) over one service layer.
-- A Python **MCP server** package: the agent front door that calls the backend internal app and shares no code with it.
+- A Python **MCP server** package: the agent front door that calls the backend internal app and shares no domain code with it (shared infra comes from `wren-common`).
 - A React **frontend** SPA that talks to the external app over a typed REST client.
 - **Ops assets**: Docker Compose files, deployment scripts, Prometheus and Alertmanager config, and the Cloudflare tunnel config.
 
-A `contract/` project holds cross-package tests, and `shared/theme/` holds the design tokens the SPA and docs site share. See `docs/architecture.md` for the conceptual model.
+A `contract/` project holds cross-package tests, `shared/wren-common` holds the shared backend/MCP infra, and `shared/theme/` holds the design tokens the SPA and docs site share. The Python packages form a uv workspace with a single root lockfile (`docs/packaging.md`). See `docs/architecture.md` for the conceptual model.
 
 ## Further reading
 
@@ -161,7 +161,7 @@ A `contract/` project holds cross-package tests, and `shared/theme/` holds the d
 | [docs/authoring.md](docs/authoring.md) | Roadmap authoring model and constraints |
 | [docs/progress.md](docs/progress.md) | The follow-and-study loop and the study-time read surface |
 | [docs/monitoring.md](docs/monitoring.md) | Metrics, alerts, retention, and signup notifications |
-| [docs/infra-duplication.md](docs/infra-duplication.md) | The hand-duplicated infra modules and the drift checklist |
+| [docs/packaging.md](docs/packaging.md) | The uv workspace, single lockfile, per-member image builds, and the backend/MCP boundary |
 | [docs/design-language.md](docs/design-language.md) | Visual design tokens and component conventions |
 | [docs/runbooks/bring-up.md](docs/runbooks/bring-up.md) | One-time production bring-up |
 | [docs/runbooks/deploy.md](docs/runbooks/deploy.md) | Repeatable deploy over the Docker Context |

@@ -11,7 +11,7 @@ Both apps come from one factory (`wren.core.app_factory.create_app`) and differ 
 
 ## Architecture
 
-- `wren.core` is the shared infrastructure kit: the app factory, settings, the two identity boundaries, persistence, logging, metrics, the error contract, correlation, health, and the route-access registry. It holds no domain logic. Two entrypoints assemble the apps: `wren.api.main` (external) and `wren.api_internal.main` (internal).
+- `wren.core` is the backend's infrastructure kit: the app factory, settings, the two identity boundaries, persistence, the error contract, correlation, the domain/service/pool metric families (`observability`), and the route-access registry. Structured logging, the HTTP-metrics instrumentation, and the health router come from the shared `wren-common` package (injected with the backend's registry and DB readiness check). It holds no domain logic. Two entrypoints assemble the apps: `wren.api.main` (external) and `wren.api_internal.main` (internal).
 - The domain packages (`roadmaps`, `progress`, `accounts`, `oauth`, `skill`) each own one area of business rules.
 - Each domain follows one layering convention: config, models, schemas, repository, service, router, and wiring. The service layer owns the transaction boundary and every business rule; routers are thin adapters.
 - Dependency direction stays one-way. A domain receives narrow injected callables rather than importing another domain's repository.
@@ -24,7 +24,7 @@ All recipes run from the repo root and change into `backend/`.
 
 | Command | Purpose |
 |---------|---------|
-| `just setup` | Install dependencies into `backend/.venv` from `uv.lock` |
+| `just setup` | Sync the shared workspace venv from the root `uv.lock` |
 | `just dev-api` | Run the external app (`:8000`) with autoreload |
 | `just dev-api-internal` | Run the internal app (`:8001`) with autoreload |
 | `just dev-infra` | Start local Postgres for the host inner loop |

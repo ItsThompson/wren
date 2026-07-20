@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Protocol
 
 import httpx
 
-from wren.core.logging import get_logger
+from wren_common.logging import get_logger
 
 if TYPE_CHECKING:
     from pydantic import SecretStr

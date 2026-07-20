@@ -88,8 +88,12 @@ services:
   backend:
     image: ghcr.io/${GHCR_OWNER:-wren-platform}/wren/backend:${WREN_IMAGE_TAG:-latest}
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      # Repo-root context so the build can reach the shared/wren-common workspace
+      # member (mirrors the frontend/docs builds). The repo-root .dockerignore
+      # keeps the context lean; backend/Dockerfile selectively COPYs only the
+      # backend member + shared/wren-common (no mcp/contract source ships).
+      context: .
+      dockerfile: backend/Dockerfile
     env_file:
       # Secrets, TTLs, pinned public URLs, CORS. Absent locally is fine: the
       # in-network overrides below plus dev defaults keep the app bootable.
@@ -135,8 +139,12 @@ services:
   mcp:
     image: ghcr.io/${GHCR_OWNER:-wren-platform}/wren/mcp:${WREN_IMAGE_TAG:-latest}
     build:
-      context: ./mcp
-      dockerfile: Dockerfile
+      # Repo-root context so the build can reach the shared/wren-common workspace
+      # member (mirrors the frontend/docs builds). The repo-root .dockerignore
+      # keeps the context lean; mcp/Dockerfile selectively COPYs only the mcp
+      # member + shared/wren-common (no backend/contract source ships).
+      context: .
+      dockerfile: mcp/Dockerfile
     env_file:
       - path: .env
         required: false
