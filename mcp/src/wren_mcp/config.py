@@ -33,8 +33,12 @@ MCP_PATH = "/mcp"
 # (separate images, no shared code).
 MCP_INSPECTOR_ORIGIN = "http://localhost:6274"
 
-# OAuth scopes advertised in the PRM. Mirrors the backend AS's
-# supported scopes so a client sees a consistent set on both documents.
+# OAuth scopes advertised in the PRM. Mirrors the backend AS's supported scopes
+# so a client sees a consistent set on both documents. The cross-package equality
+# is mechanically enforced by the `contract-drift` check
+# (``contract/tests/test_scope_constants.py``), the only interpreter where both
+# packages import together; ``mcp/tests/test_prm.py`` checks this document alone,
+# so it cannot catch drift against the backend AS metadata.
 SCOPE_ROADMAPS_READ = "roadmaps:read"
 SCOPE_ROADMAPS_WRITE = "roadmaps:write"
 SCOPE_PROGRESS_WRITE = "progress:write"

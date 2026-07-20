@@ -1,32 +1,45 @@
-# React + TypeScript + Vite
+# wren frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The wren frontend is a React 19 single-page app built with Vite. It serves human users and talks to the backend external app over a typed REST client.
 
-Currently, two official plugins are available:
+## Purpose
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Read, publish, fork, and track roadmaps, and manage their lifecycle.
+- Authenticate humans with a session cookie and resume the session on load.
 
-## React Compiler
+## Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Concern | Tools |
+|---------|-------|
+| Framework | React 19, React Router, Vite |
+| Styling | Tailwind CSS v4, vendored shadcn/ui primitives, shared design tokens |
+| Data | SWR, openapi-fetch (a typed client generated from the OpenAPI document) |
+| Dev and test | Mock Service Worker, vitest, Testing Library |
 
-## Expanding the Oxlint configuration
+## Architecture
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+- `App.tsx` composes the provider stack: SWR config, the API client provider, the auth provider, and the router.
+- `routes.tsx` holds the route tree and its two onboarding guards.
+- `auth/` owns the session client and the 401 refresh-and-retry flow.
+- `api/` is the data layer: cache `keys`, the `runQuery` adapter, and the `useApiQuery` and `usePublicApiQuery` hooks.
+- `views/` holds the route targets. Each view is a thin orchestrator over one data hook.
+- `components/` holds the shared component library. `shared/theme/` and `globals.css` bridge the design tokens onto Tailwind.
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
+See `../docs/frontend.md` for the full architecture and data flow.
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Setup and run
+
+All recipes run from the repo root and change into `frontend/`.
+
+| Command | Purpose |
+|---------|---------|
+| `just setup-frontend` | Install dependencies (`npm install`) |
+| `just dev-web` | Run the SPA against the real backend |
+| `just dev-mock` | Run the SPA against the Mock Service Worker (zero backend) |
+| `just test-frontend` | Run the test suite with coverage |
+| `just lint-frontend` | Type check (`tsc`) and lint |
+| `just codegen` | Regenerate the REST client from the external OpenAPI document |
+
+## Configuration
+
+The frontend reads three build-time variables: `VITE_API_BASE_URL`, `VITE_MCP_BASE_URL`, and `VITE_MOCK_API`. See `../docs/frontend.md` for what each does and `frontend/src/vite-env.d.ts` for the types. `.env.example` at the repo root is the canonical annotated list. Do not duplicate it here.

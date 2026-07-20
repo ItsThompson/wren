@@ -114,7 +114,8 @@ jobs:
   # path-installs both packages; neither deployable depends on the other). It
   # guards the cross-package frozen contract: the internal-
   # boundary header constants (X-User-ID, X-Internal-Api-Token) plus the
-  # X-Request-ID correlation header, and the backend<->MCP schema mirror (Group A
+  # X-Request-ID correlation header, the OAuth scope set (PRM vs AS metadata),
+  # and the backend<->MCP schema mirror (Group A
   # shapes asserted field-equal, the lean write results asserted a fields-subset).
   # An independent failure signal, gated by lint like the test jobs; not folded
   # into the isolated-venv test-backend steps. Mirrors codegen-drift's frozen-
@@ -132,7 +133,7 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Contract drift (cross-package header constants + schema mirror)
+      - name: Contract drift (cross-package header + scope constants + schema mirror)
         working-directory: contract
         run: |
           uv sync --frozen
