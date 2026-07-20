@@ -1,0 +1,16 @@
+# uv workspace root. This is a virtual root: it defines the workspace and its
+# single shared lockfile but is not itself a package (no [project]) and builds no
+# artifact. Every member resolves against one root uv.lock, so a shared library
+# (for example pydantic) has exactly one version across the backend and MCP images.
+#
+# Members:
+#   backend            -> the `wren` backend (external :8000 + internal :8001)
+#   mcp                -> the `wren-mcp` OAuth Resource Server (:9000)
+#   contract           -> the dev/test-only cross-package contract harness
+#   shared/wren-common -> shared infra (logging, metrics, health) both apps consume
+#
+# Sync model:
+#   uv sync --all-packages          one shared root .venv with every member (dev/CI)
+#   uv sync --frozen --package <m>  a lean per-member set (the Docker images)
+[tool.uv.workspace]
+members = ["backend", "mcp", "contract", "shared/wren-common"]

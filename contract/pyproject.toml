@@ -14,11 +14,11 @@ dependencies = ["wren", "wren-mcp", "pytest>=8"]
 package = false
 
 [tool.uv.sources]
-# Editable path installs: a schema/constant edit in either package is picked up
-# from the working tree with no relock. backend/uv.lock and mcp/uv.lock are
-# never touched.
-wren = { path = "../backend", editable = true }
-wren-mcp = { path = "../mcp", editable = true }
+# Workspace members: a schema/constant edit in either package is picked up from
+# the working tree via the shared root .venv, with no relock. The single root
+# uv.lock is the source of truth; there are no per-package lockfiles to touch.
+wren = { workspace = true }
+wren-mcp = { workspace = true }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
