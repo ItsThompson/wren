@@ -76,7 +76,7 @@ adding anything terracotta, place it in the right column first.
 |----------|--------------------------|----------|
 | **Loud** (fills, large type, blocks) | High-impact, low-density surfaces | Landing hero, primary CTAs, roadmap + section progress fills, the "next" node highlight, active filter chip, empty-state action, focus rings |
 | **Calm** (cream + ink; terracotta only as link/icon/1px accent) | Dense reading areas | Checklist rows, node card bodies, node detail, section/subsection text, top bar, forms, badges, metadata |
-| **Never** | — | Terracotta as a card background behind reading content; terracotta on subject tags; more than one serif display moment per dense view |
+| **Never** | N/A | Terracotta as a card background behind reading content; terracotta on subject tags; more than one serif display moment per dense view |
 
 ### 3.2 Semantic hues
 
@@ -168,8 +168,11 @@ Rules:
 
 ## 7. Components (intent)
 
-Each maps to a shadcn/ui primitive and inherits the tokens; this section is the
-*intent*, not the markup. Implementations live under
+This section is the *intent*, not the markup. Only three primitives are vendored
+shadcn/ui, under `frontend/src/components/ui/`: button, input, and dropdown-menu.
+They inherit the tokens automatically. The rest (cards, progress bars, checklist
+rows, badges, empty states) are plain Wren components built on the same tokens,
+not generated primitives. Implementations live under
 `frontend/src/components/**`. Match the nearest existing sibling when adding one.
 
 - **Buttons.** Primary = terracotta fill with a cream label (the accent-forward

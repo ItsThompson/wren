@@ -54,7 +54,7 @@ drifting:
          other.** The two `logging.py` copies are code-identical; the processor
          chain (`_build_processors`) must stay identical across both. The
          request-id correlation currently uses ASGI middleware, **not** a
-         structlog processor, so neither chain changed — but any future processor
+         structlog processor, so neither chain changed, but any future processor
          (e.g. binding a field onto every log line via the chain rather than
          `contextvars`) must land in both copies in the same change.
    - [ ] A change to the HTTP-metric families or instrumentator wiring in one
@@ -70,5 +70,5 @@ drifting:
    `backend/src/wren/core/identity.py` and re-declared in
    `mcp/src/wren_mcp/config.py`). Their cross-package equality is enforced
    automatically by `contract/tests/test_header_constants.py` (run by the
-   `contract-drift` CI job) — the sole interpreter where both packages import
+   `contract-drift` CI job): the sole interpreter where both packages import
    together. No duplicate header test is added here; that assertion is the guard.

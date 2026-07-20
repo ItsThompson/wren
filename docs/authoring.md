@@ -1,12 +1,28 @@
 # Authoring roadmaps
 
-How draft content is written, and why published content cannot be. Both transports
-(web and MCP) go through the same `RoadmapService` (`backend/src/wren/roadmaps/service.py`),
-so these rules hold identically for humans and agents.
+How draft content is written, and why published content cannot be. Content
+authoring goes through one `RoadmapService`
+(`backend/src/wren/roadmaps/service.py`), so the rules below hold identically
+wherever the write comes from.
 
 A roadmap is authored as a **draft**, then **published** in a one-way transition
 that freezes its structure. There are two ways to write draft content and a hard
 boundary that stops either from touching published content.
+
+## Where content authoring happens
+
+Content authoring (create, patch, replace, validate) has **no web UI**. It is
+agent-only, driven by an AI agent through the MCP tools. The web SPA surfaces no
+content-editing form.
+
+The backend authoring endpoints exist on both apps and enforce the same rules; the
+SPA simply does not call the content-write ones. The sanctioned web edits are the
+presentation-only metadata edit and the lifecycle actions (publish, fork,
+visibility, archive, delete). See `api.md` for which endpoints mount where.
+
+For the study-time read surface and the follow model (following is created
+implicitly by the first progress write, not by an explicit follow button), see
+`progress.md`.
 
 ## Two write paths: patch vs replace
 

@@ -86,7 +86,7 @@ variables, so CI renders it (`envsubst` substitutes **only** that token) into th
 an environment-sourced Compose secret (`0400`) at
 `/etc/alertmanager/alertmanager.yml`; the Go templating (`{{ ... }}`) in the
 title/message is left untouched and renders at alert time. `DISCORD_WEBHOOK_URL`
-is a GitHub Actions secret (see `deploy.md`). No rendered file is written to the
+is a GitHub Actions secret (see `runbooks/deploy.md`). No rendered file is written to the
 box; never commit a real webhook.
 
 **This render is release-gating, not merely "needed for live firing."**
