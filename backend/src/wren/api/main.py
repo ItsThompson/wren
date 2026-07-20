@@ -8,6 +8,7 @@ the shared factory with the external service identity injected.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,6 +35,7 @@ from wren.core.identity import (
 from wren.core.settings import EXTERNAL_PORT, EXTERNAL_SERVICE, build_app_settings
 from wren.core.state import deny_all_sessions
 from wren.oauth.api import create_oauth_router
+from wren.oauth.cleanup import start_stale_client_cleanup, stop_stale_client_cleanup
 from wren.oauth.config import build_oauth_config
 from wren.oauth.errors import build_oauth_exception_handlers
 from wren.oauth.keys import load_signing_key_set
@@ -124,9 +126,19 @@ oauth_router = create_oauth_router(
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     async with create_db_lifespan(db.engine)(app):
+        # Reap stale open-registration OAuth clients on a background task so DCR
+        # rows stay bounded; stopped on shutdown before the pool is disposed.
+        cleanup_task = start_stale_client_cleanup(
+            db.sessionmaker,
+            oauth_config,
+            oauth_codec,
+            interval=timedelta(seconds=settings.oauth_client_cleanup_interval_seconds),
+            max_age=timedelta(seconds=settings.oauth_stale_client_max_age_seconds),
+        )
         try:
             yield
         finally:
+            await stop_stale_client_cleanup(cleanup_task)
             await event_publisher.aclose()
 
 

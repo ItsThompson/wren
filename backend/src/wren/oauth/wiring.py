@@ -37,12 +37,24 @@ def build_authorization_service_provider(
     return provider
 
 
+def build_token_service(
+    session: AsyncSession, config: OAuthConfig, codec: AccessTokenCodec
+) -> TokenService:
+    """Bind a :class:`TokenService` over a session.
+
+    Shared by the request-scoped provider and the background client-cleanup sweep
+    (:mod:`wren.oauth.cleanup`), so the two never diverge in how the service is
+    composed.
+    """
+    return TokenService(SqlAlchemyOAuthRepository(session), config, codec)
+
+
 def build_token_service_provider(
     config: OAuthConfig, codec: AccessTokenCodec
 ) -> Callable[[AsyncSession], TokenService]:
     """A FastAPI dependency that builds a request-scoped :class:`TokenService`."""
 
     def provider(session: AsyncSession = Depends(get_session)) -> TokenService:
-        return TokenService(SqlAlchemyOAuthRepository(session), config, codec)
+        return build_token_service(session, config, codec)
 
     return provider
