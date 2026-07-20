@@ -14,20 +14,23 @@ Canonical sources:
 
 ## Metrics
 
-Both the backend and MCP expose `GET /metrics`. Each app serves its private HTTP
-registry concatenated with a shared registry of the custom families below, so one
-scrape sees everything. `/metrics` stays private via the Cloudflare ingress path
-allow-list (which refuses it at the edge), not network isolation.
+Both the backend and MCP expose `GET /metrics`. Each app concatenates its private
+HTTP registry with its own custom-metrics registry: the backend serves the
+domain/service/pool families (`WREN_REGISTRY`); the MCP server serves only the
+tool-invocation counter (`TOOL_METRICS_REGISTRY`). These are two separate images
+with disjoint registries, not one shared registry: the **App** column below says
+which image emits each family. `/metrics` stays private via the Cloudflare ingress
+path allow-list (which refuses it at the edge), not network isolation.
 
-| Metric | Type | Labels | Emitted by |
-|--------|------|--------|-----------|
-| `http_requests_total` | counter | `method`, `path`, `status` | Every HTTP request (`path` = matched route template, e.g. `/roadmaps/{id}`, to bound cardinality) |
-| `http_request_duration_seconds` | histogram | `method`, `path` | Every HTTP request |
-| `service_method_failures_total` | counter | `service`, `method` | A public service method exiting with an **unexpected** error (see below) |
-| `oauth_tokens_issued_total` | counter | `grant_type` | OAuth token issuance (`authorization_code` = first issuance, `refresh_token` = rotation) |
-| `mcp_tool_invocations_total` | counter | `tool`, `outcome` | Every MCP tool call (`outcome` = `ok`/`error`) |
-| `db_query_duration_seconds` | histogram | `query_name` | Every SQL statement (via SQLAlchemy engine events) |
-| `active_connections` | gauge | none | Connections checked out of the SQLAlchemy pool |
+| Metric | App | Type | Labels | Emitted by |
+|--------|-----|------|--------|-----------|
+| `http_requests_total` | backend + mcp | counter | `method`, `path`, `status` | Every HTTP request (`path` = matched route template, e.g. `/roadmaps/{id}`, to bound cardinality) |
+| `http_request_duration_seconds` | backend + mcp | histogram | `method`, `path` | Every HTTP request |
+| `service_method_failures_total` | backend | counter | `service`, `method` | A public service method exiting with an **unexpected** error (see below) |
+| `oauth_tokens_issued_total` | backend | counter | `grant_type` | OAuth token issuance by the AS (`authorization_code` = first issuance, `refresh_token` = rotation) |
+| `mcp_tool_invocations_total` | mcp | counter | `tool`, `outcome` | Every MCP tool call (`outcome` = `ok`/`error`) |
+| `db_query_duration_seconds` | backend | histogram | `query_name` | Every SQL statement (via SQLAlchemy engine events) |
+| `active_connections` | backend | gauge | none | Connections checked out of the SQLAlchemy pool |
 
 ### Service-method failures: what counts
 

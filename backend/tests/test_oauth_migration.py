@@ -24,6 +24,7 @@ from tests.oauth_fakes import build_test_codec, build_test_config, build_test_ke
 from wren.core.db import create_database
 from wren.core.errors import NotFound
 from wren.oauth.authorization import AuthorizationService
+from wren.oauth.cleanup import build_stale_client_sweep
 from wren.oauth.errors import OAuthError
 from wren.oauth.repository import SqlAlchemyOAuthRepository
 from wren.oauth.schemas import AuthorizeParams, ClientRegistrationRequest, TokenRequest
@@ -278,5 +279,38 @@ async def test_cleanup_cascade_revokes_orphaned_grants(migrated_postgres_url: st
         # circuit on the empty id list.
         async with tokens() as token_service:
             assert await token_service.cleanup_stale_clients(older_than=timedelta(seconds=-1)) == 0
+    finally:
+        await database.engine.dispose()
+
+
+async def test_sweep_reaps_a_registered_client_via_the_sessionmaker(
+    migrated_postgres_url: str,
+) -> None:
+    # The background reaper's one-shot sweep opens its own session from the app's
+    # session factory (no request scope) and reaps a stale registration end to
+    # end, proving the lifespan wiring path, not just the service method.
+    database = create_database(migrated_postgres_url)
+    config = build_test_config()
+    codec = build_test_codec(config, build_test_keyset(config))
+
+    @asynccontextmanager
+    async def auth() -> AsyncIterator[AuthorizationService]:
+        async with database.sessionmaker() as session:
+            yield AuthorizationService(SqlAlchemyOAuthRepository(session), config)
+
+    try:
+        async with auth() as auth_service:
+            registration = await auth_service.register_client(
+                ClientRegistrationRequest(redirect_uris=[_REDIRECT], client_name="Stale Agent")
+            )
+        client_id = registration.client_id
+
+        sweep = build_stale_client_sweep(
+            database.sessionmaker, config, codec, max_age=timedelta(seconds=-1)
+        )
+        assert await sweep() == 1
+
+        async with database.sessionmaker() as session:
+            assert await SqlAlchemyOAuthRepository(session).get_client(client_id) is None
     finally:
         await database.engine.dispose()

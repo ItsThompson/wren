@@ -80,6 +80,17 @@ class EnvSettings(BaseSettings):
     # Agent token lifetimes: short-lived access token + long rotating refresh.
     oauth_access_ttl_seconds: int = 900
     oauth_refresh_ttl_seconds: int = 2_592_000
+    # Stale-client reaper (external app). Dynamic Client Registration is open at
+    # P0, so registration rows would grow unbounded; a periodic sweep reaps
+    # clients whose registration is older than the max age (cascade-revoking each
+    # reaped client's grant + refresh chain). Interval is how often the sweep
+    # runs; a non-positive interval disables it (e.g. when reaped out of band).
+    # Max age is an independent knob: its 30-day default matches the refresh-TTL
+    # default but is not derived from it. The reap is by registration age
+    # (created_at), which rotation does not move, so an actively-refreshing client
+    # older than the max age is still reaped.
+    oauth_client_cleanup_interval_seconds: int = 21_600
+    oauth_stale_client_max_age_seconds: int = 2_592_000
     # Allowed browser origin for the SPA's credentialed consent/login XHRs
     # (CORS). Empty falls back to `app_public_url`; prod pins
     # https://usewren.com so the cross-subdomain cookie flow works.
@@ -119,6 +130,10 @@ class AppSettings(BaseModel):
     oauth_key_id: str
     oauth_access_ttl_seconds: int
     oauth_refresh_ttl_seconds: int
+    # Stale-client reaper knobs (external app only); defaulted so the shared test
+    # settings factory and any non-external caller need not supply them.
+    oauth_client_cleanup_interval_seconds: int = 21_600
+    oauth_stale_client_max_age_seconds: int = 2_592_000
     cors_origin: str
     discord_webhook_url: SecretStr
     # Trusted proxy IPs/CIDRs for the external app's ProxyHeadersMiddleware; empty
@@ -164,6 +179,8 @@ def build_app_settings(*, service: str, port: int, env: EnvSettings | None = Non
         oauth_key_id=env.oauth_key_id,
         oauth_access_ttl_seconds=env.oauth_access_ttl_seconds,
         oauth_refresh_ttl_seconds=env.oauth_refresh_ttl_seconds,
+        oauth_client_cleanup_interval_seconds=env.oauth_client_cleanup_interval_seconds,
+        oauth_stale_client_max_age_seconds=env.oauth_stale_client_max_age_seconds,
         cors_origin=env.cors_origin,
         discord_webhook_url=env.discord_webhook_url,
         trusted_proxies=_parse_trusted_proxies(env.trusted_proxies),

@@ -10,9 +10,12 @@ dependency (the standards' "inject strategy, don't fork on context"):
 - **External (:8000)** passes ``identity=require_user`` (the human session cookie;
   a spoofed ``X-User-ID`` is stripped upstream).
 - **Internal (:8001)** passes ``identity=require_internal_user`` (the trusted
-  ``X-User-ID`` behind the shared ``INTERNAL_API_TOKEN``). These are the endpoints
-  the MCP progress tools (``progress_get`` / ``progress_update``) call, one
-  internal HTTP call per tool.
+  ``X-User-ID`` behind the shared ``INTERNAL_API_TOKEN``). The MCP progress tools
+  call the snapshot / next / explicit-set endpoints (``progress_get``,
+  ``roadmap_get_next``, ``progress_update``), one internal HTTP call per tool.
+  ``follow`` and ``deadline`` are mounted here by the shared factory but no MCP
+  tool calls them: following is created implicitly by the first progress write,
+  and deadline is web-only (deliberately unmirrored in the MCP contract).
 
 Thin handlers: each resolves the caller via the injected ``identity`` dependency,
 calls one :class:`ProgressService` method, and lets the shared exception handler

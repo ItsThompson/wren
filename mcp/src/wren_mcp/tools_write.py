@@ -98,8 +98,9 @@ def register_write_tools(mcp: FastMCP, client: InternalApiClient) -> None:
         reference later: the server preserves it, or returns a
         proposed_id -> minted_id remap where it had to de-dupe, so you never
         address nodes by array position. Returns the minted roadmap_id. Read the
-        authoring guidance (the shipped SKILL.md, served at GET /skill on the app)
-        first: it explains ZPD sequencing, the suggested_path, and the structural
+        authoring guidance first (the shipped SKILL.md, which the Wren backend
+        serves at GET /skill on its API origin, not this MCP server): it explains
+        ZPD sequencing, the suggested_path, and the structural
         validation contract you must satisfy to publish."""
         user_id = require_scope(ctx, scope=SCOPE_ROADMAPS_WRITE)
         response = await client.create_draft(user_id, roadmap.model_dump(mode="json"))
