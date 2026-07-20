@@ -24,7 +24,7 @@ from mcp.server.fastmcp.exceptions import ToolError
 from mcp.server.session import ServerSession
 from starlette.requests import Request
 
-from wren_mcp.logging import get_logger
+from wren_common.logging import get_logger
 from wren_mcp.settings import SERVICE
 from wren_mcp.state import get_request_agent
 

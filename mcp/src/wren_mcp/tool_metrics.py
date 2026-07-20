@@ -20,7 +20,7 @@ from typing import Any
 
 from prometheus_client import CollectorRegistry, Counter
 
-from wren_mcp.logging import get_logger
+from wren_common.logging import get_logger
 from wren_mcp.settings import SERVICE
 from wren_mcp.tool_errors import BackendToolError
 

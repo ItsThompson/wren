@@ -6,7 +6,7 @@ import json
 
 import structlog
 
-from wren.core.logging import _build_processors, _renderer, get_logger
+from wren_common.logging import _build_processors, _renderer, get_logger
 
 
 def test_non_dev_renderer_emits_json() -> None:

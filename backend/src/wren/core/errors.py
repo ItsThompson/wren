@@ -20,7 +20,7 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 from starlette.responses import Response
 
-from wren.core.logging import get_logger
+from wren_common.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Mapping

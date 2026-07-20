@@ -28,7 +28,6 @@ from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING
 
 from wren.core.errors import Conflict, NotFound, Validation
-from wren.core.logging import get_logger
 from wren.core.observability import track_failures
 from wren.core.read_contract import ResponseFormat
 from wren.progress.next import compute as compute_next
@@ -42,6 +41,7 @@ from wren.progress.schemas import (
 from wren.progress.summary import summarize
 from wren.progress.traversal import all_item_ids
 from wren.roadmaps import Roadmap, RoadmapStatus, Visibility
+from wren_common.logging import get_logger
 
 if TYPE_CHECKING:
     from wren.progress.models import ProgressRecord

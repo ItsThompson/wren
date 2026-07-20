@@ -19,8 +19,8 @@ from contextlib import suppress
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
-from wren.core.logging import get_logger
 from wren.oauth.wiring import build_token_service
+from wren_common.logging import get_logger
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker

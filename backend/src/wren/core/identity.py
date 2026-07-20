@@ -32,8 +32,8 @@ import structlog
 from starlette.requests import Request  # noqa: TC002
 
 from wren.core.errors import Unauthorized
-from wren.core.logging import get_logger
 from wren.core.state import SessionVerifier, get_internal_token, get_session_verifier
+from wren_common.logging import get_logger
 
 if TYPE_CHECKING:
     from starlette.types import ASGIApp, Receive, Scope, Send

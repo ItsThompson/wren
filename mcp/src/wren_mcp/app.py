@@ -27,13 +27,13 @@ from mcp.server.fastmcp.server import StreamableHTTPASGIApp
 from starlette.routing import Route
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
+from wren_common.logging import configure_logging, get_logger
 from wren_mcp.auth import BearerAuthMiddleware
 from wren_mcp.client import InternalApiClient, create_internal_http_client
 from wren_mcp.config import MCP_PATH, PRM_PATH
 from wren_mcp.correlation import CorrelationMiddleware
 from wren_mcp.health import create_health_router, jwks_readiness_check
 from wren_mcp.keys import JsonFetch, KeyProvider, RemoteKeyProvider
-from wren_mcp.logging import configure_logging, get_logger
 from wren_mcp.mcp_server import create_mcp_server
 from wren_mcp.metrics import instrument
 from wren_mcp.prm import build_prm_document

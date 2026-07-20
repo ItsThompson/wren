@@ -30,7 +30,7 @@ import structlog
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from wren_mcp.logging import get_logger
+from wren_common.logging import get_logger
 from wren_mcp.prm import www_authenticate_challenge
 from wren_mcp.settings import SERVICE
 from wren_mcp.state import set_request_agent

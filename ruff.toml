@@ -44,6 +44,13 @@ select = [
 # tests (see each package's per-file-ignores).
 ignore = ["S105"]
 
+[lint.isort]
+# wren_common is a workspace package that lives outside each consumer's own
+# `src`, so ruff's src-based first-party detection cannot see it. Declare it
+# first-party so its imports group with the consuming package's own imports
+# rather than with third-party libraries.
+known-first-party = ["wren_common"]
+
 [lint.flake8-bugbear]
 # FastAPI's dependency-injection idiom calls Depends()/Query()/... in argument
 # defaults by design; these are immutable markers, not mutable-default bugs.

@@ -20,8 +20,8 @@ from starlette.responses import Response
 
 from wren.core.correlation import CorrelationMiddleware
 from wren.core.health import ReadinessCheck, create_health_router
-from wren.core.logging import configure_logging, get_logger
 from wren.core.metrics import instrument
+from wren_common.logging import configure_logging, get_logger
 
 if TYPE_CHECKING:
     from starlette.types import Lifespan
