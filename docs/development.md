@@ -110,7 +110,7 @@ just sync-skill        # re-sync the backend-bundled copy with the root copy
 ```
 
 Run `just sync-skill` after editing `skill/SKILL.md`. A drift test
-(`backend/tests/test_skill_content.py`) fails if the two copies diverge.
+(`backend/tests/`) fails if the two copies diverge.
 
 ## Workspace layout
 
@@ -158,7 +158,7 @@ open-registration OAuth clients. Two variables tune it:
 
 The reaper is an in-process asyncio task, started and stopped by the external app
 lifespan. See `docs/architecture.md` for its place in the system and
-`backend/src/wren/oauth/cleanup.py` for the implementation.
+`backend/src/wren/oauth/` for the implementation.
 
 ## Cross-references
 

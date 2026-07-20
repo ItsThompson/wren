@@ -7,7 +7,7 @@ rules and dashboards can be dropped in later.
 
 Canonical sources:
 
-- Instrumentation: `backend/src/wren/core/metrics.py` (HTTP), `backend/src/wren/core/observability.py` (domain/service/pool families), `backend/src/wren/core/db.py` (pool events), `mcp/src/wren_mcp/metrics.py` + `mcp/src/wren_mcp/tool_metrics.py` (MCP).
+- Instrumentation: `backend/src/wren/core/` (HTTP, domain/service/pool families, pool events), `mcp/src/wren_mcp/` (MCP).
 - Scrape + alert rules: `deployments/prometheus/prometheus.yml`, `deployments/prometheus/alerts.yml`.
 - Alert routing: `deployments/alertmanager/alertmanager.yml`.
 - Container topology, retention flags, and network placement: `docker-compose.yml`.
@@ -108,7 +108,7 @@ fire-and-forget message (`🎉 New user registered: <username>`) to Discord. The
 notification is deliberately not observability: it is a product signal, not an
 alert, and is implemented as an injected `EventPublisher`
 (`BestEffortEventPublisher` + `DiscordUserRegisteredHandler` in
-`backend/src/wren/accounts/notifications.py`) fired after the DB commit.
+`backend/src/wren/accounts/`) fired after the DB commit.
 
 - **Never blocks or fails registration.** After the commit
   `AccountService.register` calls `EventPublisher.publish(...)`, which schedules

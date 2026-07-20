@@ -17,7 +17,7 @@ Canonical sources:
 - Provider composition and entry: `frontend/src/App.tsx`, `frontend/src/main.tsx`
 - Route tree and guards: `frontend/src/routes.tsx`,
   `frontend/src/components/OnboardingGate/`,
-  `frontend/src/views/OnboardingView/OnboardingRouteGuard.tsx`
+  `frontend/src/views/OnboardingView/`
 - Session and auth: `frontend/src/auth/`
 - Data layer: `frontend/src/api/`
 - Views: `frontend/src/views/`
@@ -143,7 +143,7 @@ Reads register their key in `keys.ts`. A write reuses the same builder so the
 resource reconciles the cache in place with `mutate(returned, { revalidate: false })`,
 so co-mounted views stay coherent with no refetch and no stale flash.
 
-The `Problem` type (`frontend/src/lib/problem/problem.ts`) mirrors the backend
+The `Problem` type (`frontend/src/lib/problem/`) mirrors the backend
 RFC 9457 error body. It is the error contract every hook surfaces. The frontend
 branches on the codes `STALE_REVISION`, `IMMUTABLE`, `DELETE_HAS_FOLLOWERS`, and
 `VALIDATION`. See `api.md` for the canonical error contract; the frontend never
@@ -187,24 +187,21 @@ archive instead. See `authoring.md` for the publish and immutability contract.
 
 ## Study loop on the web
 
-The study loop on the web mirrors the shared model in `progress.md`. The frontend
-drives it through `useProgress`.
+The web drives the shared study loop (`progress.md`) through `useProgress`.
+Following is implicit and there is no follow or unfollow affordance, so do not
+build a follow button; the Dashboard "Following" list comes from
+`GET /me/dashboard`.
 
-- Following is implicit. The first progress write on a published roadmap creates
-  the progress record. Checking the first item (`POST /roadmaps/{id}/progress`) or
-  setting a deadline (`PUT /roadmaps/{id}/deadline`) starts following.
-- There is no follow or unfollow affordance on the web. Unfollow does not exist.
-  The Dashboard "Following" list comes from `GET /me/dashboard`. Do not build a
-  follow button.
-- Progress writes are explicit-set and optimistic. `useProgress.toggle` sets the
-  target state, updates the cache first through `optimisticData`, then reconciles
-  the returned snapshot. A 409 surfaces the re-read prompt; any other failure rolls
-  back and shows a quiet notice.
+Web-specific behavior:
+
+- Progress writes are optimistic. `useProgress.toggle` sets the target state,
+  updates the cache first through `optimisticData`, then reconciles the returned
+  snapshot. A 409 surfaces the re-read prompt; any other failure rolls back and
+  shows a quiet notice.
 - Done-state is derived from the checked-item set, never stored. The list and the
   tree share one `isSubsectionDone` rule, so both surfaces always agree.
-- The deadline is web-only. `useProgress.setDeadline` calls `PUT /deadline`. The
-  MCP contract does not mirror the deadline, so there is no MCP deadline tool. The
-  deadline drives a countdown only; the server computes no pacing.
+- `useProgress.setDeadline` calls `PUT /deadline`; the deadline drives a countdown
+  only. It is web-only and unmirrored in the MCP contract (see `progress.md`).
 
 The study-time reads (overview, node, section, search) are the agent's
 token-efficient projections. The web app uses the full roadmap read plus progress.
@@ -237,7 +234,7 @@ onto Tailwind v4 and defines the base style and the display utilities.
 token values to `shared/theme/tokens.css` only; `globals.css` maps them, never
 defines them.
 
-Tag color is a domain truth. `frontend/src/lib/tag-color/tag-color.ts` hashes a
+Tag color is a domain truth. The tag-color module (`frontend/src/lib/tag-color/`) hashes a
 tag string into a fixed ten-hue palette, mirrored as `--tag-1..10` in
 `tokens.css`. The palette order and the hash are a frozen cross-view contract. Do
 not reorder them; reordering repaints existing roadmaps. See `design-language.md`.

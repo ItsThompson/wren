@@ -90,8 +90,7 @@ guard fails closed (`unauthenticated`).
 
 The RS verifies tokens but mints none. The backend external app (`:8000`) is the
 OAuth 2.1 Authorization Server (AS). See `auth.md` for the full token model:
-audience binding, the confused-deputy defense, `kid` rotation, and the discovery
-chain.
+audience binding, `kid` rotation, and the discovery chain.
 
 ## Scopes
 
@@ -117,19 +116,14 @@ the response into a frozen projection. Every tool registers through
 
 ### Read tools
 
-Canonical source: `tools_read.py`. The six reads are `readOnlyHint`.
-`progress_update` is an explicit-set write (`idempotentHint`, `destructiveHint`
-false, not read-only). All are `openWorldHint` false.
-
-| Tool | Scope | Internal call | Output schema | Notes |
-|------|-------|---------------|---------------|-------|
-| `roadmap_get_overview` | `roadmaps:read` | `GET /roadmaps/{id}/overview?format=` | `Overview` | Orientation call. Sections in order, per-section and overall completion, no item bodies. |
-| `roadmap_get_next` | `roadmaps:read` | `GET /roadmaps/{id}/next?format=` | `NextResult` | Next unchecked items in `suggested_path` order whose prerequisites are done. Server-computed. `why_now` is structural only. |
-| `roadmap_get_node` | `roadmaps:read` | `GET /roadmaps/{id}/nodes/{subsection_id}?format=` | `NodeDetail` | One subsection resolved for study. Resources as links, prereqs resolved, items with done state. |
-| `roadmap_get_section` | `roadmaps:read` | `GET /roadmaps/{id}/sections/{section_id}?include=[&cursor=]` | `SectionPage` | Paginated drill-down. `include=subsections\|items\|both`. Opaque `next_cursor`. |
-| `roadmap_search` | `roadmaps:read` | `GET /roadmaps/{id}/search?q=[&tags=]` | `SearchResults` | Keyword or tag search, not list-all. `tags` is a repeated query param. |
-| `progress_get` | `roadmaps:read` | `GET /roadmaps/{id}/progress?detailed=` | `ProgressSnapshot` | Overall and per-section progress plus the deadline if set. `checked_ids` only when `detailed=true`. |
-| `progress_update` | `progress:write` | `POST /roadmaps/{id}/progress` | `ProgressUpdateResult` | Explicit batch set to `complete\|incomplete`, so a retry is idempotent. An unknown item id rejects the whole batch. Returns a fresh snapshot plus next. |
+Canonical source: `tools_read.py`. Six reads require `roadmaps:read` and are
+`readOnlyHint`: `roadmap_get_overview`, `roadmap_get_next`, `roadmap_get_node`,
+`roadmap_get_section`, `roadmap_search`, and `progress_get`. `progress_update`
+requires `progress:write` and is an explicit-set write (`idempotentHint`,
+`destructiveHint` false); an unknown item id rejects the whole batch. All are
+`openWorldHint` false. Each maps to one internal `GET` (`POST` for
+`progress_update`); see `api.md` for the endpoints and `progress.md` for the
+study-loop semantics (`why_now`, server-computed next, the deadline).
 
 The `concise` and `detailed` switch travels as `?format=`. Concise is the default
 and carries every follow-up ID. Detailed adds the free-text (a node `description`,
@@ -137,19 +131,17 @@ each next item's `path_position`).
 
 ### Write tools
 
-Canonical source: `tools_write.py`. All seven require `roadmaps:write`. All are
-`openWorldHint` false. There is no visibility, archive, or delete tool: those are
-web-only.
+Canonical source: `tools_write.py`. Seven tools require `roadmaps:write` and are
+`openWorldHint` false: `create_roadmap_draft`, `patch_roadmap_draft`,
+`replace_roadmap_draft`, `validate_roadmap_draft`, `publish_roadmap`,
+`fork_roadmap`, and `edit_roadmap_metadata`. There is no visibility, archive, or
+delete tool: those are web-only. See `authoring.md` for the write-path rules and
+the immutability boundary, and `api.md` for the endpoints.
 
-| Tool | Internal call(s) | Output schema | Notes |
-|------|------------------|---------------|-------|
-| `create_roadmap_draft` | `POST /roadmaps` | `CreatedRoadmap` | The one full-payload write (creation or import). Returns the minted `roadmap_id` plus a `proposed_id -> minted_id` remap. |
-| `patch_roadmap_draft` | `PATCH /roadmaps/{id}` (`If-Match: revision`) | `PatchResult` | Primary edit path. Ordered, ID-addressed, atomic ops. Optimistic concurrency by `revision`. Rejected on published or archived. |
-| `replace_roadmap_draft` | `GET /roadmaps/{id}` then `PUT /roadmaps/{id}` (`If-Match`) | `ReplacedRoadmap` | Import escape hatch only. Reads the current revision first (two calls). ID unchanged. Rejected on published or archived. |
-| `validate_roadmap_draft` | `POST /roadmaps/{id}:validate` | `ValidationResult` | All structural violations in one pass without mutating. `publishable` true when no violations. |
-| `publish_roadmap` | `POST /roadmaps/{id}:publish` | `PublishResult` | One-way draft to published. Refuses on any hard-block violation. The docstring tells the agent to confirm with the user first. |
-| `fork_roadmap` | `POST /roadmaps/{id}:fork` | `ForkResult` | Fresh draft from any readable roadmap, new IDs, fresh progress. Source untouched. The way to change published structure. |
-| `edit_roadmap_metadata` | `PATCH /roadmaps/{id}/metadata` | `MetadataResult` | Presentation only (`title`, `description`, `subject_tags`). Allowed post-publish. Never touches structure or revision. |
+Three MCP-specific behaviors: `replace_roadmap_draft` reads the current revision
+first, so it is the one tool that makes two internal calls; `publish_roadmap`'s
+docstring tells the agent to confirm with the user first; and
+`edit_roadmap_metadata` is presentation-only and stays allowed after publish.
 
 ## Patch operation grammar
 
@@ -170,7 +162,7 @@ cycle. Order `add_edge` ops prerequisites-first to avoid a transient cycle even
 when the final graph is acyclic.
 
 The MCP schemas mirror the backend authoring and read projections. A schema-mirror
-contract test (`contract/tests/test_schema_mirror.py`) enforces field equality.
+contract test (`contract/tests/`) enforces field equality.
 See `authoring.md` for the shared authoring rules and the immutability boundary.
 
 ## The internal-hop boundary contract
@@ -233,30 +225,9 @@ Invariants of the hop:
 
 ### Client method to endpoint map
 
-Each read tool is one internal `GET`. Each write tool is one internal call,
-except `replace_draft`, which reads the current revision first. Canonical source:
-`client.py`.
-
-| `InternalApiClient` method | Method and path |
-|----------------------------|-----------------|
-| `create_draft` | `POST /roadmaps` |
-| `get_roadmap` | `GET /roadmaps/{id}` |
-| `get_overview` | `GET /roadmaps/{id}/overview?format=` |
-| `get_next` | `GET /roadmaps/{id}/next?format=` |
-| `get_node` | `GET /roadmaps/{id}/nodes/{subsection_id}?format=` |
-| `get_section` | `GET /roadmaps/{id}/sections/{section_id}?include=[&cursor=]` |
-| `search` | `GET /roadmaps/{id}/search?q=[&tags=]` |
-| `get_progress` | `GET /roadmaps/{id}/progress?detailed=` |
-| `update_progress` | `POST /roadmaps/{id}/progress` |
-| `patch_draft` | `PATCH /roadmaps/{id}` (`If-Match`) |
-| `replace_draft` | `PUT /roadmaps/{id}` (`If-Match`) |
-| `validate_draft` | `POST /roadmaps/{id}:validate` |
-| `publish` | `POST /roadmaps/{id}:publish` |
-| `fork` | `POST /roadmaps/{id}:fork` |
-| `edit_metadata` | `PATCH /roadmaps/{id}/metadata` |
-
-The client method names mirror the internal router ops 1:1. Preserve this shape
-when you add a tool.
+`InternalApiClient` exposes one method per tool, and the method names mirror the
+internal router ops 1:1. Canonical source: `client.py`; the endpoints are
+cataloged in `api.md`. Preserve the 1:1 shape when you add a tool.
 
 ### Error translation
 
@@ -291,16 +262,11 @@ poll health in-network on `:9000`.
 
 ## Metrics
 
-Canonical source: `tool_metrics.py`, `metrics.py`. Full detail lives in
-`monitoring.md`.
-
-- `mcp_tool_invocations_total{tool,outcome}` (counter): every tool call.
-  `outcome` is `ok` or `error`. On a dedicated `TOOL_METRICS_REGISTRY`.
-- `http_requests_total{method,path,status}` and
-  `http_request_duration_seconds{method,path}`: HTTP metrics on a private
-  registry. The metric families mirror the backend so the same rules and
-  dashboards apply.
-- `/metrics` serves both registries concatenated.
+Canonical source: `tool_metrics.py`, `metrics.py`; full detail in `monitoring.md`.
+The RS emits `mcp_tool_invocations_total{tool,outcome}` on a dedicated
+`TOOL_METRICS_REGISTRY`, plus the shared `http_requests_total` /
+`http_request_duration_seconds` families on its private registry. `/metrics`
+serves both registries concatenated.
 
 ## Cross-surface notes
 
@@ -310,17 +276,15 @@ before you assume a tool exists.
 - The authoring guidance (`SKILL.md`) lives on the backend, not the MCP server.
   The backend external app serves it at `GET /skill` on its API origin (the AS
   host). Route registry: `/skill` is `PUBLIC` on the external app only
-  (`backend/src/wren/core/route_registry.py`). The MCP tool docstrings point the
+  (`backend/src/wren/core/`). The MCP tool docstrings point the
   agent there. The MCP server serves only the PRM document and `/mcp` at ingress.
-- The deadline is web-only by deliberate, tested design. There is no MCP deadline
-  tool. `progress_get` reads the deadline (in `ProgressSnapshot`); `progress_update`
-  writes progress. The backend `DeadlineRequest` and `Progress` types are
-  deliberately unmirrored in the MCP contract, asserted by
-  `contract/tests/test_schema_mirror.py`. See `progress.md`.
-- Following is created implicitly by the first progress write, the same on the
-  web and MCP. There is no follow or unfollow MCP tool. The internal
-  `POST /roadmaps/{id}/follow` route is a vestigial endpoint that no MCP client
-  method calls. See `progress.md`.
+- The deadline is web-only: there is no MCP deadline tool. `progress_get` reads
+  the deadline; `progress_update` writes progress. The `DeadlineRequest` and
+  `Progress` types are deliberately unmirrored in the MCP contract
+  (`contract/tests/`). See `progress.md`.
+- Following is created implicitly by the first progress write. There is no follow
+  or unfollow MCP tool; the internal `POST /roadmaps/{id}/follow` route is
+  vestigial and unused by any client method. See `progress.md`.
 
 ## Related docs
 

@@ -72,7 +72,7 @@ def test_every_mounted_route_is_declared():
     assert missing == set()
 ```
 
-Canonical source: `backend/tests/test_route_registry.py`.
+Canonical source: `backend/tests/`.
 
 ## High-value targets
 
@@ -81,7 +81,7 @@ Canonical source: `backend/tests/test_route_registry.py`.
 | High | The DAG validator | Property tests over graph shapes; cycles and ordering |
 | High | Route coverage | `test_route_registry.py`; an undeclared route fails deny |
 | High | Schema mirror and header constants | `contract/tests/`; cross-package drift fails a test |
-| High | Revalidate-after-write | `frontend/src/test/acceptance/revalidate-after-write.test.tsx`; no stale flash, no extra GET |
+| High | Revalidate-after-write | `frontend/src/test/acceptance/`; no stale flash, no extra GET |
 | High | Auth boundaries | `require_user` and `require_internal_user` deny paths; the OAuth cleanup reaper |
 | Medium | Next-item computation and projections | Server-computed study order, `concise` and `detailed` shapes |
 
@@ -96,8 +96,7 @@ The Playwright spine drives the full stack. The scenarios cover:
 | Author to publish | An agent creates a draft, validates, and publishes it |
 | Follow and study | A human follows a published roadmap and reads the next node |
 
-Canonical sources: `e2e/tests/spine.spec.ts`, `e2e/tests/onboarding.spec.ts`,
-`e2e/tests/ui-smoke.spec.ts`.
+Canonical source: `e2e/tests/`.
 
 ## Coverage gates
 

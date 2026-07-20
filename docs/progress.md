@@ -11,11 +11,8 @@ progress endpoints, and `architecture.md` for the system shape.
 
 Canonical sources:
 
-- Progress rules: `backend/src/wren/progress/service.py`
-- Server-computed next: `backend/src/wren/progress/next.py`
-- Derived snapshot: `backend/src/wren/progress/summary.py`
-- Study-time reads: `backend/src/wren/roadmaps/read_service.py`,
-  `backend/src/wren/roadmaps/projections.py`
+- Progress rules, server-computed next, and derived snapshot: `backend/src/wren/progress/`
+- Study-time reads: `backend/src/wren/roadmaps/`
 
 ## The study loop
 
@@ -51,7 +48,7 @@ flowchart TD
 ## Explicit-set progress
 
 Progress updates are explicit-set, not toggle. The client states the target state,
-so a retry is idempotent (`progress/service.py`).
+so a retry is idempotent (`progress/`).
 
 - `POST /roadmaps/{id}/progress` sets `item_ids` to a `CompletionState`
   (`complete` or `incomplete`). At least one id is required.
@@ -65,7 +62,7 @@ so a retry is idempotent (`progress/service.py`).
 
 The snapshot is a derived read. Nothing here is stored; it is recomputed from the
 roadmap and the caller's record on each read, so counts cannot drift
-(`progress/summary.py`).
+(`progress/`).
 
 - `GET /roadmaps/{id}/progress` returns roadmap-wide and per-section completion
   counts.
@@ -74,7 +71,7 @@ roadmap and the caller's record on each read, so counts cannot drift
 ## Server-computed next
 
 The "what to do next" computation runs on the server, never on the agent
-(`progress/next.py`).
+(`progress/`).
 
 - `GET /roadmaps/{id}/next` walks `suggested_path` and returns the unchecked items
   of the first subsection that is not done and whose prerequisites are all done.
@@ -96,12 +93,12 @@ The "what to do next" computation runs on the server, never on the agent
   forecast.
 - The deadline is web-only by design. `DeadlineRequest` and `Progress` are
   deliberately unmirrored in the MCP contract, guarded by
-  `contract/tests/test_schema_mirror.py`, so there is no MCP deadline tool.
+  `contract/tests/`, so there is no MCP deadline tool.
 
 ## Study-time read surface
 
 The study-time reads live in `RoadmapReadService`, a separate service from
-authoring (`roadmaps/read_service.py`). They are the read surface a follower uses
+authoring (`roadmaps/`). They are the read surface a follower uses
 while studying. The counts reflect the caller's own progress.
 
 | Read | Endpoint | Purpose |

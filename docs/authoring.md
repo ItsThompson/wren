@@ -2,7 +2,7 @@
 
 How draft content is written, and why published content cannot be. Content
 authoring goes through one `RoadmapService`
-(`backend/src/wren/roadmaps/service.py`), so the rules below hold identically
+(`backend/src/wren/roadmaps/`), so the rules below hold identically
 wherever the write comes from.
 
 A roadmap is authored as a **draft**, then **published** in a one-way transition
@@ -52,8 +52,8 @@ rebuilds the draft:
 The response is the full rebuilt roadmap plus a `remap` of any `proposed_id ->
 minted_id` that changed (de-dup **or** normalization), so the caller can
 reconcile its references.
-The input shapes live in `backend/src/wren/roadmaps/schemas.py`; the mint-then-
-resolve rebuild is the shared pure module `backend/src/wren/roadmaps/assembly.py`.
+The input shapes and the shared mint-then-resolve rebuild module live in
+`backend/src/wren/roadmaps/`.
 
 ## The immutability boundary
 
