@@ -72,7 +72,7 @@ sync-skill:
 
 # --- Docker stack -----------------------------------------------------------
 
-# Build the three first-party images (backend, mcp, frontend)
+# Build the first-party images (backend, mcp, frontend, docs)
 build:
     docker compose build
 
