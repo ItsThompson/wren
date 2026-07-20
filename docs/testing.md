@@ -1,17 +1,13 @@
 # Testing
 
-This guide describes the test layers, how to run each one, the main patterns, and
-the high-value targets. It documents the current implemented state.
+This guide describes the test layers, how to run each one, the main patterns, and the high-value targets. It documents the current implemented state.
 
 ## Philosophy
 
-- Pure deep modules (the DAG validator, the next-item computation, the projection
-  helpers) are exhaustively tested, including property tests.
+- Pure deep modules (the DAG validator, the next-item computation, the projection helpers) are exhaustively tested, including property tests.
 - Trust boundaries fail closed and are tested for the deny path.
-- Cross-package wire contracts are machine-gated, so drift between the backend and
-  the MCP server fails a test rather than a request in production.
-- The frontend pins its SWR posture and a coverage floor, so test behavior cannot
-  drift from production behavior.
+- Cross-package wire contracts are machine-gated, so drift between the backend and the MCP server fails a test rather than a request in production.
+- The frontend pins its SWR posture and a coverage floor, so test behavior cannot drift from production behavior.
 
 ## Test layers
 
@@ -25,19 +21,15 @@ the high-value targets. It documents the current implemented state.
 | MCP | Tool registration, the internal client, the bearer boundary, the frozen tool-schema snapshot | pytest, 80% coverage gate | `just test-mcp` |
 | E2E | The full spine and UI smoke against the running stack | Playwright | `just test-e2e` |
 
-The contract project is the only interpreter where the backend and MCP packages
-import together. Run it with `cd contract && uv run pytest`, or let the CI
-`contract-drift` job run it.
+The contract project is the only interpreter where the backend and MCP packages import together. Run it with `cd contract && uv run pytest`, or let the CI `contract-drift` job run it.
 
 ## Patterns
 
-The examples below are illustrative, not copied source. They show the shape of
-each style.
+The examples below are illustrative, not copied source. They show the shape of each style.
 
 ### A pure-module unit test
 
-A pure deep module takes inputs and returns a result, so a test asserts on the
-return value with no I/O or mocks.
+A pure deep module takes inputs and returns a result, so a test asserts on the return value with no I/O or mocks.
 
 ```python
 def test_next_skips_checked_items():
@@ -49,8 +41,7 @@ def test_next_skips_checked_items():
 
 ### An MSW-backed hook test
 
-A data-layer test renders a hook through the provider stack and serves the REST
-response from an MSW handler, so the test pins the real client contract.
+A data-layer test renders a hook through the provider stack and serves the REST response from an MSW handler, so the test pins the real client contract.
 
 ```tsx
 it("returns the dashboard body", async () => {
@@ -62,9 +53,7 @@ it("returns the dashboard body", async () => {
 
 ### A route-coverage assertion
 
-Every mounted product route needs a `route_registry.py` entry per app. The
-coverage test cross-checks the mounted routes against the registry in both
-directions, so an undeclared route fails deny.
+Every mounted product route needs a `route_registry.py` entry per app. The coverage test cross-checks the mounted routes against the registry in both directions, so an undeclared route fails deny.
 
 ```python
 def test_every_mounted_route_is_declared():

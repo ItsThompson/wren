@@ -1,9 +1,5 @@
 # Backend
 
-Scope: the wren backend package (`backend/`). This file records the durable, code-verified traps for the backend, the commands for the area, and its rules. Read it before changing backend code.
-
-The backend serves two apps from one factory over one service layer. See `docs/architecture.md`, `docs/api.md`, `docs/auth.md`, and `docs/data-model.md`.
-
 ## Commands
 
 All recipes run from the repo root and change into `backend/`.
@@ -39,11 +35,6 @@ All recipes run from the repo root and change into `backend/`.
 
 ## Rules
 
-- JSON casing matches the shared schema. The frontend client is generated from the
-  external OpenAPI document. Run `just codegen` after a contract change.
-- Follow the layering convention: config, models, schemas, repository, service,
-  router, wiring.
-- Keep dependency direction one-way. A domain receives narrow injected callables,
-  never a foreign repository.
-- Migrations run pre-traffic, never at app startup. Keep every normal migration
-  additive (expand or contract). Rollback restores an image, not the database.
+- JSON casing matches the shared schema. The frontend client is generated from the external OpenAPI document. Run `just codegen` after a contract change.
+- Follow the layering convention: config, models, schemas, repository, service, router, wiring.
+- Keep dependency direction one-way. A domain receives narrow injected callables, never a foreign repository.

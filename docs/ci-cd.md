@@ -1,9 +1,6 @@
 # CI/CD
 
-This guide describes the continuous-integration jobs, the continuous-deployment
-phases, the merge gates, and the required secrets. It documents the current
-implemented state. The deploy and rollback mechanics live in the runbooks; this
-guide owns the pipeline view.
+This guide describes the continuous-integration jobs, the continuous-deployment phases, the merge gates, and the required secrets. It documents the current implemented state. The deploy and rollback mechanics live in the runbooks; this guide owns the pipeline view.
 
 Canonical sources:
 
@@ -22,9 +19,7 @@ graph LR
   cron["Every 12 hours"] --> hc["Healthcheck probe"]
 ```
 
-CI runs on every pull request and on pushes to `main`. CD runs after CI
-concludes successfully on `main`, or by manual dispatch. The healthcheck workflow
-runs on a schedule, independent of a deploy.
+CI runs on every pull request and on pushes to `main`. CD runs after CI concludes successfully on `main`, or by manual dispatch. The healthcheck workflow runs on a schedule, independent of a deploy.
 
 ## CI jobs
 
@@ -37,26 +32,21 @@ runs on a schedule, independent of a deploy.
 | `test-frontend` | Frontend behavior | vitest with the 70% coverage gate. Needs `lint`. |
 | `e2e` | The full spine | Builds and boots the Compose stack with the e2e overlay, runs pre-traffic migrations, then runs Playwright. Needs `lint`. |
 
-Route coverage is not a separate job. The `test_route_registry.py` coverage check
-runs inside the backend pytest suite.
+Route coverage is not a separate job. The `test_route_registry.py` coverage check runs inside the backend pytest suite.
 
 ## Merge gates
 
-A change to `main` must pass every CI job. The gates that most often block a
-merge:
+A change to `main` must pass every CI job. The gates that most often block a merge:
 
 - Coverage floors: backend 80%, MCP 80%, frontend 70%.
-- `codegen-drift`: the committed `frontend/openapi.json` and
-  `frontend/src/api/schema.d.ts` must match the live external app.
+- `codegen-drift`: the committed `frontend/openapi.json` and `frontend/src/api/schema.d.ts` must match the live external app.
 - `contract-drift`: the MCP wire constants and schemas must match the backend.
 
-Run `just codegen` after any external REST change, and change both sides of a
-duplicated wire constant together.
+Run `just codegen` after any external REST change, and change both sides of a duplicated wire constant together.
 
 ## CD phases
 
-CD deploys the whole stack to the single VPS over an SSH Docker Context. The
-Compose CLI runs in the runner; the engine runs on the box.
+CD deploys the whole stack to the single VPS over an SSH Docker Context. The Compose CLI runs in the runner; the engine runs on the box.
 
 | Phase | Action |
 |-------|--------|
@@ -65,16 +55,11 @@ Compose CLI runs in the runner; the engine runs on the box.
 | `deploy` | Register the Docker Context, export config and secrets CLI-side, then run `scripts/deploy.sh`. |
 | Rollback (on failure) | CI-owned. Read the previous `.deployed-sha`, check it out, re-export env, and re-run the deploy pinned to the previous images and config. |
 
-`scripts/deploy.sh` runs a fixed sequence: assert every required config and secret
-env var is set, pull images, run migrations pre-traffic, start the stack under the
-`tunnels` profile, health-gate every service for about 60 seconds, then record the
-deployed SHA on success. See `docs/runbooks/deploy.md` and
-`docs/runbooks/rollback.md` for the operator view.
+`scripts/deploy.sh` runs a fixed sequence: assert every required config and secret env var is set, pull images, run migrations pre-traffic, start the stack under the `tunnels` profile, health-gate every service for about 60 seconds, then record the deployed SHA on success. See `docs/runbooks/deploy.md` and `docs/runbooks/rollback.md` for the operator view.
 
 ## Required secrets
 
-CD reads these from GitHub Actions repo secrets. It exports them into the deploy
-step and Compose transmits them to the daemon; nothing is written to the box.
+CD reads these from GitHub Actions repo secrets. It exports them into the deploy step and Compose transmits them to the daemon; nothing is written to the box.
 
 | Secret | Contents |
 |--------|----------|
@@ -87,21 +72,17 @@ step and Compose transmits them to the daemon; nothing is written to the box.
 | `WREN_OAUTH_PRIVATE_KEY` | The OAuth AS signing PEM (raw) |
 | `WREN_CLOUDFLARED_CREDENTIALS` | The tunnel credentials JSON (raw) |
 
-`GITHUB_TOKEN` is the built-in Actions token; CD uses it to push images to GHCR.
-See `docs/runbooks/bring-up.md` for the one-time steps that produce these values.
+`GITHUB_TOKEN` is the built-in Actions token; CD uses it to push images to GHCR. See `docs/runbooks/bring-up.md` for the one-time steps that produce these values.
 
 ## Healthcheck workflow
 
-`healthcheck.yml` runs every 12 hours from GitHub's public runners. It probes
-three public, unauthenticated surfaces for HTTP 200:
+`healthcheck.yml` runs every 12 hours from GitHub's public runners. It probes three public, unauthenticated surfaces for HTTP 200:
 
 - `https://usewren.com/` (the SPA)
 - `https://api.usewren.com/.well-known/oauth-authorization-server` (AS metadata)
 - `https://mcp.usewren.com/.well-known/oauth-protected-resource` (MCP PRM)
 
-It catches failures internal scraping cannot see: DNS, the Cloudflare edge, the
-tunnel, and per-host ingress routing. On failure after retries it posts one
-Discord message and fails the job.
+It catches failures internal scraping cannot see: DNS, the Cloudflare edge, the tunnel, and per-host ingress routing. On failure after retries it posts one Discord message and fails the job.
 
 ## Troubleshooting
 

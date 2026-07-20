@@ -1,8 +1,6 @@
 # Development
 
-This guide covers local setup, the per-area development loops, code generation,
-and the environment-variable groups. It documents the current implemented state.
-Commands run through `just`; run `just --list` for the full recipe set.
+This guide covers local setup, the per-area development loops, code generation, and the environment-variable groups. It documents the current implemented state. Commands run through `just`; run `just --list` for the full recipe set.
 
 ## Prerequisites
 
@@ -21,13 +19,9 @@ Copy the annotated example file to a working `.env`:
 cp .env.example .env
 ```
 
-`.env.example` is the canonical, sectioned list of every variable, grouped by
-consumer. Read it for the meaning and default of each key. This guide names the
-groups; it does not restate each variable.
+`.env.example` is the canonical, sectioned list of every variable, grouped by consumer. Read it for the meaning and default of each key. This guide names the groups; it does not restate each variable.
 
-The host inner-loop recipes read `.env` from the repo root. `wren.core.settings`
-anchors the file to the repo root, so `just dev-api` loads it regardless of the
-recipe working directory.
+The host inner-loop recipes read `.env` from the repo root. `wren.core.settings` anchors the file to the repo root, so `just dev-api` loads it regardless of the recipe working directory.
 
 ## Development workflows
 
@@ -41,8 +35,7 @@ just dev-api-internal  # internal app on http://127.0.0.1:8001, autoreload
 just migrate           # apply migrations up to head
 ```
 
-Run the two apps in separate terminals. The external app serves the SPA and the
-OAuth AS; the internal app serves the routes the MCP server calls.
+Run the two apps in separate terminals. The external app serves the SPA and the OAuth AS; the internal app serves the routes the MCP server calls.
 
 ### Frontend
 
@@ -52,8 +45,7 @@ just dev-web           # SPA against the real backend
 just dev-mock          # SPA against the zero-backend MSW mock harness
 ```
 
-Use `just dev-mock` to develop the SPA with no backend running. It starts the
-MSW mock worker (`VITE_MOCK_API=true`).
+Use `just dev-mock` to develop the SPA with no backend running. It starts the MSW mock worker (`VITE_MOCK_API=true`).
 
 ### MCP server
 
@@ -62,8 +54,7 @@ just setup-mcp         # install MCP dependencies (uv sync)
 just dev-mcp           # MCP Resource Server on :9000, autoreload
 ```
 
-The MCP Inspector attaches to `:9000`. The RS validates agent tokens against the
-external app's JWKS, so run the external app (or the full stack) alongside it.
+The MCP Inspector attaches to `:9000`. The RS validates agent tokens against the external app's JWKS, so run the external app (or the full stack) alongside it.
 
 ### Full stack
 
@@ -84,8 +75,7 @@ just test-e2e          # run the Playwright spine and smoke
 just e2e-down          # tear down the e2e stack and drop its volumes
 ```
 
-See `docs/testing.md` for the test layers and `docs/ci-cd.md` for how CI runs
-E2E.
+See `docs/testing.md` for the test layers and `docs/ci-cd.md` for how CI runs E2E.
 
 ## Code generation
 
@@ -95,34 +85,26 @@ The frontend REST client is generated, never hand-written.
 just codegen           # export the external OpenAPI document, then run openapi-typescript
 ```
 
-`just codegen` writes `frontend/openapi.json` from the live external app, then
-regenerates `frontend/src/api/schema.d.ts`. Run it after any change to the
-external REST surface. CI drift-gates it: the `codegen-drift` job fails on a stale
-committed client.
+`just codegen` writes `frontend/openapi.json` from the live external app, then regenerates `frontend/src/api/schema.d.ts`. Run it after any change to the external REST surface. CI drift-gates it: the `codegen-drift` job fails on a stale committed client.
 
 ## Skill sync
 
-The agent authoring guidance lives at `skill/SKILL.md`. The backend serves a
-bundled copy of it.
+The agent authoring guidance lives at `skill/SKILL.md`. The backend serves a bundled copy of it.
 
 ```sh
 just sync-skill        # re-sync the backend-bundled copy with the root copy
 ```
 
-Run `just sync-skill` after editing `skill/SKILL.md`. A drift test
-(`backend/tests/`) fails if the two copies diverge.
+Run `just sync-skill` after editing `skill/SKILL.md`. A drift test (`backend/tests/`) fails if the two copies diverge.
 
 ## Workspace layout
 
 The monorepo holds:
 
-- A Python **backend** package: a shared core kit plus the external and internal
-  apps over one service layer.
-- A Python **MCP server** package: the agent front door, which shares no code
-  with the backend.
+- A Python **backend** package: a shared core kit plus the external and internal apps over one service layer.
+- A Python **MCP server** package: the agent front door, which shares no code with the backend.
 - A React **frontend** SPA.
-- A `contract/` project: the dev/test-only cross-package tests, the only place
-  both Python packages import together.
+- A `contract/` project: the dev/test-only cross-package tests, the only place both Python packages import together.
 - `shared/theme/`: the design tokens the SPA and the docs site share.
 - Ops assets: Docker Compose files, `scripts/`, and `deployments/`.
 
@@ -148,17 +130,14 @@ See `docs/architecture.md` for the conceptual model.
 
 ### OAuth stale-client reaper knobs
 
-The external app runs a background reaper that reaps stale
-open-registration OAuth clients. Two variables tune it:
+The external app runs a background reaper that reaps stale open-registration OAuth clients. Two variables tune it:
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
 | `OAUTH_CLIENT_CLEANUP_INTERVAL_SECONDS` | `21600` (6 hours) | How often the sweep runs. A non-positive value disables the task. |
 | `OAUTH_STALE_CLIENT_MAX_AGE_SECONDS` | `2592000` (30 days) | The registration-age threshold for a reap. Independent of the refresh-token TTL. |
 
-The reaper is an in-process asyncio task, started and stopped by the external app
-lifespan. See `docs/architecture.md` for its place in the system and
-`backend/src/wren/oauth/` for the implementation.
+The reaper is an in-process asyncio task, started and stopped by the external app lifespan. See `docs/architecture.md` for its place in the system and `backend/src/wren/oauth/` for the implementation.
 
 ## Cross-references
 

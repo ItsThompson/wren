@@ -1,35 +1,20 @@
 # wren backend
 
-The wren backend is a Python modular monolith. It serves two ASGI apps over one
-shared service layer, so the rules for creating, publishing, and tracking roadmaps
-live in one place.
+The wren backend is a Python modular monolith. It serves two ASGI apps over one shared service layer, so the rules for creating, publishing, and tracking roadmaps live in one place.
 
 ## Purpose
 
-- The external app (`:8000`) is internet-facing through the Cloudflare tunnel. It
-  authenticates humans by a session cookie and hosts the public REST API and the
-  OAuth 2.1 authorization server.
-- The internal app (`:8001`) is app-net only. It trusts an injected `X-User-ID`
-  header behind a shared `INTERNAL_API_TOKEN`. The MCP server is its only intended
-  caller.
+- The external app (`:8000`) is internet-facing through the Cloudflare tunnel. It authenticates humans by a session cookie and hosts the public REST API and the OAuth 2.1 authorization server.
+- The internal app (`:8001`) is app-net only. It trusts an injected `X-User-ID` header behind a shared `INTERNAL_API_TOKEN`. The MCP server is its only intended caller.
 
-Both apps come from one factory (`wren.core.app_factory.create_app`) and differ
-only by injected settings and by which routers and identity dependency they mount.
+Both apps come from one factory (`wren.core.app_factory.create_app`) and differ only by injected settings and by which routers and identity dependency they mount.
 
 ## Architecture
 
-- `wren.core` is the shared infrastructure kit: the app factory, settings, the two
-  identity boundaries, persistence, logging, metrics, the error contract,
-  correlation, health, and the route-access registry. It holds no domain logic.
-- Two entrypoints assemble the apps: `wren.api.main` (external) and
-  `wren.api_internal.main` (internal).
-- The domain packages (`roadmaps`, `progress`, `accounts`, `oauth`, `skill`) each
-  own one area of business rules.
-- Each domain follows one layering convention: config, models, schemas,
-  repository, service, router, and wiring. The service layer owns the transaction
-  boundary and every business rule; routers are thin adapters.
-- Dependency direction stays one-way. A domain receives narrow injected callables
-  rather than importing another domain's repository.
+- `wren.core` is the shared infrastructure kit: the app factory, settings, the two identity boundaries, persistence, logging, metrics, the error contract, correlation, health, and the route-access registry. It holds no domain logic. Two entrypoints assemble the apps: `wren.api.main` (external) and `wren.api_internal.main` (internal).
+- The domain packages (`roadmaps`, `progress`, `accounts`, `oauth`, `skill`) each own one area of business rules.
+- Each domain follows one layering convention: config, models, schemas, repository, service, router, and wiring. The service layer owns the transaction boundary and every business rule; routers are thin adapters.
+- Dependency direction stays one-way. A domain receives narrow injected callables rather than importing another domain's repository.
 
 See `../docs/architecture.md` for the system shape and trust zones.
 
@@ -49,17 +34,3 @@ All recipes run from the repo root and change into `backend/`.
 | `just lint-backend` | Ruff check, format check, and mypy |
 | `just fmt-backend` | Format and autofix |
 
-## Configuration
-
-Copy `.env.example` to `.env` at the repo root and fill in the values.
-`.env.example` is the canonical annotated list of every environment variable. Do
-not duplicate it here.
-
-## Further reading
-
-- Architecture: `../docs/architecture.md`
-- REST reference and the error contract: `../docs/api.md`
-- Authentication and OAuth: `../docs/auth.md`
-- Data model and migrations: `../docs/data-model.md`
-- Roadmap authoring: `../docs/authoring.md`
-- Progress and the study loop: `../docs/progress.md`

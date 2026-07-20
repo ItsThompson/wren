@@ -95,7 +95,7 @@ sequenceDiagram
     X->>S: login(email, password)
     S->>DB: get_by_email + verify hash
     S-->>X: Session(user, TokenPair sid)
-    X-->>B: Set-Cookie wren_session + wren_refresh; body AuthenticatedUser
+    X-->>B: Set-Cookie wren_session + wren_refresh and body AuthenticatedUser
     B->>X: GET /me/dashboard (cookie)
     Note over X: StripInboundIdentityMiddleware drops any X-User-ID
     X->>X: require_user verifies the access JWT + sid blacklist lookup
@@ -125,7 +125,7 @@ sequenceDiagram
     X-->>SPA: DecisionResult with the redirect_uri carrying the code
     SPA-->>A: browser navigates to the loopback redirect_uri
     A->>X: POST /token (code, code_verifier, client_id)
-    X->>X: verify PKCE S256 + resource match; consume the code
+    X->>X: verify PKCE S256 + resource match and consume the code
     X->>DB: issue RS256 access (aud = MCP) + rotating refresh
     X-->>A: TokenResponse (access + refresh)
     A->>X: POST /token (refresh_token) -> rotate the pair
