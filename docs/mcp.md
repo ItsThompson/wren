@@ -2,7 +2,7 @@
 
 The MCP server is wren's AI-agent front door. It exposes roadmap authoring and study tools over the Model Context Protocol (MCP) so an agent can create, publish, and study roadmaps. It is a separate deployable image (`wren-mcp`) and an OAuth 2.1 Resource Server (RS).
 
-The server is a thin dispatcher. It holds no roadmap logic and imports no backend code. Each tool body is one authenticated call to the backend internal app (`:8001`), so the rules live in one place (the shared `RoadmapService`). The package re-declares the wire truths it shares with the backend (header names, scopes, schema shapes) and keeps them in sync by contract tests, not by import. See `infra-duplication.md` for the duplication model and its drift gate.
+The server is a thin dispatcher. It holds no roadmap logic and imports no backend domain code. Each tool body is one authenticated call to the backend internal app (`:8001`), so the rules live in one place (the shared `RoadmapService`). Shared infrastructure (logging, metrics, health) comes from the `wren-common` package; the wire truths it shares with the backend (header names, scopes, schema shapes) are re-declared here and kept in sync by contract tests, not by import. See `packaging.md` for the workspace and the shared-infra-versus-mirrored-wire-truth boundary.
 
 Canonical sources: `mcp/src/wren_mcp/`. This doc cites the module for each claim.
 
@@ -187,7 +187,7 @@ These record intentional design, verified against the current source. Read them 
 
 - Token model, audience binding, and discovery: `auth.md`.
 - REST route catalog and the error contract: `api.md`.
-- Cross-package duplication and its drift gate: `infra-duplication.md`.
+- The uv workspace, per-member images, and the backend/MCP boundary: `packaging.md`.
 - Metrics, alerts, and retention: `monitoring.md`.
 - Shared authoring rules and the immutability boundary: `authoring.md`.
 - Follow and study-loop semantics: `progress.md`.

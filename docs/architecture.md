@@ -55,7 +55,7 @@ Two Docker bridge networks separate the tiers. `app-net` carries every first-par
 |-----------|------|------------------|
 | External app (`:8000`) | Internet-facing. Authenticates humans by session cookie. Hosts the public REST API and the OAuth 2.1 authorization server. | `backend/src/wren/api/` |
 | Internal app (`:8001`) | App-net only. Trusts an injected `X-User-ID` header behind `INTERNAL_API_TOKEN`. Mounts the roadmap and progress routers over the same service layer. Never mounts the web-only lifecycle routes. | `backend/src/wren/api_internal/` |
-| MCP Resource Server (`:9000`) | The agent front door. An OAuth 2.1 Resource Server that verifies the agent bearer token, then forwards each tool call to the internal app. Imports no backend code. | `mcp/src/wren_mcp/` |
+| MCP Resource Server (`:9000`) | The agent front door. An OAuth 2.1 Resource Server that verifies the agent bearer token, then forwards each tool call to the internal app. Carries no backend domain dependency; shares infra via `wren-common`. | `mcp/src/wren_mcp/` |
 | Frontend SPA (`:80`) | The React app for humans. Talks to the external app over a typed REST client. Served by nginx in the container. | `frontend/` |
 | PostgreSQL | The single datastore. Reached by the backend over an async connection pool. | `docker-compose.yml` |
 | Observability | Prometheus scrapes `/metrics` on all apps in-network. node-exporter reports host metrics. Alertmanager routes alerts to Discord. | `docs/monitoring.md` |
@@ -78,7 +78,7 @@ Every request resolves to exactly one `user_id`, and the server never trusts one
 | Decision | Rationale |
 |----------|-----------|
 | One factory, two apps | The external and internal apps share one service layer and differ only by injected settings, so a rule is defined once. |
-| No shared code between backend and MCP | The two are separate deployables. Shared wire truths are hand-duplicated and gated by `contract/tests/`, so the MCP image carries no backend dependency. |
+| Backend/MCP boundary | The two are separate deployables. The MCP shares no backend DOMAIN code and carries no backend dependency. Shared INFRA (logging, metrics, health) lives in the `wren-common` workspace package; shared wire truths (headers, scopes, schema shapes) stay mirrored and are gated by `contract/tests/`, so a backend-internal schema change cannot silently mutate the agent-facing contract. See `docs/packaging.md`. |
 | Fail-safe deny at every boundary | An empty `SESSION_JWT_SECRET` denies all sessions; an empty `INTERNAL_API_TOKEN` denies all internal calls; a missing state seam degrades to deny. |
 | 404 over 403 | The service returns 404 for a private resource, so a caller never learns a resource exists but is off-limits. |
 | Site-URL pinning | All OAuth issuer, metadata, and endpoint URLs build from pinned config, never from the request host, because the tunnel reaches the origin over an internal URL. |

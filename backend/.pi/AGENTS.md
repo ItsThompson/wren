@@ -29,9 +29,9 @@ All recipes run from the repo root and change into `backend/`.
 - Raise `WrenError` subclasses from the service layer. Never build problem+json by hand. One exception handler owns the wire shape. See `docs/api.md`.
 - Two error contracts on the OAuth router. Agent protocol endpoints raise `OAuthError` (RFC 6749 JSON). SPA-facing endpoints raise `WrenError` (problem+json). Do not mix them.
 
-## Cross-package duplication
+## Cross-package boundary
 
-- The backend and MCP packages share no code. `logging.py`, `metrics.py`, and `health.py` are hand-duplicated. The internal-boundary header constants (`USER_ID_HEADER`, `INTERNAL_TOKEN_HEADER`) are re-declared in `mcp/config.py` and guarded by `contract/tests/test_header_constants.py`. Change both copies together. See `docs/infra-duplication.md`.
+- The backend and MCP packages share no DOMAIN code and neither imports the other. Shared INFRA (`logging`, `metrics`, `health`) is single-sourced in the `wren-common` workspace package, which both consume and which carries no backend or MCP dependency. Shared wire truths stay mirrored, not shared: the internal-boundary header constants (`USER_ID_HEADER`, `INTERNAL_TOKEN_HEADER`) are re-declared in `mcp/config.py` and guarded by `contract/tests/test_header_constants.py`. Change both sides of a wire truth together. See `docs/packaging.md`.
 
 ## Rules
 

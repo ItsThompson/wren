@@ -24,7 +24,7 @@ All recipes run from the repo root and change into `backend/`.
 
 | Command | Purpose |
 |---------|---------|
-| `just setup` | Install dependencies into `backend/.venv` from `uv.lock` |
+| `just setup` | Sync the shared workspace venv from the root `uv.lock` |
 | `just dev-api` | Run the external app (`:8000`) with autoreload |
 | `just dev-api-internal` | Run the internal app (`:8001`) with autoreload |
 | `just dev-infra` | Start local Postgres for the host inner loop |

@@ -13,9 +13,9 @@ default:
 
 # --- Backend ----------------------------------------------------------------
 
-# Install backend dependencies (creates backend/.venv from uv.lock)
+# Sync the Python workspace into the shared root venv (single root uv.lock)
 setup:
-    cd backend && uv sync
+    uv sync --all-packages
 
 # Boot the external app (:8000) with autoreload
 dev-api:
@@ -39,9 +39,9 @@ fmt-backend:
 
 # --- MCP server -------------------------------------------------------------
 
-# Install MCP server dependencies (creates mcp/.venv from uv.lock)
+# Sync the Python workspace into the shared root venv (same as `just setup`)
 setup-mcp:
-    cd mcp && uv sync
+    uv sync --all-packages
 
 # Boot the MCP Resource Server (:9000) with autoreload. Also used by the MCP
 # Inspector to attach during development.
@@ -64,7 +64,7 @@ fmt-mcp:
 
 # Re-sync the backend-bundled SKILL.md with the canonical repo-root copy.
 # The canonical, human-edited guidance lives at skill/SKILL.md; the backend
-# serves a bundled copy (its image build context is backend/), and a drift test
+# serves a bundled copy (backend/src/wren/skill/SKILL.md), and a drift test
 # (backend/tests/test_skill_content.py) fails if the two diverge. Run this after
 # editing skill/SKILL.md.
 sync-skill:

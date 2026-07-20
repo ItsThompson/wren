@@ -17,10 +17,10 @@ All recipes run from the repo root and change into `mcp/`.
 
 ## Separation from the backend
 
-- The MCP image must not import backend code. Shared truths are duplicated on purpose and guarded by `contract/tests/`. Change both sides together. See `docs/infra-duplication.md`.
+- The MCP image imports no backend DOMAIN code and carries no backend dependency. Shared INFRA (`logging`, `metrics`, `health`) comes from the `wren-common` workspace package; shared wire truths (header names, scopes, schema shapes) are re-declared here on purpose and guarded by `contract/tests/`. Change both sides of a wire truth together. See `docs/packaging.md`.
 - `schemas.py` mirrors the backend authoring and read projections. The schema-mirror test (`contract/tests/test_schema_mirror.py`) enforces field equality. Editing a schema here without the backend breaks the mirror.
-- `logging.py`, `metrics.py`, and `health.py` are hand-maintained copies of the backend modules. Apply any change to both copies; only the concatenated registry and MCP's extra `jwks_readiness_check` may differ. See `docs/infra-duplication.md` for the exact divergence points.
-- `configure_logging` is a once-per-process no-op after the first call. Do not rely on a second call to change the level or renderer.
+- `logging`, `metrics`, and `health` come from `wren_common`. The MCP-only `jwks_readiness_check` lives in `wren_mcp/keys.py` (next to `KeyProvider`) and is injected into `create_health_router`; the MCP's `TOOL_METRICS_REGISTRY` is injected into `instrument`.
+- `configure_logging` (from `wren_common.logging`) is a once-per-process no-op after the first call. Do not rely on a second call to change the level or renderer.
 
 ## The internal hop
 

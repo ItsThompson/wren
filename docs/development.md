@@ -25,10 +25,14 @@ The host inner-loop recipes read `.env` from the repo root. `wren.core.settings`
 
 ## Development workflows
 
+### Python workspace
+
+The Python packages (`backend`, `mcp`, `contract`, `shared/wren-common`) form a uv workspace with one shared root `.venv` and a single root `uv.lock`. `just setup` (or `uv sync --all-packages` from the repo root) installs every member and its dev tools into that venv, so `cd backend && uv run pytest` and the sibling recipes resolve against it. Images install one member's locked deps instead; see `docs/packaging.md` for that and the repo-root Docker build context.
+
 ### Backend host inner loop
 
 ```sh
-just setup             # install backend dependencies (uv sync)
+just setup             # sync the workspace venv (uv sync --all-packages)
 just dev-infra         # start local Postgres in Docker
 just dev-api           # external app on http://127.0.0.1:8000, autoreload
 just dev-api-internal  # internal app on http://127.0.0.1:8001, autoreload
@@ -50,7 +54,7 @@ Use `just dev-mock` to develop the SPA with no backend running. It starts the MS
 ### MCP server
 
 ```sh
-just setup-mcp         # install MCP dependencies (uv sync)
+just setup-mcp         # sync the workspace venv (same shared venv as just setup)
 just dev-mcp           # MCP Resource Server on :9000, autoreload
 ```
 
@@ -102,13 +106,14 @@ Run `just sync-skill` after editing `skill/SKILL.md`. A drift test (`backend/tes
 The monorepo holds:
 
 - A Python **backend** package: a shared core kit plus the external and internal apps over one service layer.
-- A Python **MCP server** package: the agent front door, which shares no code with the backend.
+- A Python **MCP server** package: the agent front door, which shares no domain code with the backend (shared infra comes from `wren-common`).
 - A React **frontend** SPA.
 - A `contract/` project: the dev/test-only cross-package tests, the only place both Python packages import together.
+- `shared/wren-common/`: the shared backend/MCP infrastructure (logging, metrics, health).
 - `shared/theme/`: the design tokens the SPA and the docs site share.
 - Ops assets: Docker Compose files, `scripts/`, and `deployments/`.
 
-See `docs/architecture.md` for the conceptual model.
+The four Python packages form a uv workspace with a single root `uv.lock`. See `docs/packaging.md` for the workspace and image-build model, and `docs/architecture.md` for the conceptual model.
 
 ## Environment variables
 
