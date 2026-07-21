@@ -7,8 +7,10 @@
 ## Context and Problem Statement
 
 The MCP server ships as a separate image that carries no backend domain code, so
-it re-declares roughly 50 Pydantic types that mirror the backend authoring and
-read projections. A cross-package test (`contract/tests/test_schema_mirror.py`)
+it re-declares about 50 Pydantic types that mirror the backend authoring and read
+projections: roughly 46 field-identical Group-A types (the ones this decision
+generates), plus a handful of lean write results and one MCP-only wrapper that
+stay hand-authored. A cross-package test (`contract/tests/test_schema_mirror.py`)
 holds the mirror equal, so drift is caught in CI rather than prevented. Adding an
 agent-facing endpoint costs about ten edits across three packages, and the
 hand-mirrored schemas are the largest part of that cost. We need a way to remove
