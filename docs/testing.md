@@ -17,8 +17,9 @@ This guide describes the test layers, how to run each one, the main patterns, an
 | Backend property tests | The DAG validator, patch operations, validation, next, slugs | pytest plus hypothesis | `just test-backend` |
 | Frontend unit and component | Components, hooks, the data layer | vitest plus Testing Library, 70% coverage gate | `just test-frontend` |
 | Frontend acceptance | The SWR data layer against a mock backend | vitest plus MSW | `just test-frontend` |
-| Contract drift | Cross-package header constants and the backend-to-MCP schema mirror | pytest in the `contract/` project | (CI `contract-drift` job) |
-| MCP | Tool registration, the internal client, the bearer boundary, the frozen tool-schema snapshot | pytest, 80% coverage gate | `just test-mcp` |
+| Contract drift | Cross-package header/scope constants, that the generated MCP Group-A module is exactly Group A (no leaked domain types), and that each lean write result is a field-subset of its backend source | pytest in the `contract/` project | (CI `contract-drift` job) |
+| Codegen drift | The committed frontend client and the generated MCP Group-A schema module are regenerated and diffed against a clean tree | `just codegen` / `just codegen-mcp`, then `git diff --exit-code` | (CI `codegen-drift` + `mcp-codegen-drift` jobs) |
+| MCP | Tool registration, the internal client, the bearer boundary, the frozen tool-schema snapshot and its structural guard | pytest, 80% coverage gate | `just test-mcp` |
 | wren-common seams | The logging/metrics/health injection seams (metrics registry, readiness checks) | pytest | `cd shared/wren-common && uv run pytest` (also in CI `test-backend`) |
 | E2E | The full spine and UI smoke against the running stack | Playwright | `just test-e2e` |
 
@@ -70,7 +71,7 @@ Canonical source: `backend/tests/`.
 |----------|--------|-------|
 | High | The DAG validator | Property tests over graph shapes; cycles and ordering |
 | High | Route coverage | `test_route_registry.py`; an undeclared route fails deny |
-| High | Schema mirror and header constants | `contract/tests/`; cross-package drift fails a test |
+| High | The generated Group-A module, the lean-write-result subset, and header/scope constants | `contract/tests/`; cross-package drift fails a test |
 | High | Revalidate-after-write | `frontend/src/test/acceptance/`; no stale flash, no extra GET |
 | High | Auth boundaries | `require_user` and `require_internal_user` deny paths; the OAuth cleanup reaper |
 | Medium | Next-item computation and projections | Server-computed study order, `concise` and `detailed` shapes |

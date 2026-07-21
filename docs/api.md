@@ -43,7 +43,11 @@ Health and metrics routes mount with `include_in_schema=False`, so the coverage 
 
 ## Roadmaps endpoints
 
-Mounted on both apps unless the row says web-only. The web-only lifecycle routes mount on the external app only (`include_web_lifecycle=True`), so they have no internal route and no MCP tool.
+Each route's mounting app and access level are declared in `route_registry.py`;
+the roadmaps factory reads that table, so a route mounts on an app only when the
+registry lists it for that app. The web-only lifecycle routes (visibility,
+archive, delete) are declared for the external app only, so they have no internal
+route and no MCP tool.
 
 | Method and path | Purpose | Notes |
 |-----------------|---------|-------|
@@ -69,7 +73,9 @@ See `authoring.md` for the authoring rules and the immutability boundary. See `d
 
 ## Progress endpoints
 
-Mounted on both apps, under the `/roadmaps/{id}` resource.
+Under the `/roadmaps/{id}` resource. Snapshot, explicit-set, and next mount on
+both apps; follow and deadline mount on the external app only (see the
+internal-surface note).
 
 | Method and path | Purpose | Notes |
 |-----------------|---------|-------|
@@ -79,7 +85,7 @@ Mounted on both apps, under the `/roadmaps/{id}` resource.
 | `GET /roadmaps/{id}/next` | Server-computed next items | `format=concise\|detailed` |
 | `PUT /roadmaps/{id}/deadline` | Set (a date) or clear (null) the deadline | See the internal-surface note |
 
-Internal-surface note: two of these routes mount on the internal app for parity but no MCP tool calls them. `POST /follow` is vestigial: following is created implicitly by the first progress write, so neither surface calls it. `PUT /deadline` is web-only, and its `DeadlineRequest`/`Progress` types are unmirrored in the MCP contract (`contract/tests/`), so there is no MCP deadline tool. See `progress.md` for the follow and study-loop semantics.
+Internal-surface note: `POST /follow` and `PUT /deadline` mount on the external app only; the internal app the MCP server calls does not mount them, so both return 404 there. `POST /follow` is called by no client: following is created implicitly by the first progress write. `PUT /deadline` is web-only, and its `DeadlineRequest`/`Progress` types are unmirrored in the MCP contract (`contract/tests/`), so there is no MCP deadline tool. See `progress.md` for the follow and study-loop semantics.
 
 ## OAuth, accounts, and skill endpoints
 

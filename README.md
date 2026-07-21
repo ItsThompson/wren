@@ -125,7 +125,8 @@ See `docs/development.md` for the full development guide.
 | `just test-backend` | Run backend tests with coverage |
 | `just lint-backend` | Ruff check, format check, and mypy |
 | `just migrate` | Apply migrations up to head |
-| `just codegen` | Regenerate the frontend REST client from the OpenAPI document |
+| `just codegen` | Regenerate the frontend REST client from the external OpenAPI document |
+| `just codegen-mcp` | Regenerate the MCP Group-A schemas from the internal OpenAPI document |
 | `just up-dev` | Run the full stack in dev mode |
 
 Run `just --list` for the full recipe set.

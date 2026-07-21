@@ -26,7 +26,7 @@ flowchart TD
 
 - A progress record is created implicitly by the first progress write. Checking an item (`progress_update`) or setting a deadline on a published roadmap creates the record. This holds on both surfaces: the web app and MCP.
 - There is no explicit follow or unfollow affordance on any surface. Unfollow does not exist.
-- `POST /roadmaps/{id}/follow` is a vestigial internal endpoint. Neither the web app nor MCP calls it; only tests and the e2e suite do. Do not document or build a follow button.
+- `POST /roadmaps/{id}/follow` mounts on the external app only; the internal app the MCP server calls does not mount it. Neither the web app nor MCP calls it; only tests and the e2e suite do. Do not document or build a follow button.
 - Starting to follow requires a published roadmap the caller may read (their own, or a public one). A draft is not startable.
 - An archived roadmap is closed to new participation. It keeps existing followers and their progress but gains no new ones. A caller with no existing record cannot start tracking an archived roadmap, so the upsert never creates a phantom follower. This keeps `count_followers` stable for the owner's delete guard.
 - An unreadable roadmap is a 404 with no existence leak.
