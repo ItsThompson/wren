@@ -6,14 +6,16 @@ and how the caller's ``user_id`` is resolved. Rather than fork the router or pas
 those two facts in by hand, :func:`create_progress_router` takes an :class:`App`
 selector and reads both from the route registry:
 
-- **mounting** (composition): a route mounts on the app iff that app's registry
-  declares it. ``follow`` and ``deadline`` are declared for the external app only
-  (following is created implicitly by the first progress write, and deadline is
-  web-only, deliberately unmirrored in the MCP contract), so the internal app the
-  MCP server calls mounts only snapshot / explicit-set / next.
-- **identity** (policy): each route resolves the identity dependency its declared
-  access level maps to: ``require_user`` (external cookie) or
-  ``require_internal_user`` (the trusted ``X-User-ID`` behind ``INTERNAL_API_TOKEN``).
+- **identity** (policy): :func:`identity_for_app` resolves the identity dependency
+  the app's routes gate on, from their declared access level: ``require_user``
+  (external cookie) or ``require_internal_user`` (the trusted ``X-User-ID`` behind
+  ``INTERNAL_API_TOKEN``).
+- **mounting** (composition): the factory defines every progress route, then
+  :func:`restrict_to_declared` keeps only those the app's registry declares.
+  ``follow`` and ``deadline`` are declared for the external app only (following is
+  created implicitly by the first progress write, and deadline is web-only,
+  deliberately unmirrored in the MCP contract), so the internal app the MCP server
+  calls mounts only snapshot / explicit-set / next.
 
 Thin handlers: each resolves the caller via the resolved ``identity`` dependency,
 calls one :class:`ProgressService` method, and lets the shared exception handler
@@ -26,137 +28,90 @@ the resolved user.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 
 from fastapi import APIRouter, Depends
 
 from wren.core.read_contract import ResponseFormat
-from wren.core.route_registry import IDENTITY_BY_ACCESS, App, Identity, RouteKey, route_access
-
-# The schema/service imports below suppress TC001: FastAPI evaluates a handler's
-# parameter/return annotations at runtime (via get_type_hints when the route is
-# registered), so they must stay runtime imports. The repo's flake8-type-checking
-# config whitelists the @router.* route decorators, but this factory registers via
-# add_api_route in a loop, which that config does not cover; moving them into a
-# type-checking block would NameError at registration.
+from wren.core.route_registry import App, identity_for_app, restrict_to_declared
 from wren.progress.schemas import (
-    DeadlineRequest,  # noqa: TC001
-    NextResult,  # noqa: TC001
-    Progress,  # noqa: TC001
-    ProgressSnapshot,  # noqa: TC001
-    ProgressUpdateRequest,  # noqa: TC001
-    ProgressUpdateResult,  # noqa: TC001
+    DeadlineRequest,
+    NextResult,
+    Progress,
+    ProgressSnapshot,
+    ProgressUpdateRequest,
+    ProgressUpdateResult,
 )
-from wren.progress.service import ProgressService  # noqa: TC001
+from wren.progress.service import ProgressService
 from wren.roadmaps.config import ROADMAPS_PATH
 
 # A FastAPI dependency that yields a ProgressService for the request.
 ProgressServiceProvider = Callable[..., object]
 
-# An endpoint builder: given the resolved identity dependency, returns the route
-# handler (closing over the injected service provider).
-_Endpoint = Callable[..., Awaitable[object]]
-_Builder = Callable[[Identity], _Endpoint]
-
 
 def create_progress_router(service_provider: ProgressServiceProvider, *, app: App) -> APIRouter:
     """Build the progress router for ``app``, driven by the route registry.
 
-    Injects the progress service provider (request-scoped). The set of routes
-    mounted and the identity each resolves both come from ``app``'s registry (see
-    the module docstring): the internal app mounts only snapshot / explicit-set /
-    next, while the external app additionally mounts the web-only follow / deadline
-    routes. The service scopes every query to the resolved user, so the internal
-    app can trust the injected identity without a route reaching another user's
-    progress.
+    Injects the progress service provider (request-scoped). The identity every
+    handler resolves and the subset of routes mounted both come from ``app``'s
+    registry (see the module docstring): the internal app mounts only snapshot /
+    explicit-set / next, while the external app additionally mounts the web-only
+    follow / deadline routes. The service scopes every query to the resolved user,
+    so the internal app can trust the injected identity without a route reaching
+    another user's progress.
     """
     router = APIRouter(prefix=ROADMAPS_PATH, tags=["progress"])
-    registry = route_access(app)
+    identity = identity_for_app(app)
 
-    def _follow(identity: Identity) -> _Endpoint:
-        async def follow_roadmap(
-            roadmap_id: str,
-            user_id: str = Depends(identity),
-            service: ProgressService = Depends(service_provider),
-        ) -> Progress:
-            return await service.follow(user_id, roadmap_id)
+    @router.post("/{roadmap_id}/follow", status_code=201)
+    async def follow_roadmap(
+        roadmap_id: str,
+        user_id: str = Depends(identity),
+        service: ProgressService = Depends(service_provider),
+    ) -> Progress:
+        return await service.follow(user_id, roadmap_id)
 
-        return follow_roadmap
+    @router.get("/{roadmap_id}/progress")
+    async def get_progress(
+        roadmap_id: str,
+        detailed: bool = False,
+        user_id: str = Depends(identity),
+        service: ProgressService = Depends(service_provider),
+    ) -> ProgressSnapshot:
+        return await service.get(user_id, roadmap_id, detailed)
 
-    def _get(identity: Identity) -> _Endpoint:
-        async def get_progress(
-            roadmap_id: str,
-            detailed: bool = False,
-            user_id: str = Depends(identity),
-            service: ProgressService = Depends(service_provider),
-        ) -> ProgressSnapshot:
-            return await service.get(user_id, roadmap_id, detailed)
+    @router.post("/{roadmap_id}/progress")
+    async def update_progress(
+        roadmap_id: str,
+        body: ProgressUpdateRequest,
+        user_id: str = Depends(identity),
+        service: ProgressService = Depends(service_provider),
+    ) -> ProgressUpdateResult:
+        return await service.update(user_id, roadmap_id, body.item_ids, body.state)
 
-        return get_progress
+    @router.get("/{roadmap_id}/next")
+    async def get_next(
+        roadmap_id: str,
+        format: ResponseFormat = ResponseFormat.CONCISE,
+        user_id: str = Depends(identity),
+        service: ProgressService = Depends(service_provider),
+    ) -> NextResult:
+        # Server-computed next items with a structural why_now + resource links;
+        # detailed adds each item's path_position (never delegated to the agent).
+        return await service.get_next(user_id, roadmap_id, format)
 
-    def _update(identity: Identity) -> _Endpoint:
-        async def update_progress(
-            roadmap_id: str,
-            body: ProgressUpdateRequest,
-            user_id: str = Depends(identity),
-            service: ProgressService = Depends(service_provider),
-        ) -> ProgressUpdateResult:
-            return await service.update(user_id, roadmap_id, body.item_ids, body.state)
+    @router.put("/{roadmap_id}/deadline")
+    async def set_deadline(
+        roadmap_id: str,
+        body: DeadlineRequest,
+        user_id: str = Depends(identity),
+        service: ProgressService = Depends(service_provider),
+    ) -> Progress:
+        # Set (a date) or clear (null) the per-user deadline; editable anytime,
+        # a past date is allowed (countdown only, no pacing signal).
+        return await service.set_deadline(user_id, roadmap_id, body.deadline)
 
-        return update_progress
-
-    def _next(identity: Identity) -> _Endpoint:
-        async def get_next(
-            roadmap_id: str,
-            format: ResponseFormat = ResponseFormat.CONCISE,
-            user_id: str = Depends(identity),
-            service: ProgressService = Depends(service_provider),
-        ) -> NextResult:
-            # Server-computed next items with a structural why_now + resource links;
-            # detailed adds each item's path_position (never delegated to the agent).
-            return await service.get_next(user_id, roadmap_id, format)
-
-        return get_next
-
-    def _deadline(identity: Identity) -> _Endpoint:
-        async def set_deadline(
-            roadmap_id: str,
-            body: DeadlineRequest,
-            user_id: str = Depends(identity),
-            service: ProgressService = Depends(service_provider),
-        ) -> Progress:
-            # Set (a date) or clear (null) the per-user deadline; editable anytime,
-            # a past date is allowed (countdown only, no pacing signal).
-            return await service.set_deadline(user_id, roadmap_id, body.deadline)
-
-        return set_deadline
-
-    # The route table, in the external OpenAPI declaration order. follow and
-    # deadline are declared for the external app only, so the internal app skips
-    # them. Status codes carry per-route (201 follow); response models are inferred
-    # from the handler return annotations.
-    table: list[tuple[RouteKey, _Builder, int]] = [
-        (RouteKey(method="POST", path=f"{ROADMAPS_PATH}/{{roadmap_id}}/follow"), _follow, 201),
-        (RouteKey(method="GET", path=f"{ROADMAPS_PATH}/{{roadmap_id}}/progress"), _get, 200),
-        (RouteKey(method="POST", path=f"{ROADMAPS_PATH}/{{roadmap_id}}/progress"), _update, 200),
-        (RouteKey(method="GET", path=f"{ROADMAPS_PATH}/{{roadmap_id}}/next"), _next, 200),
-        (RouteKey(method="PUT", path=f"{ROADMAPS_PATH}/{{roadmap_id}}/deadline"), _deadline, 200),
-    ]
-
-    # Membership in ``registry`` is the mounting decision (composition); the mapped
-    # access level resolves the identity (policy). A declared progress route always
-    # gates identity, so a None resolution is a wiring bug that fails loudly rather
-    # than mounting an unguarded route.
-    for key, build, status_code in table:
-        if key not in registry:
-            continue
-        identity = IDENTITY_BY_ACCESS[registry[key]]
-        if identity is None:
-            raise RuntimeError(f"{key} resolves no identity dependency; refusing to mount.")
-        router.add_api_route(
-            key.path.removeprefix(ROADMAPS_PATH),
-            build(identity),
-            methods=[key.method],
-            status_code=status_code,
-        )
+    # Composition from the registry: keep only the routes this app declares (follow
+    # and deadline are external-only).
+    restrict_to_declared(router, app)
     return router

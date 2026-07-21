@@ -54,7 +54,7 @@ packages = ["src/wren_mcp"]
 # only per-package bits stay here. `src` is kept local so first-party import
 # detection resolves against this package's own src/tests, not the repo root.
 extend = "../ruff.toml"
-src = ["src", "tests"]
+src = ["src", "scripts", "tests"]
 
 [tool.ruff.lint.per-file-ignores]
 # Tests assert liberally (S101), pass dummy secrets as arguments (S106), and
@@ -64,14 +64,15 @@ src = ["src", "tests"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-mypy_path = "src"
-# Type-check the package plus the test suite so the hand-written token/harness
-# fakes are held to the shapes they stand in for (a diverged fake fails
-# ``mypy --strict``). The flat ``tests`` layout resolves as top-level modules.
-files = ["src/wren_mcp", "tests"]
+mypy_path = ["src", "scripts"]
+# Type-check the package, the codegen scripts, and the test suite so the
+# hand-written token/harness fakes are held to the shapes they stand in for (a
+# diverged fake fails ``mypy --strict``). The flat ``tests`` layout resolves as
+# top-level modules.
+files = ["src/wren_mcp", "scripts", "tests"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "scripts"]
 testpaths = ["tests"]
 addopts = "--cov=wren_mcp --cov-report=term-missing --strict-markers --strict-config"
 asyncio_mode = "auto"

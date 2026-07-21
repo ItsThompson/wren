@@ -11,6 +11,15 @@ mounted, on purpose: forgetting to declare a route is exactly what the coverage
 test catches. The same path can carry different access levels on the two apps
 (e.g. ``POST /roadmaps`` is external-cookie on :8000 and internal-trusted on
 :8001), so the registries are per-app.
+
+Two enforcement modes share this table. Most routers mount every route they
+define, so an undeclared route reaches the coverage test and fails it (fail-safe
+deny). The roadmaps/progress factories instead treat the registry as
+load-bearing: :func:`restrict_to_declared` mounts only the routes the registry
+declares, so an undeclared route there is never built into the app. Either way an
+unscoped route cannot ship. The difference is where a forgotten route surfaces: a
+forgotten roadmaps/progress route is a missing endpoint (its own functional test
+fails), not a coverage failure.
 """
 
 from __future__ import annotations
@@ -23,7 +32,7 @@ from typing import TYPE_CHECKING, Any
 from wren.core.identity import require_internal_user, require_user
 
 if TYPE_CHECKING:
-    from fastapi import FastAPI
+    from fastapi import APIRouter, FastAPI
 
 
 class AccessLevel(StrEnum):
@@ -235,6 +244,65 @@ def route_access(app: App) -> RouteRegistry:
     return _ROUTE_ACCESS_BY_APP[app]
 
 
+# HTTP methods that carry a product route (auto-added HEAD/OPTIONS are excluded).
+_PRODUCT_METHODS = frozenset({"GET", "POST", "PUT", "PATCH", "DELETE"})
+
+
+def identity_for_app(app: App) -> Identity:
+    """The identity dependency ``app``'s roadmaps/progress routes resolve.
+
+    Every such route on one app shares a single access level (external cookie or
+    internal trusted), so the roadmaps/progress factories resolve the identity once
+    from the registry rather than taking it as an argument. This is the policy half
+    of "the registry is load-bearing": change a route's declared access level and
+    the resolved dependency follows.
+    """
+    return _roadmaps_identity(route_access(app), app)
+
+
+def _roadmaps_identity(registry: RouteRegistry, label: object) -> Identity:
+    """The one identity dependency the ``/roadmaps`` routes in ``registry`` gate on.
+
+    ``label`` (an :class:`App`) names the source in the error messages only. Raises
+    if those routes do not share exactly one access level, or if that level maps to
+    no identity: both are registry misconfigurations the caller cannot recover from.
+    Split from :func:`identity_for_app` so the invariant is testable against a
+    hand-built registry without the module-level tables.
+    """
+    levels = {level for key, level in registry.items() if key.path.startswith("/roadmaps")}
+    if len(levels) != 1:
+        raise RuntimeError(
+            f"expected one access level for /roadmaps routes on {label}, got {sorted(levels)}"
+        )
+    identity = IDENTITY_BY_ACCESS[next(iter(levels))]
+    if identity is None:
+        raise RuntimeError(f"/roadmaps routes on {label} must resolve an identity dependency")
+    return identity
+
+
+def restrict_to_declared(router: APIRouter, app: App) -> None:
+    """Drop every route ``app``'s registry does not declare (composition, in place).
+
+    The mounting half of "the registry is load-bearing": a factory defines every
+    route its domain owns, then calls this so the app mounts exactly the subset its
+    registry lists (e.g. the web-only lifecycle and follow/deadline routes are
+    declared for the external app only). Removing a route from the registry unmounts
+    it; a stale registry entry (declared but defined by no factory) still fails the
+    coverage test's ``orphaned`` direction.
+    """
+    registry = route_access(app)
+    kept = [
+        route
+        for route in router.routes
+        if any(
+            RouteKey(method=method, path=getattr(route, "path", "")) in registry
+            for method in getattr(route, "methods", ())
+            if method in _PRODUCT_METHODS
+        )
+    ]
+    router.routes = kept
+
+
 # OpenAPI operation keys that are HTTP methods (a path item also carries non-method
 # keys such as "parameters").
 _HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
@@ -263,7 +331,7 @@ def mounted_product_routes(app: FastAPI) -> list[RouteKey]:
 class CoverageReport:
     """Result of cross-checking mounted routes against a registry."""
 
-    undeclared: list[RouteKey]  # mounted but no declared level -> DENY (coverage fails)
+    undeclared: list[RouteKey]  # mounted but no declared level -> DENY (fails coverage)
     orphaned: list[RouteKey]  # declared but not mounted -> stale registry entry
 
     @property

@@ -36,9 +36,9 @@ _AUTHORING_INPUT_TARGET = "RoadmapDraftInput"
 # generated here. datamodel-codegen emits a top-level ``oneOf`` component as a
 # ``RootModel`` subclass, not the ``Annotated[Union[...], Field(discriminator=...)]``
 # type alias the frozen contract and ``tools_write`` use, and a RootModel wrapper
-# would change the tool input schema at every ``list[PatchOp]`` use site. Per the
-# plan's Checkpoint B fallback, ``PatchOp`` is hand-authored in ``schemas.py`` as a
-# union alias over the generated member classes, so the union is not lifted here.
+# would change the tool input schema at every ``list[PatchOp]`` use site. So
+# ``PatchOp`` is hand-authored in ``schemas.py`` as a union alias over the generated
+# member classes, and the union is not lifted here.
 _PATCH_REQUEST = "PatchRequest"
 
 # The Group-A component set, keyed by the raw artifact's (backend) component names.
