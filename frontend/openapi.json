@@ -980,6 +980,48 @@
         }
       }
     },
+    "/roadmaps/{roadmap_id}/follow": {
+      "post": {
+        "tags": [
+          "progress"
+        ],
+        "summary": "Follow Roadmap",
+        "operationId": "follow_roadmap_roadmaps__roadmap_id__follow_post",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Progress"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/roadmaps/{roadmap_id}/progress": {
       "get": {
         "tags": [
@@ -1116,48 +1158,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NextResult"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/roadmaps/{roadmap_id}/follow": {
-      "post": {
-        "tags": [
-          "progress"
-        ],
-        "summary": "Follow Roadmap",
-        "operationId": "follow_roadmap_roadmaps__roadmap_id__follow_post",
-        "parameters": [
-          {
-            "name": "roadmap_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Roadmap Id"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Progress"
                 }
               }
             }
