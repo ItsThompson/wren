@@ -32,6 +32,7 @@ from wren.core.identity import (
     StripInboundIdentityMiddleware,
     require_user,
 )
+from wren.core.route_registry import App
 from wren.core.settings import EXTERNAL_PORT, EXTERNAL_SERVICE, build_app_settings
 from wren.core.state import deny_all_sessions
 from wren.oauth.api import create_oauth_router
@@ -44,16 +45,10 @@ from wren.oauth.wiring import (
     build_authorization_service_provider,
     build_token_service_provider,
 )
-from wren.progress.router import (
-    create_progress_router,
-    create_progress_web_only_router,
-)
+from wren.progress.router import create_progress_router
 from wren.progress.wiring import build_progress_service_provider
 from wren.roadmaps.listing_api import create_listing_router
-from wren.roadmaps.router import (
-    create_roadmaps_router,
-    create_roadmaps_web_lifecycle_router,
-)
+from wren.roadmaps.router import create_roadmaps_router
 from wren.roadmaps.wiring import (
     build_listing_service_provider,
     build_roadmap_read_service_provider,
@@ -86,18 +81,14 @@ accounts_router = create_accounts_router(service_provider, cookie_config=cookie_
 # same account service provider. External app only.
 onboarding_router = create_onboarding_router(service_provider, identity=require_user)
 
-# Roadmap authoring + reads over the same service layer, resolving identity via
-# the human session cookie (require_user). The external app also mounts the three
-# web-only lifecycle routes (visibility / archive / delete) via a separate
-# factory; the internal app never mounts that router.
+# Roadmap authoring + reads over the same service layer. The App selector drives
+# both mounting (the external app also mounts the web-only lifecycle routes
+# visibility / archive / delete) and identity (require_user) from the route
+# registry; the internal app passes App.INTERNAL for the smaller trusted surface.
 roadmaps_router = create_roadmaps_router(
     build_roadmap_service_provider(),
     build_roadmap_read_service_provider(),
-    identity=require_user,
-)
-roadmaps_web_lifecycle_router = create_roadmaps_web_lifecycle_router(
-    build_roadmap_service_provider(),
-    identity=require_user,
+    app=App.EXTERNAL,
 )
 
 # Dashboard + public profile: the private
@@ -107,14 +98,10 @@ roadmaps_web_lifecycle_router = create_roadmaps_web_lifecycle_router(
 listing_router = create_listing_router(build_listing_service_provider())
 
 # Follow + progress + server-computed next: the study-time surface over the
-# progress service, resolving the human session via require_user and scoped to
-# that user (another user's progress is never returned). The external app also
-# mounts the two web-only progress routes (follow / deadline) via a separate
-# factory; the internal app never mounts that router.
-progress_router = create_progress_router(build_progress_service_provider(), identity=require_user)
-progress_web_only_router = create_progress_web_only_router(
-    build_progress_service_provider(), identity=require_user
-)
+# progress service. The App selector drives mounting (the external app also mounts
+# the web-only follow / deadline routes) and identity (require_user) from the
+# registry; scoped to the resolved user (another user's progress is never returned).
+progress_router = create_progress_router(build_progress_service_provider(), app=App.EXTERNAL)
 
 # Shipped SKILL.md authoring guidance: the public,
 # unauthenticated GET /skill an agent fetches (referenced from the MCP tool
@@ -162,10 +149,8 @@ app: FastAPI = create_app(
         accounts_router,
         onboarding_router,
         roadmaps_router,
-        roadmaps_web_lifecycle_router,
         listing_router,
         progress_router,
-        progress_web_only_router,
         oauth_router,
         skill_router,
     ],

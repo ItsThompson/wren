@@ -8,10 +8,11 @@ external app only by these settings.
 
 Mounts the roadmap + progress routers as thin adapters over the same service
 layer the external app uses (:mod:`wren.roadmaps.router`,
-:mod:`wren.progress.router`), differing only in that ``identity`` resolves the
-trusted ``X-User-ID`` header (``require_internal_user``) instead of the cookie.
-The web-only lifecycle routes live in a separate factory the external entrypoint
-mounts, so they are never built here. These are the endpoints the MCP write/read
+:mod:`wren.progress.router`), passing ``App.INTERNAL``. The registry drives both
+which routes mount (only those an MCP tool consumes) and the identity each
+resolves (the trusted ``X-User-ID`` header, ``require_internal_user``). The
+web-only lifecycle and follow/deadline routes are declared for the external app
+only, so they are never built here. These are the endpoints the MCP write/read
 tools call, one HTTP call per tool.
 """
 
@@ -22,7 +23,7 @@ from typing import TYPE_CHECKING
 from wren.core.app_factory import create_app
 from wren.core.db import create_database, create_db_lifespan, db_readiness_check
 from wren.core.errors import build_exception_handlers
-from wren.core.identity import require_internal_user
+from wren.core.route_registry import App
 from wren.core.settings import INTERNAL_PORT, INTERNAL_SERVICE, build_app_settings
 from wren.progress.router import create_progress_router
 from wren.progress.wiring import build_progress_service_provider
@@ -38,23 +39,21 @@ if TYPE_CHECKING:
 settings = build_app_settings(service=INTERNAL_SERVICE, port=INTERNAL_PORT)
 db = create_database(settings.database_url)
 
-# Roadmap authoring/reading over the trusted identity: the same core factory the
-# external app binds, differing only in that require_internal_user resolves the
-# user from the trusted X-User-ID header. The web-only visibility / archive /
-# delete routes live in a separate factory the external entrypoint mounts, so they
-# are never built here.
+# Roadmap authoring/reading over the trusted identity: the same factory the
+# external app binds, passing App.INTERNAL so the registry resolves
+# require_internal_user and mounts only the routes an MCP tool consumes (the
+# web-only visibility / archive / delete routes are external-only, never built here).
 internal_roadmaps_router = create_roadmaps_router(
     build_roadmap_service_provider(),
     build_roadmap_read_service_provider(),
-    identity=require_internal_user,
+    app=App.INTERNAL,
 )
 
 # Progress surface over the trusted identity: snapshot / explicit-set / next, the
 # three endpoints the MCP progress tools call. The web-only follow / deadline
-# routes live in a separate factory the external entrypoint mounts, so they are
-# never built here.
+# routes are external-only, so App.INTERNAL never mounts them.
 internal_progress_router = create_progress_router(
-    build_progress_service_provider(), identity=require_internal_user
+    build_progress_service_provider(), app=App.INTERNAL
 )
 
 app: FastAPI = create_app(

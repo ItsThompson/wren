@@ -31,12 +31,10 @@ from wren.accounts.service import AccountService
 from wren.accounts.session import create_session_verifier
 from wren.core.app_factory import create_app
 from wren.core.errors import build_exception_handlers
-from wren.core.identity import StripInboundIdentityMiddleware, require_user
+from wren.core.identity import StripInboundIdentityMiddleware
+from wren.core.route_registry import App
 from wren.core.settings import AppSettings
-from wren.progress.router import (
-    create_progress_router,
-    create_progress_web_only_router,
-)
+from wren.progress.router import create_progress_router
 from wren.progress.service import ProgressService
 from wren.roadmaps.listing import ListingService, ProfileOwner
 from wren.roadmaps.listing_api import create_listing_router
@@ -148,8 +146,7 @@ def _build_harness(make_settings: MakeSettings) -> _Harness:
         routers=[
             accounts_router,
             create_listing_router(listing_provider),
-            create_progress_router(progress_provider, identity=require_user),
-            create_progress_web_only_router(progress_provider, identity=require_user),
+            create_progress_router(progress_provider, app=App.EXTERNAL),
         ],
         exception_handlers=build_exception_handlers(),
     )

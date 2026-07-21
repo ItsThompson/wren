@@ -15,10 +15,12 @@ test catches. The same path can carry different access levels on the two apps
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
+
+from wren.core.identity import require_internal_user, require_user
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -31,6 +33,25 @@ class AccessLevel(StrEnum):
     EXTERNAL_COOKIE = "external-cookie"  # require_user (human session cookie)
     INTERNAL_TRUSTED = "internal-trusted"  # require_internal_user (trusted X-User-ID)
     OAUTH = "oauth"  # OAuth 2.1 bearer / AS handshake endpoints
+
+
+class App(StrEnum):
+    """The two apps assembled from one factory; the mounting-composition selector.
+
+    A route mounts on an app iff that app's per-app registry declares it, and it
+    resolves the identity that registry's access level maps to. Passed to the
+    roadmaps/progress factories so mounting and identity both derive from the
+    registry rather than from a hand-passed argument.
+    """
+
+    EXTERNAL = "external"
+    INTERNAL = "internal"
+
+
+# A FastAPI identity dependency (``require_user`` / ``require_internal_user``) or
+# ``None`` for an unauthenticated access level. The roadmaps/progress factories
+# resolve this from a route's access level via :data:`IDENTITY_BY_ACCESS`.
+Identity = Callable[..., Awaitable[str]]
 
 
 @dataclass(frozen=True, order=True)
@@ -188,6 +209,31 @@ INTERNAL_ROUTE_ACCESS: RouteRegistry = {
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}/progress"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/next"): AccessLevel.INTERNAL_TRUSTED,
 }
+
+# The identity dependency each access level resolves. The roadmaps/progress
+# factories key into this by a route's declared access level, so per-route policy
+# lives in the registry, not a hand-passed argument. PUBLIC/OAUTH resolve no
+# identity (those surfaces are not driven by this mechanism, so they map to None).
+IDENTITY_BY_ACCESS: Mapping[AccessLevel, Identity | None] = {
+    AccessLevel.EXTERNAL_COOKIE: require_user,
+    AccessLevel.INTERNAL_TRUSTED: require_internal_user,
+    AccessLevel.PUBLIC: None,
+    AccessLevel.OAUTH: None,
+}
+
+# The per-app registry, so the factories resolve both composition (membership =
+# which app mounts a route) and policy (the access level = which identity it
+# resolves) from one table.
+_ROUTE_ACCESS_BY_APP: Mapping[App, RouteRegistry] = {
+    App.EXTERNAL: EXTERNAL_ROUTE_ACCESS,
+    App.INTERNAL: INTERNAL_ROUTE_ACCESS,
+}
+
+
+def route_access(app: App) -> RouteRegistry:
+    """The route -> access-level registry for ``app`` (the mounting source)."""
+    return _ROUTE_ACCESS_BY_APP[app]
+
 
 # OpenAPI operation keys that are HTTP methods (a path item also carries non-method
 # keys such as "parameters").

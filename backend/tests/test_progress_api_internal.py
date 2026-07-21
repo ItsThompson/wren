@@ -25,8 +25,8 @@ from wren.core.errors import build_exception_handlers
 from wren.core.identity import (
     INTERNAL_TOKEN_HEADER,
     USER_ID_HEADER,
-    require_internal_user,
 )
+from wren.core.route_registry import App
 from wren.core.settings import AppSettings
 from wren.progress.router import create_progress_router
 from wren.progress.service import ProgressService
@@ -53,7 +53,7 @@ def _build_client(make_settings: MakeSettings) -> TestClient:
 
     app: FastAPI = create_app(
         make_settings(),
-        routers=[create_progress_router(progress_provider, identity=require_internal_user)],
+        routers=[create_progress_router(progress_provider, app=App.INTERNAL)],
         exception_handlers=build_exception_handlers(),
     )
     app.state.internal_api_token = SecretStr(_INTERNAL_TOKEN)

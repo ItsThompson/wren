@@ -1,22 +1,19 @@
 """Router-factory tests for the collapsed roadmaps + progress adapters.
 
 One factory per domain replaces the external/internal forked routers
-(byte-identical handler bodies differing only by the identity dependency),
-parameterized by the injected ``identity`` dependency. The three web-only
-lifecycle routes live in a separate factory
-(``create_roadmaps_web_lifecycle_router``) the external entrypoint composes. These
-tests guard the seams that collapse introduced, complementing the per-app contract
-suites (``test_roadmaps_api*`` / ``test_progress_api*``) which still exercise each
-mode's full behavior:
+(byte-identical handler bodies differing only by identity), taking an ``App``
+selector and reading both which routes mount and the identity each resolves from
+the route registry. These tests guard the seams that collapse introduced,
+complementing the per-app contract suites (``test_roadmaps_api*`` /
+``test_progress_api*``) which still exercise each mode's full behavior:
 
-- the one factory serves BOTH identity modes (a parameterized suite): the injected
-  identity dependency denies an anonymous caller and resolves an authenticated one;
-- the three web-only lifecycle routes are built only by the separate
-  web-lifecycle factory and are absent from the core factory, so the internal app
-  (:8001) never exposes them while the external app (:8000) does;
-- the per-app mounted ``/roadmaps`` route set (paths + methods) is exactly the
-  HEAD surface, so the collapse is byte-for-byte route-preserving (the
-  ``route_registry`` access map is re-verified by ``test_route_registry``).
+- the one factory serves BOTH apps (a parameterized suite): the registry-resolved
+  identity denies an anonymous caller and resolves an authenticated one;
+- the web-only routes (visibility/archive/delete and follow/deadline) are declared
+  for the external app only, so ``App.INTERNAL`` never mounts them while
+  ``App.EXTERNAL`` does;
+- the mounted ``/roadmaps`` surface is EXACTLY each app's registry declaration, so
+  mounting is registry-driven (load-bearing), and it equals the HEAD surface.
 """
 
 from __future__ import annotations
@@ -51,21 +48,19 @@ from wren.core.identity import (
     INTERNAL_TOKEN_HEADER,
     USER_ID_HEADER,
     StripInboundIdentityMiddleware,
-    require_internal_user,
-    require_user,
 )
-from wren.core.route_registry import RouteKey, mounted_product_routes
+from wren.core.route_registry import (
+    EXTERNAL_ROUTE_ACCESS,
+    INTERNAL_ROUTE_ACCESS,
+    App,
+    RouteKey,
+    mounted_product_routes,
+)
 from wren.core.settings import AppSettings
-from wren.progress.router import (
-    create_progress_router,
-    create_progress_web_only_router,
-)
+from wren.progress.router import create_progress_router
 from wren.progress.service import ProgressService
 from wren.roadmaps.read_service import RoadmapReadService
-from wren.roadmaps.router import (
-    create_roadmaps_router,
-    create_roadmaps_web_lifecycle_router,
-)
+from wren.roadmaps.router import create_roadmaps_router
 from wren.roadmaps.service import RoadmapService
 
 if TYPE_CHECKING:
@@ -155,7 +150,7 @@ def _roadmap_surface(app: FastAPI) -> set[RouteKey]:
     return {key for key in mounted_product_routes(app) if key.path.startswith("/roadmaps")}
 
 
-# --- composed web-lifecycle router: the three web-only routes are separate ----
+# --- registry-driven composition: web-only routes are external-app only ------
 
 
 def _dummy_provider() -> object:  # pragma: no cover - never invoked (build-time only)
@@ -164,40 +159,49 @@ def _dummy_provider() -> object:  # pragma: no cover - never invoked (build-time
     raise AssertionError("provider should not be invoked in a structural test")
 
 
+_NON_PRODUCT_METHODS = frozenset({"HEAD", "OPTIONS"})
+
+
 def _roadmap_route_keys(router_routes: object) -> set[RouteKey]:
     keys: set[RouteKey] = set()
     for route in router_routes:  # type: ignore[attr-defined]
         for method in route.methods:
+            if method in _NON_PRODUCT_METHODS:
+                continue
             keys.add(RouteKey(method=method, path=route.path))
     return keys
 
 
-def test_web_lifecycle_factory_builds_only_the_three_web_only_routes() -> None:
-    router = create_roadmaps_web_lifecycle_router(_dummy_provider, identity=require_user)
-    keys = _roadmap_route_keys(router.routes)
-    assert keys == _WEB_LIFECYCLE_ROUTES
+def test_external_app_builds_the_web_only_routes() -> None:
+    roadmaps = create_roadmaps_router(_dummy_provider, _dummy_provider, app=App.EXTERNAL)
+    progress = create_progress_router(_dummy_provider, app=App.EXTERNAL)
+    keys = _roadmap_route_keys(roadmaps.routes) | _roadmap_route_keys(progress.routes)
+    assert keys >= _WEB_LIFECYCLE_ROUTES
+    assert keys >= _WEB_ONLY_PROGRESS_ROUTES
 
 
-def test_core_roadmaps_router_omits_the_web_only_routes() -> None:
-    router = create_roadmaps_router(
-        _dummy_provider,
-        _dummy_provider,
-        identity=require_internal_user,
-    )
-    keys = _roadmap_route_keys(router.routes)
+def test_internal_app_omits_the_web_only_routes() -> None:
+    roadmaps = create_roadmaps_router(_dummy_provider, _dummy_provider, app=App.INTERNAL)
+    progress = create_progress_router(_dummy_provider, app=App.INTERNAL)
+    keys = _roadmap_route_keys(roadmaps.routes) | _roadmap_route_keys(progress.routes)
     assert keys.isdisjoint(_WEB_LIFECYCLE_ROUTES)
-
-
-def test_progress_web_only_factory_builds_only_follow_and_deadline() -> None:
-    router = create_progress_web_only_router(_dummy_provider, identity=require_user)
-    keys = _roadmap_route_keys(router.routes)
-    assert keys == _WEB_ONLY_PROGRESS_ROUTES
-
-
-def test_core_progress_router_omits_the_web_only_routes() -> None:
-    router = create_progress_router(_dummy_provider, identity=require_internal_user)
-    keys = _roadmap_route_keys(router.routes)
     assert keys.isdisjoint(_WEB_ONLY_PROGRESS_ROUTES)
+
+
+def test_mounted_surface_is_exactly_the_registry_declaration() -> None:
+    # Mounting is registry-driven (load-bearing): the roadmaps + progress routes
+    # the factories mount on each app are EXACTLY the /roadmaps-prefixed routes that
+    # app's registry declares. Change a route's registry membership and what mounts
+    # follows; the coverage test guards the same table in both directions.
+    for app, registry in (
+        (App.EXTERNAL, EXTERNAL_ROUTE_ACCESS),
+        (App.INTERNAL, INTERNAL_ROUTE_ACCESS),
+    ):
+        roadmaps = create_roadmaps_router(_dummy_provider, _dummy_provider, app=app)
+        progress = create_progress_router(_dummy_provider, app=app)
+        mounted = _roadmap_route_keys(roadmaps.routes) | _roadmap_route_keys(progress.routes)
+        declared = {key for key in registry if key.path.startswith("/roadmaps")}
+        assert mounted == declared
 
 
 # --- per-app mount: web-lifecycle is external-only, surface unchanged --------
@@ -293,9 +297,8 @@ def _external_harness(make_settings: MakeSettings) -> _Harness:
             create_accounts_router(
                 account_provider, cookie_config=CookieConfig(secure=False, domain=None)
             ),
-            create_roadmaps_router(roadmap_provider, read_provider, identity=require_user),
-            create_roadmaps_web_lifecycle_router(roadmap_provider, identity=require_user),
-            create_progress_router(progress_provider, identity=require_user),
+            create_roadmaps_router(roadmap_provider, read_provider, app=App.EXTERNAL),
+            create_progress_router(progress_provider, app=App.EXTERNAL),
         ],
         exception_handlers=build_exception_handlers(),
     )
@@ -334,8 +337,8 @@ def _internal_harness(make_settings: MakeSettings) -> _Harness:
     app: FastAPI = create_app(
         make_settings(),
         routers=[
-            create_roadmaps_router(roadmap_provider, read_provider, identity=require_internal_user),
-            create_progress_router(progress_provider, identity=require_internal_user),
+            create_roadmaps_router(roadmap_provider, read_provider, app=App.INTERNAL),
+            create_progress_router(progress_provider, app=App.INTERNAL),
         ],
         exception_handlers=build_exception_handlers(),
     )

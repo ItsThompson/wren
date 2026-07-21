@@ -33,8 +33,8 @@ from wren.core.errors import build_exception_handlers
 from wren.core.identity import (
     INTERNAL_TOKEN_HEADER,
     USER_ID_HEADER,
-    require_internal_user,
 )
+from wren.core.route_registry import App
 from wren.core.settings import AppSettings
 from wren.progress.router import create_progress_router
 from wren.progress.service import ProgressService
@@ -83,8 +83,8 @@ def _build_client(
     app: FastAPI = create_app(
         make_settings(),
         routers=[
-            create_roadmaps_router(roadmap_provider, read_provider, identity=require_internal_user),
-            create_progress_router(progress_provider, identity=require_internal_user),
+            create_roadmaps_router(roadmap_provider, read_provider, app=App.INTERNAL),
+            create_progress_router(progress_provider, app=App.INTERNAL),
         ],
         exception_handlers=build_exception_handlers(),
     )

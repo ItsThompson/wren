@@ -28,12 +28,10 @@ from wren.accounts.wiring import build_account_service_provider
 from wren.core.app_factory import create_app
 from wren.core.db import create_database
 from wren.core.errors import build_exception_handlers
-from wren.core.identity import StripInboundIdentityMiddleware, require_user
+from wren.core.identity import StripInboundIdentityMiddleware
+from wren.core.route_registry import App
 from wren.core.settings import AppSettings
-from wren.progress.router import (
-    create_progress_router,
-    create_progress_web_only_router,
-)
+from wren.progress.router import create_progress_router
 from wren.progress.wiring import build_progress_service_provider
 from wren.roadmaps.router import create_roadmaps_router
 from wren.roadmaps.wiring import (
@@ -108,17 +106,12 @@ def _external_app(database_url: str, settings: AppSettings) -> FastAPI:
     roadmaps_router = create_roadmaps_router(
         build_roadmap_service_provider(),
         build_roadmap_read_service_provider(),
-        identity=require_user,
+        app=App.EXTERNAL,
     )
-    progress_router = create_progress_router(
-        build_progress_service_provider(), identity=require_user
-    )
-    progress_web_only_router = create_progress_web_only_router(
-        build_progress_service_provider(), identity=require_user
-    )
+    progress_router = create_progress_router(build_progress_service_provider(), app=App.EXTERNAL)
     app = create_app(
         settings,
-        routers=[accounts_router, roadmaps_router, progress_router, progress_web_only_router],
+        routers=[accounts_router, roadmaps_router, progress_router],
         exception_handlers=build_exception_handlers(),
     )
     app.state.db = database
