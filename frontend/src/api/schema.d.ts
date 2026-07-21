@@ -330,23 +330,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/roadmaps/{roadmap_id}/follow": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Follow Roadmap */
-        post: operations["follow_roadmap_roadmaps__roadmap_id__follow_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/roadmaps/{roadmap_id}/progress": {
         parameters: {
             query?: never;
@@ -376,6 +359,23 @@ export interface paths {
         get: operations["get_next_roadmaps__roadmap_id__next_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/roadmaps/{roadmap_id}/follow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Follow Roadmap */
+        post: operations["follow_roadmap_roadmaps__roadmap_id__follow_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2479,37 +2479,6 @@ export interface operations {
             };
         };
     };
-    follow_roadmap_roadmaps__roadmap_id__follow_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                roadmap_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Progress"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     get_progress_roadmaps__roadmap_id__progress_get: {
         parameters: {
             query?: {
@@ -2598,6 +2567,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NextResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    follow_roadmap_roadmaps__roadmap_id__follow_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                roadmap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Progress"];
                 };
             };
             /** @description Validation Error */

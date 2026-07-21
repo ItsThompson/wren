@@ -652,48 +652,6 @@
         }
       }
     },
-    "/roadmaps/{roadmap_id}/follow": {
-      "post": {
-        "tags": [
-          "progress"
-        ],
-        "summary": "Follow Roadmap",
-        "operationId": "follow_roadmap_roadmaps__roadmap_id__follow_post",
-        "parameters": [
-          {
-            "name": "roadmap_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Roadmap Id"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Progress"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/roadmaps/{roadmap_id}/progress": {
       "get": {
         "tags": [
@@ -830,58 +788,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NextResult"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/roadmaps/{roadmap_id}/deadline": {
-      "put": {
-        "tags": [
-          "progress"
-        ],
-        "summary": "Set Deadline",
-        "operationId": "set_deadline_roadmaps__roadmap_id__deadline_put",
-        "parameters": [
-          {
-            "name": "roadmap_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Roadmap Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DeadlineRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Progress"
                 }
               }
             }
@@ -1179,25 +1085,6 @@
         ],
         "title": "CompletionState",
         "description": "The explicit target state a ``progress_update`` sets its items to.\n\nExplicit set, never toggle: the client states the desired\nstate so a retry is idempotent."
-      },
-      "DeadlineRequest": {
-        "properties": {
-          "deadline": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Deadline"
-          }
-        },
-        "type": "object",
-        "title": "DeadlineRequest",
-        "description": "The ``PUT /roadmaps/{id}/deadline`` body: set or clear the per-user deadline.\n\nA ``date`` sets the deadline; ``null`` clears it. The deadline is editable and\nclearable at any time. A date in the past is allowed (the countdown shows\nelapsed / overdue with no pacing signal)."
       },
       "HTTPValidationError": {
         "properties": {
@@ -1628,50 +1515,6 @@
         ],
         "title": "PrereqRef",
         "description": "A resolved prerequisite: its id, title, and the caller's done state.\n\n``done`` is ``True`` when the caller has completed every checklist item of the\nprerequisite subsection (so an agent can see at a glance whether this node is\nunlocked)."
-      },
-      "Progress": {
-        "properties": {
-          "user_id": {
-            "type": "string",
-            "title": "User Id"
-          },
-          "roadmap_id": {
-            "type": "string",
-            "title": "Roadmap Id"
-          },
-          "deadline": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Deadline"
-          },
-          "checked": {
-            "additionalProperties": {
-              "type": "boolean"
-            },
-            "type": "object",
-            "title": "Checked"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "user_id",
-          "roadmap_id",
-          "updated_at"
-        ],
-        "title": "Progress",
-        "description": "A user's progress against one roadmap.\n\n``checked`` maps a checklist-item id to its checked state; only checked items\nare retained (an unchecked item is simply absent), which keeps the map lean\nand the explicit-set idempotent. ``user_id`` is resolved from the\ntoken/session and never trusted from args. This is the ``follow`` response\nbody (following creates the record)."
       },
       "ProgressSnapshot": {
         "properties": {
