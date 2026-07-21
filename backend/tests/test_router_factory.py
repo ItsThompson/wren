@@ -56,7 +56,10 @@ from wren.core.identity import (
 )
 from wren.core.route_registry import RouteKey, mounted_product_routes
 from wren.core.settings import AppSettings
-from wren.progress.router import create_progress_router
+from wren.progress.router import (
+    create_progress_router,
+    create_progress_web_only_router,
+)
 from wren.progress.service import ProgressService
 from wren.roadmaps.read_service import RoadmapReadService
 from wren.roadmaps.router import (
@@ -129,9 +132,21 @@ _EXTERNAL_ROADMAP_SURFACE = frozenset(
     }
 )
 
-# The internal app is exactly the external surface minus the web-only lifecycle:
-# same roadmap reads/writes and progress, none of visibility/archive/delete.
-_INTERNAL_ROADMAP_SURFACE = _EXTERNAL_ROADMAP_SURFACE - _WEB_LIFECYCLE_ROUTES
+# The two web-only progress routes: follow + deadline. They mount on the external
+# app only (no internal-app route, no MCP tool).
+_WEB_ONLY_PROGRESS_ROUTES = frozenset(
+    {
+        RouteKey(method="POST", path="/roadmaps/{roadmap_id}/follow"),
+        RouteKey(method="PUT", path="/roadmaps/{roadmap_id}/deadline"),
+    }
+)
+
+# The internal app is the external surface minus the web-only routes: the web
+# lifecycle (visibility/archive/delete) and the web-only progress routes
+# (follow/deadline). It mounts only what an MCP tool consumes.
+_INTERNAL_ROADMAP_SURFACE = (
+    _EXTERNAL_ROADMAP_SURFACE - _WEB_LIFECYCLE_ROUTES - _WEB_ONLY_PROGRESS_ROUTES
+)
 
 
 def _roadmap_surface(app: FastAPI) -> set[RouteKey]:
@@ -171,6 +186,18 @@ def test_core_roadmaps_router_omits_the_web_only_routes() -> None:
     )
     keys = _roadmap_route_keys(router.routes)
     assert keys.isdisjoint(_WEB_LIFECYCLE_ROUTES)
+
+
+def test_progress_web_only_factory_builds_only_follow_and_deadline() -> None:
+    router = create_progress_web_only_router(_dummy_provider, identity=require_user)
+    keys = _roadmap_route_keys(router.routes)
+    assert keys == _WEB_ONLY_PROGRESS_ROUTES
+
+
+def test_core_progress_router_omits_the_web_only_routes() -> None:
+    router = create_progress_router(_dummy_provider, identity=require_internal_user)
+    keys = _roadmap_route_keys(router.routes)
+    assert keys.isdisjoint(_WEB_ONLY_PROGRESS_ROUTES)
 
 
 # --- per-app mount: web-lifecycle is external-only, surface unchanged --------
@@ -218,8 +245,8 @@ class _Harness:
         response: Response = self.client.post("/roadmaps", json=_MINIMAL_ROADMAP)
         return response
 
-    def anon_follow(self) -> Response:
-        response: Response = self.client.post("/roadmaps/any-roadmap-0000/follow")
+    def anon_progress(self) -> Response:
+        response: Response = self.client.get("/roadmaps/any-roadmap-0000/progress")
         return response
 
     def login(self) -> None:
@@ -335,7 +362,7 @@ def test_identity_injected_factory_denies_anonymous_then_serves_authenticated(
 
     assert harness.anon_create().status_code == 401
     # Progress got the same one-factory treatment: its routes are identity-gated too.
-    assert harness.anon_follow().status_code == 401
+    assert harness.anon_progress().status_code == 401
 
     harness.login()
     created = harness.create()

@@ -49,8 +49,10 @@ internal_roadmaps_router = create_roadmaps_router(
     identity=require_internal_user,
 )
 
-# Progress surface over the trusted identity: follow / snapshot /
-# explicit-set / next, the endpoints the MCP progress tools call.
+# Progress surface over the trusted identity: snapshot / explicit-set / next, the
+# three endpoints the MCP progress tools call. The web-only follow / deadline
+# routes live in a separate factory the external entrypoint mounts, so they are
+# never built here.
 internal_progress_router = create_progress_router(
     build_progress_service_provider(), identity=require_internal_user
 )

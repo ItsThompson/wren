@@ -38,7 +38,10 @@ from wren.core.app_factory import create_app
 from wren.core.errors import build_exception_handlers
 from wren.core.identity import StripInboundIdentityMiddleware, require_user
 from wren.core.settings import AppSettings
-from wren.progress.router import create_progress_router
+from wren.progress.router import (
+    create_progress_router,
+    create_progress_web_only_router,
+)
 from wren.progress.service import ProgressService
 from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
 
@@ -74,10 +77,13 @@ def _build_client(
         account_provider, cookie_config=CookieConfig(secure=False, domain=None)
     )
     progress_router = create_progress_router(progress_provider, identity=require_user)
+    progress_web_only_router = create_progress_web_only_router(
+        progress_provider, identity=require_user
+    )
 
     app: FastAPI = create_app(
         make_settings(),
-        routers=[accounts_router, progress_router],
+        routers=[accounts_router, progress_router, progress_web_only_router],
         exception_handlers=build_exception_handlers(),
     )
     app.state.session_verifier = create_session_verifier(codec, account_repo.is_session_revoked)

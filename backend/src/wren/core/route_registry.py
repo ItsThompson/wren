@@ -147,10 +147,12 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
 }
 # Internal app routes (:8001), non-tunnel-routed on app-net, gated by the token.
 # Every route resolves identity via require_internal_user (the trusted X-User-ID
-# header behind INTERNAL_API_TOKEN), so all are INTERNAL_TRUSTED. These mirror the
-# external roadmap surface op-for-op (see wren.roadmaps.router, mounted with
-# identity=require_internal_user); the MCP tools are thin clients of exactly these
-# endpoints.
+# header behind INTERNAL_API_TOKEN), so all are INTERNAL_TRUSTED. The internal app
+# mounts only the routes an MCP tool consumes (see wren.roadmaps.router /
+# wren.progress.router, mounted with identity=require_internal_user); the MCP tools
+# are thin clients of exactly these endpoints. The web-only lifecycle routes
+# (visibility / archive / delete) and the web-only follow / deadline routes are
+# external-app only and have no entry here.
 INTERNAL_ROUTE_ACCESS: RouteRegistry = {
     RouteKey(method="POST", path="/roadmaps"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}"): AccessLevel.INTERNAL_TRUSTED,
@@ -175,22 +177,16 @@ INTERNAL_ROUTE_ACCESS: RouteRegistry = {
         method="GET", path="/roadmaps/{roadmap_id}/sections/{section_id}"
     ): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/search"): AccessLevel.INTERNAL_TRUSTED,
-    # Progress surface, mirrored on the internal app by the shared progress-router
-    # factory. The MCP progress tools call the snapshot / next / explicit-set
-    # endpoints (GET /progress, GET /next, POST /progress), each resolving the
-    # trusted X-User-ID and scoped to that user. POST /follow is mounted for parity
-    # but no MCP tool calls it: following is created implicitly by the first
-    # progress write (see ProgressService.update).
-    RouteKey(method="POST", path="/roadmaps/{roadmap_id}/follow"): AccessLevel.INTERNAL_TRUSTED,
+    # Progress surface, mirrored on the internal app by the core progress-router
+    # factory. The MCP progress tools call exactly these three (GET /progress,
+    # POST /progress, GET /next), each resolving the trusted X-User-ID and scoped
+    # to that user. follow and deadline are web-only (external app only, reached by
+    # no MCP tool): following is created implicitly by the first progress write
+    # (see ProgressService.update) and deadline is unmirrored in the MCP contract,
+    # so neither is mounted here.
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/progress"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}/progress"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/next"): AccessLevel.INTERNAL_TRUSTED,
-    # Per-user deadline set/clear, mounted on the internal app by the same factory.
-    # Deadline is web-only today: no MCP tool sets it (DeadlineRequest / Progress
-    # are deliberately unmirrored in the MCP contract, see contract/), so this
-    # route is reached only through the external app. It resolves the trusted
-    # X-User-ID and is scoped to that user's record (countdown only, no pacing).
-    RouteKey(method="PUT", path="/roadmaps/{roadmap_id}/deadline"): AccessLevel.INTERNAL_TRUSTED,
 }
 
 # OpenAPI operation keys that are HTTP methods (a path item also carries non-method

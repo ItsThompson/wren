@@ -44,7 +44,10 @@ from wren.oauth.wiring import (
     build_authorization_service_provider,
     build_token_service_provider,
 )
-from wren.progress.router import create_progress_router
+from wren.progress.router import (
+    create_progress_router,
+    create_progress_web_only_router,
+)
 from wren.progress.wiring import build_progress_service_provider
 from wren.roadmaps.listing_api import create_listing_router
 from wren.roadmaps.router import (
@@ -105,8 +108,13 @@ listing_router = create_listing_router(build_listing_service_provider())
 
 # Follow + progress + server-computed next: the study-time surface over the
 # progress service, resolving the human session via require_user and scoped to
-# that user (another user's progress is never returned).
+# that user (another user's progress is never returned). The external app also
+# mounts the two web-only progress routes (follow / deadline) via a separate
+# factory; the internal app never mounts that router.
 progress_router = create_progress_router(build_progress_service_provider(), identity=require_user)
+progress_web_only_router = create_progress_web_only_router(
+    build_progress_service_provider(), identity=require_user
+)
 
 # Shipped SKILL.md authoring guidance: the public,
 # unauthenticated GET /skill an agent fetches (referenced from the MCP tool
@@ -157,6 +165,7 @@ app: FastAPI = create_app(
         roadmaps_web_lifecycle_router,
         listing_router,
         progress_router,
+        progress_web_only_router,
         oauth_router,
         skill_router,
     ],
