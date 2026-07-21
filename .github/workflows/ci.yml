@@ -118,6 +118,49 @@ jobs:
         run: git diff --exit-code -- frontend/openapi.json frontend/src/api/schema.d.ts
 
   # ---------------------------------------------------------------------------
+  # mcp-codegen-drift: regenerate the internal app's OpenAPI and the MCP Group-A
+  # schema module from it, then fail if the committed artifact or generated module
+  # is stale. The MCP analog of codegen-drift, for the internal surface the MCP
+  # tools consume. Inlines the `just codegen-mcp` pipeline (the runner has uv, not
+  # just), mirroring how codegen-drift inlines `just codegen`. The generator
+  # (datamodel-code-generator) is an MCP dev dependency, so `uv sync --all-packages`
+  # provides it; the MCP image never runs this and only copies the committed file.
+  # ---------------------------------------------------------------------------
+  mcp-codegen-drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install workspace deps
+        run: uv sync --all-packages --frozen
+
+      - name: Regenerate the internal OpenAPI + MCP Group-A schema module
+        run: |
+          LOG_LEVEL=critical uv run --no-sync --package wren python -c "import json; from wren.api_internal.main import app; print(json.dumps(app.openapi(), indent=2))" > mcp/internal-openapi.json
+          genin="$(mktemp)"
+          uv run --no-sync --package wren-mcp python mcp/scripts/build_generation_input.py mcp/internal-openapi.json > "$genin"
+          uv run --no-sync --package wren-mcp datamodel-codegen \
+            --input "$genin" --input-file-type openapi \
+            --output-model-type pydantic_v2.BaseModel --target-python-version 3.12 \
+            --use-standard-collections --use-union-operator --use-annotated --field-constraints \
+            --capitalise-enum-members --strict-nullable --disable-timestamp \
+            --custom-file-header "$(cat mcp/scripts/generated_module_header.txt)" \
+            --formatters black --formatters isort \
+            --output mcp/src/wren_mcp/_schemas_generated.py
+          cd mcp
+          uv run --no-sync ruff format src/wren_mcp/_schemas_generated.py
+          uv run --no-sync ruff check --fix src/wren_mcp/_schemas_generated.py
+
+      - name: Fail on stale committed artifact or generated module
+        run: git diff --exit-code -- mcp/internal-openapi.json mcp/src/wren_mcp/_schemas_generated.py
+
+  # ---------------------------------------------------------------------------
   # contract-drift: run the dev/test-only `contract/` uv project, the only
   # interpreter where `wren.*` and `wren_mcp.*` import together (it editable
   # path-installs both packages; neither deployable depends on the other). It
