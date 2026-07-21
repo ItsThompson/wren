@@ -1,6 +1,6 @@
 # Generate the MCP Group-A schemas from the internal OpenAPI
 
-- Status: proposed
+- Status: accepted
 - Deciders: repository owner
 - Date: 2026-07-20
 
