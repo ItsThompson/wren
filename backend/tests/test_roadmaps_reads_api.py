@@ -39,7 +39,8 @@ from wren.accounts.service import AccountService
 from wren.accounts.session import create_session_verifier
 from wren.core.app_factory import create_app
 from wren.core.errors import build_exception_handlers
-from wren.core.identity import StripInboundIdentityMiddleware, require_user
+from wren.core.identity import StripInboundIdentityMiddleware
+from wren.core.route_registry import App
 from wren.core.settings import AppSettings
 from wren.progress.router import create_progress_router
 from wren.progress.service import ProgressService
@@ -98,10 +99,8 @@ def _build_client(
         make_settings(),
         routers=[
             accounts_router,
-            create_roadmaps_router(
-                roadmap_provider, read_provider, identity=require_user, include_web_lifecycle=True
-            ),
-            create_progress_router(progress_provider, identity=require_user),
+            create_roadmaps_router(roadmap_provider, read_provider, app=App.EXTERNAL),
+            create_progress_router(progress_provider, app=App.EXTERNAL),
         ],
         exception_handlers=build_exception_handlers(),
     )

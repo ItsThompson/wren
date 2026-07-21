@@ -1,18 +1,21 @@
 """REST adapter factory for roadmaps, one factory for both trust boundaries.
 
 The external app (:8000) and the internal app (:8001) mount the same ``/roadmaps``
-handlers: the handler bodies are identical and differ only in how the caller's
-``user_id`` is resolved. Rather than fork the router into two byte-identical
-modules, :func:`create_roadmaps_router` takes the identity resolution as an
-injected dependency (the standards' "inject strategy, don't fork on context"):
+handlers: the handler bodies are identical and differ only in which routes mount
+and how the caller's ``user_id`` is resolved. Rather than fork the router or pass
+those two facts in by hand, :func:`create_roadmaps_router` takes an :class:`App`
+selector and reads both from the route registry:
 
-- **External (:8000)** passes ``identity=require_user`` (the human session cookie;
-  a spoofed ``X-User-ID`` is stripped upstream) and ``include_web_lifecycle=True``.
-- **Internal (:8001)** passes ``identity=require_internal_user`` (the trusted
-  ``X-User-ID`` behind the shared ``INTERNAL_API_TOKEN``) and leaves
-  ``include_web_lifecycle`` at its default ``False``.
+- **identity** (policy): :func:`identity_for_app` resolves the identity dependency
+  the app's routes gate on, from their declared access level: ``require_user``
+  (external cookie; a spoofed ``X-User-ID`` is stripped upstream) or
+  ``require_internal_user`` (the trusted ``X-User-ID`` behind ``INTERNAL_API_TOKEN``).
+- **mounting** (composition): the factory defines every roadmaps route, then
+  :func:`restrict_to_declared` keeps only those the app's registry declares. The
+  web-only lifecycle routes (visibility / archive / delete) are declared for the
+  external app only, so the internal app (the MCP surface) never mounts them.
 
-Thin handlers: each resolves the caller via the injected ``identity`` dependency,
+Thin handlers: each resolves the caller via the resolved ``identity`` dependency,
 calls one :class:`RoadmapService` / :class:`RoadmapReadService` method, and lets
 the shared exception handler render any ``WrenError`` as RFC 9457 problem+json.
 The services are injected via ``service_provider`` / ``read_service_provider`` so
@@ -25,20 +28,18 @@ hard-blocks with a 422 carrying the ``Violation`` list, while ``validate`` alway
 returns 200 with a (possibly empty) list and ``fork`` returns 201 with the new
 draft. ``PATCH /roadmaps/{id}/metadata`` is the presentation-only edit that stays
 allowed post-publish (not ``If-Match``-guarded). The three web-only lifecycle
-actions (``PUT /roadmaps/{id}/visibility``, ``POST /roadmaps/{id}:archive``,
-``DELETE /roadmaps/{id}``) mount only when ``include_web_lifecycle`` is set, so the
-internal app (which the MCP server calls) never exposes them: they have no
-internal-app route and no MCP tool. Delete is guarded by a zero-followers check
-(409 ``DELETE_HAS_FOLLOWERS`` otherwise); archive is the safe retirement path.
+actions are external-app only: delete is guarded by a zero-followers check (409
+``DELETE_HAS_FOLLOWERS`` otherwise) and archive is the safe retirement path.
 """
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 
 from fastapi import APIRouter, Depends, Header, Query
 
 from wren.core.read_contract import ResponseFormat
+from wren.core.route_registry import App, identity_for_app, restrict_to_declared
 from wren.roadmaps.config import ROADMAPS_PATH
 from wren.roadmaps.read_schemas import (
     NodeDetail,
@@ -61,10 +62,6 @@ from wren.roadmaps.schemas import (
 )
 from wren.roadmaps.service import RoadmapService
 
-# A FastAPI dependency that resolves the request's ``user_id`` at the trust
-# boundary: ``require_user`` (external cookie) or ``require_internal_user``
-# (internal trusted header). Injected so one factory serves both apps.
-Identity = Callable[..., Awaitable[str]]
 # A FastAPI dependency that yields a RoadmapService for the request.
 RoadmapServiceProvider = Callable[..., object]
 # A FastAPI dependency that yields a RoadmapReadService for the request.
@@ -75,21 +72,20 @@ def create_roadmaps_router(
     service_provider: RoadmapServiceProvider,
     read_service_provider: RoadmapReadServiceProvider,
     *,
-    identity: Identity,
-    include_web_lifecycle: bool = False,
+    app: App,
 ) -> APIRouter:
-    """Build the /roadmaps router, parameterized by the injected identity.
+    """Build the /roadmaps router for ``app``, driven by the route registry.
 
-    Injects the authoring/lifecycle service provider (writes + lifecycle), the read
-    service provider (the study-time reads, each request-scoped), and the
-    ``identity`` dependency every handler resolves ``user_id`` from. The service
-    scopes every query to that user, so the internal app can trust the injected
-    identity without a route ever reaching another user's roadmap. When
-    ``include_web_lifecycle`` is set (external app only), the three web-only
-    lifecycle routes (visibility / archive / delete) are mounted; otherwise they
-    are absent, so the internal app never exposes them.
+    Injects the authoring/lifecycle service provider (writes + lifecycle) and the
+    read service provider (the study-time reads, each request-scoped). The identity
+    every handler resolves and the subset of routes mounted both come from ``app``'s
+    registry (see the module docstring), so the surface difference between the two
+    apps lives in one table rather than a flag or a forked module. The service
+    scopes every query to the resolved user, so the internal app can trust the
+    injected identity without a route ever reaching another user's roadmap.
     """
     router = APIRouter(prefix=ROADMAPS_PATH, tags=["roadmaps"])
+    identity = identity_for_app(app)
 
     @router.post("", status_code=201)
     async def create_roadmap(
@@ -227,24 +223,6 @@ def create_roadmaps_router(
             user_id, roadmap_id, body.title, body.description, body.subject_tags
         )
 
-    if include_web_lifecycle:
-        _mount_web_lifecycle(router, service_provider, identity)
-
-    return router
-
-
-def _mount_web_lifecycle(
-    router: APIRouter, service_provider: RoadmapServiceProvider, identity: Identity
-) -> None:
-    """Mount the three web-only lifecycle routes (visibility / archive / delete).
-
-    Kept behind :func:`create_roadmaps_router`'s ``include_web_lifecycle`` flag so
-    the internal app (the MCP surface) never exposes them: there is no internal-app
-    route and no MCP tool for visibility / archive / delete. All three resolve the
-    caller via the same injected ``identity`` dependency and are owner-scoped in the
-    service (a non-owner is a 404, no existence leak).
-    """
-
     @router.put("/{roadmap_id}/visibility")
     async def set_roadmap_visibility(
         roadmap_id: str,
@@ -279,3 +257,8 @@ def _mount_web_lifecycle(
         # route and no MCP tool. Guarded by a zero-followers check in the service; a
         # roadmap with followers is a 409 DELETE_HAS_FOLLOWERS steering to archive.
         await service.delete(user_id, roadmap_id)
+
+    # Composition from the registry: keep only the routes this app declares (the
+    # web-only lifecycle routes are external-only).
+    restrict_to_declared(router, app)
+    return router

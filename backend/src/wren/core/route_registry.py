@@ -11,17 +11,28 @@ mounted, on purpose: forgetting to declare a route is exactly what the coverage
 test catches. The same path can carry different access levels on the two apps
 (e.g. ``POST /roadmaps`` is external-cookie on :8000 and internal-trusted on
 :8001), so the registries are per-app.
+
+Two enforcement modes share this table. Most routers mount every route they
+define, so an undeclared route reaches the coverage test and fails it (fail-safe
+deny). The roadmaps/progress factories instead treat the registry as
+load-bearing: :func:`restrict_to_declared` mounts only the routes the registry
+declares, so an undeclared route there is never built into the app. Either way an
+unscoped route cannot ship. The difference is where a forgotten route surfaces: a
+forgotten roadmaps/progress route is a missing endpoint (its own functional test
+fails), not a coverage failure.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
+from wren.core.identity import require_internal_user, require_user
+
 if TYPE_CHECKING:
-    from fastapi import FastAPI
+    from fastapi import APIRouter, FastAPI
 
 
 class AccessLevel(StrEnum):
@@ -31,6 +42,25 @@ class AccessLevel(StrEnum):
     EXTERNAL_COOKIE = "external-cookie"  # require_user (human session cookie)
     INTERNAL_TRUSTED = "internal-trusted"  # require_internal_user (trusted X-User-ID)
     OAUTH = "oauth"  # OAuth 2.1 bearer / AS handshake endpoints
+
+
+class App(StrEnum):
+    """The two apps assembled from one factory; the mounting-composition selector.
+
+    A route mounts on an app iff that app's per-app registry declares it, and it
+    resolves the identity that registry's access level maps to. Passed to the
+    roadmaps/progress factories so mounting and identity both derive from the
+    registry rather than from a hand-passed argument.
+    """
+
+    EXTERNAL = "external"
+    INTERNAL = "internal"
+
+
+# A FastAPI identity dependency (``require_user`` / ``require_internal_user``) or
+# ``None`` for an unauthenticated access level. The roadmaps/progress factories
+# resolve this from a route's access level via :data:`IDENTITY_BY_ACCESS`.
+Identity = Callable[..., Awaitable[str]]
 
 
 @dataclass(frozen=True, order=True)
@@ -147,10 +177,12 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
 }
 # Internal app routes (:8001), non-tunnel-routed on app-net, gated by the token.
 # Every route resolves identity via require_internal_user (the trusted X-User-ID
-# header behind INTERNAL_API_TOKEN), so all are INTERNAL_TRUSTED. These mirror the
-# external roadmap surface op-for-op (see wren.roadmaps.router, mounted with
-# identity=require_internal_user); the MCP tools are thin clients of exactly these
-# endpoints.
+# header behind INTERNAL_API_TOKEN), so all are INTERNAL_TRUSTED. The internal app
+# mounts only the routes an MCP tool consumes (see wren.roadmaps.router /
+# wren.progress.router, mounted with identity=require_internal_user); the MCP tools
+# are thin clients of exactly these endpoints. The web-only lifecycle routes
+# (visibility / archive / delete) and the web-only follow / deadline routes are
+# external-app only and have no entry here.
 INTERNAL_ROUTE_ACCESS: RouteRegistry = {
     RouteKey(method="POST", path="/roadmaps"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}"): AccessLevel.INTERNAL_TRUSTED,
@@ -175,23 +207,101 @@ INTERNAL_ROUTE_ACCESS: RouteRegistry = {
         method="GET", path="/roadmaps/{roadmap_id}/sections/{section_id}"
     ): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/search"): AccessLevel.INTERNAL_TRUSTED,
-    # Progress surface, mirrored on the internal app by the shared progress-router
-    # factory. The MCP progress tools call the snapshot / next / explicit-set
-    # endpoints (GET /progress, GET /next, POST /progress), each resolving the
-    # trusted X-User-ID and scoped to that user. POST /follow is mounted for parity
-    # but no MCP tool calls it: following is created implicitly by the first
-    # progress write (see ProgressService.update).
-    RouteKey(method="POST", path="/roadmaps/{roadmap_id}/follow"): AccessLevel.INTERNAL_TRUSTED,
+    # Progress surface, mirrored on the internal app by the core progress-router
+    # factory. The MCP progress tools call exactly these three (GET /progress,
+    # POST /progress, GET /next), each resolving the trusted X-User-ID and scoped
+    # to that user. follow and deadline are web-only (external app only, reached by
+    # no MCP tool): following is created implicitly by the first progress write
+    # (see ProgressService.update) and deadline is unmirrored in the MCP contract,
+    # so neither is mounted here.
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/progress"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}/progress"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/next"): AccessLevel.INTERNAL_TRUSTED,
-    # Per-user deadline set/clear, mounted on the internal app by the same factory.
-    # Deadline is web-only today: no MCP tool sets it (DeadlineRequest / Progress
-    # are deliberately unmirrored in the MCP contract, see contract/), so this
-    # route is reached only through the external app. It resolves the trusted
-    # X-User-ID and is scoped to that user's record (countdown only, no pacing).
-    RouteKey(method="PUT", path="/roadmaps/{roadmap_id}/deadline"): AccessLevel.INTERNAL_TRUSTED,
 }
+
+# The identity dependency each access level resolves. The roadmaps/progress
+# factories key into this by a route's declared access level, so per-route policy
+# lives in the registry, not a hand-passed argument. PUBLIC/OAUTH resolve no
+# identity (those surfaces are not driven by this mechanism, so they map to None).
+IDENTITY_BY_ACCESS: Mapping[AccessLevel, Identity | None] = {
+    AccessLevel.EXTERNAL_COOKIE: require_user,
+    AccessLevel.INTERNAL_TRUSTED: require_internal_user,
+    AccessLevel.PUBLIC: None,
+    AccessLevel.OAUTH: None,
+}
+
+# The per-app registry, so the factories resolve both composition (membership =
+# which app mounts a route) and policy (the access level = which identity it
+# resolves) from one table.
+_ROUTE_ACCESS_BY_APP: Mapping[App, RouteRegistry] = {
+    App.EXTERNAL: EXTERNAL_ROUTE_ACCESS,
+    App.INTERNAL: INTERNAL_ROUTE_ACCESS,
+}
+
+
+def route_access(app: App) -> RouteRegistry:
+    """The route -> access-level registry for ``app`` (the mounting source)."""
+    return _ROUTE_ACCESS_BY_APP[app]
+
+
+# HTTP methods that carry a product route (auto-added HEAD/OPTIONS are excluded).
+_PRODUCT_METHODS = frozenset({"GET", "POST", "PUT", "PATCH", "DELETE"})
+
+
+def identity_for_app(app: App) -> Identity:
+    """The identity dependency ``app``'s roadmaps/progress routes resolve.
+
+    Every such route on one app shares a single access level (external cookie or
+    internal trusted), so the roadmaps/progress factories resolve the identity once
+    from the registry rather than taking it as an argument. This is the policy half
+    of "the registry is load-bearing": change a route's declared access level and
+    the resolved dependency follows.
+    """
+    return _roadmaps_identity(route_access(app), app)
+
+
+def _roadmaps_identity(registry: RouteRegistry, label: object) -> Identity:
+    """The one identity dependency the ``/roadmaps`` routes in ``registry`` gate on.
+
+    ``label`` (an :class:`App`) names the source in the error messages only. Raises
+    if those routes do not share exactly one access level, or if that level maps to
+    no identity: both are registry misconfigurations the caller cannot recover from.
+    Split from :func:`identity_for_app` so the invariant is testable against a
+    hand-built registry without the module-level tables.
+    """
+    levels = {level for key, level in registry.items() if key.path.startswith("/roadmaps")}
+    if len(levels) != 1:
+        raise RuntimeError(
+            f"expected one access level for /roadmaps routes on {label}, got {sorted(levels)}"
+        )
+    identity = IDENTITY_BY_ACCESS[next(iter(levels))]
+    if identity is None:
+        raise RuntimeError(f"/roadmaps routes on {label} must resolve an identity dependency")
+    return identity
+
+
+def restrict_to_declared(router: APIRouter, app: App) -> None:
+    """Drop every route ``app``'s registry does not declare (composition, in place).
+
+    The mounting half of "the registry is load-bearing": a factory defines every
+    route its domain owns, then calls this so the app mounts exactly the subset its
+    registry lists (e.g. the web-only lifecycle and follow/deadline routes are
+    declared for the external app only). Removing a route from the registry unmounts
+    it; a stale registry entry (declared but defined by no factory) still fails the
+    coverage test's ``orphaned`` direction.
+    """
+    registry = route_access(app)
+    kept = [
+        route
+        for route in router.routes
+        if any(
+            RouteKey(method=method, path=getattr(route, "path", "")) in registry
+            for method in getattr(route, "methods", ())
+            if method in _PRODUCT_METHODS
+        )
+    ]
+    router.routes = kept
+
 
 # OpenAPI operation keys that are HTTP methods (a path item also carries non-method
 # keys such as "parameters").
@@ -221,7 +331,7 @@ def mounted_product_routes(app: FastAPI) -> list[RouteKey]:
 class CoverageReport:
     """Result of cross-checking mounted routes against a registry."""
 
-    undeclared: list[RouteKey]  # mounted but no declared level -> DENY (coverage fails)
+    undeclared: list[RouteKey]  # mounted but no declared level -> DENY (fails coverage)
     orphaned: list[RouteKey]  # declared but not mounted -> stale registry entry
 
     @property

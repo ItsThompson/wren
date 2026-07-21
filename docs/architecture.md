@@ -77,8 +77,8 @@ Every request resolves to exactly one `user_id`, and the server never trusts one
 
 | Decision | Rationale |
 |----------|-----------|
-| One factory, two apps | The external and internal apps share one service layer and differ only by injected settings, so a rule is defined once. |
-| Backend/MCP boundary | The two are separate deployables. The MCP shares no backend DOMAIN code and carries no backend dependency. Shared INFRA (logging, metrics, health) lives in the `wren-common` workspace package; shared wire truths (headers, scopes, schema shapes) stay mirrored and are gated by `contract/tests/`, so a backend-internal schema change cannot silently mutate the agent-facing contract. See `docs/packaging.md`. |
+| One factory, two apps | The external and internal apps share one service layer and differ only by injected settings and the per-app route registry (which routes mount and the identity each resolves), so a rule is defined once. |
+| Backend/MCP boundary | The two are separate deployables. The MCP shares no backend DOMAIN code and carries no backend dependency. Shared INFRA (logging, metrics, health) lives in the `wren-common` workspace package. The agent-facing Group-A schemas are generated from the internal app's OpenAPI document (`just codegen-mcp`), so they cannot drift; the remaining wire truths (headers, scopes, lean write results) stay mirrored and are gated by `contract/tests/`. A backend-internal schema change cannot silently mutate the agent-facing contract. See `docs/packaging.md`. |
 | Fail-safe deny at every boundary | An empty `SESSION_JWT_SECRET` denies all sessions; an empty `INTERNAL_API_TOKEN` denies all internal calls; a missing state seam degrades to deny. |
 | 404 over 403 | The service returns 404 for a private resource, so a caller never learns a resource exists but is off-limits. |
 | Site-URL pinning | All OAuth issuer, metadata, and endpoint URLs build from pinned config, never from the request host, because the tunnel reaches the origin over an internal URL. |

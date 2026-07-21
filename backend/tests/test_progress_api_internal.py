@@ -25,8 +25,8 @@ from wren.core.errors import build_exception_handlers
 from wren.core.identity import (
     INTERNAL_TOKEN_HEADER,
     USER_ID_HEADER,
-    require_internal_user,
 )
+from wren.core.route_registry import App
 from wren.core.settings import AppSettings
 from wren.progress.router import create_progress_router
 from wren.progress.service import ProgressService
@@ -53,7 +53,7 @@ def _build_client(make_settings: MakeSettings) -> TestClient:
 
     app: FastAPI = create_app(
         make_settings(),
-        routers=[create_progress_router(progress_provider, identity=require_internal_user)],
+        routers=[create_progress_router(progress_provider, app=App.INTERNAL)],
         exception_handlers=build_exception_handlers(),
     )
     app.state.internal_api_token = SecretStr(_INTERNAL_TOKEN)
@@ -64,18 +64,17 @@ def _trusted(user_id: str = _USER) -> dict[str, str]:
     return {INTERNAL_TOKEN_HEADER: _INTERNAL_TOKEN, USER_ID_HEADER: user_id}
 
 
-def test_follow_without_the_internal_token_is_401(make_settings: MakeSettings) -> None:
+def test_web_only_follow_and_deadline_are_not_mounted(make_settings: MakeSettings) -> None:
+    # follow and deadline are web-only (external app only); the internal app the
+    # MCP server calls never mounts them, so both are 404 even over the trusted
+    # identity (no route, not an auth failure).
     client = _build_client(make_settings)
-    response = client.post(f"/roadmaps/{ROADMAP_ID}/follow", headers={USER_ID_HEADER: _USER})
-    assert response.status_code == 401
-    assert response.json()["code"] == "UNAUTHORIZED"
-
-
-def test_follow_over_the_trusted_identity_is_201(make_settings: MakeSettings) -> None:
-    client = _build_client(make_settings)
-    response = client.post(f"/roadmaps/{ROADMAP_ID}/follow", headers=_trusted())
-    assert response.status_code == 201, response.text
-    assert response.json()["user_id"] == _USER
+    follow = client.post(f"/roadmaps/{ROADMAP_ID}/follow", headers=_trusted())
+    assert follow.status_code == 404, follow.text
+    deadline = client.put(
+        f"/roadmaps/{ROADMAP_ID}/deadline", headers=_trusted(), json={"deadline": "2026-12-01"}
+    )
+    assert deadline.status_code == 404, deadline.text
 
 
 def test_update_over_the_trusted_identity(make_settings: MakeSettings) -> None:
@@ -102,30 +101,6 @@ def test_get_and_next_over_the_trusted_identity(make_settings: MakeSettings) -> 
     assert body["remaining_in_path"] == 3
     assert all(item["path_position"] == 1 for item in body["items"])
     assert "suggested path" in body["items"][0]["why_now"].lower()
-
-
-def test_set_and_clear_deadline_over_the_trusted_identity(make_settings: MakeSettings) -> None:
-    client = _build_client(make_settings)
-    response = client.put(
-        f"/roadmaps/{ROADMAP_ID}/deadline", headers=_trusted(), json={"deadline": "2026-12-01"}
-    )
-    assert response.status_code == 200, response.text
-    assert response.json()["deadline"] == "2026-12-01"
-    cleared = client.put(
-        f"/roadmaps/{ROADMAP_ID}/deadline", headers=_trusted(), json={"deadline": None}
-    )
-    assert cleared.json()["deadline"] is None
-
-
-def test_deadline_without_the_internal_token_is_401(make_settings: MakeSettings) -> None:
-    client = _build_client(make_settings)
-    response = client.put(
-        f"/roadmaps/{ROADMAP_ID}/deadline",
-        headers={USER_ID_HEADER: _USER},
-        json={"deadline": "2026-12-01"},
-    )
-    assert response.status_code == 401
-    assert response.json()["code"] == "UNAUTHORIZED"
 
 
 def test_progress_is_scoped_per_trusted_user(make_settings: MakeSettings) -> None:

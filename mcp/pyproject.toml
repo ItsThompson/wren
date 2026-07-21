@@ -35,6 +35,11 @@ dev = [
     "pytest-asyncio>=0.24.0,<2",
     "ruff>=0.8.0,<1",
     "mypy>=1.13.0,<3",
+    # OpenAPI -> Pydantic generator for the Group-A schema codegen (`just
+    # codegen-mcp`). Dev-only: the MCP image exports with `--no-dev`, so it never
+    # ships in the runtime image; the image only copies the committed generated
+    # module. See docs/packaging.md and docs/adr/0001-*.
+    "datamodel-code-generator>=0.67.0,<1",
 ]
 
 [build-system]
@@ -49,7 +54,7 @@ packages = ["src/wren_mcp"]
 # only per-package bits stay here. `src` is kept local so first-party import
 # detection resolves against this package's own src/tests, not the repo root.
 extend = "../ruff.toml"
-src = ["src", "tests"]
+src = ["src", "scripts", "tests"]
 
 [tool.ruff.lint.per-file-ignores]
 # Tests assert liberally (S101), pass dummy secrets as arguments (S106), and
@@ -59,14 +64,15 @@ src = ["src", "tests"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-mypy_path = "src"
-# Type-check the package plus the test suite so the hand-written token/harness
-# fakes are held to the shapes they stand in for (a diverged fake fails
-# ``mypy --strict``). The flat ``tests`` layout resolves as top-level modules.
-files = ["src/wren_mcp", "tests"]
+mypy_path = ["src", "scripts"]
+# Type-check the package, the codegen scripts, and the test suite so the
+# hand-written token/harness fakes are held to the shapes they stand in for (a
+# diverged fake fails ``mypy --strict``). The flat ``tests`` layout resolves as
+# top-level modules.
+files = ["src/wren_mcp", "scripts", "tests"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "scripts"]
 testpaths = ["tests"]
 addopts = "--cov=wren_mcp --cov-report=term-missing --strict-markers --strict-config"
 asyncio_mode = "auto"

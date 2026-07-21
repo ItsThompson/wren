@@ -27,7 +27,8 @@ CI runs on every pull request and on pushes to `main`. CD runs after CI conclude
 |-----|-------|-------|
 | `lint` | Format, style, and types for the Python workspace and the frontend | Ruff and mypy for backend, MCP, and wren-common; `tsc` and oxlint for the frontend. Gates the test jobs. |
 | `codegen-drift` | The frozen frontend REST client | Regenerates the OpenAPI document and the TS client, then fails on a stale committed client. Independent of `lint`. |
-| `contract-drift` | Cross-package wire contracts | Runs the `contract/` project: the internal-boundary header constants, the OAuth scope constants, and the backend-to-MCP schema mirror. Needs `lint`. |
+| `mcp-codegen-drift` | The generated MCP Group-A schemas | Regenerates the internal-app OpenAPI artifact and the Group-A schema module, then fails on a stale committed artifact or module. Independent of `lint`. |
+| `contract-drift` | Cross-package wire contracts | Runs the `contract/` project: the internal-boundary header constants, the OAuth scope constants, that the generated MCP Group-A module is exactly Group A, and that each lean write result is a field-subset of its backend source. Needs `lint`. |
 | `test-backend` | Backend and MCP behavior | pytest with the 80% backend coverage gate, then the MCP suite with its 80% gate, then the wren-common seam tests. Real Postgres per test via testcontainers. Needs `lint`. |
 | `test-frontend` | Frontend behavior | vitest with the 70% coverage gate. Needs `lint`. |
 | `e2e` | The full spine | Builds and boots the Compose stack with the e2e overlay, runs pre-traffic migrations, then runs Playwright. Needs `lint`. |
@@ -42,7 +43,7 @@ A change to `main` must pass every CI job. The gates that most often block a mer
 
 - Coverage floors: backend 80%, MCP 80%, frontend 70%.
 - `codegen-drift`: the committed `frontend/openapi.json` and `frontend/src/api/schema.d.ts` must match the live external app.
-- `contract-drift`: the MCP wire constants and schemas must match the backend.
+- `contract-drift`: the MCP wire constants and the generated Group-A schema set must match the backend.
 
 Run `just codegen` after any external REST change, and change both sides of a duplicated wire constant together.
 
@@ -93,6 +94,7 @@ It catches failures internal scraping cannot see: DNS, the Cloudflare edge, the 
 | Symptom | Cause | Resolution |
 |---------|-------|------------|
 | `codegen-drift` fails | The committed client is stale | Run `just codegen` and commit the result |
+| `mcp-codegen-drift` fails | The committed internal OpenAPI or generated Group-A module is stale | Run `just codegen-mcp` and commit the result |
 | `contract-drift` fails | A wire constant or schema diverged between the backend and MCP | Change both sides together; re-run the `contract/` project |
 | Deploy fails the health gate after Alertmanager starts | The Discord webhook is blank or unrendered; Alertmanager exits on config load | Provide a valid `DISCORD_WEBHOOK_URL` so CI renders the config |
 | Deploy aborts before any container serves traffic | A migration failed in the pre-traffic step | Fix the migration; migrations run before traffic, so a failure aborts safely |

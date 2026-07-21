@@ -41,6 +41,7 @@ All recipes run from the repo root and change into `mcp/`.
 | `just lint-mcp` | Ruff check, format check, and mypy |
 | `just fmt-mcp` | Format and autofix |
 | `just sync-skill` | Re-sync the backend-bundled `SKILL.md` after editing the root copy |
+| `just codegen-mcp` | Regenerate the Group-A schemas from the internal app's OpenAPI (dev-only; CI drift-gates it) |
 
 ## Configuration
 

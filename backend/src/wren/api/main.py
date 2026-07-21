@@ -32,6 +32,7 @@ from wren.core.identity import (
     StripInboundIdentityMiddleware,
     require_user,
 )
+from wren.core.route_registry import App
 from wren.core.settings import EXTERNAL_PORT, EXTERNAL_SERVICE, build_app_settings
 from wren.core.state import deny_all_sessions
 from wren.oauth.api import create_oauth_router
@@ -80,15 +81,14 @@ accounts_router = create_accounts_router(service_provider, cookie_config=cookie_
 # same account service provider. External app only.
 onboarding_router = create_onboarding_router(service_provider, identity=require_user)
 
-# Roadmap authoring + reads over the same service layer, resolving identity via
-# the human session cookie (require_user). The external app mounts the three
-# web-only lifecycle routes (visibility / archive / delete) via
-# include_web_lifecycle; the internal app never does.
+# Roadmap authoring + reads over the same service layer. The App selector drives
+# both mounting (the external app also mounts the web-only lifecycle routes
+# visibility / archive / delete) and identity (require_user) from the route
+# registry; the internal app passes App.INTERNAL for the smaller trusted surface.
 roadmaps_router = create_roadmaps_router(
     build_roadmap_service_provider(),
     build_roadmap_read_service_provider(),
-    identity=require_user,
-    include_web_lifecycle=True,
+    app=App.EXTERNAL,
 )
 
 # Dashboard + public profile: the private
@@ -98,9 +98,10 @@ roadmaps_router = create_roadmaps_router(
 listing_router = create_listing_router(build_listing_service_provider())
 
 # Follow + progress + server-computed next: the study-time surface over the
-# progress service, resolving the human session via require_user and scoped to
-# that user (another user's progress is never returned).
-progress_router = create_progress_router(build_progress_service_provider(), identity=require_user)
+# progress service. The App selector drives mounting (the external app also mounts
+# the web-only follow / deadline routes) and identity (require_user) from the
+# registry; scoped to the resolved user (another user's progress is never returned).
+progress_router = create_progress_router(build_progress_service_provider(), app=App.EXTERNAL)
 
 # Shipped SKILL.md authoring guidance: the public,
 # unauthenticated GET /skill an agent fetches (referenced from the MCP tool

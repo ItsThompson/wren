@@ -1,23 +1,23 @@
 """REST adapter factory for progress, one factory for both trust boundaries.
 
 The external app (:8000) and the internal app (:8001) mount the same progress
-handlers (follow / snapshot / explicit-set / next / deadline); the handler bodies
-are identical and differ only in how the caller's ``user_id`` is resolved. Rather
-than fork the router into two byte-identical modules,
-:func:`create_progress_router` takes the identity resolution as an injected
-dependency (the standards' "inject strategy, don't fork on context"):
+handlers: the handler bodies are identical and differ only in which routes mount
+and how the caller's ``user_id`` is resolved. Rather than fork the router or pass
+those two facts in by hand, :func:`create_progress_router` takes an :class:`App`
+selector and reads both from the route registry:
 
-- **External (:8000)** passes ``identity=require_user`` (the human session cookie;
-  a spoofed ``X-User-ID`` is stripped upstream).
-- **Internal (:8001)** passes ``identity=require_internal_user`` (the trusted
-  ``X-User-ID`` behind the shared ``INTERNAL_API_TOKEN``). The MCP progress tools
-  call the snapshot / next / explicit-set endpoints (``progress_get``,
-  ``roadmap_get_next``, ``progress_update``), one internal HTTP call per tool.
-  ``follow`` and ``deadline`` are mounted here by the shared factory but no MCP
-  tool calls them: following is created implicitly by the first progress write,
-  and deadline is web-only (deliberately unmirrored in the MCP contract).
+- **identity** (policy): :func:`identity_for_app` resolves the identity dependency
+  the app's routes gate on, from their declared access level: ``require_user``
+  (external cookie) or ``require_internal_user`` (the trusted ``X-User-ID`` behind
+  ``INTERNAL_API_TOKEN``).
+- **mounting** (composition): the factory defines every progress route, then
+  :func:`restrict_to_declared` keeps only those the app's registry declares.
+  ``follow`` and ``deadline`` are declared for the external app only (following is
+  created implicitly by the first progress write, and deadline is web-only,
+  deliberately unmirrored in the MCP contract), so the internal app the MCP server
+  calls mounts only snapshot / explicit-set / next.
 
-Thin handlers: each resolves the caller via the injected ``identity`` dependency,
+Thin handlers: each resolves the caller via the resolved ``identity`` dependency,
 calls one :class:`ProgressService` method, and lets the shared exception handler
 render any ``WrenError`` as RFC 9457 problem+json. The service scopes every query
 to the resolved user, so a tool can never reach another user's progress even
@@ -28,11 +28,12 @@ the resolved user.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 
 from fastapi import APIRouter, Depends
 
 from wren.core.read_contract import ResponseFormat
+from wren.core.route_registry import App, identity_for_app, restrict_to_declared
 from wren.progress.schemas import (
     DeadlineRequest,
     NextResult,
@@ -44,25 +45,23 @@ from wren.progress.schemas import (
 from wren.progress.service import ProgressService
 from wren.roadmaps.config import ROADMAPS_PATH
 
-# A FastAPI dependency that resolves the request's ``user_id`` at the trust
-# boundary: ``require_user`` (external cookie) or ``require_internal_user``
-# (internal trusted header). Injected so one factory serves both apps.
-Identity = Callable[..., Awaitable[str]]
 # A FastAPI dependency that yields a ProgressService for the request.
 ProgressServiceProvider = Callable[..., object]
 
 
-def create_progress_router(
-    service_provider: ProgressServiceProvider, *, identity: Identity
-) -> APIRouter:
-    """Build the progress router, parameterized by the injected identity.
+def create_progress_router(service_provider: ProgressServiceProvider, *, app: App) -> APIRouter:
+    """Build the progress router for ``app``, driven by the route registry.
 
-    Injects the progress service provider (request-scoped) and the ``identity``
-    dependency every handler resolves ``user_id`` from. The service scopes every
-    query to that user, so the internal app can trust the injected identity without
-    a route ever reaching another user's progress.
+    Injects the progress service provider (request-scoped). The identity every
+    handler resolves and the subset of routes mounted both come from ``app``'s
+    registry (see the module docstring): the internal app mounts only snapshot /
+    explicit-set / next, while the external app additionally mounts the web-only
+    follow / deadline routes. The service scopes every query to the resolved user,
+    so the internal app can trust the injected identity without a route reaching
+    another user's progress.
     """
     router = APIRouter(prefix=ROADMAPS_PATH, tags=["progress"])
+    identity = identity_for_app(app)
 
     @router.post("/{roadmap_id}/follow", status_code=201)
     async def follow_roadmap(
@@ -112,4 +111,7 @@ def create_progress_router(
         # a past date is allowed (countdown only, no pacing signal).
         return await service.set_deadline(user_id, roadmap_id, body.deadline)
 
+    # Composition from the registry: keep only the routes this app declares (follow
+    # and deadline are external-only).
+    restrict_to_declared(router, app)
     return router

@@ -92,7 +92,7 @@ Canonical source: `schemas.py`. `patch_roadmap_draft` accepts an ordered `operat
 
 Every `add_*` op accepts an optional `proposed_id`. The server mints one otherwise and echoes a `proposed_id -> minted_id` remap on de-dup. The whole batch is validated together, including that no intermediate step forms a prerequisite cycle. Order `add_edge` ops prerequisites-first to avoid a transient cycle even when the final graph is acyclic.
 
-The MCP schemas mirror the backend authoring and read projections. A schema-mirror contract test (`contract/tests/`) enforces field equality. See `authoring.md` for the shared authoring rules and the immutability boundary.
+The MCP Group-A schemas (shared enums, authoring inputs, the patch ops, and the read projections) are generated from the internal app's OpenAPI document (`just codegen-mcp`) into `wren_mcp/_schemas_generated.py`, so field equality with the backend is guaranteed by construction; the lean write results stay hand-authored. A contract test (`contract/tests/`) guards that the generated module is exactly Group A (no leaked domain types) and that each hand-authored write result is a field-subset of its backend source. See `authoring.md` for the shared authoring rules and the immutability boundary.
 
 ## The internal-hop boundary contract
 
@@ -181,7 +181,7 @@ These record intentional design, verified against the current source. Read them 
 
 - The authoring guidance (`SKILL.md`) lives on the backend, not the MCP server. The backend external app serves it at `GET /skill` on its API origin (the AS host). Route registry: `/skill` is `PUBLIC` on the external app only (`backend/src/wren/core/`). The MCP tool docstrings point the agent there. The MCP server serves only the PRM document and `/mcp` at ingress.
 - The deadline is web-only: there is no MCP deadline tool. `progress_get` reads the deadline; `progress_update` writes progress. The `DeadlineRequest` and `Progress` types are deliberately unmirrored in the MCP contract (`contract/tests/`). See `progress.md`.
-- Following is created implicitly by the first progress write. There is no follow or unfollow MCP tool; the internal `POST /roadmaps/{id}/follow` route is vestigial and unused by any client method. See `progress.md`.
+- Following is created implicitly by the first progress write. There is no follow or unfollow MCP tool, and the internal app the MCP server calls no longer mounts `POST /roadmaps/{id}/follow` (it is external-web-only), so no client method calls it. See `progress.md`.
 
 ## Related docs
 

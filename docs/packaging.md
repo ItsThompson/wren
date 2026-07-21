@@ -85,9 +85,22 @@ The backend and MCP share no **domain** code, and neither imports the other:
 
 - **Shared infrastructure** lives in `wren-common` and is single-sourced.
 - **Shared wire truths** stay mirrored, not shared: the internal-boundary header
-  constants, the OAuth scope constants, and the ~50 Pydantic schema types in
-  `wren_mcp`. Each service owns its own view of the contract, and the `contract/`
-  project asserts they stay equal (see `docs/ci-cd.md`).
+  constants, the OAuth scope constants, and the Pydantic schema types in
+  `wren_mcp`. The Group-A schema types (enums, authoring inputs, patch ops, read
+  projections) are GENERATED from the internal app's OpenAPI document by `just
+  codegen-mcp` into `mcp/src/wren_mcp/_schemas_generated.py`, so they cannot drift;
+  the header/scope constants and the lean write results stay hand-mirrored. The
+  `contract/` project asserts the generated module is exactly Group A and that the
+  hand-authored parts stay equal (see `docs/ci-cd.md` and `docs/testing.md`).
+
+The OpenAPI-to-Pydantic generator (`datamodel-code-generator`) is an MCP **dev**
+dependency, resolved through the root lockfile. `just codegen-mcp` exports the
+internal app's OpenAPI to the committed `mcp/internal-openapi.json`, restricts a
+copy to the Group-A component set, and runs the generator; CI regenerates and
+`git diff --exit-code`s the committed artifacts, mirroring the frontend
+`codegen-drift` job. The MCP image build (`uv sync ... --package wren-mcp`) exports
+with `--no-dev`, so the generator never ships in the runtime image, which only
+copies the committed generated file and never runs codegen or imports `wren`.
 
 Collapsing the wire mirror into `wren-common` would drag the whole domain schema
 into the MCP image and re-couple the frozen agent contract to backend refactors,
