@@ -1,0 +1,3102 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "wren (wren-internal)",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/roadmaps": {
+      "post": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Create Roadmap",
+        "operationId": "create_roadmap_roadmaps_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoadmapInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoadmapCreated"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}": {
+      "get": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Get Roadmap",
+        "operationId": "get_roadmap_roadmaps__roadmap_id__get",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Roadmap"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Patch Roadmap",
+        "operationId": "patch_roadmap_roadmaps__roadmap_id__patch",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatchResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Replace Roadmap",
+        "operationId": "replace_roadmap_roadmaps__roadmap_id__put",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoadmapInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoadmapReplaced"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}/overview": {
+      "get": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Get Overview",
+        "operationId": "get_overview_roadmaps__roadmap_id__overview_get",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ResponseFormat",
+              "default": "concise"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Overview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}/nodes/{subsection_id}": {
+      "get": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Get Node",
+        "operationId": "get_node_roadmaps__roadmap_id__nodes__subsection_id__get",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          },
+          {
+            "name": "subsection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Subsection Id"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ResponseFormat",
+              "default": "concise"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}/sections/{section_id}": {
+      "get": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Get Section",
+        "operationId": "get_section_roadmaps__roadmap_id__sections__section_id__get",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          },
+          {
+            "name": "section_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Section Id"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "include",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SectionInclude",
+              "default": "both"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SectionPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}/search": {
+      "get": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Search Roadmap",
+        "operationId": "search_roadmap_roadmaps__roadmap_id__search_get",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tags"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SearchHit"
+                  },
+                  "title": "Response Search Roadmap Roadmaps  Roadmap Id  Search Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}:validate": {
+      "post": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Validate Roadmap",
+        "operationId": "validate_roadmap_roadmaps__roadmap_id__validate_post",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidateResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}:publish": {
+      "post": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Publish Roadmap",
+        "operationId": "publish_roadmap_roadmaps__roadmap_id__publish_post",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Roadmap"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}:fork": {
+      "post": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Fork Roadmap",
+        "operationId": "fork_roadmap_roadmaps__roadmap_id__fork_post",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Roadmap"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}/metadata": {
+      "patch": {
+        "tags": [
+          "roadmaps"
+        ],
+        "summary": "Edit Roadmap Metadata",
+        "operationId": "edit_roadmap_metadata_roadmaps__roadmap_id__metadata_patch",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetadataEditRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Roadmap"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}/follow": {
+      "post": {
+        "tags": [
+          "progress"
+        ],
+        "summary": "Follow Roadmap",
+        "operationId": "follow_roadmap_roadmaps__roadmap_id__follow_post",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Progress"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}/progress": {
+      "get": {
+        "tags": [
+          "progress"
+        ],
+        "summary": "Get Progress",
+        "operationId": "get_progress_roadmaps__roadmap_id__progress_get",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          },
+          {
+            "name": "detailed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Detailed"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressSnapshot"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "progress"
+        ],
+        "summary": "Update Progress",
+        "operationId": "update_progress_roadmaps__roadmap_id__progress_post",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProgressUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressUpdateResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}/next": {
+      "get": {
+        "tags": [
+          "progress"
+        ],
+        "summary": "Get Next",
+        "operationId": "get_next_roadmaps__roadmap_id__next_get",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ResponseFormat",
+              "default": "concise"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NextResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roadmaps/{roadmap_id}/deadline": {
+      "put": {
+        "tags": [
+          "progress"
+        ],
+        "summary": "Set Deadline",
+        "operationId": "set_deadline_roadmaps__roadmap_id__deadline_put",
+        "parameters": [
+          {
+            "name": "roadmap_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Roadmap Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeadlineRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Progress"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AddEdgeOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "add_edge",
+            "title": "Op"
+          },
+          "from_id": {
+            "type": "string",
+            "title": "From Id"
+          },
+          "to_id": {
+            "type": "string",
+            "title": "To Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "from_id",
+          "to_id"
+        ],
+        "title": "AddEdgeOp",
+        "description": "``to_id`` gains ``from_id`` as a prerequisite."
+      },
+      "AddItemOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "add_item",
+            "title": "Op"
+          },
+          "subsection_id": {
+            "type": "string",
+            "title": "Subsection Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "proposed_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Id"
+          },
+          "before_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Id"
+          },
+          "after_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "subsection_id",
+          "text"
+        ],
+        "title": "AddItemOp"
+      },
+      "AddSectionOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "add_section",
+            "title": "Op"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Title"
+          },
+          "proposed_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Id"
+          },
+          "before_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Id"
+          },
+          "after_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "title"
+        ],
+        "title": "AddSectionOp"
+      },
+      "AddSubsectionOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "add_subsection",
+            "title": "Op"
+          },
+          "section_id": {
+            "type": "string",
+            "title": "Section Id"
+          },
+          "subsection": {
+            "$ref": "#/components/schemas/SubsectionInput"
+          },
+          "before_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Id"
+          },
+          "after_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "section_id",
+          "subsection"
+        ],
+        "title": "AddSubsectionOp"
+      },
+      "ChangeType": {
+        "type": "string",
+        "enum": [
+          "added",
+          "updated",
+          "removed"
+        ],
+        "title": "ChangeType"
+      },
+      "ChangedNode": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ChangedNodeKind"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "change": {
+            "$ref": "#/components/schemas/ChangeType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "change"
+        ],
+        "title": "ChangedNode",
+        "description": "One node the batch touched, echoed back so the agent knows what changed\nwithout re-reading the whole roadmap (summary-first). Lean\non purpose (kind + id + change), keeping a small edit's response near the\n~50-token target; the agent re-reads a specific node for its new body."
+      },
+      "ChangedNodeKind": {
+        "type": "string",
+        "enum": [
+          "roadmap",
+          "section",
+          "subsection",
+          "item"
+        ],
+        "title": "ChangedNodeKind"
+      },
+      "ChecklistItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "text"
+        ],
+        "title": "ChecklistItem",
+        "description": "The only checkable unit."
+      },
+      "ChecklistItemInput": {
+        "properties": {
+          "proposed_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "ChecklistItemInput"
+      },
+      "CompletionState": {
+        "type": "string",
+        "enum": [
+          "complete",
+          "incomplete"
+        ],
+        "title": "CompletionState",
+        "description": "The explicit target state a ``progress_update`` sets its items to.\n\nExplicit set, never toggle: the client states the desired\nstate so a retry is idempotent."
+      },
+      "DeadlineRequest": {
+        "properties": {
+          "deadline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline"
+          }
+        },
+        "type": "object",
+        "title": "DeadlineRequest",
+        "description": "The ``PUT /roadmaps/{id}/deadline`` body: set or clear the per-user deadline.\n\nA ``date`` sets the deadline; ``null`` clears it. The deadline is editable and\nclearable at any time. A date in the past is allowed (the countdown shows\nelapsed / overdue with no pacing signal)."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ItemState": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "done": {
+            "type": "boolean",
+            "title": "Done"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "text",
+          "done"
+        ],
+        "title": "ItemState",
+        "description": "A checklist item with the caller's done state (``done`` = checked)."
+      },
+      "MetadataEditRequest": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "subject_tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Tags"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "title": "MetadataEditRequest",
+        "description": "The ``PATCH /roadmaps/{id}/metadata`` body: the presentation-only fields\nthat stay mutable after publish.\n\nOnly ``title`` / ``description`` / ``subject_tags`` are editable here; a field\nleft out (``None``) is unchanged (last-write-wins, deliberately not\n``If-Match``-guarded and never bumps the structural ``revision``). ``extra`` is\n``allow``ed so a smuggled structural, lifecycle, or identity field (e.g.\n``sections`` / ``visibility`` / ``status`` / ``revision``) is *captured* rather\nthan silently dropped, then rejected as immutable by\n:meth:`reject_structural_fields`: the metadata endpoint can never touch\nanything but presentation."
+      },
+      "NextItem": {
+        "properties": {
+          "subsection_id": {
+            "type": "string",
+            "title": "Subsection Id"
+          },
+          "item_id": {
+            "type": "string",
+            "title": "Item Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "why_now": {
+            "type": "string",
+            "title": "Why Now"
+          },
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceLink"
+            },
+            "type": "array",
+            "title": "Resources"
+          },
+          "path_position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path Position"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subsection_id",
+          "item_id",
+          "text",
+          "why_now"
+        ],
+        "title": "NextItem",
+        "description": "One unchecked, prereq-satisfied checklist item to work on next.\n\n``why_now`` is a STRUCTURAL rationale only: it states the\nmechanical facts the app owns (this is the next unchecked subsection in\n``suggested_path`` and its named prerequisites are complete), never\npedagogical / ZPD judgement (that intelligence lives in the agent and was\nbaked into ``suggested_path`` at authoring time). ``path_position`` (the\n1-based index of the item's subsection in ``suggested_path``) is populated\nonly in ``detailed`` mode."
+      },
+      "NextResult": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NextItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "remaining_in_path": {
+            "type": "integer",
+            "title": "Remaining In Path",
+            "default": 0
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "NextResult",
+        "description": "The ``GET /next`` body: the next unchecked items in ``suggested_path``\norder whose prerequisites are all complete.\n\n``remaining_in_path`` counts the subsections still to do along the path (any\nwith an unchecked item); ``complete`` is ``True`` when nothing remains."
+      },
+      "NodeDetail": {
+        "properties": {
+          "subsection_id": {
+            "type": "string",
+            "title": "Subsection Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "effort_estimate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort Estimate"
+          },
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            },
+            "type": "array",
+            "title": "Resources"
+          },
+          "prereqs": {
+            "items": {
+              "$ref": "#/components/schemas/PrereqRef"
+            },
+            "type": "array",
+            "title": "Prereqs"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ItemState"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subsection_id",
+          "title"
+        ],
+        "title": "NodeDetail",
+        "description": "One subsection resolved for study.\n\n``description`` is populated only in ``detailed`` mode; the concise projection\nleaves it ``None`` while still carrying every follow-up ID (the subsection id,\nthe resource links, the resolved prereq ids, and the item ids). External\nbodies are never inlined: ``resources`` are links only."
+      },
+      "OverallProgress": {
+        "properties": {
+          "total_items": {
+            "type": "integer",
+            "title": "Total Items"
+          },
+          "checked_items": {
+            "type": "integer",
+            "title": "Checked Items"
+          },
+          "percent": {
+            "type": "integer",
+            "title": "Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_items",
+          "checked_items",
+          "percent"
+        ],
+        "title": "OverallProgress",
+        "description": "Roadmap-wide completion totals (derived, never stored)."
+      },
+      "Overview": {
+        "properties": {
+          "roadmap_id": {
+            "type": "string",
+            "title": "Roadmap Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RoadmapStatus"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/SectionOverview"
+            },
+            "type": "array",
+            "title": "Sections"
+          },
+          "overall": {
+            "$ref": "#/components/schemas/OverallProgress"
+          }
+        },
+        "type": "object",
+        "required": [
+          "roadmap_id",
+          "title",
+          "status",
+          "revision",
+          "overall"
+        ],
+        "title": "Overview",
+        "description": "The ``GET /overview`` body: sections in ``section_order`` with per-section\nand overall completion, and no checklist-item bodies.\n\nThe orientation call; from here the agent drills into a node (``get_node``) or\na section (``get_section``). ``checked_items`` / ``percent`` reflect the\ncaller's own progress (zero when they have not started)."
+      },
+      "PatchRequest": {
+        "properties": {
+          "operations": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/AddSubsectionOp"
+                },
+                {
+                  "$ref": "#/components/schemas/UpdateSubsectionOp"
+                },
+                {
+                  "$ref": "#/components/schemas/RemoveSubsectionOp"
+                },
+                {
+                  "$ref": "#/components/schemas/AddEdgeOp"
+                },
+                {
+                  "$ref": "#/components/schemas/RemoveEdgeOp"
+                },
+                {
+                  "$ref": "#/components/schemas/SetTagsOp"
+                },
+                {
+                  "$ref": "#/components/schemas/SetResourcesOp"
+                },
+                {
+                  "$ref": "#/components/schemas/SetEffortOp"
+                },
+                {
+                  "$ref": "#/components/schemas/AddItemOp"
+                },
+                {
+                  "$ref": "#/components/schemas/UpdateItemOp"
+                },
+                {
+                  "$ref": "#/components/schemas/RemoveItemOp"
+                },
+                {
+                  "$ref": "#/components/schemas/ReorderOp"
+                },
+                {
+                  "$ref": "#/components/schemas/SetSuggestedPathOp"
+                },
+                {
+                  "$ref": "#/components/schemas/AddSectionOp"
+                },
+                {
+                  "$ref": "#/components/schemas/UpdateSectionOp"
+                },
+                {
+                  "$ref": "#/components/schemas/RemoveSectionOp"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "op",
+                "mapping": {
+                  "add_edge": "#/components/schemas/AddEdgeOp",
+                  "add_item": "#/components/schemas/AddItemOp",
+                  "add_section": "#/components/schemas/AddSectionOp",
+                  "add_subsection": "#/components/schemas/AddSubsectionOp",
+                  "remove_edge": "#/components/schemas/RemoveEdgeOp",
+                  "remove_item": "#/components/schemas/RemoveItemOp",
+                  "remove_section": "#/components/schemas/RemoveSectionOp",
+                  "remove_subsection": "#/components/schemas/RemoveSubsectionOp",
+                  "reorder": "#/components/schemas/ReorderOp",
+                  "set_effort": "#/components/schemas/SetEffortOp",
+                  "set_resources": "#/components/schemas/SetResourcesOp",
+                  "set_suggested_path": "#/components/schemas/SetSuggestedPathOp",
+                  "set_tags": "#/components/schemas/SetTagsOp",
+                  "update_item": "#/components/schemas/UpdateItemOp",
+                  "update_section": "#/components/schemas/UpdateSectionOp",
+                  "update_subsection": "#/components/schemas/UpdateSubsectionOp"
+                }
+              }
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Operations"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "operations"
+        ],
+        "title": "PatchRequest",
+        "description": "The ``PATCH /roadmaps/{id}`` body: the ordered op list applied atomically.\n\nThe target ``revision`` travels in the ``If-Match`` header,\nnot the body. At least one op is required so a patch is never a silent no-op\nthat would still burn a revision."
+      },
+      "PatchResult": {
+        "properties": {
+          "roadmap_id": {
+            "type": "string",
+            "title": "Roadmap Id"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "changed_nodes": {
+            "items": {
+              "$ref": "#/components/schemas/ChangedNode"
+            },
+            "type": "array",
+            "title": "Changed Nodes"
+          },
+          "remap": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Remap"
+          }
+        },
+        "type": "object",
+        "required": [
+          "roadmap_id",
+          "revision"
+        ],
+        "title": "PatchResult",
+        "description": "The ``PATCH /roadmaps/{id}`` body: the post-batch ``revision``, the changed\nnodes, and the ``proposed_id -> minted_id`` remap for any de-duped ``add_*``\nproposal. ``remap`` is empty when nothing was de-duped."
+      },
+      "PrereqRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "done": {
+            "type": "boolean",
+            "title": "Done"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "done"
+        ],
+        "title": "PrereqRef",
+        "description": "A resolved prerequisite: its id, title, and the caller's done state.\n\n``done`` is ``True`` when the caller has completed every checklist item of the\nprerequisite subsection (so an agent can see at a glance whether this node is\nunlocked)."
+      },
+      "Progress": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "roadmap_id": {
+            "type": "string",
+            "title": "Roadmap Id"
+          },
+          "deadline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline"
+          },
+          "checked": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "type": "object",
+            "title": "Checked"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "roadmap_id",
+          "updated_at"
+        ],
+        "title": "Progress",
+        "description": "A user's progress against one roadmap.\n\n``checked`` maps a checklist-item id to its checked state; only checked items\nare retained (an unchecked item is simply absent), which keeps the map lean\nand the explicit-set idempotent. ``user_id`` is resolved from the\ntoken/session and never trusted from args. This is the ``follow`` response\nbody (following creates the record)."
+      },
+      "ProgressSnapshot": {
+        "properties": {
+          "roadmap_id": {
+            "type": "string",
+            "title": "Roadmap Id"
+          },
+          "total_items": {
+            "type": "integer",
+            "title": "Total Items"
+          },
+          "checked_items": {
+            "type": "integer",
+            "title": "Checked Items"
+          },
+          "percent": {
+            "type": "integer",
+            "title": "Percent"
+          },
+          "deadline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/SectionProgress"
+            },
+            "type": "array",
+            "title": "Sections"
+          },
+          "checked_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "roadmap_id",
+          "total_items",
+          "checked_items",
+          "percent"
+        ],
+        "title": "ProgressSnapshot",
+        "description": "The ``GET /progress`` body: roadmap-wide + per-section completion.\n\n``checked_ids`` is populated only in ``detailed`` mode,\nkeeping the default concise response small while still letting a client\nreconcile the exact checked set when it asks for it."
+      },
+      "ProgressUpdateRequest": {
+        "properties": {
+          "item_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Item Ids"
+          },
+          "state": {
+            "$ref": "#/components/schemas/CompletionState"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_ids",
+          "state"
+        ],
+        "title": "ProgressUpdateRequest",
+        "description": "The ``POST /progress`` body: set ``item_ids`` to ``state`` (explicit set,\nnot toggle). At least one id is required so an update is\nnever a silent no-op."
+      },
+      "ProgressUpdateResult": {
+        "properties": {
+          "progress": {
+            "$ref": "#/components/schemas/ProgressSnapshot"
+          },
+          "next": {
+            "$ref": "#/components/schemas/NextResult"
+          }
+        },
+        "type": "object",
+        "required": [
+          "progress",
+          "next"
+        ],
+        "title": "ProgressUpdateResult",
+        "description": "The ``POST /progress`` body: the fresh snapshot after the set plus the\nnext suggestion. The snapshot is returned in detailed\nmode so the client can reconcile its checkbox state to the server truth."
+      },
+      "RemoveEdgeOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "remove_edge",
+            "title": "Op"
+          },
+          "from_id": {
+            "type": "string",
+            "title": "From Id"
+          },
+          "to_id": {
+            "type": "string",
+            "title": "To Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "from_id",
+          "to_id"
+        ],
+        "title": "RemoveEdgeOp"
+      },
+      "RemoveItemOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "remove_item",
+            "title": "Op"
+          },
+          "item_id": {
+            "type": "string",
+            "title": "Item Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "item_id"
+        ],
+        "title": "RemoveItemOp"
+      },
+      "RemoveSectionOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "remove_section",
+            "title": "Op"
+          },
+          "section_id": {
+            "type": "string",
+            "title": "Section Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "section_id"
+        ],
+        "title": "RemoveSectionOp"
+      },
+      "RemoveSubsectionOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "remove_subsection",
+            "title": "Op"
+          },
+          "subsection_id": {
+            "type": "string",
+            "title": "Subsection Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "subsection_id"
+        ],
+        "title": "RemoveSubsectionOp"
+      },
+      "ReorderOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "reorder",
+            "title": "Op"
+          },
+          "target_id": {
+            "type": "string",
+            "title": "Target Id"
+          },
+          "before_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Id"
+          },
+          "after_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "target_id"
+        ],
+        "title": "ReorderOp",
+        "description": "Move any node (section / subsection / item) within its sibling order."
+      },
+      "Resource": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "pattern": "^https?://",
+            "title": "Url"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ResourceType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "url",
+          "type"
+        ],
+        "title": "Resource",
+        "description": "An external link on a subsection; the body is never inlined."
+      },
+      "ResourceInput": {
+        "properties": {
+          "proposed_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Id"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "pattern": "^https?://",
+            "title": "Url"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ResourceType"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "url",
+          "type"
+        ],
+        "title": "ResourceInput"
+      },
+      "ResourceLink": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ResourceType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "url",
+          "type"
+        ],
+        "title": "ResourceLink",
+        "description": "A resource reference on a next item: a link, never an inlined body."
+      },
+      "ResourceRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ResourceType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "url",
+          "type"
+        ],
+        "title": "ResourceRef",
+        "description": "A subsection resource as a link, never an inlined body."
+      },
+      "ResourceType": {
+        "type": "string",
+        "enum": [
+          "article",
+          "video",
+          "book",
+          "course",
+          "docs",
+          "other"
+        ],
+        "title": "ResourceType"
+      },
+      "ResponseFormat": {
+        "type": "string",
+        "enum": [
+          "concise",
+          "detailed"
+        ],
+        "title": "ResponseFormat",
+        "description": "The ``concise | detailed`` switch on the read tools.\n\nConcise is roughly one-third the tokens and still carries the follow-up IDs;\ndetailed adds the explanatory free-text (the node ``description``)."
+      },
+      "Roadmap": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "owner": {
+            "type": "string",
+            "title": "Owner"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "subject_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subject Tags"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility",
+            "default": "private"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RoadmapStatus",
+            "default": "draft"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "default": 1
+          },
+          "sections": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Section"
+            },
+            "type": "object",
+            "title": "Sections"
+          },
+          "section_order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Section Order"
+          },
+          "suggested_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggested Path"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "owner",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Roadmap",
+        "description": "A roadmap definition owned by one user. ``owner`` is resolved from the\nsession, never trusted from client input."
+      },
+      "RoadmapCreated": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "owner": {
+            "type": "string",
+            "title": "Owner"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "subject_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subject Tags"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility",
+            "default": "private"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RoadmapStatus",
+            "default": "draft"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "default": 1
+          },
+          "sections": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Section"
+            },
+            "type": "object",
+            "title": "Sections"
+          },
+          "section_order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Section Order"
+          },
+          "suggested_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggested Path"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "remap": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Remap"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "owner",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "RoadmapCreated",
+        "description": "The ``POST /roadmaps`` body: the full minted roadmap plus a ``remap`` of\nevery de-duped ``proposed_id -> minted_id`` so the author can reconcile the\nreferences it sent. ``remap`` is empty when no proposed ID\nhad to be changed."
+      },
+      "RoadmapInput": {
+        "properties": {
+          "proposed_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Id"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "subject_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subject Tags"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility",
+            "default": "private"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/SectionInput"
+            },
+            "type": "array",
+            "title": "Sections"
+          },
+          "suggested_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggested Path"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "RoadmapInput",
+        "description": "The ``create_roadmap_draft`` / ``replace_roadmap_draft`` payload."
+      },
+      "RoadmapReplaced": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "owner": {
+            "type": "string",
+            "title": "Owner"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "subject_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subject Tags"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility",
+            "default": "private"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RoadmapStatus",
+            "default": "draft"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "default": 1
+          },
+          "sections": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Section"
+            },
+            "type": "object",
+            "title": "Sections"
+          },
+          "section_order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Section Order"
+          },
+          "suggested_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggested Path"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "remap": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Remap"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "owner",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "RoadmapReplaced",
+        "description": "The ``PUT /roadmaps/{id}`` body: the full rebuilt draft after a full-document\nimport (the escape hatch) plus the ``proposed_id -> minted_id``\nremap. Mirrors :class:`RoadmapCreated` because replace reuses the same\nmint-then-resolve assembly: ``proposed_id``s are preserved, every other node is\nre-minted, and the roadmap's own ID is unchanged. ``remap`` is\nempty when no proposed ID had to be de-duped."
+      },
+      "RoadmapStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "published",
+          "archived"
+        ],
+        "title": "RoadmapStatus"
+      },
+      "SearchHit": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/SearchHitKind"
+          },
+          "subsection_id": {
+            "type": "string",
+            "title": "Subsection Id"
+          },
+          "item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Id"
+          },
+          "title_or_text": {
+            "type": "string",
+            "title": "Title Or Text"
+          },
+          "matched_tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "subsection_id",
+          "title_or_text"
+        ],
+        "title": "SearchHit",
+        "description": "One search match, carrying the IDs needed to drill down.\n\n``item_id`` is present only when ``kind == item``; ``matched_tags`` names the\nsubsection tags that matched a tag filter (absent for a keyword-only match)."
+      },
+      "SearchHitKind": {
+        "type": "string",
+        "enum": [
+          "subsection",
+          "item"
+        ],
+        "title": "SearchHitKind",
+        "description": "Whether a search hit is a subsection (DAG node) or a checklist item."
+      },
+      "Section": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "subsections": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Subsection"
+            },
+            "type": "object",
+            "title": "Subsections"
+          },
+          "subsection_order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subsection Order"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "Section",
+        "description": "An ordered phase grouping DAG-node subsections."
+      },
+      "SectionInclude": {
+        "type": "string",
+        "enum": [
+          "subsections",
+          "items",
+          "both"
+        ],
+        "title": "SectionInclude",
+        "description": "Which parts of each node a ``SectionPage`` populates.\n\n``subsections`` = node metadata (tags, effort, resources, resolved prereqs);\n``items`` = the checklist items only; ``both`` = everything. Every variant\nstill carries the ``subsection_id`` so the agent can drill in further."
+      },
+      "SectionInput": {
+        "properties": {
+          "proposed_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Id"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Title"
+          },
+          "subsections": {
+            "items": {
+              "$ref": "#/components/schemas/SubsectionInput"
+            },
+            "type": "array",
+            "title": "Subsections"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "SectionInput"
+      },
+      "SectionOverview": {
+        "properties": {
+          "section_id": {
+            "type": "string",
+            "title": "Section Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "total_items": {
+            "type": "integer",
+            "title": "Total Items"
+          },
+          "checked_items": {
+            "type": "integer",
+            "title": "Checked Items"
+          },
+          "percent": {
+            "type": "integer",
+            "title": "Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "section_id",
+          "title",
+          "total_items",
+          "checked_items",
+          "percent"
+        ],
+        "title": "SectionOverview",
+        "description": "Per-section completion counts, no checklist-item bodies."
+      },
+      "SectionPage": {
+        "properties": {
+          "section_id": {
+            "type": "string",
+            "title": "Section Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "include": {
+            "$ref": "#/components/schemas/SectionInclude"
+          },
+          "subsections": {
+            "items": {
+              "$ref": "#/components/schemas/NodeDetail"
+            },
+            "type": "array",
+            "title": "Subsections"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "steering": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Steering"
+          }
+        },
+        "type": "object",
+        "required": [
+          "section_id",
+          "title",
+          "include"
+        ],
+        "title": "SectionPage",
+        "description": "The ``GET /sections/{sid}`` body: a paginated section drill-down.\n\n``include`` selects which parts of each node are populated. The page holds a\nserver-set number of subsections in ``subsection_order``; ``next_cursor`` is\nan **opaque** token for the next page (absent on the last page) and\n``steering`` is present only when the response was truncated."
+      },
+      "SectionProgress": {
+        "properties": {
+          "section_id": {
+            "type": "string",
+            "title": "Section Id"
+          },
+          "total_items": {
+            "type": "integer",
+            "title": "Total Items"
+          },
+          "checked_items": {
+            "type": "integer",
+            "title": "Checked Items"
+          },
+          "percent": {
+            "type": "integer",
+            "title": "Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "section_id",
+          "total_items",
+          "checked_items",
+          "percent"
+        ],
+        "title": "SectionProgress",
+        "description": "Per-section completion counts, derived from progress + roadmap."
+      },
+      "SetEffortOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "set_effort",
+            "title": "Op"
+          },
+          "subsection_id": {
+            "type": "string",
+            "title": "Subsection Id"
+          },
+          "effort_estimate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort Estimate"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "subsection_id"
+        ],
+        "title": "SetEffortOp"
+      },
+      "SetResourcesOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "set_resources",
+            "title": "Op"
+          },
+          "subsection_id": {
+            "type": "string",
+            "title": "Subsection Id"
+          },
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceInput"
+            },
+            "type": "array",
+            "title": "Resources"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "subsection_id"
+        ],
+        "title": "SetResourcesOp"
+      },
+      "SetSuggestedPathOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "set_suggested_path",
+            "title": "Op"
+          },
+          "path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Path"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op"
+        ],
+        "title": "SetSuggestedPathOp"
+      },
+      "SetTagsOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "set_tags",
+            "title": "Op"
+          },
+          "subsection_id": {
+            "type": "string",
+            "title": "Subsection Id"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "subsection_id"
+        ],
+        "title": "SetTagsOp"
+      },
+      "Subsection": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "effort_estimate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort Estimate"
+          },
+          "prereq_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Prereq Ids"
+          },
+          "resources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Resource"
+            },
+            "type": "object",
+            "title": "Resources"
+          },
+          "resource_order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Resource Order"
+          },
+          "checklist_items": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ChecklistItem"
+            },
+            "type": "object",
+            "title": "Checklist Items"
+          },
+          "item_order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Item Order"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "Subsection",
+        "description": "The DAG node: track tags, resources, checklist items, prereq edges."
+      },
+      "SubsectionInput": {
+        "properties": {
+          "proposed_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Id"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "effort_estimate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort Estimate"
+          },
+          "prereq_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Prereq Ids"
+          },
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceInput"
+            },
+            "type": "array",
+            "title": "Resources"
+          },
+          "checklist_items": {
+            "items": {
+              "$ref": "#/components/schemas/ChecklistItemInput"
+            },
+            "type": "array",
+            "title": "Checklist Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "SubsectionInput"
+      },
+      "UpdateItemOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "update_item",
+            "title": "Op"
+          },
+          "item_id": {
+            "type": "string",
+            "title": "Item Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "item_id",
+          "text"
+        ],
+        "title": "UpdateItemOp"
+      },
+      "UpdateSectionOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "update_section",
+            "title": "Op"
+          },
+          "section_id": {
+            "type": "string",
+            "title": "Section Id"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Title"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "section_id",
+          "title"
+        ],
+        "title": "UpdateSectionOp"
+      },
+      "UpdateSubsectionOp": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "update_subsection",
+            "title": "Op"
+          },
+          "subsection_id": {
+            "type": "string",
+            "title": "Subsection Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "effort_estimate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort Estimate"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "subsection_id"
+        ],
+        "title": "UpdateSubsectionOp"
+      },
+      "ValidateResult": {
+        "properties": {
+          "violations": {
+            "items": {
+              "$ref": "#/components/schemas/Violation"
+            },
+            "type": "array",
+            "title": "Violations"
+          }
+        },
+        "type": "object",
+        "title": "ValidateResult",
+        "description": "The ``POST /roadmaps/{id}:validate`` body: all structural violations in one\npass (empty when the draft is publishable). The ``violations`` shape is\nidentical to the 422 publish hard-block body, so a client\nhandles one violation contract for both validate and publish."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "Violation": {
+        "properties": {
+          "rule": {
+            "type": "string",
+            "title": "Rule"
+          },
+          "ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ids"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule",
+          "ids",
+          "message"
+        ],
+        "title": "Violation",
+        "description": "One structural rule failure, model-recoverable by naming the rule and IDs.\n\nProduced by the structural validator (``validation.py``) and carried in a\n``Validation`` error's problem+json body. Lives\nin the error contract because it is part of the wire shape every client reads."
+      },
+      "Visibility": {
+        "type": "string",
+        "enum": [
+          "public",
+          "private"
+        ],
+        "title": "Visibility"
+      }
+    }
+  }
+}

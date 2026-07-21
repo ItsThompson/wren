@@ -142,13 +142,37 @@ test-frontend:
 lint-frontend:
     cd frontend && npx tsc -b && npm run lint
 
-# Regenerate the OpenAPI -> TypeScript client from the live FastAPI schema.
+# Regenerate the frontend OpenAPI -> TypeScript client from the live FastAPI schema.
 # Exports the external app's OpenAPI document, then runs openapi-typescript.
 # CI runs this and `git diff --exit-code` to fail on a stale committed client.
 # Run after any change to the external REST surface.
 codegen:
     cd backend && LOG_LEVEL=critical uv run python -c "import json; from wren.api.main import app; print(json.dumps(app.openapi(), indent=2))" > ../frontend/openapi.json
     cd frontend && npm run codegen
+
+# Regenerate the MCP Group-A schema module from the internal app's OpenAPI.
+# Exports the internal app's OpenAPI to a committed raw artifact, restricts a copy
+# to the Group-A component set (dropping visibility, renaming RoadmapInput ->
+# RoadmapDraftInput), runs datamodel-codegen, then canonicalizes with ruff. CI runs
+# this and `git diff --exit-code` to fail on a stale committed artifact or module.
+# The generator is a DEV-only dependency; the MCP image only copies the committed
+# generated file and never runs this. See docs/adr/0001-*.
+codegen-mcp:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    LOG_LEVEL=critical uv run --package wren python -c "import json; from wren.api_internal.main import app; print(json.dumps(app.openapi(), indent=2))" > mcp/internal-openapi.json
+    genin="$(mktemp)"
+    trap 'rm -f "$genin"' EXIT
+    uv run --package wren-mcp python mcp/scripts/build_generation_input.py mcp/internal-openapi.json > "$genin"
+    uv run --package wren-mcp datamodel-codegen \
+      --input "$genin" --input-file-type openapi \
+      --output-model-type pydantic_v2.BaseModel --target-python-version 3.12 \
+      --use-standard-collections --use-union-operator --use-annotated --field-constraints \
+      --capitalise-enum-members --strict-nullable --disable-timestamp \
+      --custom-file-header "$(cat mcp/scripts/generated_module_header.txt)" \
+      --formatters black --formatters isort \
+      --output mcp/src/wren_mcp/_schemas_generated.py
+    cd mcp && uv run ruff format src/wren_mcp/_schemas_generated.py && uv run ruff check --fix src/wren_mcp/_schemas_generated.py
 
 # --- Deploy / ops -----------------------------------------------------------
 

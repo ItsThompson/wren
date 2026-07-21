@@ -35,6 +35,11 @@ dev = [
     "pytest-asyncio>=0.24.0,<2",
     "ruff>=0.8.0,<1",
     "mypy>=1.13.0,<3",
+    # OpenAPI -> Pydantic generator for the Group-A schema codegen (`just
+    # codegen-mcp`). Dev-only: the MCP image exports with `--no-dev`, so it never
+    # ships in the runtime image; the image only copies the committed generated
+    # module. See docs/packaging.md and docs/adr/0001-*.
+    "datamodel-code-generator>=0.67.0,<1",
 ]
 
 [build-system]

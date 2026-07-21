@@ -84,3 +84,68 @@ async def test_tool_schemas_match_the_frozen_snapshot() -> None:
         "MCP tool contract drifted. If intentional, regenerate with "
         "WREN_UPDATE_SNAPSHOTS=1 and review the diff."
     )
+
+
+# --------------------------------------------------------------------------- #
+# Structural guard: classify drift as cosmetic vs contract-breaking            #
+# --------------------------------------------------------------------------- #
+#
+# The Group-A tool schemas are generated from the backend OpenAPI, so a backend
+# edit changes generated ``title``/``description`` values (cosmetic) and can add a
+# non-structural ``default: []`` or reorder a ``required`` array. Those are safe to
+# accept in a snapshot refresh. A change to a field NAME, TYPE, enum value,
+# ``required`` membership, or a discriminator is an agent-facing contract change
+# and must be scrutinized. This guard normalizes both sides to the structural
+# contract only, so it stays green through a cosmetic refresh but fails on a real
+# field/type/enum/required/discriminator change: when the exact snapshot test
+# above fails, run this to tell the two apart before refreshing.
+
+_COSMETIC_KEYS = frozenset({"title", "description"})
+_NAME_MAPS = frozenset({"properties", "$defs", "patternProperties", "definitions"})
+_NON_STRUCTURAL_DEFAULTS: tuple[object, ...] = ([], None, {})
+
+
+def _structural(node: Any) -> Any:
+    """Reduce a tool schema to its structural contract.
+
+    Drops the cosmetic ``title``/``description`` schema keywords (never the field
+    NAMES under ``properties``/``$defs``), sorts each ``required`` array (order is
+    not part of the contract), and drops a non-structural empty ``default``
+    (``[]``/``null``/``{}``) so a generated ``default: []`` reads the same as a
+    hand-authored ``default_factory`` that omits the key.
+    """
+    if isinstance(node, dict):
+        out: dict[str, Any] = {}
+        for key, value in node.items():
+            if key in _COSMETIC_KEYS:
+                continue
+            if key in _NAME_MAPS and isinstance(value, dict):
+                out[key] = {name: _structural(sub) for name, sub in value.items()}
+            elif key == "required" and isinstance(value, list):
+                out[key] = sorted(value)
+            elif key == "default" and value in _NON_STRUCTURAL_DEFAULTS:
+                continue
+            else:
+                out[key] = _structural(value)
+        return out
+    if isinstance(node, list):
+        return [_structural(item) for item in node]
+    return node
+
+
+async def test_tool_schemas_are_structurally_unchanged() -> None:
+    """The live tool contract matches the snapshot on every structural field.
+
+    Unlike the exact snapshot test, this tolerates cosmetic ``title``/
+    ``description`` edits, an added empty ``default``, and ``required`` reordering.
+    A failure here means a real field/type/enum/required/discriminator change
+    reached an agent-facing tool: do not accept it as a routine snapshot refresh.
+    """
+    assert _SNAPSHOT.exists(), "snapshot missing; regenerate with WREN_UPDATE_SNAPSHOTS=1"
+    live = _structural(await _contract())
+    committed = _structural(json.loads(_SNAPSHOT.read_text()))
+    assert live == committed, (
+        "MCP tool contract changed a structural field (name, type, enum, required "
+        "membership, or discriminator). This is an agent-facing contract change, "
+        "not a cosmetic refresh: investigate before updating the snapshot."
+    )
