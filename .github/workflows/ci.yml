@@ -139,6 +139,22 @@ jobs:
           uv run pytest
 
   # ---------------------------------------------------------------------------
+  # test-scripts: pure-bash test harnesses for scripts/tests/*.sh (deploy,
+  # user-ops, and any future harness). Auto-discovers *_test.sh via
+  # scripts/tests/run_all.sh, so adding a harness never requires a ci.yml edit.
+  # No language runtime needed -- just bash on the runner. Gated by lint.
+  # ---------------------------------------------------------------------------
+  test-scripts:
+    needs: [lint]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Script test harnesses (scripts/tests/*_test.sh)
+        run: bash scripts/tests/run_all.sh
+
+  # ---------------------------------------------------------------------------
   # test-backend: pytest with the hard 80% coverage gate over the backend, plus
   # the MCP suite (tool-schema snapshot + tool contract tests). Real Postgres is
   # started per-test by testcontainers-python (Docker is present on the runner),
