@@ -5,12 +5,12 @@
 # Plain-bash harness (no external test runner), mirroring deploy_test.sh.
 # Exercises everything verifiable WITHOUT a live VPS or postgres container:
 #   - list-users: limit validation, the exact query shape, no password_hash
-#   - delete-user: username resolution, backup, dry-run table coverage,
+#   - delete-user: username resolution, dry-run table coverage,
 #     review-vs-commit SQL (BEGIN without COMMIT vs COMMIT), the two
 #     confirmation gates, and the post-delete verification
 # Live execution against the real box is out of scope for this harness.
 #
-# Run: scripts/tests/user_ops_test.sh   (or: just test-user-ops)
+# Run: scripts/tests/user_ops_test.sh
 # =============================================================================
 #
 # Test harness: functions defined here are stubs invoked indirectly by the
@@ -85,7 +85,6 @@ docker() {
   if [[ -n "${PG_LOG:-}" ]]; then printf '%s\n' "${*//$'\n'/ }" >> "${PG_LOG}"; fi
   case "$*" in
     *"SELECT id, email FROM users"*) printf '%s\n' "${PG_RESOLVE:-}";;
-    *"COPY (SELECT row_to_json"*) printf '%s\n' "${PG_BACKUP:-}";;
     *"SELECT 'users' AS tbl"*) printf '%s\n' "${PG_COUNTS:-}";;
     *"BEGIN;"*"COMMIT;"*) printf '%s\n' "${PG_COMMIT_OUT:-DELETE 1}";;
     *"BEGIN;"*) printf '%s\n' "${PG_REVIEW_OUT:-DELETE 1}";;
@@ -124,33 +123,6 @@ test_resolve_user_not_found() {
   rc=$?
   [[ ${rc} -ne 0 ]] || { echo "expected non-zero for unknown user"; rm -f "${PG_LOG}"; return 1; }
   rm -f "${PG_LOG}"
-}
-
-test_backup_user_writes_json() {
-  PG_LOG="$(mktemp)"
-  PG_BACKUP='{"id":"8c31dcfb91dc420f8bbe5e63a7c631f2","username":"idk"}'
-  USER_ID="8c31dcfb91dc420f8bbe5e63a7c631f2"
-  USERNAME="idk"
-  local tmp
-  tmp="$(mktemp -d)"
-  BACKUP_DIR="${tmp}"
-  backup_user
-  [[ -s "${BACKUP_FILE}" ]] || { echo "backup file missing or empty"; rm -rf "${tmp}" "${PG_LOG}"; return 1; }
-  contains "$(cat "${BACKUP_FILE}")" '"username":"idk"' || { rm -rf "${tmp}" "${PG_LOG}"; return 1; }
-  rm -rf "${tmp}" "${PG_LOG}"
-}
-
-test_backup_user_aborts_on_empty_output() {
-  PG_LOG="$(mktemp)"
-  PG_BACKUP=""
-  USER_ID="8c31dcfb91dc420f8bbe5e63a7c631f2"
-  USERNAME="idk"
-  local tmp rc
-  tmp="$(mktemp -d)"
-  ( BACKUP_DIR="${tmp}" backup_user ) >/dev/null 2>&1
-  rc=$?
-  [[ ${rc} -ne 0 ]] || { echo "expected non-zero on empty backup output"; rm -rf "${tmp}" "${PG_LOG}"; return 1; }
-  rm -rf "${tmp}" "${PG_LOG}"
 }
 
 test_dry_run_covers_all_tables() {
@@ -236,42 +208,36 @@ test_main_rejects_invalid_username() {
 test_main_aborts_when_confirmation_refused() {
   PG_LOG="$(mktemp)"
   PG_RESOLVE="8c31dcfb91dc420f8bbe5e63a7c631f2|idk@example.com"
-  PG_BACKUP='{"id":"8c31dcfb91dc420f8bbe5e63a7c631f2","username":"idk"}'
   PG_COUNTS="${EMPTY_COUNTS}"
   CONFIRM_RC=1
-  local tmp rc
-  tmp="$(mktemp -d)"
-  ( BACKUP_DIR="${tmp}" main "idk" ) >/dev/null 2>&1
+  local rc
+  ( main "idk" ) >/dev/null 2>&1
   rc=$?
-  [[ ${rc} -ne 0 ]] || { echo "expected non-zero when confirmation refused"; rm -rf "${tmp}" "${PG_LOG}"; return 1; }
-  # No delete SQL was ever sent (only resolve + backup + the two dry-run calls).
+  [[ ${rc} -ne 0 ]] || { echo "expected non-zero when confirmation refused"; rm -f "${PG_LOG}"; return 1; }
+  # No delete SQL was ever sent (only resolve + the two dry-run calls).
   equals "$(grep -c 'DELETE FROM' "${PG_LOG}" || true)" "0" \
-    || { rm -rf "${tmp}" "${PG_LOG}"; return 1; }
-  rm -rf "${tmp}" "${PG_LOG}"
+    || { rm -f "${PG_LOG}"; return 1; }
+  rm -f "${PG_LOG}"
 }
 
 test_main_full_flow_with_confirmations() {
   PG_LOG="$(mktemp)"
   PG_RESOLVE="8c31dcfb91dc420f8bbe5e63a7c631f2|idk@example.com"
-  PG_BACKUP='{"id":"8c31dcfb91dc420f8bbe5e63a7c631f2","username":"idk"}'
   PG_COUNTS="${EMPTY_COUNTS}"
   PG_REVIEW_OUT="DELETE 1"
   PG_COMMIT_OUT="DELETE 1"
   PG_VERIFY="0"
   CONFIRM_RC=0
-  local tmp rc review_line commit_line
-  tmp="$(mktemp -d)"
-  ( BACKUP_DIR="${tmp}" main "idk" ) >/dev/null 2>&1
+  local rc review_line commit_line
+  ( main "idk" ) >/dev/null 2>&1
   rc=$?
-  [[ ${rc} -eq 0 ]] || { echo "expected success"; rm -rf "${tmp}" "${PG_LOG}"; return 1; }
+  [[ ${rc} -eq 0 ]] || { echo "expected success"; rm -f "${PG_LOG}"; return 1; }
   # The two BEGIN lines are the review (no COMMIT) and the commit (has COMMIT).
   review_line="$(grep 'BEGIN;' "${PG_LOG}" | sed -n '1p')"
   commit_line="$(grep 'BEGIN;' "${PG_LOG}" | sed -n '2p')"
-  not_contains "${review_line}" "COMMIT" || { rm -rf "${tmp}" "${PG_LOG}"; return 1; }
-  contains "${commit_line}" "COMMIT" || { rm -rf "${tmp}" "${PG_LOG}"; return 1; }
-  # Backup file was written next to the deleted user.
-  ls "${tmp}"/user-idk-*.json >/dev/null 2>&1 || { echo "no backup file written"; rm -rf "${tmp}" "${PG_LOG}"; return 1; }
-  rm -rf "${tmp}" "${PG_LOG}"
+  not_contains "${review_line}" "COMMIT" || { rm -f "${PG_LOG}"; return 1; }
+  contains "${commit_line}" "COMMIT" || { rm -f "${PG_LOG}"; return 1; }
+  rm -f "${PG_LOG}"
 }
 
 # --- run all ----------------------------------------------------------------
@@ -282,8 +248,6 @@ main_tests() {
   run_test test_list_users_rejects_non_numeric_limit
   run_test test_resolve_user_found
   run_test test_resolve_user_not_found
-  run_test test_backup_user_writes_json
-  run_test test_backup_user_aborts_on_empty_output
   run_test test_dry_run_covers_all_tables
   run_test test_dry_run_warns_on_non_empty_account
   run_test test_delete_sql_review_has_begin_no_commit

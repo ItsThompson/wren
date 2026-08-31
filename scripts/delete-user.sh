@@ -6,28 +6,24 @@
 # where the postgres container lives; it is not a Docker-Context script.
 #
 # Every destructive step requires an explicit `y`:
-#   1. Back up the user row to WREN_BACKUP_DIR (automatic, no prompt)
-#   2. Dry run: rows that would be deleted, per table (prompt)
-#   3. Review: run the deletes in a transaction WITHOUT commit (prompt)
-#   4. Commit: run the deletes WITH commit, verify the user is gone
+#   1. Dry run: rows that would be deleted, per table (prompt)
+#   2. Review: run the deletes in a transaction WITHOUT commit (prompt)
+#   3. Commit: run the deletes WITH commit, verify the user is gone
 #
 # Usage:
 #   ./scripts/delete-user.sh <username>
 #
 # Env:
 #   WREN_PG_CONTAINER  postgres container name (default wren-postgres-1)
-#   WREN_BACKUP_DIR    backup directory (default ~/wren-backups)
 # =============================================================================
 
 # --- Configuration ----------------------------------------------------------
 
 PG_CONTAINER="${WREN_PG_CONTAINER:-wren-postgres-1}"
-BACKUP_DIR="${WREN_BACKUP_DIR:-${HOME}/wren-backups}"
 
-# Set by resolve_user()/backup_user(); consumed by the delete/verify steps.
+# Set by resolve_user(); consumed by the delete/verify steps.
 USER_ID=""
 USER_EMAIL=""
-BACKUP_FILE=""
 
 # --- Helpers ----------------------------------------------------------------
 
@@ -55,14 +51,6 @@ resolve_user() {
   [[ -n "${out}" ]] || die "no user with username '${username}'"
   USER_ID="${out%%|*}"
   USER_EMAIL="${out#*|}"
-}
-
-backup_user() {
-  mkdir -p "${BACKUP_DIR}"
-  BACKUP_FILE="${BACKUP_DIR}/user-${USERNAME}-$(date +%Y%m%d-%H%M%S).json"
-  pg -t -A -c "COPY (SELECT row_to_json(t) FROM (SELECT * FROM users WHERE id = '${USER_ID}') t) TO STDOUT;" > "${BACKUP_FILE}"
-  [[ -s "${BACKUP_FILE}" ]] || die "backup file is empty; aborting"
-  head -1 "${BACKUP_FILE}" | grep -q '^{' || die "backup does not look like JSON; aborting"
 }
 
 counts_sql() {
@@ -138,9 +126,6 @@ main() {
 
   resolve_user "${USERNAME}"
   log "Found: ${USERNAME} <${USER_EMAIL}> (id ${USER_ID})"
-
-  backup_user
-  log "Backup written to ${BACKUP_FILE}"
 
   dry_run
   confirm "Proceed with deleting '${USERNAME}' <${USER_EMAIL}>?" || die "aborted by user"
