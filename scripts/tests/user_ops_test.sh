@@ -19,8 +19,8 @@
 set -uo pipefail
 
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/.."
-LIST_USERS="${SCRIPTS_DIR}/list-users.sh"
-DELETE_USER="${SCRIPTS_DIR}/delete-user.sh"
+LIST_USERS="${SCRIPTS_DIR}/ops/list-users.sh"
+DELETE_USER="${SCRIPTS_DIR}/ops/delete-user.sh"
 PASS=0
 FAIL=0
 

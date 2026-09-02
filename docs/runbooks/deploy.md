@@ -11,7 +11,8 @@ CD registers the context, exports the config/secret env (committed `.env.prod` +
 3. **Migrations (pre-traffic):** start postgres, wait healthy, then `... run --rm backend alembic upgrade head`. Aborts the deploy on failure. See `migration.md`.
 4. **Start:** `docker --context wren compose --profile tunnels up -d`.
 5. **Health gate:** poll `docker --context wren compose ps` health across all services (~60s).
-6. **Record on success:** the ONE remaining `ssh` line writes the deployed SHA to `/opt/wren/.deployed-sha` (the rollback key). On a failed gate the script exits non-zero and CD owns the rollback (below); the script never re-deploys itself.
+6. **Sync ops scripts:** `tar` `scripts/ops/` over SSH to `/opt/wren/scripts/` on the box (clean-replace: wipe + extract). The box holds no repo checkout, so host-side ops scripts (`list-users.sh`, `delete-user.sh`, etc.) are otherwise absent; this keeps them version-matched to the running deploy. Only runs after the gate passes.
+7. **Record on success:** the ONE remaining `ssh` line writes the deployed SHA to `/opt/wren/.deployed-sha` (the rollback key). On a failed gate the script exits non-zero and CD owns the rollback (below); the script never re-deploys itself.
 
 Host bootstrap (Docker install, `daemon.json`, prune cron, the deploy user and docker group, the Docker Context) is a one-time bring-up concern (`bring-up.md`), not part of a deploy. Not zero-downtime: there is a brief per-deploy gap while containers recreate, accepted at this scale (~5 users).
 
@@ -38,6 +39,22 @@ The tunnel is the only ingress (zero inbound ports). CI renders `deployments/clo
 On a failed health gate the deploy exits non-zero and CD runs a conditional rollback step: it reads the previous `/opt/wren/.deployed-sha` (via `./scripts/deploy.sh read-deployed-sha <ip>`), checks that SHA out in the runner, re-exports the env from that checkout, and re-runs the deploy once with `WREN_IMAGE_TAG=sha-<prev>`. Because the checkout moves to the previous SHA, this restores the previous **images AND config**. If no previous `.deployed-sha` exists (the first deploy), `read-deployed-sha` refuses and the workflow fails: there is nothing to roll back to.
 
 **Forward-only migrations (caveat):** a release carrying a schema migration can block re-deploying the previous image against the already-migrated DB. Migrations are forward-only; down-migrations are manual and out of scope. See `migration.md` and `rollback.md`.
+
+## Running ops scripts on the VPS
+
+The box holds no repo checkout, but each successful deploy syncs `scripts/ops/` (host-side ops scripts) to `/opt/wren/scripts/` on the box. These scripts run ON the VPS: they call `docker exec` against the postgres container directly, and are available to an operator SSH'd in as `deploy@<ip>`.
+
+```sh
+ssh deploy@<vps-ip>
+
+# List recent users:
+/opt/wren/scripts/list-users.sh 20
+
+# Delete a user (interactive, three confirmation gates):
+/opt/wren/scripts/delete-user.sh <username>
+```
+
+The scripts are version-matched to the running deploy (synced after the health gate passes), so they always reflect the current schema and container names. Adding a new ops script: put it in `scripts/ops/`, make it executable (`chmod +x`), and it will be picked up by the next deploy's sync automatically.
 
 ## First-time bring-up
 

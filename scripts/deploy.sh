@@ -272,6 +272,26 @@ read_deployed_sha() {
   printf '%s\n' "${sha}"
 }
 
+# --- Ops scripts sync -------------------------------------------------------
+
+# Sync scripts/ops/ (host-side ops scripts like list-users.sh and delete-user.sh)
+# to /opt/wren/scripts/ on the box. The box holds no repo checkout, so these
+# scripts are otherwise absent; this clean-replace (rm + mkdir + extract) keeps
+# them version-matched to the running deploy and removes any scripts deleted
+# from the repo. Only runs after the health gate passes, so a failed deploy
+# never leaves a mismatched scripts/ dir. Uses tar over SSH (not scp): no extra
+# tool on the box, and the box's authorized_keys already permits this SSH user.
+sync_ops_scripts() {
+  log "==> Sync ops scripts to box (${REMOTE_DIR}/scripts/)"
+  if is_dry_run; then
+    log "    [dry-run] would tar scripts/ops/ -> ${SSH_TARGET}:${REMOTE_DIR}/scripts/"
+    return 0
+  fi
+  tar -C "${REPO_ROOT}/scripts/ops" -cf - . \
+    | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
+      "rm -rf ${REMOTE_DIR}/scripts && mkdir -p ${REMOTE_DIR}/scripts && tar -C ${REMOTE_DIR}/scripts -xf -"
+}
+
 # --- Success bookkeeping ----------------------------------------------------
 
 record_deploy() {
@@ -308,6 +328,7 @@ main() {
     die "deploy failed the health gate on context ${CONTEXT_NAME}"
   fi
 
+  sync_ops_scripts
   record_deploy
   log "=== Deploy complete: ${CURRENT_SHA:-unknown} on context ${CONTEXT_NAME} ==="
 }

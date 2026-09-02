@@ -58,7 +58,7 @@ CD deploys the whole stack to the single VPS over an SSH Docker Context. The Com
 | `deploy` | Register the Docker Context, export config and secrets CLI-side, then run `scripts/deploy.sh`. |
 | Rollback (on failure) | CI-owned. Read the previous `.deployed-sha`, check it out, re-export env, and re-run the deploy pinned to the previous images and config. |
 
-`scripts/deploy.sh` runs a fixed sequence: assert every required config and secret env var is set, pull images, run migrations pre-traffic, start the stack under the `tunnels` profile, health-gate every service for about 60 seconds, then record the deployed SHA on success. See `docs/runbooks/deploy.md` and `docs/runbooks/rollback.md` for the operator view.
+`scripts/deploy.sh` runs a fixed sequence: assert every required config and secret env var is set, pull images, run migrations pre-traffic, start the stack under the `tunnels` profile, health-gate every service for about 60 seconds, sync host-side ops scripts to `/opt/wren/scripts/`, then record the deployed SHA on success. See `docs/runbooks/deploy.md` and `docs/runbooks/rollback.md` for the operator view.
 
 The backend and MCP images build from the repo-root context (like `frontend`/`docs`), each selecting a member `dockerfile:` in `docker-compose.yml`; `discover` parses the context and dockerfile from `docker compose config`. See `docs/packaging.md` for the per-member build.
 

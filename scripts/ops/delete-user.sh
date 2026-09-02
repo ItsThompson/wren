@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 # =============================================================================
-# scripts/delete-user.sh
+# scripts/ops/delete-user.sh
 #
 # Delete a Wren user account from the production database. Runs ON the VPS,
-# where the postgres container lives; it is not a Docker-Context script.
+# where the postgres container lives; it is not a Docker-Context script. Synced
+# to the box at /opt/wren/scripts/ by deploy.sh after each healthy deploy, so it
+# is available for an operator SSH'd in as deploy@<ip>.
 #
 # Every destructive step requires an explicit `y`:
 #   1. Dry run: rows that would be deleted, per table (prompt)
 #   2. Review: run the deletes in a transaction WITHOUT commit (prompt)
 #   3. Commit: run the deletes WITH commit, verify the user is gone
 #
-# Usage:
-#   ./scripts/delete-user.sh <username>
+# Usage (on the VPS):
+#   /opt/wren/scripts/delete-user.sh <username>
 #
 # Env:
 #   WREN_PG_CONTAINER  postgres container name (default wren-postgres-1)
