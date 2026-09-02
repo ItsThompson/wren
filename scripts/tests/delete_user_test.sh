@@ -1,25 +1,23 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Tests for scripts/ops/list-users.sh and scripts/ops/delete-user.sh (VPS user ops).
+# Tests for scripts/ops/delete-user.sh (VPS user deletion, destructive).
 #
 # Plain-bash harness (no external test runner), mirroring deploy_test.sh.
 # Exercises everything verifiable WITHOUT a live VPS or postgres container:
-#   - list-users: limit validation, the exact query shape, no password_hash
-#   - delete-user: username resolution, dry-run table coverage,
+#   - username resolution, dry-run table coverage,
 #     review-vs-commit SQL (BEGIN without COMMIT vs COMMIT), the two
 #     confirmation gates, and the post-delete verification
 # Live execution against the real box is out of scope for this harness.
 #
-# Run: scripts/tests/user_ops_test.sh
+# Run: scripts/tests/delete_user_test.sh
 # =============================================================================
 #
 # Test harness: functions defined here are stubs invoked indirectly by the
-# sourced scripts (via main), and vars set here are consumed by them.
+# sourced script (via main), and vars set here are consumed by it.
 # shellcheck disable=SC1090,SC2034,SC2329,SC2016
 set -uo pipefail
 
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/.."
-LIST_USERS="${SCRIPTS_DIR}/ops/list-users.sh"
 DELETE_USER="${SCRIPTS_DIR}/ops/delete-user.sh"
 PASS=0
 FAIL=0
@@ -44,32 +42,6 @@ run_test() {
 contains() { [[ "$1" == *"$2"* ]] || { echo "expected to contain: $2"; return 1; }; }
 not_contains() { [[ "$1" != *"$2"* ]] || { echo "expected NOT to contain: $2"; return 1; }; }
 equals() { [[ "$1" == "$2" ]] || { echo "expected '$2', got '$1'"; return 1; }; }
-
-# --- list-users.sh ----------------------------------------------------------
-
-test_list_users_queries_recent_users() {
-  local out
-  docker() { printf 'docker %s\n' "$*"; }
-  out="$(source "${LIST_USERS}"; main 5)"
-  contains "${out}" "docker exec wren-postgres-1 psql -U wren -d wren -c" || return 1
-  contains "${out}" "ORDER BY created_at DESC LIMIT 5" || return 1
-  not_contains "${out}" "password_hash" || return 1
-}
-
-test_list_users_defaults_to_ten() {
-  local out
-  docker() { printf 'docker %s\n' "$*"; }
-  out="$(source "${LIST_USERS}"; main)"
-  contains "${out}" "LIMIT 10" || return 1
-}
-
-test_list_users_rejects_non_numeric_limit() {
-  local rc
-  docker() { :; }
-  ( source "${LIST_USERS}"; main abc ) >/dev/null 2>&1
-  rc=$?
-  [[ ${rc} -ne 0 ]] || { echo "expected non-zero for non-numeric limit"; return 1; }
-}
 
 # --- delete-user.sh ---------------------------------------------------------
 
@@ -243,9 +215,6 @@ test_main_full_flow_with_confirmations() {
 # --- run all ----------------------------------------------------------------
 
 main_tests() {
-  run_test test_list_users_queries_recent_users
-  run_test test_list_users_defaults_to_ten
-  run_test test_list_users_rejects_non_numeric_limit
   run_test test_resolve_user_found
   run_test test_resolve_user_not_found
   run_test test_dry_run_covers_all_tables
