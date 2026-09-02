@@ -2,6 +2,14 @@
 
 Docker Context deploy of the whole stack to the single VPS. The Compose CLI runs in CI (or an operator checkout); the engine runs on the VPS, reached over a Docker Context (`ssh://deploy@<ip>`). All config and secret content is sourced CLI-side and transmitted to the daemon, so the box holds no `.env`, OAuth key, or rendered config. Driven by `scripts/deploy.sh`; run automatically by CD on merge to `main`, or manually.
 
+## How deployment works
+
+Deployment is a two-phase, two-machine process:
+
+- **Build (CI runner):** CD (`cd.yml`) discovers first-party services from `docker-compose.yml`, builds each image with Buildx, and pushes two tags to GHCR: `:latest` (what the next deploy pulls) and `:sha-<SHA>` (immutable, for rollback).
+- **Deploy (CI runner -> VPS):** CD registers a Docker Context (`ssh://deploy@<ip>`) so Compose CLI commands run on the runner but target the engine on the VPS. It sources all config and secrets CLI-side (committed `.env.prod` + rendered config files + GitHub secrets) and hands off to `scripts/deploy.sh`, which drives the full lifecycle over the context: pull, migrate, start, health-gate, sync ops scripts, record SHA.
+- **The box is stateless:** no repo checkout, no `.env`, no secret files. Only Docker containers, named volumes (`pgdata`, `promdata`), `/opt/wren/.deployed-sha` (rollback key), and `/opt/wren/scripts/` (ops scripts) persist on the VPS.
+
 ## What a deploy does
 
 CD registers the context, exports the config/secret env (committed `.env.prod` + files rendered in the runner + GitHub secrets), and runs `scripts/deploy.sh <server-ip>`, which:
@@ -40,9 +48,24 @@ On a failed health gate the deploy exits non-zero and CD runs a conditional roll
 
 **Forward-only migrations (caveat):** a release carrying a schema migration can block re-deploying the previous image against the already-migrated DB. Migrations are forward-only; down-migrations are manual and out of scope. See `migration.md` and `rollback.md`.
 
-## Running ops scripts on the VPS
+## Host-side ops scripts (`scripts/ops/`)
 
-The box holds no repo checkout, but each successful deploy syncs `scripts/ops/` (host-side ops scripts) to `/opt/wren/scripts/` on the box. These scripts run ON the VPS: they call `docker exec` against the postgres container directly, and are available to an operator SSH'd in as `deploy@<ip>`.
+The box holds no repo checkout, but each successful deploy syncs `scripts/ops/` to `/opt/wren/scripts/` on the box (deploy step 6). This keeps ops scripts version-matched to the running deploy: the scripts always reflect the current schema and container names.
+
+### What goes in `scripts/ops/`
+
+Host-side scripts that run **on the VPS** and operate against the running stack directly (e.g. `docker exec` into the postgres container). They are not Docker-Context scripts and are not run from CI; an operator SSH's in and runs them.
+
+Scripts that run **CLI-side** (like `deploy.sh`, which drives the Docker Context from a checkout) stay in `scripts/` and never reach the box.
+
+### Current scripts
+
+| Script | Purpose |
+| --- | --- |
+| `list-users.sh` | List recent users (read-only) |
+| `delete-user.sh` | Delete a user (interactive, three confirmation gates) |
+
+### Usage
 
 ```sh
 ssh deploy@<vps-ip>
@@ -54,7 +77,11 @@ ssh deploy@<vps-ip>
 /opt/wren/scripts/delete-user.sh <username>
 ```
 
-The scripts are version-matched to the running deploy (synced after the health gate passes), so they always reflect the current schema and container names. Adding a new ops script: put it in `scripts/ops/`, make it executable (`chmod +x`), and it will be picked up by the next deploy's sync automatically.
+### Adding a new ops script
+
+1. Put it in `scripts/ops/` and make it executable (`chmod +x`).
+2. It is picked up automatically by the next deploy's sync (clean-replace: the directory is wiped and re-extracted, so removed scripts don't linger).
+3. Add a test in `scripts/tests/` (the `run_all.sh` harness auto-discovers `*_test.sh`).
 
 ## First-time bring-up
 
