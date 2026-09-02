@@ -31,15 +31,13 @@ The tunnel is the only ingress (zero inbound ports). CI renders `deployments/clo
 
 **How app config reaches the containers:** the deploy layers a deploy-only overlay (`docker-compose.deploy.yml`) that loads `.env.prod` into backend/mcp via `env_file` (read CLI-side and transmitted over the context: no file on the box) and passes `SESSION_JWT_SECRET`/`INTERNAL_API_TOKEN` through from the runner env. The base file's `env_file: .env` stays the local-dev source; the overlay is never used locally, so a stray dev `.env` cannot leak into a deploy.
 
-**GitHub repo secrets** (CI/CD only): `DEPLOY_SSH_KEY`, `DEPLOY_SERVER_IP`, `POSTGRES_PASSWORD`, `SESSION_JWT_SECRET`, `INTERNAL_API_TOKEN`, `DISCORD_WEBHOOK_URL`, `WREN_OAUTH_PRIVATE_KEY` (RAW PEM), `WREN_CLOUDFLARED_CREDENTIALS` (RAW `credentials.json`, not base64), plus the built-in `GITHUB_TOKEN` (GHCR). CD exports these into the deploy step's environment; Compose transmits them to the daemon as environment-sourced `secrets:`. Nothing is written to the box. The old `CF_TUNNEL_CREDENTIALS` and `CF_CERT_PEM` secrets are retired (`cert.pem` is a bring-up-only tunnel-management artifact).
+**GitHub repo secrets** (CI/CD only): `DEPLOY_SSH_KEY`, `DEPLOY_SERVER_IP`, `POSTGRES_PASSWORD`, `SESSION_JWT_SECRET`, `INTERNAL_API_TOKEN`, `DISCORD_WEBHOOK_URL`, `WREN_OAUTH_PRIVATE_KEY` (RAW PEM), `WREN_CLOUDFLARED_CREDENTIALS` (RAW `credentials.json`, not base64), plus the built-in `GITHUB_TOKEN` (GHCR). CD exports these into the deploy step's environment; Compose transmits them to the daemon as environment-sourced `secrets:`. Nothing is written to the box. (`cert.pem` is a bring-up-only tunnel-management artifact.)
 
 ## Rollback (CI-owned)
 
 On a failed health gate the deploy exits non-zero and CD runs a conditional rollback step: it reads the previous `/opt/wren/.deployed-sha` (via `./scripts/deploy.sh read-deployed-sha <ip>`), checks that SHA out in the runner, re-exports the env from that checkout, and re-runs the deploy once with `WREN_IMAGE_TAG=sha-<prev>`. Because the checkout moves to the previous SHA, this restores the previous **images AND config**. If no previous `.deployed-sha` exists (the first deploy), `read-deployed-sha` refuses and the workflow fails: there is nothing to roll back to.
 
 **Forward-only migrations (caveat):** a release carrying a schema migration can block re-deploying the previous image against the already-migrated DB. Migrations are forward-only; down-migrations are manual and out of scope. See `migration.md` and `rollback.md`.
-
-**First-deploy caveat:** on the very first rearchitected deploy the previous `.deployed-sha` (if the box was deployed under the old model) points at pre-rearchitecture code whose `deploy.sh` is incompatible with the context model; that rollback aborts cleanly at the old credential preflight. Clear the stale key at cutover (see `bring-up.md`) and treat the first deploy as fix-forward-only.
 
 ## First-time bring-up
 

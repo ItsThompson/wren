@@ -58,8 +58,6 @@ PermitRootLogin prohibit-password
 sudo systemctl restart ssh   # keep your current session open until you verify a new key-only login works
 ```
 
-> A prior `10-wren.conf` here set `PermitRootLogin no`, which shadowed the main `sshd_config` and silently blocked root key login. Correct the drop-in to `prohibit-password` so it is the single source of truth and root key login actually works.
-
 ### A3. Authorize keys for root and deploy (one key per target user)
 
 Keys are separated by target user: **`wren` → root, `wren_deploy` → deploy.** `scripts/deploy.sh` connects as `deploy` over an SSH Docker Context, so `deploy` needs Docker-group membership. Host bootstrap (Docker install, `/etc/docker/daemon.json`, the prune cron) is a one-time step in Phase A5 below, not part of the repeatable deploy, so passwordless sudo is only needed here at bring-up.
@@ -72,7 +70,7 @@ sudo mkdir -p /root/.ssh
 sudo tee /root/.ssh/authorized_keys < ~/.ssh/wren.pub
 sudo chmod 700 /root/.ssh && sudo chmod 600 /root/.ssh/authorized_keys
 
-# Deploy: authorize the wren_deploy key ONLY (do NOT also add the wren key here)
+# Deploy: authorize the wren_deploy key ONLY
 sudo mkdir -p /home/deploy/.ssh
 sudo tee /home/deploy/.ssh/authorized_keys < ~/.ssh/wren_deploy.pub
 sudo chown -R deploy:deploy /home/deploy/.ssh && sudo chmod 700 /home/deploy/.ssh && sudo chmod 600 /home/deploy/.ssh/authorized_keys
@@ -88,8 +86,6 @@ Final authorization state:
 /home/deploy/.ssh/authorized_keys └── wren_deploy.pub
 ```
 
-If `deploy` previously also carried the `wren` key (the old setup), remove it from `/home/deploy/.ssh/authorized_keys` so only `wren_deploy` remains — the keys must not cross target users.
-
 ### A4. fail2ban + unattended-upgrades
 
 ```sh
@@ -103,7 +99,7 @@ Verify a fresh **key-only** login as `root@<ip>` (via the `wren` key) **and** as
 
 ### A5. Host bootstrap (Docker, daemon config, prune cron)
 
-The repeatable deploy no longer mutates the host, so install Docker and its runtime config once here (as root/sudo on the box).
+The repeatable deploy never mutates the host, so install Docker and its runtime config once here (as root/sudo on the box).
 
 ```sh
 curl -fsSL https://get.docker.com | sudo sh          # Docker Engine + CLI
@@ -119,7 +115,7 @@ sudo tee /etc/docker/daemon.json >/dev/null <<'JSON'
 JSON
 sudo systemctl restart docker
 
-# Daily image/build-cache prune (was a deploy.sh phase; now a one-time cron):
+# Daily image/build-cache prune (one-time cron):
 sudo tee /etc/cron.daily/wren-docker-prune >/dev/null <<'CRON'
 #!/bin/sh
 echo "$(date -Is): docker system prune" >> /var/log/wren-docker-prune.log
@@ -199,7 +195,7 @@ gh secret set WREN_OAUTH_PRIVATE_KEY       < oauth_private.pem             # RAW
 gh secret set WREN_CLOUDFLARED_CREDENTIALS < ~/.cloudflared/<UUID>.json    # RAW credentials.json (NOT base64)
 ```
 
-> `WREN_CLOUDFLARED_CREDENTIALS` holds the RAW, unencoded `credentials.json` (environment-sourced secrets transmit raw content). Do NOT reuse the old base64 `CF_TUNNEL_CREDENTIALS` value; retire `CF_TUNNEL_CREDENTIALS` and `CF_CERT_PEM` (cert.pem is not needed at runtime).
+> `WREN_CLOUDFLARED_CREDENTIALS` holds the RAW, unencoded `credentials.json` (environment-sourced secrets transmit raw content). `cert.pem` is a bring-up-only tunnel-management artifact and is not needed at runtime.
 
 `GITHUB_TOKEN` is **not** set manually: it is the built-in Actions token. Ensure Actions is allowed to write packages (repo/org **Settings → Actions → Workflow permissions**), since `cd.yml` already requests `packages: write` and logs into GHCR with it.
 
@@ -230,15 +226,7 @@ DRY_RUN=1 DEPLOY_SHA=$(git rev-parse HEAD) ./scripts/deploy.sh <vps-ip> deploy  
 DEPLOY_SHA=$(git rev-parse HEAD) ./scripts/deploy.sh <vps-ip> deploy             # real
 ```
 
-The script asserts every required config/secret env var is set → pulls → runs **migrations pre-traffic** (`alembic upgrade head`; aborts on failure) → starts the stack under the `tunnels` profile over the context → **health-gates every service (~60s)** → records `/opt/wren/.deployed-sha` on success. On a failed gate it exits non-zero; CD (not the script) owns the rollback re-run.
-
-**Cutover caveat (one-time).** If the box was previously deployed under the old model it still holds a `/opt/wren/.deployed-sha` pointing at a **pre-rearchitecture** commit. A failed first deploy would check that SHA out and run the OLD `deploy.sh`, which aborts at its local-credential preflight (CD no longer stages `credentials.json`/`cert.pem`), so the rollback fails cleanly without mutating the box. Treat the first rearchitected deploy as **fix-forward-only**, and clear the stale key first so a failure refuses rollback cleanly rather than running incompatible old code:
-
-```sh
-ssh deploy@<vps-ip> 'rm -f /opt/wren/.deployed-sha'
-```
-
-Run the cutover in a low-traffic window (containers recreate; `pgdata`/`promdata` persist).
+The script asserts every required config/secret env var is set → pulls → runs **migrations pre-traffic** (`alembic upgrade head`; aborts on failure) → starts the stack under the `tunnels` profile over the context → **health-gates every service (~60s)** → records `/opt/wren/.deployed-sha` on success. On a failed gate it exits non-zero; CD (not the script) owns the rollback re-run. Run the first deploy in a low-traffic window (containers recreate; `pgdata`/`promdata` persist).
 
 ---
 

@@ -12,8 +12,6 @@ On a failed post-start health gate, `scripts/deploy.sh` exits non-zero WITHOUT a
 
 If no previous SHA is recorded (the very first deploy), `read-deployed-sha` refuses (non-zero) and the workflow fails: there is nothing to roll back to.
 
-At the one-time cutover to this model, clear any stale pre-rearchitecture `.deployed-sha` left by the old deploy (`ssh deploy@<ip> 'rm -f /opt/wren/.deployed-sha'`) so a failed first deploy refuses cleanly instead of checking out incompatible old code that aborts at the old credential preflight (see `bring-up.md`).
-
 ## Prerequisites
 
 - **`:sha-<prev>` images exist in GHCR.** CD dual-tags every build `:latest` + `:sha-<github.sha>`, so the previous SHA's images are pullable. Rollback fails if they were pruned from the registry.
