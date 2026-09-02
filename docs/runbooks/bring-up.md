@@ -13,7 +13,11 @@ None of these can be produced by the codebase or CI; the operator provides them:
    - **x86_64** is a drop-in for the current amd64-only first-party images: no multi-arch `cd.yml` change needed (an ARM box would require one).
    - **4 vCores** match the 4.0 vCPU ceiling budget; ample at ~5 users since limits are ceilings, not reservations, and builds run in CI, not here.
    - **80 GB NVMe** is enough for the current named volumes plus short-term Docker image churn; the prune cron in Phase A5 keeps unused layers bounded.
-2. **An SSH keypair** for the non-root `deploy` user (CD uses the private half).
+2. **Two SSH keypairs, separated by target user:**
+   - **`wren`** → root (`~/.ssh/wren` / `~/.ssh/wren.pub`). Operator/admin access; `ssh wren` lands you at `root@wren`.
+   - **`wren_deploy`** → the non-root `deploy` user (`~/.ssh/wren_deploy` / `~/.ssh/wren_deploy.pub`). CD uses the private half; `ssh wren-deploy` lands you at `deploy@wren`.
+
+   The two keys never cross target users: `wren` is authorized **only** for root, `wren_deploy` **only** for `deploy`.
 3. **A Cloudflare account** with the `usewren.com` zone (DNS managed by Cloudflare) and `cloudflared` installed locally to create the tunnel.
 4. **Production secret values:** a strong `POSTGRES_PASSWORD`, `SESSION_JWT_SECRET` (≥32 bytes), `INTERNAL_API_TOKEN`, a generated OAuth RSA private key, and a real Discord Incoming Webhook URL.
 5. **Admin rights on the GitHub repo** to set the CD repo secrets.
@@ -39,32 +43,52 @@ sudo ufw enable
 sudo ufw status verbose      # verify: default deny incoming, only OpenSSH allowed
 ```
 
-### A2. SSH hardening (key-only, no root)
+### A2. SSH hardening (key-only; key-based root)
+
+Password auth is refused for everyone, root included. Root login is allowed **by key only** (`prohibit-password`): the `wren` key authorizes root (A3 below); no password can ever log in as root.
 
 ```sh
 # /etc/ssh/sshd_config.d/10-wren.conf
 PubkeyAuthentication yes
 PasswordAuthentication no
-PermitRootLogin no
+PermitRootLogin prohibit-password
 ```
 
 ```sh
 sudo systemctl restart ssh   # keep your current session open until you verify a new key-only login works
 ```
 
-### A3. Non-root deploy user
+> A prior `10-wren.conf` here set `PermitRootLogin no`, which shadowed the main `sshd_config` and silently blocked root key login. Correct the drop-in to `prohibit-password` so it is the single source of truth and root key login actually works.
 
-`scripts/deploy.sh` connects as `deploy` over an SSH Docker Context, so `deploy` needs Docker-group membership. Host bootstrap (Docker install, `/etc/docker/daemon.json`, the prune cron) is a one-time step in Phase A5 below, not part of the repeatable deploy, so passwordless sudo is only needed here at bring-up.
+### A3. Authorize keys for root and deploy (one key per target user)
+
+Keys are separated by target user: **`wren` → root, `wren_deploy` → deploy.** `scripts/deploy.sh` connects as `deploy` over an SSH Docker Context, so `deploy` needs Docker-group membership. Host bootstrap (Docker install, `/etc/docker/daemon.json`, the prune cron) is a one-time step in Phase A5 below, not part of the repeatable deploy, so passwordless sudo is only needed here at bring-up.
 
 ```sh
 sudo adduser --disabled-password --gecos "" deploy
+
+# Root: authorize the wren key ONLY
+sudo mkdir -p /root/.ssh
+sudo tee /root/.ssh/authorized_keys < ~/.ssh/wren.pub
+sudo chmod 700 /root/.ssh && sudo chmod 600 /root/.ssh/authorized_keys
+
+# Deploy: authorize the wren_deploy key ONLY (do NOT also add the wren key here)
 sudo mkdir -p /home/deploy/.ssh
-# paste the deploy public key:
-echo "ssh-ed25519 AAAA... deploy@wren" | sudo tee /home/deploy/.ssh/authorized_keys
+sudo tee /home/deploy/.ssh/authorized_keys < ~/.ssh/wren_deploy.pub
 sudo chown -R deploy:deploy /home/deploy/.ssh && sudo chmod 700 /home/deploy/.ssh && sudo chmod 600 /home/deploy/.ssh/authorized_keys
+
 echo "deploy ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/deploy && sudo chmod 440 /etc/sudoers.d/deploy
 sudo usermod -aG docker deploy   # (docker is installed in Phase A5; re-run if the group did not exist yet)
 ```
+
+Final authorization state:
+
+```text
+/root/.ssh/authorized_keys        └── wren.pub
+/home/deploy/.ssh/authorized_keys └── wren_deploy.pub
+```
+
+If `deploy` previously also carried the `wren` key (the old setup), remove it from `/home/deploy/.ssh/authorized_keys` so only `wren_deploy` remains — the keys must not cross target users.
 
 ### A4. fail2ban + unattended-upgrades
 
@@ -75,7 +99,7 @@ sudo systemctl enable --now fail2ban                 # default sshd jail
 sudo dpkg-reconfigure -plow unattended-upgrades      # enable automatic security updates
 ```
 
-Verify a fresh **key-only** login as `deploy@<ip>` works before closing your root session.
+Verify a fresh **key-only** login as `root@<ip>` (via the `wren` key) **and** as `deploy@<ip>` (via the `wren_deploy` key) works before closing your current session.
 
 ### A5. Host bootstrap (Docker, daemon config, prune cron)
 
@@ -166,7 +190,7 @@ CD (`cd.yml`) needs these to build/push images and deploy. Set via the repo **Se
 
 ```sh
 gh secret set DEPLOY_SERVER_IP             --body "<vps-ip>"
-gh secret set DEPLOY_SSH_KEY               < ~/.ssh/deploy_ed25519         # deploy user's PRIVATE key
+gh secret set DEPLOY_SSH_KEY               < ~/.ssh/wren_deploy             # deploy user's PRIVATE key (wren_deploy)
 gh secret set POSTGRES_PASSWORD            --body "<generated hex>"
 gh secret set SESSION_JWT_SECRET           --body "<generated>"
 gh secret set INTERNAL_API_TOKEN           --body "<generated>"
