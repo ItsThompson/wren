@@ -19,8 +19,8 @@ CD registers the context, exports the config/secret env (committed `.env.prod` +
 3. **Migrations (pre-traffic):** start postgres, wait healthy, then `... run --rm backend alembic upgrade head`. Aborts the deploy on failure. See `migration.md`.
 4. **Start:** `docker --context wren compose --profile tunnels up -d`.
 5. **Health gate:** poll `docker --context wren compose ps` health across all services (~60s).
-6. **Sync ops scripts:** `tar` `scripts/ops/` over SSH to `/opt/wren/scripts/` on the box (clean-replace: wipe + extract). The box holds no repo checkout, so host-side ops scripts (`list-users.sh`, `delete-user.sh`, etc.) are otherwise absent; this keeps them version-matched to the running deploy. Only runs after the gate passes.
-7. **Record on success:** the ONE remaining `ssh` line writes the deployed SHA to `/opt/wren/.deployed-sha` (the rollback key). On a failed gate the script exits non-zero and CD owns the rollback (below); the script never re-deploys itself.
+6. **Sync ops scripts:** `tar` `scripts/ops/` over SSH to `/opt/wren/scripts/` on the box (atomic swap: extract to a temp dir, then replace). The box holds no repo checkout, so host-side ops scripts (`list-users.sh`, `delete-user.sh`, etc.) are otherwise absent; this keeps them version-matched to the running deploy. Only runs after the gate passes, and a sync failure is non-fatal (warning only): the box keeps its previous scripts and the deploy proceeds.
+7. **Record on success:** writes the deployed SHA to `/opt/wren/.deployed-sha` (the rollback key) via `ssh`. On a failed gate the script exits non-zero and CD owns the rollback (below); the script never re-deploys itself.
 
 Host bootstrap (Docker install, `daemon.json`, prune cron, the deploy user and docker group, the Docker Context) is a one-time bring-up concern (`bring-up.md`), not part of a deploy. Not zero-downtime: there is a brief per-deploy gap while containers recreate, accepted at this scale (~5 users).
 

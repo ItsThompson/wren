@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Tests for scripts/list-users.sh and scripts/delete-user.sh (VPS user ops).
+# Tests for scripts/ops/list-users.sh and scripts/ops/delete-user.sh (VPS user ops).
 #
 # Plain-bash harness (no external test runner), mirroring deploy_test.sh.
 # Exercises everything verifiable WITHOUT a live VPS or postgres container:

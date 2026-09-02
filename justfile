@@ -183,9 +183,9 @@ codegen-mcp:
 deploy ip user='deploy':
     ./scripts/deploy.sh {{ip}} {{user}}
 
-# Print the deploy plan (every docker --context compose line + the single ssh
-# line) without touching a server. The preflight runs, so the required
-# config/secret env vars must be set (even dummy values) to reach the plan.
+# Print the deploy plan (every docker --context compose line + the ssh lines)
+# without touching a server. The preflight runs, so the required config/secret
+# env vars must be set (even dummy values) to reach the plan.
 deploy-plan ip user='deploy':
     DRY_RUN=1 ./scripts/deploy.sh {{ip}} {{user}}
 

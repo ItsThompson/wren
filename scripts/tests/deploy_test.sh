@@ -143,7 +143,8 @@ test_dry_run_uses_docker_context_and_no_ssh_heredoc() {
   out="$(main 203.0.113.10 deploy 2>&1)"
   # Transport is the Docker Context, not ssh-bash.
   contains "${out}" "docker --context wren compose" || return 1
-  # The ONLY ssh line is the .deployed-sha write.
+  # .deployed-sha write appears in the plan (ssh is also used by the ops scripts
+  # sync, but that has no direct ssh line in dry-run; it just logs a message).
   contains "${out}" ".deployed-sha" || return 1
   not_contains "${out}" "bash -s" || return 1
   not_contains "${out}" "REMOTE" || return 1
@@ -159,9 +160,9 @@ test_dry_run_includes_ops_scripts_sync() {
   DEPLOY_SHA="cafef00d"
   local out
   out="$(main 203.0.113.10 deploy 2>&1)"
-  # The sync step appears in the plan and uses tar (not scp).
+  # The sync step appears in the plan with its transport (tar, not scp).
   contains "${out}" "Sync ops scripts" || return 1
-  contains "${out}" "scripts/ops/" || return 1
+  contains "${out}" "would tar scripts/ops/" || return 1
   # The sync step runs AFTER the health gate (which passes in dry-run).
   local gate_line sync_line
   gate_line="$(printf '%s\n' "${out}" | grep -n 'Health gate' | head -1 | cut -d: -f1)"
@@ -335,6 +336,8 @@ test_failed_gate_nonzero_exit_and_no_deployed_sha_write() {
   rc=$?
   [[ ${rc} -ne 0 ]] || { echo "expected non-zero exit"; rm -f "${rcalls}"; return 1; }
   contains "${out}" "health gate FAILED" || { rm -f "${rcalls}"; return 1; }
+  # Ops scripts sync is NEVER run on a failed gate (it runs after the gate).
+  not_contains "${out}" "Sync ops scripts" || { echo "ops sync ran on failed gate"; rm -f "${rcalls}"; return 1; }
   not_contains "$(cat "${rcalls}")" ".deployed-sha" || { echo ".deployed-sha written on failed gate"; rm -f "${rcalls}"; return 1; }
   rm -f "${rcalls}"
 }
