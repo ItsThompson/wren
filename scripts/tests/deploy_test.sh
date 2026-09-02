@@ -143,13 +143,34 @@ test_dry_run_uses_docker_context_and_no_ssh_heredoc() {
   out="$(main 203.0.113.10 deploy 2>&1)"
   # Transport is the Docker Context, not ssh-bash.
   contains "${out}" "docker --context wren compose" || return 1
-  # The ONLY ssh line is the .deployed-sha write.
+  # .deployed-sha write appears in the plan (ssh is also used by the ops scripts
+  # sync, but that has no direct ssh line in dry-run; it just logs a message).
   contains "${out}" ".deployed-sha" || return 1
   not_contains "${out}" "bash -s" || return 1
   not_contains "${out}" "REMOTE" || return 1
   not_contains "${out}" "envsubst" || return 1
   not_contains "${out}" "scp" || return 1
   not_contains "${out}" "chown" || return 1
+}
+
+test_dry_run_includes_ops_scripts_sync() {
+  source "${DEPLOY}"
+  export_required_secret_env
+  DRY_RUN=1
+  DEPLOY_SHA="cafef00d"
+  local out
+  out="$(main 203.0.113.10 deploy 2>&1)"
+  # The sync step appears in the plan with its transport (tar, not scp).
+  contains "${out}" "Sync ops scripts" || return 1
+  contains "${out}" "would tar scripts/ops/" || return 1
+  # The sync step runs AFTER the health gate (which passes in dry-run).
+  local gate_line sync_line
+  gate_line="$(printf '%s\n' "${out}" | grep -n 'Health gate' | head -1 | cut -d: -f1)"
+  sync_line="$(printf '%s\n' "${out}" | grep -n 'Sync ops scripts' | head -1 | cut -d: -f1)"
+  [[ -n "${gate_line}" && -n "${sync_line}" ]] \
+    || { echo "missing gate(${gate_line}) or sync(${sync_line}) marker"; return 1; }
+  [[ "${gate_line}" -lt "${sync_line}" ]] \
+    || { echo "sync (${sync_line}) should be after gate (${gate_line})"; return 1; }
 }
 
 test_dry_run_migrations_before_start() {
@@ -294,6 +315,8 @@ test_failed_gate_no_internal_redeploy() {
   grep -qx 'up -d --force-recreate' "${ccalls}" || { echo "no start"; rm -f "${ccalls}" "${rcalls}"; return 1; }
   # .deployed-sha is NEVER written on a failed gate.
   not_contains "$(cat "${rcalls}")" ".deployed-sha" || { rm -f "${ccalls}" "${rcalls}"; return 1; }
+  # Ops scripts sync is NEVER run on a failed gate (it runs after the gate);
+  # the gate's failure log is captured in main's output, not the sync log.
   rm -f "${ccalls}" "${rcalls}"
 }
 
@@ -313,6 +336,8 @@ test_failed_gate_nonzero_exit_and_no_deployed_sha_write() {
   rc=$?
   [[ ${rc} -ne 0 ]] || { echo "expected non-zero exit"; rm -f "${rcalls}"; return 1; }
   contains "${out}" "health gate FAILED" || { rm -f "${rcalls}"; return 1; }
+  # Ops scripts sync is NEVER run on a failed gate (it runs after the gate).
+  not_contains "${out}" "Sync ops scripts" || { echo "ops sync ran on failed gate"; rm -f "${rcalls}"; return 1; }
   not_contains "$(cat "${rcalls}")" ".deployed-sha" || { echo ".deployed-sha written on failed gate"; rm -f "${rcalls}"; return 1; }
   rm -f "${rcalls}"
 }
@@ -350,6 +375,7 @@ main_tests() {
   run_test test_gate_unhealthy_empty_or_unparseable_is_not_healthy
   run_test test_assert_secret_env_present
   run_test test_dry_run_uses_docker_context_and_no_ssh_heredoc
+  run_test test_dry_run_includes_ops_scripts_sync
   run_test test_dry_run_migrations_before_start
   run_test test_dry_run_pull_migrate_up_use_overlay_and_profile
   run_test test_compose_tunnel_overlay_declares_environment_sourced_secrets_and_ingress

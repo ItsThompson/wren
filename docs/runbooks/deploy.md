@@ -2,6 +2,14 @@
 
 Docker Context deploy of the whole stack to the single VPS. The Compose CLI runs in CI (or an operator checkout); the engine runs on the VPS, reached over a Docker Context (`ssh://deploy@<ip>`). All config and secret content is sourced CLI-side and transmitted to the daemon, so the box holds no `.env`, OAuth key, or rendered config. Driven by `scripts/deploy.sh`; run automatically by CD on merge to `main`, or manually.
 
+## How deployment works
+
+Deployment is a two-phase, two-machine process:
+
+- **Build (CI runner):** CD (`cd.yml`) discovers first-party services from `docker-compose.yml`, builds each image with Buildx, and pushes two tags to GHCR: `:latest` (what the next deploy pulls) and `:sha-<SHA>` (immutable, for rollback).
+- **Deploy (CI runner -> VPS):** CD registers a Docker Context (`ssh://deploy@<ip>`) so Compose CLI commands run on the runner but target the engine on the VPS. It sources all config and secrets CLI-side (committed `.env.prod` + rendered config files + GitHub secrets) and hands off to `scripts/deploy.sh`, which drives the full lifecycle over the context: pull, migrate, start, health-gate, sync ops scripts, record SHA.
+- **The box is stateless:** no repo checkout, no `.env`, no secret files. Only Docker containers, named volumes (`pgdata`, `promdata`), `/opt/wren/.deployed-sha` (rollback key), and `/opt/wren/scripts/` (ops scripts) persist on the VPS.
+
 ## What a deploy does
 
 CD registers the context, exports the config/secret env (committed `.env.prod` + files rendered in the runner + GitHub secrets), and runs `scripts/deploy.sh <server-ip>`, which:
@@ -11,7 +19,8 @@ CD registers the context, exports the config/secret env (committed `.env.prod` +
 3. **Migrations (pre-traffic):** start postgres, wait healthy, then `... run --rm backend alembic upgrade head`. Aborts the deploy on failure. See `migration.md`.
 4. **Start:** `docker --context wren compose --profile tunnels up -d`.
 5. **Health gate:** poll `docker --context wren compose ps` health across all services (~60s).
-6. **Record on success:** the ONE remaining `ssh` line writes the deployed SHA to `/opt/wren/.deployed-sha` (the rollback key). On a failed gate the script exits non-zero and CD owns the rollback (below); the script never re-deploys itself.
+6. **Sync ops scripts:** `tar` `scripts/ops/` over SSH to `/opt/wren/scripts/` on the box (atomic swap: extract to a temp dir, then replace). The box holds no repo checkout, so host-side ops scripts (`list-users.sh`, `delete-user.sh`, etc.) are otherwise absent; this keeps them version-matched to the running deploy. Only runs after the gate passes, and a sync failure is non-fatal (warning only): the box keeps its previous scripts and the deploy proceeds.
+7. **Record on success:** writes the deployed SHA to `/opt/wren/.deployed-sha` (the rollback key) via `ssh`. On a failed gate the script exits non-zero and CD owns the rollback (below); the script never re-deploys itself.
 
 Host bootstrap (Docker install, `daemon.json`, prune cron, the deploy user and docker group, the Docker Context) is a one-time bring-up concern (`bring-up.md`), not part of a deploy. Not zero-downtime: there is a brief per-deploy gap while containers recreate, accepted at this scale (~5 users).
 
@@ -38,6 +47,34 @@ The tunnel is the only ingress (zero inbound ports). CI renders `deployments/clo
 On a failed health gate the deploy exits non-zero and CD runs a conditional rollback step: it reads the previous `/opt/wren/.deployed-sha` (via `./scripts/deploy.sh read-deployed-sha <ip>`), checks that SHA out in the runner, re-exports the env from that checkout, and re-runs the deploy once with `WREN_IMAGE_TAG=sha-<prev>`. Because the checkout moves to the previous SHA, this restores the previous **images AND config**. If no previous `.deployed-sha` exists (the first deploy), `read-deployed-sha` refuses and the workflow fails: there is nothing to roll back to.
 
 **Forward-only migrations (caveat):** a release carrying a schema migration can block re-deploying the previous image against the already-migrated DB. Migrations are forward-only; down-migrations are manual and out of scope. See `migration.md` and `rollback.md`.
+
+## Host-side ops scripts (`scripts/ops/`)
+
+The box holds no repo checkout, but each successful deploy syncs `scripts/ops/` to `/opt/wren/scripts/` on the box (deploy step 6). This keeps ops scripts version-matched to the running deploy: the scripts always reflect the current schema and container names.
+
+### What goes in `scripts/ops/`
+
+Host-side scripts that run **on the VPS** and operate against the running stack directly (e.g. `docker exec` into the postgres container). They are not Docker-Context scripts and are not run from CI; an operator SSH's in and runs them.
+
+Scripts that run **CLI-side** (like `deploy.sh`, which drives the Docker Context from a checkout) stay in `scripts/` and never reach the box.
+
+### Usage
+
+```sh
+ssh deploy@<vps-ip>
+
+# List recent users:
+/opt/wren/scripts/list-users.sh 20
+
+# Delete a user (interactive, three confirmation gates):
+/opt/wren/scripts/delete-user.sh <username>
+```
+
+### Adding a new ops script
+
+1. Put it in `scripts/ops/` and make it executable (`chmod +x`).
+2. It is picked up automatically by the next deploy's sync (clean-replace: the directory is wiped and re-extracted, so removed scripts don't linger).
+3. Add a test in `scripts/tests/` (the `run_all.sh` harness auto-discovers `*_test.sh`).
 
 ## First-time bring-up
 

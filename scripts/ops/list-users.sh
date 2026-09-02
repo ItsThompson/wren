@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # =============================================================================
-# scripts/list-users.sh
+# scripts/ops/list-users.sh
 #
 # List the most recent Wren users (read-only). Runs ON the VPS, where the
-# postgres container lives; it is not a Docker-Context script.
+# postgres container lives; it is not a Docker-Context script. Synced to the
+# box at /opt/wren/scripts/ by deploy.sh after each healthy deploy, so it is
+# available for an operator SSH'd in as deploy@<ip>.
 #
-# Usage:
-#   ./scripts/list-users.sh [limit]
+# Usage (on the VPS):
+#   /opt/wren/scripts/list-users.sh [limit]
 #
 # Env:
 #   WREN_PG_CONTAINER  postgres container name (default wren-postgres-1)

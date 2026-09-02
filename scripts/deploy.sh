@@ -21,7 +21,7 @@
 #   DRY_RUN=1            print the phase plan (every compose/ssh line) without
 #                        executing.
 #   WREN_DOCKER_CONTEXT  Docker context name (default `wren`); CI registers it.
-#   WREN_REMOTE_DIR      remote dir holding .deployed-sha (default /opt/wren).
+#   WREN_REMOTE_DIR      remote dir holding .deployed-sha and scripts/ (default /opt/wren).
 #
 # Required config/secret env vars (asserted before ANY compose call, because the
 # migration `run` materializes configs/secrets exactly like `up`):
@@ -85,9 +85,10 @@ log() { printf '%s\n' "$*" >&2; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 is_dry_run() { [[ "${DRY_RUN}" == "1" ]]; }
 
-# The ONLY ssh boundary that remains: read/write /opt/wren/.deployed-sha (the
-# settled rollback key). Everything else goes through the Docker Context. Kept a
-# thin wrapper so the deploy_test.sh harness can stub it.
+# The ssh boundaries that remain: read/write /opt/wren/.deployed-sha (the
+# settled rollback key) and sync ops scripts to /opt/wren/scripts/. Everything
+# else goes through the Docker Context. Kept a thin wrapper so the deploy_test.sh
+# harness can stub it.
 remote() {
   if is_dry_run; then
     printf '[dry-run][ssh %s] %s\n' "${SSH_TARGET}" "$*" >&2
@@ -272,6 +273,30 @@ read_deployed_sha() {
   printf '%s\n' "${sha}"
 }
 
+# --- Ops scripts sync -------------------------------------------------------
+
+# Sync scripts/ops/ -> ${REMOTE_DIR}/scripts/ on the box (no checkout there, so
+# these scripts are otherwise absent). Clean-replace keeps them version-matched
+# and drops scripts deleted from the repo. Runs only after the health gate, so a
+# failed deploy never touches scripts/. Uses tar over SSH (no scp on the box).
+#
+# Extract to a temp dir, then swap (rm old + mv temp): a failed transfer leaves
+# the previous scripts intact (rm/mv run only after a successful extract).
+# Non-fatal: the if ! guard suppresses set -e; a failure logs a warning
+# and the deploy continues to record_deploy.
+sync_ops_scripts() {
+  log "==> Sync ops scripts to box (${REMOTE_DIR}/scripts/)"
+  if is_dry_run; then
+    log "    [dry-run] would tar scripts/ops/ -> ${SSH_TARGET}:${REMOTE_DIR}/scripts/"
+    return 0
+  fi
+  if ! tar -C "${REPO_ROOT}/scripts/ops" -cf - . \
+    | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
+      "tmp=\$(mktemp -d) && tar -C \"\${tmp}\" -xf - && rm -rf '${REMOTE_DIR}/scripts' && mv \"\${tmp}\" '${REMOTE_DIR}/scripts' || { rm -rf \"\${tmp}\" 2>/dev/null; exit 1; }"; then
+    log "    WARNING: ops scripts sync failed (box keeps previous scripts); deploy continues"
+  fi
+}
+
 # --- Success bookkeeping ----------------------------------------------------
 
 record_deploy() {
@@ -279,7 +304,7 @@ record_deploy() {
     log "    no DEPLOY_SHA resolved; skipping .deployed-sha write"
     return 0
   fi
-  # The one remaining ssh line: settle the rollback key on the box.
+  # Settle the rollback key on the box via ssh.
   remote "printf '%s\n' '${CURRENT_SHA}' > ${REMOTE_DIR}/.deployed-sha"
   log "    recorded deployed SHA: ${CURRENT_SHA}"
 }
@@ -308,6 +333,7 @@ main() {
     die "deploy failed the health gate on context ${CONTEXT_NAME}"
   fi
 
+  sync_ops_scripts
   record_deploy
   log "=== Deploy complete: ${CURRENT_SHA:-unknown} on context ${CONTEXT_NAME} ==="
 }
