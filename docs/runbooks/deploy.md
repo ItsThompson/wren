@@ -58,13 +58,6 @@ Host-side scripts that run **on the VPS** and operate against the running stack 
 
 Scripts that run **CLI-side** (like `deploy.sh`, which drives the Docker Context from a checkout) stay in `scripts/` and never reach the box.
 
-### Current scripts
-
-| Script | Purpose |
-| --- | --- |
-| `list-users.sh` | List recent users (read-only) |
-| `delete-user.sh` | Delete a user (interactive, three confirmation gates) |
-
 ### Usage
 
 ```sh
