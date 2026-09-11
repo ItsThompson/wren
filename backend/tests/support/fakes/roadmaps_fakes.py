@@ -67,6 +67,12 @@ class InMemoryRoadmapRepository:
         # own readability rule before using the result.
         return self._by_id.get(roadmap_id)
 
+    async def get_owned_for_update(self, roadmap_id: str, owner_id: str) -> RoadmapRecord | None:
+        return await self.get_owned(roadmap_id, owner_id)
+
+    async def get_for_update(self, roadmap_id: str) -> RoadmapRecord | None:
+        return await self.get(roadmap_id)
+
     async def list_owned(self, owner_id: str) -> list[RoadmapRecord]:
         # Mirror the real query: the owner's roadmaps at any status, newest-touched
         # first (updated_at desc, id asc tiebreak).

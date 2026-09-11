@@ -184,6 +184,9 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
 # (visibility / archive / delete) and the web-only follow / deadline routes are
 # external-app only and have no entry here.
 INTERNAL_ROUTE_ACCESS: RouteRegistry = {
+    # Listing reads are mirrored for the MCP roadmap list and profile tools.
+    RouteKey(method="GET", path="/me/dashboard"): AccessLevel.INTERNAL_TRUSTED,
+    RouteKey(method="GET", path="/users/{handle}"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="POST", path="/roadmaps"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}"): AccessLevel.INTERNAL_TRUSTED,
     RouteKey(method="PATCH", path="/roadmaps/{roadmap_id}"): AccessLevel.INTERNAL_TRUSTED,

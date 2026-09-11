@@ -27,8 +27,10 @@ from wren.core.route_registry import App
 from wren.core.settings import INTERNAL_PORT, INTERNAL_SERVICE, build_app_settings
 from wren.progress.router import create_progress_router
 from wren.progress.wiring import build_progress_service_provider
+from wren.roadmaps.listing_api import create_listing_router
 from wren.roadmaps.router import create_roadmaps_router
 from wren.roadmaps.wiring import (
+    build_listing_service_provider,
     build_roadmap_read_service_provider,
     build_roadmap_service_provider,
 )
@@ -56,9 +58,11 @@ internal_progress_router = create_progress_router(
     build_progress_service_provider(), app=App.INTERNAL
 )
 
+internal_listing_router = create_listing_router(build_listing_service_provider(), app=App.INTERNAL)
+
 app: FastAPI = create_app(
     settings,
-    routers=[internal_roadmaps_router, internal_progress_router],
+    routers=[internal_roadmaps_router, internal_listing_router, internal_progress_router],
     readiness_checks=[db_readiness_check(db.engine)],
     exception_handlers=build_exception_handlers(),
     lifespan=create_db_lifespan(db.engine),

@@ -147,6 +147,19 @@ async def test_dashboard_authored_and_followed_overlap() -> None:
     assert [card.id for card in dashboard.followed] == ["r-ada"]
 
 
+async def test_dashboard_omits_followed_private_and_draft_cards() -> None:
+    service = _service(
+        _roadmap("r-private", BOB, status=RoadmapStatus.PUBLISHED, visibility=Visibility.PRIVATE),
+        _roadmap("r-draft", BOB, status=RoadmapStatus.DRAFT, visibility=Visibility.PUBLIC),
+        _roadmap("r-public", BOB, status=RoadmapStatus.PUBLISHED, visibility=Visibility.PUBLIC),
+        followed_reader=_follows("r-private", "r-draft", "r-public"),
+    )
+
+    dashboard = await service.dashboard(ADA)
+
+    assert [card.id for card in dashboard.followed] == ["r-public"]
+
+
 async def test_dashboard_skips_followed_id_without_a_live_record() -> None:
     # Defensive: a followed id with no roadmap record is dropped, not crashed.
     service = _service(followed_reader=_follows("ghost-roadmap"))

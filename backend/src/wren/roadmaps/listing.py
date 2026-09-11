@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING
 
 from wren.core.errors import NotFound
 from wren.core.observability import track_failures
+from wren.roadmaps.access import can_read
 from wren.roadmaps.list_schemas import Dashboard, Profile, RoadmapCard
 from wren.roadmaps.schemas import Roadmap
 
@@ -118,7 +119,15 @@ class ListingService:
         followed_ids = await self._followed_reader(user_id)
         records = await self._repo.list_by_ids(followed_ids)
         by_id = {record.id: record for record in records}
-        return [_to_card(by_id[rid]) for rid in followed_ids if rid in by_id]
+        cards: list[RoadmapCard] = []
+        for roadmap_id in followed_ids:
+            record = by_id.get(roadmap_id)
+            if record is None:
+                continue
+            roadmap = Roadmap.model_validate(record.document)
+            if can_read(roadmap, user_id):
+                cards.append(_to_card(record))
+        return cards
 
 
 def _to_card(record: RoadmapRecord) -> RoadmapCard:

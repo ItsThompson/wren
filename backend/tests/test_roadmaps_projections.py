@@ -68,14 +68,17 @@ def test_overview_all_checked_is_100_percent() -> None:
     assert all(section.percent == 100 for section in overview.sections)
 
 
-def test_overview_concise_and_detailed_are_identical() -> None:
-    # Overview is the orientation summary: it carries no verbose free-text to trim,
-    # so the format flag (accepted for tool parity) produces the same body.
+def test_overview_detailed_exposes_stored_metadata_and_path() -> None:
     roadmap = build_read_roadmap()
     checked = frozenset({CHK_ARRAYS_READ})
     concise = projections.build_overview(roadmap, checked, fmt=ResponseFormat.CONCISE)
     detailed = projections.build_overview(roadmap, checked, fmt=ResponseFormat.DETAILED)
-    assert concise.model_dump() == detailed.model_dump()
+    assert concise.details is None
+    assert detailed.details is not None
+    assert detailed.details.owner == roadmap.owner
+    assert detailed.details.description == roadmap.description
+    assert detailed.details.subject_tags == roadmap.subject_tags
+    assert detailed.details.suggested_path == roadmap.suggested_path
 
 
 # --- build_node_detail ------------------------------------------------------

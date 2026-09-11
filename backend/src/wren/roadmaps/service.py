@@ -107,28 +107,26 @@ class RoadmapService:
         nothing is persisted; on success the ``revision`` bumps by one and only the
         changed nodes (plus any de-dup remap) are echoed.
         """
-        draft = await self._load_writable_draft(user_id, roadmap_id)
-        if draft.revision != revision:
-            raise Conflict(
-                f"Your edit targeted revision {revision} but the current revision is "
-                f"{draft.revision}. Re-read and retry.",
-                code=ErrorCode.STALE_REVISION,
-                instance=f"/roadmaps/{roadmap_id}",
-            )
-        try:
-            outcome = patch.apply(draft, operations)
-        except patch.PatchError as err:
-            # A model-recoverable op failure (unknown ID naming valid siblings, or
-            # a cycle-creating edge explaining the cycle) -> field-level 422.
-            raise Validation(
-                err.message,
-                fields={err.field: err.message},
-                instance=f"/roadmaps/{roadmap_id}",
-            ) from err
-        patched = outcome.roadmap.model_copy(
-            update={"revision": draft.revision + 1, "updated_at": self._clock()}
-        )
         async with transaction(self._repo):
+            draft = await self._load_writable_draft(user_id, roadmap_id, for_update=True)
+            if draft.revision != revision:
+                raise Conflict(
+                    f"Your edit targeted revision {revision} but the current revision is "
+                    f"{draft.revision}. Re-read and retry.",
+                    code=ErrorCode.STALE_REVISION,
+                    instance=f"/roadmaps/{roadmap_id}",
+                )
+            try:
+                outcome = patch.apply(draft, operations)
+            except patch.PatchError as err:
+                raise Validation(
+                    err.message,
+                    fields={err.field: err.message},
+                    instance=f"/roadmaps/{roadmap_id}",
+                ) from err
+            patched = outcome.roadmap.model_copy(
+                update={"revision": draft.revision + 1, "updated_at": self._clock()}
+            )
             await self._repo.save(patched)
         _log.info(
             "roadmap_patched",
@@ -169,26 +167,23 @@ class RoadmapService:
         flip a draft public/private. Visibility is a web-only lifecycle toggle,
         changed only through :meth:`set_visibility`.
         """
-        draft = await self._load_writable_draft(user_id, roadmap_id)
-        if draft.revision != revision:
-            raise Conflict(
-                f"Your import targeted revision {revision} but the current revision is "
-                f"{draft.revision}. Re-read and retry.",
-                code=ErrorCode.STALE_REVISION,
-                instance=f"/roadmaps/{roadmap_id}",
-            )
-        # Rebuild from the full document using the same pure assembly as create: the
-        # roadmap ID is the (unchanged) route param, so no re-mint/collision check is
-        # needed. Preserve created_at + bump the revision (assemble_draft resets both).
-        assembled = assemble_draft(doc, roadmap_id, owner=user_id, now=self._clock())
-        replaced = assembled.roadmap.model_copy(
-            update={
-                "revision": draft.revision + 1,
-                "created_at": draft.created_at,
-                "visibility": draft.visibility,
-            }
-        )
         async with transaction(self._repo):
+            draft = await self._load_writable_draft(user_id, roadmap_id, for_update=True)
+            if draft.revision != revision:
+                raise Conflict(
+                    f"Your import targeted revision {revision} but the current revision is "
+                    f"{draft.revision}. Re-read and retry.",
+                    code=ErrorCode.STALE_REVISION,
+                    instance=f"/roadmaps/{roadmap_id}",
+                )
+            assembled = assemble_draft(doc, roadmap_id, owner=user_id, now=self._clock())
+            replaced = assembled.roadmap.model_copy(
+                update={
+                    "revision": draft.revision + 1,
+                    "created_at": draft.created_at,
+                    "visibility": draft.visibility,
+                }
+            )
             await self._repo.save(replaced)
         _log.info(
             "roadmap_replaced",
@@ -213,19 +208,19 @@ class RoadmapService:
         immutable (structural writes on a non-draft are refused by the same
         :meth:`_load_owned_draft` guard).
         """
-        draft = await self._load_owned_draft(user_id, roadmap_id)
-        violations = validate_structure(draft)
-        if violations:
-            rules = "rule" if len(violations) == 1 else "rules"
-            raise Validation(
-                f"{len(violations)} structural {rules} failed.",
-                violations=violations,
-                instance=f"/roadmaps/{roadmap_id}",
-            )
-        published = draft.model_copy(
-            update={"status": RoadmapStatus.PUBLISHED, "updated_at": self._clock()}
-        )
         async with transaction(self._repo):
+            draft = await self._load_owned_draft(user_id, roadmap_id, for_update=True)
+            violations = validate_structure(draft)
+            if violations:
+                rules = "rule" if len(violations) == 1 else "rules"
+                raise Validation(
+                    f"{len(violations)} structural {rules} failed.",
+                    violations=violations,
+                    instance=f"/roadmaps/{roadmap_id}",
+                )
+            published = draft.model_copy(
+                update={"status": RoadmapStatus.PUBLISHED, "updated_at": self._clock()}
+            )
             await self._repo.save(published)
         _log.info("roadmap_published", roadmap_id=roadmap_id, user_id=user_id)
         return published
@@ -276,16 +271,16 @@ class RoadmapService:
         and all content are untouched (a smuggled structural field is rejected at
         the wire boundary by :meth:`MetadataEditRequest.reject_structural_fields`).
         """
-        roadmap = await self._load_owned(user_id, roadmap_id)
-        updates: dict[str, object] = {"updated_at": self._clock()}
-        if title is not None:
-            updates["title"] = title
-        if description is not None:
-            updates["description"] = description
-        if subject_tags is not None:
-            updates["subject_tags"] = list(subject_tags)
-        edited = roadmap.model_copy(update=updates)
         async with transaction(self._repo):
+            roadmap = await self._load_owned(user_id, roadmap_id, for_update=True)
+            updates: dict[str, object] = {"updated_at": self._clock()}
+            if title is not None:
+                updates["title"] = title
+            if description is not None:
+                updates["description"] = description
+            if subject_tags is not None:
+                updates["subject_tags"] = list(subject_tags)
+            edited = roadmap.model_copy(update=updates)
             await self._repo.save(edited)
         _log.info("roadmap_metadata_edited", roadmap_id=roadmap_id, user_id=user_id)
         return edited
@@ -303,9 +298,11 @@ class RoadmapService:
         never bumps the structural ``revision`` or alters any content. Setting the
         current value again is an idempotent no-op beyond the timestamp.
         """
-        roadmap = await self._load_owned(user_id, roadmap_id)
-        updated = roadmap.model_copy(update={"visibility": visibility, "updated_at": self._clock()})
         async with transaction(self._repo):
+            roadmap = await self._load_owned(user_id, roadmap_id, for_update=True)
+            updated = roadmap.model_copy(
+                update={"visibility": visibility, "updated_at": self._clock()}
+            )
             await self._repo.save(updated)
         _log.info(
             "roadmap_visibility_set",
@@ -326,17 +323,17 @@ class RoadmapService:
         roadmap raises ``Conflict``. Archiving alters no content and keeps the
         structural ``revision``.
         """
-        roadmap = await self._load_owned(user_id, roadmap_id)
-        if roadmap.status is not RoadmapStatus.PUBLISHED:
-            raise Conflict(
-                f"Roadmap '{roadmap_id}' is {roadmap.status.value}; only a published roadmap can "
-                "be archived.",
-                instance=f"/roadmaps/{roadmap_id}",
-            )
-        archived = roadmap.model_copy(
-            update={"status": RoadmapStatus.ARCHIVED, "updated_at": self._clock()}
-        )
         async with transaction(self._repo):
+            roadmap = await self._load_owned(user_id, roadmap_id, for_update=True)
+            if roadmap.status is not RoadmapStatus.PUBLISHED:
+                raise Conflict(
+                    f"Roadmap '{roadmap_id}' is {roadmap.status.value}; only a published "
+                    "roadmap can be archived.",
+                    instance=f"/roadmaps/{roadmap_id}",
+                )
+            archived = roadmap.model_copy(
+                update={"status": RoadmapStatus.ARCHIVED, "updated_at": self._clock()}
+            )
             await self._repo.save(archived)
         _log.info("roadmap_archived", roadmap_id=roadmap_id, user_id=user_id)
         return archived
@@ -353,34 +350,49 @@ class RoadmapService:
         with zero followers the row is removed. Applies to a roadmap of any status
         (a draft always has zero followers, since a draft is not followable).
         """
-        roadmap = await self._load_owned(user_id, roadmap_id)
-        followers = await self._follower_counter(roadmap.id)
-        if followers > 0:
-            noun = "follower" if followers == 1 else "followers"
-            raise Conflict(
-                f"Roadmap '{roadmap_id}' has {followers} {noun}; delete is only allowed with zero "
-                "followers. Archive it instead to retire it while existing followers keep their "
-                "progress.",
-                code=ErrorCode.DELETE_HAS_FOLLOWERS,
-                instance=f"/roadmaps/{roadmap_id}",
-            )
         async with transaction(self._repo):
+            roadmap = await self._load_owned(user_id, roadmap_id, for_update=True)
+            followers = await self._follower_counter(roadmap.id)
+            if followers > 0:
+                noun = "follower" if followers == 1 else "followers"
+                code = ErrorCode.DELETE_HAS_FOLLOWERS
+                if roadmap.status is RoadmapStatus.ARCHIVED:
+                    detail = (
+                        f"Roadmap '{roadmap_id}' has {followers} {noun}; delete is only allowed "
+                        "with zero followers. Existing followers must finish or leave their "
+                        "progress before deletion."
+                    )
+                else:
+                    detail = (
+                        f"Roadmap '{roadmap_id}' has {followers} {noun}; delete is only allowed "
+                        "with zero followers. Archive it instead to retire it while existing "
+                        "followers keep their progress."
+                    )
+                raise Conflict(detail, code=code, instance=f"/roadmaps/{roadmap_id}")
             await self._repo.delete(roadmap_id)
         _log.info("roadmap_deleted", roadmap_id=roadmap_id, user_id=user_id)
 
-    async def _load_owned(self, user_id: str, roadmap_id: str) -> Roadmap:
+    async def _load_owned(
+        self, user_id: str, roadmap_id: str, *, for_update: bool = False
+    ) -> Roadmap:
         """Load the caller's own roadmap or raise ``NotFound``.
 
         Owner-scoped (the repository query filters by ``owner``), so a non-owner or
         unknown ID is a 404 that never reveals another user's roadmap's existence.
         The shared load underneath every owner-scoped operation.
         """
-        record = await self._repo.get_owned(roadmap_id, user_id)
+        record = (
+            await self._repo.get_owned_for_update(roadmap_id, user_id)
+            if for_update
+            else await self._repo.get_owned(roadmap_id, user_id)
+        )
         if record is None:
             raise NotFound(f"No roadmap '{roadmap_id}'.", instance=f"/roadmaps/{roadmap_id}")
         return Roadmap.model_validate(record.document)
 
-    async def _load_writable_draft(self, user_id: str, roadmap_id: str) -> Roadmap:
+    async def _load_writable_draft(
+        self, user_id: str, roadmap_id: str, *, for_update: bool = False
+    ) -> Roadmap:
         """Load the caller's own roadmap for a **content write** (create-content /
         patch / replace) and enforce the immutability boundary.
 
@@ -391,7 +403,7 @@ class RoadmapService:
         into a fresh draft. Presentation edits (``edit_metadata``) do
         **not** load through here, which is why they stay allowed post-publish.
         """
-        roadmap = await self._load_owned(user_id, roadmap_id)
+        roadmap = await self._load_owned(user_id, roadmap_id, for_update=for_update)
         if roadmap.status is not RoadmapStatus.DRAFT:
             raise Conflict(
                 f"Roadmap '{roadmap_id}' is {roadmap.status.value}; published content is "
@@ -402,7 +414,9 @@ class RoadmapService:
             )
         return roadmap
 
-    async def _load_owned_draft(self, user_id: str, roadmap_id: str) -> Roadmap:
+    async def _load_owned_draft(
+        self, user_id: str, roadmap_id: str, *, for_update: bool = False
+    ) -> Roadmap:
         """Load the caller's own roadmap for a draft-only **lifecycle** action
         (validate / publish).
 
@@ -410,7 +424,7 @@ class RoadmapService:
         archived roadmap is a lifecycle ``Conflict`` (these actions apply only to a
         draft and change no content, so they are not the immutability/fork path).
         """
-        roadmap = await self._load_owned(user_id, roadmap_id)
+        roadmap = await self._load_owned(user_id, roadmap_id, for_update=for_update)
         if roadmap.status is not RoadmapStatus.DRAFT:
             raise Conflict(
                 f"Roadmap '{roadmap_id}' is {roadmap.status.value}; only draft roadmaps can be "

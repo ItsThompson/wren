@@ -21,7 +21,7 @@ from collections.abc import Callable
 
 from fastapi import APIRouter, Depends
 
-from wren.core.identity import require_user
+from wren.core.route_registry import App, identity_for_app
 from wren.roadmaps.list_schemas import Dashboard, Profile
 from wren.roadmaps.listing import ListingService
 
@@ -29,28 +29,35 @@ from wren.roadmaps.listing import ListingService
 ListingServiceProvider = Callable[..., object]
 
 
-def create_listing_router(service_provider: ListingServiceProvider) -> APIRouter:
-    """Build the dashboard + profile router, injecting the service provider."""
+def create_listing_router(
+    service_provider: ListingServiceProvider, *, app: App = App.EXTERNAL
+) -> APIRouter:
+    """Build the dashboard + profile router for one app trust boundary."""
     router = APIRouter(tags=["listing"])
+    identity = identity_for_app(app)
 
     @router.get("/me/dashboard")
     async def get_dashboard(
-        user_id: str = Depends(require_user),
+        user_id: str = Depends(identity),
         service: ListingService = Depends(service_provider),
     ) -> Dashboard:
         # Private, caller-scoped: everything the caller authored (any status) plus
         # everything they follow.
         return await service.dashboard(user_id)
 
-    @router.get("/users/{handle}")
     async def get_profile(
         handle: str,
         service: ListingService = Depends(service_provider),
     ) -> Profile:
-        # Public + viewer-agnostic: the handle owner's published-public roadmaps
-        # only; an unknown handle is a 404 via the shared exception handler. No
-        # session is required or consulted, so drafts/private/archived and the
-        # social graph are never exposed.
+        # The internal route is authenticated at the trusted boundary even though
+        # the projection itself is viewer-agnostic and public on the external app.
         return await service.profile(handle)
+
+    router.add_api_route(
+        "/users/{handle}",
+        get_profile,
+        methods=["GET"],
+        dependencies=[Depends(identity)] if app is App.INTERNAL else None,
+    )
 
     return router

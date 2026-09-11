@@ -21,11 +21,12 @@ Design rules they encode:
 
 from __future__ import annotations
 
+from datetime import datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
-from wren.roadmaps.schemas import ResourceType, RoadmapStatus
+from wren.roadmaps.schemas import ResourceType, RoadmapStatus, Visibility
 
 
 class SectionInclude(StrEnum):
@@ -118,6 +119,18 @@ class OverallProgress(BaseModel):
     percent: int
 
 
+class OverviewDetails(BaseModel):
+    """Stored roadmap metadata exposed only by a detailed overview."""
+
+    owner: str
+    description: str | None = None
+    subject_tags: list[str] = Field(default_factory=list)
+    visibility: Visibility
+    created_at: datetime
+    updated_at: datetime
+    suggested_path: list[str] = Field(default_factory=list)
+
+
 class Overview(BaseModel):
     """The ``GET /overview`` body: sections in ``section_order`` with per-section
     and overall completion, and no checklist-item bodies.
@@ -130,6 +143,7 @@ class Overview(BaseModel):
     title: str
     status: RoadmapStatus
     revision: int
+    details: OverviewDetails | None = None
     sections: list[SectionOverview] = Field(default_factory=list)
     overall: OverallProgress
 

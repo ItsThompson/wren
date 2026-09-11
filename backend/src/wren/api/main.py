@@ -95,7 +95,7 @@ roadmaps_router = create_roadmaps_router(
 # dashboard (authored + followed, require_user) and the public profile
 # (published-public only, no session). The listing service composes the roadmaps,
 # accounts, and progress repositories over one request-scoped session.
-listing_router = create_listing_router(build_listing_service_provider())
+listing_router = create_listing_router(build_listing_service_provider(), app=App.EXTERNAL)
 
 # Follow + progress + server-computed next: the study-time surface over the
 # progress service. The App selector drives mounting (the external app also mounts

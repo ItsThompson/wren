@@ -27,8 +27,9 @@ from typing import TYPE_CHECKING
 from wren.core.errors import NotFound, Validation
 from wren.core.observability import track_failures
 from wren.roadmaps import projections
+from wren.roadmaps.access import can_read
 from wren.roadmaps.config import SECTION_PAGE_SIZE
-from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
+from wren.roadmaps.schemas import Roadmap
 
 if TYPE_CHECKING:
     from wren.core.read_contract import ResponseFormat
@@ -75,8 +76,7 @@ async def load_readable(repo: RoadmapRepository, user_id: str, roadmap_id: str) 
     if record is None:
         raise NotFound(f"No roadmap '{roadmap_id}'.", instance=f"/roadmaps/{roadmap_id}")
     roadmap = Roadmap.model_validate(record.document)
-    if roadmap.owner != user_id and roadmap.visibility is not Visibility.PUBLIC:
-        # Private roadmap owned by someone else: 404, no existence leak.
+    if not can_read(roadmap, user_id):
         raise NotFound(f"No roadmap '{roadmap_id}'.", instance=f"/roadmaps/{roadmap_id}")
     return roadmap
 
@@ -214,9 +214,4 @@ class RoadmapReadService:
         owner still reads their own roadmap at any status (draft preview). This is
         the shared load under ``get`` and every read projection.
         """
-        roadmap = await self._load_readable(user_id, roadmap_id)
-        if roadmap.owner != user_id and roadmap.status is RoadmapStatus.DRAFT:
-            # A non-owner cannot read another user's draft even if it is public
-            # (drafts are not discoverable): 404, no existence leak.
-            raise NotFound(f"No roadmap '{roadmap_id}'.", instance=f"/roadmaps/{roadmap_id}")
-        return roadmap
+        return await self._load_readable(user_id, roadmap_id)
