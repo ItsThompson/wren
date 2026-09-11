@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { useSWRConfig, type Arguments } from 'swr'
+import { useSWRConfig } from 'swr'
 
+import { useAuth } from '@/auth'
 import { keys, useApiQuery, useSessionClient } from '@/api'
 import { toProblem, type Problem } from '@/lib/problem'
 import { useLifecycle } from './useLifecycle'
@@ -31,10 +32,6 @@ import type {
  * flashing the skeleton, and a read error preserves the HTTP status (or `null`
  * on a network failure) for `RoadmapErrorState`.
  */
-function isProfileKey(key: Arguments): boolean {
-  return Array.isArray(key) && key[0] === '/users/{handle}'
-}
-
 function toRoadmapViewState(
   roadmap: Roadmap | undefined,
   error: Problem | undefined,
@@ -76,6 +73,7 @@ export function useRoadmap(roadmapId: string): {
   reload: () => void
 } {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const client = useSessionClient()
   const { mutate: mutateCache } = useSWRConfig()
   const generationRef = useRef(0)
@@ -122,11 +120,13 @@ export function useRoadmap(roadmapId: string): {
       void mutateCache<Dashboard>(keys.dashboard(), (current) => reconcileDashboard(current, updated), {
         revalidate: dashboardNeedsRefresh,
       })
-      void mutateCache<Profile>(isProfileKey, (current) => reconcileProfile(current, updated), {
-        revalidate: profileNeedsRefresh,
-      })
+      if (user?.username) {
+        void mutateCache<Profile>(keys.profile(user.username), (current) => reconcileProfile(current, updated), {
+          revalidate: profileNeedsRefresh,
+        })
+      }
     },
-    [mutate, mutateCache, roadmap],
+    [mutate, mutateCache, roadmap, user?.username],
   )
 
   const removeRoadmapCaches = useCallback(() => {
@@ -136,10 +136,12 @@ export function useRoadmap(roadmapId: string): {
     void mutateCache<Dashboard>(keys.dashboard(), (current) => removeRoadmapFromDashboard(current, roadmapId), {
       revalidate: false,
     })
-    void mutateCache<Profile>(isProfileKey, (current) => removeRoadmapFromProfile(current, roadmapId), {
-      revalidate: false,
-    })
-  }, [mutateCache, roadmapId])
+    if (user?.username) {
+      void mutateCache<Profile>(keys.profile(user.username), (current) => removeRoadmapFromProfile(current, roadmapId), {
+        revalidate: false,
+      })
+    }
+  }, [mutateCache, roadmapId, user?.username])
 
   // The same RoadmapView instance stays mounted
   // across a `:roadmapId` change, so reset these useState sub-states on change

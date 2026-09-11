@@ -25,7 +25,7 @@ export function TreeView() {
 
   const graph = useMemo(() => {
     if (state.phase !== 'loaded') return null
-    const built = buildTreeGraph(state.roadmap, state.checkedIds ?? new Set(), id)
+    const built = buildTreeGraph(state.roadmap, state.checkedIds, id)
     return { nodes: layoutTree(built.nodes, built.edges), edges: built.edges }
   }, [state, id])
 

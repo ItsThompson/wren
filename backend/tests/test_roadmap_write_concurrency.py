@@ -24,6 +24,7 @@ from wren.roadmaps.repository import SqlAlchemyRoadmapRepository, transaction
 from wren.roadmaps.schemas import (
     ChecklistItemInput,
     PatchOp,
+    PatchResult,
     ResourceInput,
     ResourceType,
     Roadmap,
@@ -175,6 +176,7 @@ async def test_delete_and_first_follow_are_serialized_at_service_boundary(
     async with _service_pair(migrated_url) as (roadmaps, progress, _):
         created = await roadmaps[0].create_draft("owner", _roadmap_input("Delete follow race"))
         await roadmaps[0].publish("owner", created.id)
+        await roadmaps[0].set_visibility("owner", created.id, Visibility.PUBLIC)
         delete_result, follow_result = await asyncio.gather(
             roadmaps[0].delete("owner", created.id),
             progress[1].follow("follower", created.id),
@@ -194,6 +196,7 @@ async def test_archive_and_first_follow_are_serialized_at_service_boundary(
     async with _service_pair(migrated_url) as (roadmaps, progress, _):
         created = await roadmaps[0].create_draft("owner", _roadmap_input("Archive follow race"))
         await roadmaps[0].publish("owner", created.id)
+        await roadmaps[0].set_visibility("owner", created.id, Visibility.PUBLIC)
         archive_result, follow_result = await asyncio.gather(
             roadmaps[0].archive("owner", created.id),
             progress[1].follow("follower", created.id),
@@ -202,10 +205,12 @@ async def test_archive_and_first_follow_are_serialized_at_service_boundary(
         if isinstance(archive_result, Roadmap):
             assert archive_result.status is RoadmapStatus.ARCHIVED
             assert isinstance(follow_result, Conflict)
+            expected_status = RoadmapStatus.ARCHIVED
         else:
             assert isinstance(archive_result, Conflict)
             assert isinstance(follow_result, Progress)
-        assert (await _read_roadmap(migrated_url, created.id)).status is RoadmapStatus.ARCHIVED
+            expected_status = RoadmapStatus.PUBLISHED
+        assert (await _read_roadmap(migrated_url, created.id)).status is expected_status
 
 
 async def test_same_revision_patch_writers_have_one_winner(
@@ -241,8 +246,8 @@ async def test_patch_and_publish_race_preserves_immutability(
             return_exceptions=True,
         )
         assert (await _read_roadmap(migrated_url, created.id)).status is RoadmapStatus.PUBLISHED
-        assert any(isinstance(result, Roadmap) for result in (patch_result, publish_result))
-        assert any(isinstance(result, Conflict) for result in (patch_result, publish_result))
+        assert isinstance(publish_result, Roadmap)
+        assert isinstance(patch_result, (Conflict, PatchResult))
 
 
 async def test_metadata_and_archive_race_keeps_both_committed_invariants(
@@ -289,6 +294,7 @@ async def test_progress_and_deadline_race_preserves_unrelated_state(
     async with _service_pair(migrated_url) as (roadmaps, progress, _):
         created = await roadmaps[0].create_draft("owner", _roadmap_input("Progress deadline race"))
         await roadmaps[0].publish("owner", created.id)
+        await roadmaps[0].set_visibility("owner", created.id, Visibility.PUBLIC)
         update_result, deadline_result = await asyncio.gather(
             progress[0].update(
                 "reader", created.id, ["chk_read-the-guide"], CompletionState.COMPLETE

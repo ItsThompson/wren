@@ -1,4 +1,4 @@
-import { Check, Circle, Lock, type LucideIcon } from 'lucide-react'
+import { Check, Circle, CircleHelp, Lock, type LucideIcon } from 'lucide-react'
 import { Link } from 'react-router'
 
 import { NODE_WIDTH } from '../constants'
@@ -36,6 +36,12 @@ const STATE_PRESENTATION: Record<
     className: 'border-border bg-muted opacity-60',
     iconClassName: 'text-muted-foreground',
     label: 'locked',
+  },
+  [NODE_STATE.Unavailable]: {
+    icon: CircleHelp,
+    className: 'border-border bg-muted opacity-60',
+    iconClassName: 'text-muted-foreground',
+    label: 'progress unavailable',
   },
 }
 

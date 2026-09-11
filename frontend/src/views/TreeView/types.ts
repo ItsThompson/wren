@@ -22,6 +22,7 @@ export const NODE_STATE = {
   Done: 'done',
   Available: 'available',
   Locked: 'locked',
+  Unavailable: 'unavailable',
 } as const
 
 export type NodeState = (typeof NODE_STATE)[keyof typeof NODE_STATE]

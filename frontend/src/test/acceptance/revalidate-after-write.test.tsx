@@ -5,6 +5,7 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { mockRoadmap } from '@/mocks/data'
+import { buildAuthUser, buildAuthValue } from '@/test/auth-harness'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { useDashboard } from '@/views/DashboardView/hooks/useDashboard'
 import { useProfile } from '@/views/ProfileView/hooks/useProfile'
@@ -33,6 +34,7 @@ const ARCHIVE_URL = `${BASE}/roadmaps/${ROADMAP_ID}:archive`
 const METADATA_URL = `${BASE}/roadmaps/${ROADMAP_ID}/metadata`
 const VISIBILITY_URL = `${BASE}/roadmaps/${ROADMAP_ID}/visibility`
 const DELETE_URL = `${BASE}/roadmaps/${ROADMAP_ID}`
+const AUTH_VALUE = buildAuthValue({ status: 'authenticated', user: buildAuthUser() })
 
 /** Phases observed across every render, to detect a stale flash (a loading relapse). */
 const phases: string[] = []
@@ -57,6 +59,15 @@ function DiscoveryProbe() {
         {profile.phase === 'loaded' ? profile.profile.roadmaps?.[0]?.title ?? '' : ''}
       </span>
     </div>
+  )
+}
+
+function OtherProfileProbe() {
+  const { state } = useProfile('bob')
+  return (
+    <span data-testid="other-profile-title">
+      {state.phase === 'loaded' ? state.profile.roadmaps?.[0]?.title ?? '' : ''}
+    </span>
   )
 }
 
@@ -187,7 +198,7 @@ describe('revalidate-after-write keeps server state and avoids stale flashes', (
         <WriteProbe />
         <DiscoveryProbe />
       </>,
-      { baseUrl: BASE },
+      { baseUrl: BASE, authValue: AUTH_VALUE },
     )
     await waitFor(() => expect(screen.getByTestId('dashboard-title')).toHaveTextContent(mockRoadmap.title))
     await waitFor(() => expect(screen.getByTestId('profile-title')).toHaveTextContent(mockRoadmap.title))
@@ -213,7 +224,7 @@ describe('revalidate-after-write keeps server state and avoids stale flashes', (
         <WriteProbe />
         <DiscoveryProbe />
       </>,
-      { baseUrl: BASE },
+      { baseUrl: BASE, authValue: AUTH_VALUE },
     )
     await waitFor(() => expect(screen.getByTestId('dashboard-title')).toHaveTextContent(mockRoadmap.title))
     await waitFor(() => expect(screen.getByTestId('profile-title')).toHaveTextContent(mockRoadmap.title))
@@ -254,7 +265,7 @@ describe('revalidate-after-write keeps server state and avoids stale flashes', (
         <WriteProbe />
         <DiscoveryProbe />
       </>,
-      { baseUrl: BASE },
+      { baseUrl: BASE, authValue: AUTH_VALUE },
     )
     await waitFor(() => expect(screen.getByTestId('dashboard-title')).toHaveTextContent(mockRoadmap.title))
     await user.click(screen.getByRole('button', { name: 'make-public' }))
@@ -269,7 +280,10 @@ describe('revalidate-after-write keeps server state and avoids stale flashes', (
     let profileReads = 0
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(publicDraft)),
-      http.get('*/users/:handle', () => {
+      http.get('*/users/:handle', ({ params }) => {
+        if (params.handle === 'bob') {
+          return HttpResponse.json({ handle: 'bob', display_name: 'Bob', roadmaps: [] })
+        }
         profileReads += 1
         return HttpResponse.json({
           handle: 'ada',
@@ -283,15 +297,18 @@ describe('revalidate-after-write keeps server state and avoids stale flashes', (
       <>
         <WriteProbe />
         <DiscoveryProbe />
+        <OtherProfileProbe />
       </>,
-      { baseUrl: BASE },
+      { baseUrl: BASE, authValue: AUTH_VALUE },
     )
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('draft'))
     await waitFor(() => expect(profileReads).toBe(1))
+    await waitFor(() => expect(screen.getByTestId('other-profile-title')).toHaveTextContent(''))
 
     await user.click(screen.getByRole('button', { name: 'publish' }))
 
     await waitFor(() => expect(screen.getByTestId('profile-title')).toHaveTextContent(mockRoadmap.title))
+    expect(screen.getByTestId('other-profile-title')).toHaveTextContent('')
     expect(profileReads).toBe(2)
   })
 

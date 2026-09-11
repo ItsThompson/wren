@@ -42,11 +42,9 @@ describe('roadmap cache reconciliation', () => {
     expect(reconcileDashboard(dashboard, roadmap({ visibility: 'private' }))?.followed).toEqual([])
   })
 
-  it('adds a newly published public roadmap to a mounted profile cache', () => {
+  it('does not fabricate a roadmap in a profile cache without its card', () => {
     const publishedNew = roadmap({ id: 'r2' })
-    expect(reconcileProfile({ ...profile, roadmaps: [] }, publishedNew)?.roadmaps).toEqual([
-      { id: 'r2', title: 'Roadmap', status: 'published', visibility: 'public', subject_tags: undefined },
-    ])
+    expect(reconcileProfile({ ...profile, roadmaps: [] }, publishedNew)?.roadmaps).toEqual([])
     expect(reconcileProfile({ ...profile, roadmaps: [] }, roadmap({ status: 'draft' }))?.roadmaps).toEqual([])
   })
 

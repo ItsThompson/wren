@@ -26,8 +26,9 @@ import { NODE_STATE, type NodeState, type Subsection } from '../../types'
 export function deriveNodeState(
   subsection: Subsection,
   prereqs: Subsection[],
-  checkedIds: Set<string>,
+  checkedIds: Set<string> | null,
 ): NodeState {
+  if (!checkedIds) return NODE_STATE.Unavailable
   if (isSubsectionDone(subsection, checkedIds)) return NODE_STATE.Done
   const prereqsSatisfied = prereqs.every((prereq) => isSubsectionDone(prereq, checkedIds))
   return prereqsSatisfied ? NODE_STATE.Available : NODE_STATE.Locked

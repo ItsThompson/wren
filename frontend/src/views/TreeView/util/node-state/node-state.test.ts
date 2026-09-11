@@ -22,6 +22,11 @@ describe('deriveNodeState', () => {
     expect(state).toBe(NODE_STATE.Done)
   })
 
+  it('is unavailable when progress has not loaded', () => {
+    const subsection = buildSubsection()
+    expect(deriveNodeState(subsection, [], null)).toBe(NODE_STATE.Unavailable)
+  })
+
   it('is available when it is not done and it has no prerequisites', () => {
     const subsection = buildSubsection({ item_order: ['a'] })
     const state = deriveNodeState(subsection, [], new Set())

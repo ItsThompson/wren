@@ -57,12 +57,7 @@ export function removeRoadmapFromDashboard(data: Dashboard | undefined, roadmapI
 
 export function reconcileProfile(data: Profile | undefined, roadmap: Roadmap): Profile | undefined {
   if (!data) return data
-  const roadmaps = data.roadmaps ?? []
-  const allowed = canAppearInProfile(roadmap)
-  const index = roadmaps.findIndex((card) => card.id === roadmap.id)
-  if (!allowed) return { ...data, roadmaps: index === -1 ? roadmaps : roadmaps.filter((card) => card.id !== roadmap.id) }
-  if (index === -1) return { ...data, roadmaps: [roadmapToCard(roadmap), ...roadmaps] }
-  return { ...data, roadmaps: roadmaps.map((card) => (card.id === roadmap.id ? roadmapToCard(roadmap) : card)) }
+  return { ...data, roadmaps: replaceCard(data.roadmaps ?? [], roadmap, canAppearInProfile(roadmap)) }
 }
 
 export function removeRoadmapFromProfile(data: Profile | undefined, roadmapId: string): Profile | undefined {
