@@ -105,3 +105,39 @@ export async function getProgress(
   expect(response.status(), await response.text()).toBe(200)
   return (await response.json()) as ProgressSnapshot
 }
+
+export async function getRoadmap(context: APIRequestContext, id: string): Promise<Record<string, unknown>> {
+  const response = await context.get(`/roadmaps/${id}`)
+  expect(response.status(), await response.text()).toBe(200)
+  return (await response.json()) as Record<string, unknown>
+}
+
+export async function getDashboard(context: APIRequestContext): Promise<Record<string, unknown>[]> {
+  const response = await context.get('/me/dashboard')
+  expect(response.status(), await response.text()).toBe(200)
+  const body = (await response.json()) as { authored?: Record<string, unknown>[]; followed?: Record<string, unknown>[] }
+  return [...(body.authored ?? []), ...(body.followed ?? [])]
+}
+
+export async function getProfile(
+  context: APIRequestContext,
+  handle: string,
+): Promise<{ roadmaps?: Record<string, unknown>[] }> {
+  const response = await context.get(`/users/${handle}`)
+  expect(response.status(), await response.text()).toBe(200)
+  return (await response.json()) as { roadmaps?: Record<string, unknown>[] }
+}
+
+export async function setVisibility(
+  context: APIRequestContext,
+  id: string,
+  visibility: 'public' | 'private',
+): Promise<void> {
+  const response = await context.put(`/roadmaps/${id}/visibility`, { data: { visibility } })
+  expect(response.status(), await response.text()).toBe(200)
+}
+
+export async function archiveRoadmap(context: APIRequestContext, id: string): Promise<void> {
+  const response = await context.post(`/roadmaps/${id}:archive`)
+  expect(response.status(), await response.text()).toBe(200)
+}

@@ -117,16 +117,20 @@ export function useRoadmap(roadmapId: string): {
       const becamePublished = roadmap?.status !== 'published' && updated.status === 'published'
       const profileNeedsRefresh =
         updated.status === 'published' && (becamePublic || becamePublished)
-      void mutateCache<Dashboard>(keys.dashboard(), (current) => reconcileDashboard(current, updated), {
-        revalidate: dashboardNeedsRefresh,
-      })
+      void mutateCache<Dashboard>(
+        keys.dashboard(),
+        (current) => reconcileDashboard(current, updated, user?.id),
+        {
+          revalidate: dashboardNeedsRefresh,
+        },
+      )
       if (user?.username) {
         void mutateCache<Profile>(keys.profile(user.username), (current) => reconcileProfile(current, updated), {
           revalidate: profileNeedsRefresh,
         })
       }
     },
-    [mutate, mutateCache, roadmap, user?.username],
+    [mutate, mutateCache, roadmap, user?.id, user?.username],
   )
 
   const removeRoadmapCaches = useCallback(() => {

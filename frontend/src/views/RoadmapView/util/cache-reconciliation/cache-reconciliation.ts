@@ -15,8 +15,10 @@ export function roadmapToCard(roadmap: Roadmap): RoadmapCard {
   }
 }
 
-function canAppearInFollowed(roadmap: Roadmap): boolean {
-  return roadmap.visibility === 'public' && (roadmap.status === 'published' || roadmap.status === 'archived')
+function canAppearInFollowed(roadmap: Roadmap, viewerId?: string): boolean {
+  const isOwner = roadmap.owner === viewerId
+  return (isOwner || roadmap.visibility === 'public') &&
+    (roadmap.status === 'published' || roadmap.status === 'archived')
 }
 
 function canAppearInProfile(roadmap: Roadmap): boolean {
@@ -37,12 +39,16 @@ export function addAuthoredRoadmap(data: Dashboard | undefined, roadmap: Roadmap
   return { ...data, authored: [roadmapToCard(roadmap), ...authored] }
 }
 
-export function reconcileDashboard(data: Dashboard | undefined, roadmap: Roadmap): Dashboard | undefined {
+export function reconcileDashboard(
+  data: Dashboard | undefined,
+  roadmap: Roadmap,
+  viewerId?: string,
+): Dashboard | undefined {
   if (!data) return data
   return {
     ...data,
     authored: replaceCard(data.authored ?? [], roadmap, true),
-    followed: replaceCard(data.followed ?? [], roadmap, canAppearInFollowed(roadmap)),
+    followed: replaceCard(data.followed ?? [], roadmap, canAppearInFollowed(roadmap, viewerId)),
   }
 }
 

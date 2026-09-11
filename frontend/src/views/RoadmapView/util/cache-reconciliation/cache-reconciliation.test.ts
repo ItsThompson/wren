@@ -7,6 +7,7 @@ import {
   reconcileProfile,
   removeRoadmapFromDashboard,
   removeRoadmapFromProfile,
+  roadmapToCard,
 } from './cache-reconciliation'
 
 function roadmap(overrides: Partial<Roadmap> = {}): Roadmap {
@@ -40,6 +41,13 @@ describe('roadmap cache reconciliation', () => {
     const archived = roadmap({ status: 'archived' })
     expect(reconcileProfile(profile, archived)?.roadmaps).toEqual([])
     expect(reconcileDashboard(dashboard, roadmap({ visibility: 'private' }))?.followed).toEqual([])
+  })
+
+  it('keeps an owner self-follow card when the roadmap becomes private', () => {
+    const ownedPrivate = roadmap({ owner: 'u1', visibility: 'private' })
+    expect(reconcileDashboard(dashboard, ownedPrivate, 'u1')?.followed).toEqual([
+      roadmapToCard(ownedPrivate),
+    ])
   })
 
   it('does not fabricate a roadmap in a profile cache without its card', () => {
