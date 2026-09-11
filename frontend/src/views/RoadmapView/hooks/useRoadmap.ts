@@ -61,6 +61,7 @@ function toRoadmapViewState(
 export function useRoadmap(roadmapId: string): {
   state: RoadmapViewState
   publishState: PublishState
+  isMutationPending: boolean
   publish: () => Promise<void>
   metadataState: MetadataEditState
   editMetadata: (draft: MetadataDraft) => Promise<boolean>
@@ -274,6 +275,13 @@ export function useRoadmap(roadmapId: string): {
     onChanged: onLifecycleChanged,
     onDeleted,
   })
+  const isMutationPending =
+    publishState.phase === 'publishing' ||
+    metadataState.phase === 'saving' ||
+    forkState.phase === 'forking' ||
+    lifecycle.visibilityState.phase === 'saving' ||
+    lifecycle.archiveState.phase === 'archiving' ||
+    lifecycle.deleteState.phase === 'deleting'
 
   const reload = useCallback(() => {
     void mutate()
@@ -282,6 +290,7 @@ export function useRoadmap(roadmapId: string): {
   return {
     state,
     publishState,
+    isMutationPending,
     publish,
     metadataState,
     editMetadata,

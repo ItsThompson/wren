@@ -180,9 +180,38 @@ def _roadmap_body(**overrides: Any) -> dict[str, Any]:
         "visibility": "public",
         "status": "published",
         "revision": 3,
-        "sections": {},
-        "section_order": [],
-        "suggested_path": [],
+        "sections": {
+            "sec_core": {
+                "id": "sec_core",
+                "title": "Core",
+                "subsection_order": ["sub_sql"],
+                "subsections": {
+                    "sub_sql": {
+                        "id": "sub_sql",
+                        "title": "SQL",
+                        "description": "Query fundamentals.",
+                        "tags": ["data"],
+                        "effort_estimate": "2h",
+                        "prereq_ids": ["sub_intro"],
+                        "resources": {
+                            "res_guide": {
+                                "id": "res_guide",
+                                "title": "Guide",
+                                "url": "https://example.test/sql",
+                                "type": "article",
+                            }
+                        },
+                        "resource_order": ["res_guide"],
+                        "checklist_items": {
+                            "chk_read": {"id": "chk_read", "text": "Read the guide"}
+                        },
+                        "item_order": ["chk_read"],
+                    }
+                },
+            }
+        },
+        "section_order": ["sec_core"],
+        "suggested_path": ["sub_sql"],
         "created_at": "2026-07-01T00:00:00Z",
         "updated_at": "2026-07-02T00:00:00Z",
     }
@@ -224,8 +253,7 @@ def test_roadmap_get_maps_to_one_internal_get() -> None:
     with harness.open() as client:
         result = harness.call_tool(client, "roadmap_get", {"roadmap_id": _RID})
 
-    assert result["structuredContent"]["id"] == _RID
-    assert result["structuredContent"]["sections"] == {}
+    assert result["structuredContent"] == _roadmap_body()
     request = harness.captured[0]
     assert request.method == "GET"
     assert request.url.path == f"/roadmaps/{_RID}"

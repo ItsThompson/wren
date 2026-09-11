@@ -1,4 +1,4 @@
-import { API_BASE_URL, FRONTEND_BASE_URL } from './helpers/config'
+import { API_BASE_URL, FRONTEND_BASE_URL, MCP_BASE_URL } from './helpers/config'
 
 const MAX_ATTEMPTS = 60
 const INTERVAL_MS = 2000
@@ -29,4 +29,5 @@ export default async function globalSetup(): Promise<void> {
   console.log('E2E pre-flight: waiting for the stack to report healthy...')
   await waitForOk('frontend', `${FRONTEND_BASE_URL}/healthz`)
   await waitForOk('backend', `${API_BASE_URL}/readyz`)
+  await waitForOk('MCP', `${MCP_BASE_URL}/readyz`)
 }

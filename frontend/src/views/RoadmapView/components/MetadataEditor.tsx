@@ -7,6 +7,7 @@ import type { MetadataDraft, MetadataEditState, Roadmap } from '../types'
 interface MetadataEditorProps {
   roadmap: Roadmap
   state: MetadataEditState
+  disabled: boolean
   onSave: (draft: MetadataDraft) => void | Promise<unknown>
   onCancel: () => void
 }
@@ -32,7 +33,7 @@ function parseTags(raw: string): string[] {
  * inputs. Seeded from the current roadmap; Save calls the owner's edit action and
  * a failure surfaces a retry message without discarding the entered values.
  */
-export function MetadataEditor({ roadmap, state, onSave, onCancel }: MetadataEditorProps) {
+export function MetadataEditor({ roadmap, state, disabled, onSave, onCancel }: MetadataEditorProps) {
   const [title, setTitle] = useState(roadmap.title)
   const [description, setDescription] = useState(roadmap.description ?? '')
   const [tags, setTags] = useState((roadmap.subject_tags ?? []).join(', '))
@@ -57,7 +58,7 @@ export function MetadataEditor({ roadmap, state, onSave, onCancel }: MetadataEdi
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             required
-            disabled={isSaving}
+            disabled={disabled || isSaving}
           />
         </label>
 
@@ -67,7 +68,7 @@ export function MetadataEditor({ roadmap, state, onSave, onCancel }: MetadataEdi
             className="mt-1 flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            disabled={isSaving}
+            disabled={disabled || isSaving}
           />
         </label>
 
@@ -78,16 +79,16 @@ export function MetadataEditor({ roadmap, state, onSave, onCancel }: MetadataEdi
             value={tags}
             onChange={(event) => setTags(event.target.value)}
             placeholder="comma, separated, tags"
-            disabled={isSaving}
+            disabled={disabled || isSaving}
           />
         </label>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <Button type="submit" disabled={isSaving || title.trim().length === 0}>
+        <Button type="submit" disabled={disabled || isSaving || title.trim().length === 0}>
           {isSaving ? 'Saving…' : 'Save details'}
         </Button>
-        <Button type="button" variant="ghost" onClick={onCancel} disabled={isSaving}>
+        <Button type="button" variant="ghost" onClick={onCancel} disabled={disabled || isSaving}>
           Cancel
         </Button>
       </div>

@@ -1,6 +1,8 @@
+import { createHash, randomBytes } from 'node:crypto'
+
 import { type APIRequest, type APIRequestContext, expect } from '@playwright/test'
 
-import { API_BASE_URL } from './config'
+import { API_BASE_URL, MCP_BASE_URL } from './config'
 import type { NextResult, ProgressSnapshot } from './types'
 import type { TestUser } from './users'
 
@@ -140,4 +142,101 @@ export async function setVisibility(
 export async function archiveRoadmap(context: APIRequestContext, id: string): Promise<void> {
   const response = await context.post(`/roadmaps/${id}:archive`)
   expect(response.status(), await response.text()).toBe(200)
+}
+
+export async function createAgentAccessToken(context: APIRequestContext): Promise<string> {
+  const redirectUri = 'http://127.0.0.1:8765/callback'
+  const verifier = randomBytes(32).toString('base64url')
+  const challenge = createHash('sha256').update(verifier).digest('base64url')
+  const registration = await context.post('/register', {
+    data: { client_name: 'Wren E2E agent', redirect_uris: [redirectUri], scope: 'roadmaps:read' },
+  })
+  expect(registration.status(), await registration.text()).toBe(201)
+  const { client_id: clientId } = (await registration.json()) as { client_id: string }
+
+  const authorization = await context.get('/authorize', {
+    maxRedirects: 0,
+    params: {
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      code_challenge: challenge,
+      code_challenge_method: 'S256',
+      scope: 'roadmaps:read',
+      state: 'e2e',
+      resource: MCP_BASE_URL,
+    },
+  })
+  expect(authorization.status(), await authorization.text()).toBe(302)
+  const consentLocation = authorization.headers().location
+  expect(consentLocation).toBeTruthy()
+  const authRequestId = new URL(consentLocation).searchParams.get('auth_request_id')
+  expect(authRequestId).toBeTruthy()
+
+  const consentContext = await context.get('/authorize/context', {
+    params: { auth_request_id: authRequestId as string },
+  })
+  expect(consentContext.status(), await consentContext.text()).toBe(200)
+  expect((await consentContext.json()).authenticated).toBe(true)
+
+  const decision = await context.post('/authorize/decision', {
+    data: { auth_request_id: authRequestId, approve: true },
+  })
+  expect(decision.status(), await decision.text()).toBe(200)
+  const decisionLocation = (await decision.json()).redirect_uri as string
+  const code = new URL(decisionLocation).searchParams.get('code')
+  expect(code).toBeTruthy()
+
+  const token = await context.post('/token', {
+    form: {
+      grant_type: 'authorization_code',
+      client_id: clientId,
+      code: code as string,
+      code_verifier: verifier,
+      redirect_uri: redirectUri,
+      resource: MCP_BASE_URL,
+    },
+  })
+  expect(token.status(), await token.text()).toBe(200)
+  const body = (await token.json()) as { access_token: string }
+  return body.access_token
+}
+
+export async function listMcpTools(
+  context: APIRequestContext,
+  accessToken: string,
+): Promise<Record<string, unknown>[]> {
+  const response = await context.post(`${MCP_BASE_URL}/mcp`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/json, text/event-stream',
+    },
+    data: { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} },
+  })
+  expect(response.status(), await response.text()).toBe(200)
+  const body = (await response.json()) as { result: { tools: Record<string, unknown>[] } }
+  return body.result.tools
+}
+
+export async function callMcpTool(
+  context: APIRequestContext,
+  accessToken: string,
+  name: string,
+  arguments_: Record<string, unknown>,
+): Promise<{ structuredContent: Record<string, unknown> }> {
+  const response = await context.post(`${MCP_BASE_URL}/mcp`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/json, text/event-stream',
+    },
+    data: {
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/call',
+      params: { name, arguments: arguments_ },
+    },
+  })
+  expect(response.status(), await response.text()).toBe(200)
+  const body = (await response.json()) as { result: { structuredContent: Record<string, unknown> } }
+  return body.result
 }

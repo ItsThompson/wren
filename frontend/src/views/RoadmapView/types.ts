@@ -153,6 +153,8 @@ export interface RoadmapLifecycle {
  * by `isOwner` at the render site.
  */
 export interface RoadmapActions {
+  /** True while any roadmap write is in flight. */
+  isMutationPending: boolean
   metadataState: MetadataEditState
   editMetadata: (draft: MetadataDraft) => Promise<boolean>
   forkState: ForkState

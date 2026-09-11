@@ -26,6 +26,7 @@ interface RoadmapActionsProps {
 export function RoadmapActions({ roadmap, isOwner, actions }: RoadmapActionsProps) {
   const [editing, setEditing] = useState(false)
   const isForking = actions.forkState.phase === 'forking'
+  const { isMutationPending } = actions
 
   const handleSave = async (draft: MetadataDraft) => {
     const saved = await actions.editMetadata(draft)
@@ -41,11 +42,12 @@ export function RoadmapActions({ roadmap, isOwner, actions }: RoadmapActionsProp
             variant="outline"
             onClick={() => setEditing((open) => !open)}
             aria-expanded={editing}
+            disabled={isMutationPending}
           >
             {editing ? 'Close editor' : 'Edit details'}
           </Button>
         ) : null}
-        <Button type="button" variant="secondary" onClick={actions.fork} disabled={isForking}>
+        <Button type="button" variant="secondary" onClick={actions.fork} disabled={isMutationPending || isForking}>
           {isForking ? 'Forking…' : 'Fork'}
         </Button>
         <p className="text-sm text-muted-foreground">
@@ -58,6 +60,7 @@ export function RoadmapActions({ roadmap, isOwner, actions }: RoadmapActionsProp
           <MetadataEditor
             roadmap={roadmap}
             state={actions.metadataState}
+            disabled={isMutationPending}
             onSave={handleSave}
             onCancel={() => setEditing(false)}
           />
@@ -70,7 +73,13 @@ export function RoadmapActions({ roadmap, isOwner, actions }: RoadmapActionsProp
         </p>
       ) : null}
 
-      {isOwner ? <LifecycleActions roadmap={roadmap} lifecycle={actions.lifecycle} /> : null}
+      {isOwner ? (
+        <LifecycleActions
+          roadmap={roadmap}
+          lifecycle={actions.lifecycle}
+          isMutationPending={isMutationPending}
+        />
+      ) : null}
     </section>
   )
 }

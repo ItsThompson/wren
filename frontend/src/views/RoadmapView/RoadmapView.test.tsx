@@ -835,6 +835,39 @@ describe('RoadmapView web-only lifecycle', () => {
     expect(screen.queryByRole('button', { name: /^archive$/i })).not.toBeInTheDocument()
   })
 
+  it('disables competing roadmap writes while archive is pending', async () => {
+    const user = userEvent.setup()
+    let archiveRequests = 0
+    let releaseArchive!: () => void
+    const archiveGate = new Promise<void>((resolve) => {
+      releaseArchive = resolve
+    })
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
+      http.get('*/roadmaps/:id/progress', () => HttpResponse.json(buildProgress())),
+      http.post(ARCHIVE_URL, async () => {
+        archiveRequests += 1
+        await archiveGate
+        return HttpResponse.json(buildDraft({ status: 'archived' }))
+      }),
+    )
+    renderView()
+    await screen.findByRole('progressbar', { name: /overall progress/i })
+
+    await user.click(screen.getByRole('button', { name: /^archive$/i }))
+    await user.click(screen.getByRole('button', { name: /confirm archive/i }))
+    await waitFor(() => expect(archiveRequests).toBe(1))
+
+    expect(screen.getByRole('button', { name: /make public/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /fork/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /edit details/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /^delete$/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /archiving/i })).toBeDisabled()
+
+    releaseArchive()
+    expect(await screen.findByText('Archived')).toBeInTheDocument()
+  })
+
   it('disables cached tracking controls until an archive progress read confirms followership', async () => {
     const user = userEvent.setup()
     let progressReads = 0

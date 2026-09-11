@@ -13,6 +13,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import delete as sa_delete
+from sqlalchemy import text
 
 from wren.core.db import create_db_engine, create_sessionmaker
 from wren.core.errors import Conflict, ErrorCode, NotFound
@@ -312,13 +313,36 @@ async def test_progress_and_deadline_race_preserves_unrelated_state(
         assert snapshot.deadline == date(2026, 12, 31)
 
 
+async def _wait_for_lock_wait(url: str, backend_pid: int) -> None:
+    engine = create_db_engine(url)
+    try:
+        async with create_sessionmaker(engine)() as session:
+            for _ in range(200):
+                result = await session.execute(
+                    text(
+                        """
+                        SELECT wait_event_type
+                        FROM pg_stat_activity
+                        WHERE pid = :backend_pid
+                        """
+                    ),
+                    {"backend_pid": backend_pid},
+                )
+                if result.scalar_one_or_none() == "Lock":
+                    return
+                await asyncio.sleep(0.01)
+    finally:
+        await engine.dispose()
+    raise AssertionError("PostgreSQL did not report the writer waiting on a row lock")
+
+
 async def test_locked_writer_waits_and_reads_committed_revision(migrated_url: str) -> None:
     await _seed(migrated_url)
     engine = create_db_engine(migrated_url)
     sessionmaker = create_sessionmaker(engine)
     first_locked = asyncio.Event()
     release_first = asyncio.Event()
-    second_started = asyncio.Event()
+    second_backend_pid: asyncio.Future[int] = asyncio.get_running_loop().create_future()
 
     async def first_writer() -> None:
         async with sessionmaker() as session:
@@ -337,15 +361,16 @@ async def test_locked_writer_waits_and_reads_committed_revision(migrated_url: st
     async def second_writer() -> RoadmapRecord | None:
         async with sessionmaker() as session:
             repo = SqlAlchemyRoadmapRepository(session)
-            second_started.set()
+            pid_result = await session.execute(text("SELECT pg_backend_pid()"))
+            second_backend_pid.set_result(pid_result.scalar_one())
             return await repo.get_for_update(ROADMAP_ID)
 
     try:
         first_task = asyncio.create_task(first_writer())
         await asyncio.wait_for(first_locked.wait(), timeout=2)
         second_task = asyncio.create_task(second_writer())
-        await asyncio.wait_for(second_started.wait(), timeout=2)
-        await asyncio.sleep(0)
+        backend_pid = await asyncio.wait_for(asyncio.shield(second_backend_pid), timeout=2)
+        await asyncio.wait_for(_wait_for_lock_wait(migrated_url, backend_pid), timeout=2)
         assert not second_task.done()
         release_first.set()
         await asyncio.wait_for(first_task, timeout=2)
