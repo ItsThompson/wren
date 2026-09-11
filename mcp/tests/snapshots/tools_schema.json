@@ -2134,6 +2134,322 @@
       "idempotentHint": null,
       "openWorldHint": false,
       "readOnlyHint": true,
+      "title": "Get roadmap"
+    },
+    "inputSchema": {
+      "properties": {
+        "roadmap_id": {
+          "title": "Roadmap Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "roadmap_id"
+      ],
+      "title": "roadmap_getArguments",
+      "type": "object"
+    },
+    "name": "roadmap_get",
+    "outputSchema": {
+      "$defs": {
+        "ChecklistItem": {
+          "properties": {
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "text": {
+              "title": "Text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "text"
+          ],
+          "title": "ChecklistItem",
+          "type": "object"
+        },
+        "Resource": {
+          "properties": {
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            },
+            "type": {
+              "$ref": "#/$defs/ResourceType"
+            },
+            "url": {
+              "pattern": "^https?://",
+              "title": "Url",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "type",
+            "url"
+          ],
+          "title": "Resource",
+          "type": "object"
+        },
+        "ResourceType": {
+          "enum": [
+            "article",
+            "video",
+            "book",
+            "course",
+            "docs",
+            "other"
+          ],
+          "title": "ResourceType",
+          "type": "string"
+        },
+        "RoadmapStatus": {
+          "enum": [
+            "draft",
+            "published",
+            "archived"
+          ],
+          "title": "RoadmapStatus",
+          "type": "string"
+        },
+        "Section": {
+          "properties": {
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "subsection_order": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Subsection Order",
+              "type": "array"
+            },
+            "subsections": {
+              "additionalProperties": {
+                "$ref": "#/$defs/Subsection"
+              },
+              "default": {},
+              "title": "Subsections",
+              "type": "object"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "title"
+          ],
+          "title": "Section",
+          "type": "object"
+        },
+        "Subsection": {
+          "properties": {
+            "checklist_items": {
+              "additionalProperties": {
+                "$ref": "#/$defs/ChecklistItem"
+              },
+              "default": {},
+              "title": "Checklist Items",
+              "type": "object"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Description"
+            },
+            "effort_estimate": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Effort Estimate"
+            },
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "item_order": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Item Order",
+              "type": "array"
+            },
+            "prereq_ids": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Prereq Ids",
+              "type": "array"
+            },
+            "resource_order": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Resource Order",
+              "type": "array"
+            },
+            "resources": {
+              "additionalProperties": {
+                "$ref": "#/$defs/Resource"
+              },
+              "default": {},
+              "title": "Resources",
+              "type": "object"
+            },
+            "tags": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Tags",
+              "type": "array"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "title"
+          ],
+          "title": "Subsection",
+          "type": "object"
+        },
+        "Visibility": {
+          "enum": [
+            "public",
+            "private"
+          ],
+          "title": "Visibility",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "owner": {
+          "title": "Owner",
+          "type": "string"
+        },
+        "revision": {
+          "default": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "section_order": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Section Order",
+          "type": "array"
+        },
+        "sections": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Section"
+          },
+          "default": {},
+          "title": "Sections",
+          "type": "object"
+        },
+        "status": {
+          "$ref": "#/$defs/RoadmapStatus",
+          "default": "draft"
+        },
+        "subject_tags": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Subject Tags",
+          "type": "array"
+        },
+        "suggested_path": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Suggested Path",
+          "type": "array"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        },
+        "visibility": {
+          "$ref": "#/$defs/Visibility",
+          "default": "private"
+        }
+      },
+      "required": [
+        "created_at",
+        "id",
+        "owner",
+        "title",
+        "updated_at"
+      ],
+      "title": "Roadmap",
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": null,
+      "idempotentHint": null,
+      "openWorldHint": false,
+      "readOnlyHint": true,
       "title": "Get next steps"
     },
     "inputSchema": {
@@ -2537,6 +2853,63 @@
           "title": "OverallProgress",
           "type": "object"
         },
+        "OverviewDetails": {
+          "properties": {
+            "created_at": {
+              "format": "date-time",
+              "title": "Created At",
+              "type": "string"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Description"
+            },
+            "owner": {
+              "title": "Owner",
+              "type": "string"
+            },
+            "subject_tags": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Subject Tags",
+              "type": "array"
+            },
+            "suggested_path": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Suggested Path",
+              "type": "array"
+            },
+            "updated_at": {
+              "format": "date-time",
+              "title": "Updated At",
+              "type": "string"
+            },
+            "visibility": {
+              "$ref": "#/$defs/Visibility"
+            }
+          },
+          "required": [
+            "created_at",
+            "owner",
+            "updated_at",
+            "visibility"
+          ],
+          "title": "OverviewDetails",
+          "type": "object"
+        },
         "RoadmapStatus": {
           "enum": [
             "draft",
@@ -2578,9 +2951,28 @@
           ],
           "title": "SectionOverview",
           "type": "object"
+        },
+        "Visibility": {
+          "enum": [
+            "public",
+            "private"
+          ],
+          "title": "Visibility",
+          "type": "string"
         }
       },
       "properties": {
+        "details": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OverviewDetails"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "overall": {
           "$ref": "#/$defs/OverallProgress"
         },
@@ -2616,6 +3008,108 @@
         "title"
       ],
       "title": "Overview",
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": null,
+      "idempotentHint": null,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "Get roadmap profile"
+    },
+    "inputSchema": {
+      "properties": {
+        "handle": {
+          "title": "Handle",
+          "type": "string"
+        }
+      },
+      "required": [
+        "handle"
+      ],
+      "title": "roadmap_get_profileArguments",
+      "type": "object"
+    },
+    "name": "roadmap_get_profile",
+    "outputSchema": {
+      "$defs": {
+        "RoadmapCard": {
+          "properties": {
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "status": {
+              "$ref": "#/$defs/RoadmapStatus"
+            },
+            "subject_tags": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Subject Tags",
+              "type": "array"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            },
+            "visibility": {
+              "$ref": "#/$defs/Visibility"
+            }
+          },
+          "required": [
+            "id",
+            "status",
+            "title",
+            "visibility"
+          ],
+          "title": "RoadmapCard",
+          "type": "object"
+        },
+        "RoadmapStatus": {
+          "enum": [
+            "draft",
+            "published",
+            "archived"
+          ],
+          "title": "RoadmapStatus",
+          "type": "string"
+        },
+        "Visibility": {
+          "enum": [
+            "public",
+            "private"
+          ],
+          "title": "Visibility",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "display_name": {
+          "title": "Display Name",
+          "type": "string"
+        },
+        "handle": {
+          "title": "Handle",
+          "type": "string"
+        },
+        "roadmaps": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/RoadmapCard"
+          },
+          "title": "Roadmaps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "display_name",
+        "handle"
+      ],
+      "title": "Profile",
       "type": "object"
     }
   },
@@ -2895,6 +3389,96 @@
         "title"
       ],
       "title": "SectionPage",
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": null,
+      "idempotentHint": null,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "List roadmaps"
+    },
+    "inputSchema": {
+      "properties": {},
+      "title": "roadmap_listArguments",
+      "type": "object"
+    },
+    "name": "roadmap_list",
+    "outputSchema": {
+      "$defs": {
+        "RoadmapCard": {
+          "properties": {
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "status": {
+              "$ref": "#/$defs/RoadmapStatus"
+            },
+            "subject_tags": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Subject Tags",
+              "type": "array"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            },
+            "visibility": {
+              "$ref": "#/$defs/Visibility"
+            }
+          },
+          "required": [
+            "id",
+            "status",
+            "title",
+            "visibility"
+          ],
+          "title": "RoadmapCard",
+          "type": "object"
+        },
+        "RoadmapStatus": {
+          "enum": [
+            "draft",
+            "published",
+            "archived"
+          ],
+          "title": "RoadmapStatus",
+          "type": "string"
+        },
+        "Visibility": {
+          "enum": [
+            "public",
+            "private"
+          ],
+          "title": "Visibility",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "authored": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/RoadmapCard"
+          },
+          "title": "Authored",
+          "type": "array"
+        },
+        "followed": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/RoadmapCard"
+          },
+          "title": "Followed",
+          "type": "array"
+        }
+      },
+      "title": "Dashboard",
       "type": "object"
     }
   },

@@ -68,8 +68,8 @@ _MCP_HEADERS = {
     "Accept": "application/json, text/event-stream",
     "Content-Type": "application/json",
 }
-# Registered tool surface: seven write tools + seven read tools.
-_TOOL_COUNT = 14
+# Registered tool surface: seven write tools + ten read tools.
+_TOOL_COUNT = 17
 
 
 def _authed_client(make_settings: MakeSettings) -> tuple[TestClient, dict[str, str]]:
@@ -288,7 +288,7 @@ def test_authenticated_post_mcp_no_slash_is_served_directly(make_settings: MakeS
 
 
 def test_all_tools_are_callable_over_both_mcp_paths(make_settings: MakeSettings) -> None:
-    # The full 14-tool surface is reachable over both /mcp and /mcp/.
+    # The full tool surface is reachable over both /mcp and /mcp/.
     client, headers = _authed_client(make_settings)
     with client:
         no_slash = client.post(MCP_PATH, json=_TOOLS_LIST, headers=headers)

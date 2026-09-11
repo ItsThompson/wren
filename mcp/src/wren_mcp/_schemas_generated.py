@@ -8,7 +8,7 @@ from datetime import date
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 
 class AddEdgeOp(BaseModel):
@@ -54,6 +54,11 @@ class ChangedNodeKind(StrEnum):
     SECTION = "section"
     SUBSECTION = "subsection"
     ITEM = "item"
+
+
+class ChecklistItem(BaseModel):
+    id: Annotated[str, Field(title="Id")]
+    text: Annotated[str, Field(title="Text")]
 
 
 class ChecklistItemInput(BaseModel):
@@ -237,19 +242,25 @@ class Violation(BaseModel):
     rule: Annotated[str, Field(title="Rule")]
 
 
+class Visibility(StrEnum):
+    PUBLIC = "public"
+    PRIVATE = "private"
+
+
 class ChangedNode(BaseModel):
     change: ChangeType
     id: Annotated[str, Field(title="Id")]
     kind: ChangedNodeKind
 
 
-class Overview(BaseModel):
-    overall: OverallProgress
-    revision: Annotated[int, Field(title="Revision")]
-    roadmap_id: Annotated[str, Field(title="Roadmap Id")]
-    sections: Annotated[list[SectionOverview], Field(title="Sections", validate_default=True)] = []
-    status: RoadmapStatus
-    title: Annotated[str, Field(title="Title")]
+class OverviewDetails(BaseModel):
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    description: Annotated[str | None, Field(title="Description")] = None
+    owner: Annotated[str, Field(title="Owner")]
+    subject_tags: Annotated[list[str], Field(title="Subject Tags")] = []
+    suggested_path: Annotated[list[str], Field(title="Suggested Path")] = []
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    visibility: Visibility
 
 
 class ProgressSnapshot(BaseModel):
@@ -260,6 +271,13 @@ class ProgressSnapshot(BaseModel):
     roadmap_id: Annotated[str, Field(title="Roadmap Id")]
     sections: Annotated[list[SectionProgress], Field(title="Sections", validate_default=True)] = []
     total_items: Annotated[int, Field(title="Total Items")]
+
+
+class Resource(BaseModel):
+    id: Annotated[str, Field(title="Id")]
+    title: Annotated[str, Field(title="Title")]
+    type: ResourceType
+    url: Annotated[str, Field(pattern="^https?://", title="Url")]
 
 
 class ResourceInput(BaseModel):
@@ -285,6 +303,14 @@ class ResourceRef(BaseModel):
     url: Annotated[str, Field(title="Url")]
 
 
+class RoadmapCard(BaseModel):
+    id: Annotated[str, Field(title="Id")]
+    status: RoadmapStatus
+    subject_tags: Annotated[list[str], Field(title="Subject Tags")] = []
+    title: Annotated[str, Field(title="Title")]
+    visibility: Visibility
+
+
 class SearchHit(BaseModel):
     item_id: Annotated[str | None, Field(title="Item Id")] = None
     kind: SearchHitKind
@@ -300,6 +326,21 @@ class SetResourcesOp(BaseModel):
     op: Annotated[Literal["set_resources"], Field(title="Op")]
     resources: Annotated[list[ResourceInput], Field(title="Resources", validate_default=True)] = []
     subsection_id: Annotated[str, Field(title="Subsection Id")]
+
+
+class Subsection(BaseModel):
+    checklist_items: Annotated[
+        dict[str, ChecklistItem], Field(title="Checklist Items", validate_default=True)
+    ] = {}
+    description: Annotated[str | None, Field(title="Description")] = None
+    effort_estimate: Annotated[str | None, Field(title="Effort Estimate")] = None
+    id: Annotated[str, Field(title="Id")]
+    item_order: Annotated[list[str], Field(title="Item Order")] = []
+    prereq_ids: Annotated[list[str], Field(title="Prereq Ids")] = []
+    resource_order: Annotated[list[str], Field(title="Resource Order")] = []
+    resources: Annotated[dict[str, Resource], Field(title="Resources", validate_default=True)] = {}
+    tags: Annotated[list[str], Field(title="Tags")] = []
+    title: Annotated[str, Field(title="Title")]
 
 
 class SubsectionInput(BaseModel):
@@ -329,6 +370,11 @@ class AddSubsectionOp(BaseModel):
     subsection: SubsectionInput
 
 
+class Dashboard(BaseModel):
+    authored: Annotated[list[RoadmapCard], Field(title="Authored", validate_default=True)] = []
+    followed: Annotated[list[RoadmapCard], Field(title="Followed", validate_default=True)] = []
+
+
 class NextItem(BaseModel):
     item_id: Annotated[str, Field(title="Item Id")]
     path_position: Annotated[int | None, Field(title="Path Position")] = None
@@ -355,9 +401,34 @@ class NodeDetail(BaseModel):
     title: Annotated[str, Field(title="Title")]
 
 
+class Overview(BaseModel):
+    details: OverviewDetails | None = None
+    overall: OverallProgress
+    revision: Annotated[int, Field(title="Revision")]
+    roadmap_id: Annotated[str, Field(title="Roadmap Id")]
+    sections: Annotated[list[SectionOverview], Field(title="Sections", validate_default=True)] = []
+    status: RoadmapStatus
+    title: Annotated[str, Field(title="Title")]
+
+
+class Profile(BaseModel):
+    display_name: Annotated[str, Field(title="Display Name")]
+    handle: Annotated[str, Field(title="Handle")]
+    roadmaps: Annotated[list[RoadmapCard], Field(title="Roadmaps", validate_default=True)] = []
+
+
 class ProgressUpdateResult(BaseModel):
     next: NextResult
     progress: ProgressSnapshot
+
+
+class Section(BaseModel):
+    id: Annotated[str, Field(title="Id")]
+    subsection_order: Annotated[list[str], Field(title="Subsection Order")] = []
+    subsections: Annotated[
+        dict[str, Subsection], Field(title="Subsections", validate_default=True)
+    ] = {}
+    title: Annotated[str, Field(title="Title")]
 
 
 class SectionInput(BaseModel):
@@ -378,6 +449,22 @@ class SectionPage(BaseModel):
     steering: Annotated[str | None, Field(title="Steering")] = None
     subsections: Annotated[list[NodeDetail], Field(title="Subsections", validate_default=True)] = []
     title: Annotated[str, Field(title="Title")]
+
+
+class Roadmap(BaseModel):
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    description: Annotated[str | None, Field(title="Description")] = None
+    id: Annotated[str, Field(title="Id")]
+    owner: Annotated[str, Field(title="Owner")]
+    revision: Annotated[int, Field(title="Revision")] = 1
+    section_order: Annotated[list[str], Field(title="Section Order")] = []
+    sections: Annotated[dict[str, Section], Field(title="Sections", validate_default=True)] = {}
+    status: RoadmapStatus = RoadmapStatus.DRAFT
+    subject_tags: Annotated[list[str], Field(title="Subject Tags")] = []
+    suggested_path: Annotated[list[str], Field(title="Suggested Path")] = []
+    title: Annotated[str, Field(title="Title")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    visibility: Visibility = Visibility.PRIVATE
 
 
 class RoadmapDraftInput(BaseModel):

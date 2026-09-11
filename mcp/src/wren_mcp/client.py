@@ -90,6 +90,12 @@ class InternalApiClient:
     async def create_draft(self, user_id: str, document: Any) -> httpx.Response:
         return await self._request("POST", "/roadmaps", user_id=user_id, json=document)
 
+    async def list_roadmaps(self, user_id: str) -> httpx.Response:
+        return await self._request("GET", "/me/dashboard", user_id=user_id)
+
+    async def get_profile(self, user_id: str, handle: str) -> httpx.Response:
+        return await self._request("GET", f"/users/{handle}", user_id=user_id)
+
     async def get_roadmap(self, user_id: str, roadmap_id: str) -> httpx.Response:
         return await self._request("GET", f"/roadmaps/{roadmap_id}", user_id=user_id)
 

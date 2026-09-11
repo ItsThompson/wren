@@ -18,6 +18,7 @@ import pytest
 from build_generation_input import (
     GROUP_A_COMPONENTS,
     _default_empty_non_null_arrays,
+    _default_empty_non_null_maps,
     _drop_visibility,
     _inline_nullable_constrained_scalars,
     _lift_patch_op_union,
@@ -104,6 +105,36 @@ def test_default_preserves_an_existing_default() -> None:
     assert schema["properties"]["tags"]["default"] == ["x"]
 
 
+# --- _default_empty_non_null_maps -------------------------------------------
+
+
+def test_default_added_to_an_optional_non_null_map() -> None:
+    schema: dict[str, Any] = {
+        "properties": {
+            "sections": {
+                "type": "object",
+                "additionalProperties": {"$ref": "#/components/schemas/Section"},
+            }
+        },
+        "required": [],
+    }
+    _default_empty_non_null_maps(schema)
+    assert schema["properties"]["sections"]["default"] == {}
+
+
+def test_default_not_added_to_a_nullable_map() -> None:
+    schema: dict[str, Any] = {
+        "properties": {
+            "sections": {
+                "anyOf": [{"type": "object"}, {"type": "null"}],
+            }
+        },
+        "required": [],
+    }
+    _default_empty_non_null_maps(schema)
+    assert "default" not in schema["properties"]["sections"]
+
+
 # --- _drop_visibility --------------------------------------------------------
 
 
@@ -128,10 +159,10 @@ def test_drop_visibility_without_a_required_key() -> None:
 
 def test_select_group_a_returns_only_group_a() -> None:
     raw: dict[str, Any] = {name: {"type": "object"} for name in GROUP_A_COMPONENTS}
-    raw["Roadmap"] = {"type": "object"}  # a non-Group-A domain type
+    raw["RoadmapExtra"] = {"type": "object"}  # a non-Group-A domain type
     selected = _select_group_a(raw)
     assert set(selected) == set(GROUP_A_COMPONENTS)
-    assert "Roadmap" not in selected
+    assert "RoadmapExtra" not in selected
 
 
 def test_select_group_a_fails_loudly_on_a_missing_component() -> None:

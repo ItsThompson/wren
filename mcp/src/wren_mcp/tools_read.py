@@ -1,6 +1,6 @@
 """MCP read tools: the agent study-time surface.
 
-The six workflow-shaped read tools plus ``progress_update``, registered on the
+The nine workflow-shaped read tools plus ``progress_update``, registered on the
 shared FastMCP server (:mod:`wren_mcp.mcp_server`) that :mod:`wren_mcp.app` mounts
 under the bearer-guarded ``/mcp`` prefix, alongside the write tools.
 Each tool is a **thin adapter**: it enforces the required OAuth scope and resolves
@@ -13,7 +13,7 @@ frozen read projection. Backend failures surface as model-recoverable
 Design rules: summary-first then drill-down; the
 ``concise | detailed`` switch; resource links never inlined bodies; the one
 many-item tool (``roadmap_get_section``) paginates via an opaque cursor and
-carries steering text on truncation. Annotations: the six reads are
+carries steering text on truncation. Annotations: the reads are
 ``readOnlyHint``; ``progress_update`` is an explicit-set write, so it is
 ``idempotentHint`` (a retry is a no-op), ``destructiveHint: false``, not readOnly.
 
@@ -31,12 +31,15 @@ from mcp.types import ToolAnnotations
 from wren_mcp.config import SCOPE_PROGRESS_WRITE, SCOPE_ROADMAPS_READ
 from wren_mcp.schemas import (
     CompletionState,
+    Dashboard,
     NextResult,
     NodeDetail,
     Overview,
+    Profile,
     ProgressSnapshot,
     ProgressUpdateResult,
     ResponseFormat,
+    Roadmap,
     SearchResults,
     SectionInclude,
     SectionPage,
@@ -50,6 +53,9 @@ if TYPE_CHECKING:
 
     from wren_mcp.client import InternalApiClient
 
+_LIST = ToolAnnotations(title="List roadmaps", readOnlyHint=True, openWorldHint=False)
+_PROFILE = ToolAnnotations(title="Get roadmap profile", readOnlyHint=True, openWorldHint=False)
+_GET = ToolAnnotations(title="Get roadmap", readOnlyHint=True, openWorldHint=False)
 _OVERVIEW = ToolAnnotations(title="Get roadmap overview", readOnlyHint=True, openWorldHint=False)
 _NEXT = ToolAnnotations(title="Get next steps", readOnlyHint=True, openWorldHint=False)
 _NODE = ToolAnnotations(title="Get subsection detail", readOnlyHint=True, openWorldHint=False)
@@ -66,10 +72,45 @@ _PROGRESS_UPDATE = ToolAnnotations(
 
 
 def register_read_tools(mcp: FastMCP, client: InternalApiClient) -> None:
-    """Register the seven study-time tools onto ``mcp``, each closing over the
+    """Register the ten study-time tools onto ``mcp``, each closing over the
     injected internal client (the write tools are registered alongside)."""
 
     tool = counted_tool_registrar(mcp)
+
+    @tool(_LIST)
+    async def roadmap_list(ctx: AgentContext) -> Dashboard:
+        """List your authored and followed roadmap cards.
+
+        Start here when you do not know a roadmap ID. The groups, ordering, and
+        overlap match the web dashboard; this read does not expose other users.
+        """
+        user_id = require_scope(ctx, scope=SCOPE_ROADMAPS_READ)
+        response = await client.list_roadmaps(user_id)
+        return Dashboard.model_validate(raise_for_problem(response).json())
+
+    @tool(_PROFILE)
+    async def roadmap_get_profile(handle: str, ctx: AgentContext) -> Profile:
+        """Get a public profile by handle.
+
+        The response contains only published, public roadmap cards. Use this when
+        you know a handle and need a roadmap ID; an unknown handle is a recoverable
+        not-found error.
+        """
+        user_id = require_scope(ctx, scope=SCOPE_ROADMAPS_READ)
+        response = await client.get_profile(user_id, handle)
+        return Profile.model_validate(raise_for_problem(response).json())
+
+    @tool(_GET)
+    async def roadmap_get(roadmap_id: str, ctx: AgentContext) -> Roadmap:
+        """Get one readable roadmap's complete canonical document.
+
+        Prefer roadmap_get_overview and drill-down reads for normal study. Call
+        this explicitly when the complete document is needed for inspection or
+        export. Full retrieval can be large and is never truncated or paginated.
+        """
+        user_id = require_scope(ctx, scope=SCOPE_ROADMAPS_READ)
+        response = await client.get_roadmap(user_id, roadmap_id)
+        return Roadmap.model_validate(raise_for_problem(response).json())
 
     @tool(_OVERVIEW)
     async def roadmap_get_overview(
@@ -78,7 +119,8 @@ def register_read_tools(mcp: FastMCP, client: InternalApiClient) -> None:
         """Orientation call: the sections in order with per-section and overall
         completion counts/percent for your progress, and no checklist-item bodies.
         Start here, then drill into a node (roadmap_get_node) or a section
-        (roadmap_get_section). Use format=detailed for the fuller projection."""
+        (roadmap_get_section). Use format=detailed to include stored metadata and
+        the author's suggested path; it still omits checklist bodies."""
         user_id = require_scope(ctx, scope=SCOPE_ROADMAPS_READ)
         response = await client.get_overview(user_id, roadmap_id, format.value)
         return Overview.model_validate(raise_for_problem(response).json())

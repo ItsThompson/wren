@@ -156,7 +156,26 @@ async def test_extra_headers_cannot_override_the_trusted_identity() -> None:
     assert request.headers[INTERNAL_TOKEN_HEADER] == _API_TOKEN
 
 
-# ---------- read projections ----------
+# ---------- listing + read projections ----------
+
+
+async def test_listing_methods_hit_internal_get_routes() -> None:
+    client, captured = _client_with_capture()
+
+    await client.list_roadmaps("user-ada")
+    await client.get_profile("user-ada", "ada")
+    await client.get_roadmap("user-ada", "r-1")
+
+    dashboard, profile, roadmap = captured
+    assert dashboard.method == "GET"
+    assert dashboard.url.path == "/me/dashboard"
+    assert profile.method == "GET"
+    assert profile.url.path == "/users/ada"
+    assert roadmap.method == "GET"
+    assert roadmap.url.path == "/roadmaps/r-1"
+    for request in captured:
+        assert request.headers[USER_ID_HEADER] == "user-ada"
+        assert request.headers[INTERNAL_TOKEN_HEADER] == _API_TOKEN
 
 
 async def test_read_projection_calls_hit_their_routes_with_the_switches() -> None:
