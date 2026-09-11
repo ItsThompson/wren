@@ -42,6 +42,14 @@ describe('roadmap cache reconciliation', () => {
     expect(reconcileDashboard(dashboard, roadmap({ visibility: 'private' }))?.followed).toEqual([])
   })
 
+  it('adds a newly published public roadmap to a mounted profile cache', () => {
+    const publishedNew = roadmap({ id: 'r2' })
+    expect(reconcileProfile({ ...profile, roadmaps: [] }, publishedNew)?.roadmaps).toEqual([
+      { id: 'r2', title: 'Roadmap', status: 'published', visibility: 'public', subject_tags: undefined },
+    ])
+    expect(reconcileProfile({ ...profile, roadmaps: [] }, roadmap({ status: 'draft' }))?.roadmaps).toEqual([])
+  })
+
   it('adds a newly forked roadmap once to authored dashboard data', () => {
     const fork = roadmap({ id: 'r2', status: 'draft', visibility: 'private' })
     const added = addAuthoredRoadmap({ authored: [], followed: [] }, fork)

@@ -116,7 +116,9 @@ export function useRoadmap(roadmapId: string): {
       void mutate(updated, { revalidate: false })
       const becamePublic = roadmap?.visibility === 'private' && updated.visibility === 'public'
       const dashboardNeedsRefresh = becamePublic
-      const profileNeedsRefresh = becamePublic && updated.status === 'published'
+      const becamePublished = roadmap?.status !== 'published' && updated.status === 'published'
+      const profileNeedsRefresh =
+        updated.status === 'published' && (becamePublic || becamePublished)
       void mutateCache<Dashboard>(keys.dashboard(), (current) => reconcileDashboard(current, updated), {
         revalidate: dashboardNeedsRefresh,
       })
@@ -139,7 +141,7 @@ export function useRoadmap(roadmapId: string): {
     })
   }, [mutateCache, roadmapId])
 
-  // Sub-state reset invariant (R2): the same RoadmapView instance stays mounted
+  // The same RoadmapView instance stays mounted
   // across a `:roadmapId` change, so reset these useState sub-states on change
   // or they leak from roadmap A onto roadmap B.
   useEffect(() => {

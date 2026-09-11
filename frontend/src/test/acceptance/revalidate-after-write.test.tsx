@@ -263,6 +263,38 @@ describe('revalidate-after-write keeps server state and avoids stale flashes', (
     await waitFor(() => expect(profileReads).toBe(2))
   })
 
+  it('reconciles a public draft into a mounted profile when it publishes', async () => {
+    const user = userEvent.setup()
+    const publicDraft = draft({ visibility: 'public' })
+    let profileReads = 0
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(publicDraft)),
+      http.get('*/users/:handle', () => {
+        profileReads += 1
+        return HttpResponse.json({
+          handle: 'ada',
+          display_name: 'Ada',
+          roadmaps: profileReads === 1 ? [] : [published()],
+        })
+      }),
+      http.post(PUBLISH_URL, () => HttpResponse.json(published())),
+    )
+    renderWithProviders(
+      <>
+        <WriteProbe />
+        <DiscoveryProbe />
+      </>,
+      { baseUrl: BASE },
+    )
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('draft'))
+    await waitFor(() => expect(profileReads).toBe(1))
+
+    await user.click(screen.getByRole('button', { name: 'publish' }))
+
+    await waitFor(() => expect(screen.getByTestId('profile-title')).toHaveTextContent(mockRoadmap.title))
+    expect(profileReads).toBe(2)
+  })
+
   it('archive reflects the returned archived status in place', async () => {
     const user = userEvent.setup()
     let roadmapGets = 0

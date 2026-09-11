@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 
 import { keys, runQuery, useApiQuery, useSessionClient } from '@/api'
 import { isStaleRevision, toProblem } from '@/lib/problem'
+import { useArchivedProgressRefresh } from './useArchivedProgressRefresh'
 import { firstNextSubsectionId, patchCheckedIds, patchDeadline } from '../util/progress-derive'
 import type { ProgressNotice, ProgressReadState, RoadmapStatus } from '../types'
 
@@ -56,13 +57,19 @@ export function useProgress(roadmapId: string, roadmapStatus: RoadmapStatus = 'p
   const { data: next, error: nextError, mutate: mutateNext } = useApiQuery(keys.next(roadmapId), (c) =>
     c.GET('/roadmaps/{roadmap_id}/next', { params: { path: { roadmap_id: roadmapId } } }),
   )
+  const refreshArchivedProgress = useCallback(
+    () => Promise.all([mutateProgress(), mutateNext()]),
+    [mutateNext, mutateProgress],
+  )
+  const archivedRefreshPending = useArchivedProgressRefresh(roadmapStatus, refreshArchivedProgress)
 
   const progressState = useMemo<ProgressReadState>(() => {
+    if (archivedRefreshPending) return { phase: 'loading' }
     if (roadmapStatus === 'archived' && progressError?.status === 409) return { phase: 'closed' }
     if (progressError) return { phase: 'failed', status: progressError.status }
     if (progress) return { phase: 'ready' }
     return { phase: 'loading' }
-  }, [progress, progressError, roadmapStatus])
+  }, [archivedRefreshPending, progress, progressError, roadmapStatus])
   const checkedIds = useMemo(
     () => (progressState.phase === 'ready' && progress ? new Set(progress.checked_ids ?? []) : null),
     [progress, progressState.phase],

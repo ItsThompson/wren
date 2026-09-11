@@ -1,6 +1,7 @@
 import { keys, useApiQuery } from '@/api'
 import type { Problem } from '@/lib/problem'
 
+import { useArchivedProgressRefresh } from '@/views/RoadmapView/hooks/useArchivedProgressRefresh'
 import type { ProgressReadState } from '@/views/RoadmapView/types'
 import type { ProgressSnapshot, Roadmap, TreeDataState } from '../types'
 
@@ -20,11 +21,14 @@ interface ReadResult<T> {
 function toTreeDataState(
   roadmap: ReadResult<Roadmap>,
   progress: ReadResult<ProgressSnapshot>,
+  archivedRefreshPending: boolean,
 ): TreeDataState {
   if (roadmap.isLoading && !roadmap.data) return { phase: 'loading' }
   if (roadmap.error || !roadmap.data) return { phase: 'error' }
   let progressState: ProgressReadState = { phase: 'loading' }
-  if (progress.error?.status === 409 && roadmap.data.status === 'archived') {
+  if (archivedRefreshPending) {
+    progressState = { phase: 'loading' }
+  } else if (progress.error?.status === 409 && roadmap.data.status === 'archived') {
     progressState = { phase: 'closed' }
   } else if (progress.error) {
     progressState = { phase: 'failed', status: progress.error.status }
@@ -59,6 +63,10 @@ export function useTreeData(roadmapId: string): { state: TreeDataState } {
       params: { path: { roadmap_id: roadmapId }, query: { detailed: true } },
     }),
   )
+  const archivedRefreshPending = useArchivedProgressRefresh(
+    roadmap.data?.status,
+    progress.mutate,
+  )
 
-  return { state: toTreeDataState(roadmap, progress) }
+  return { state: toTreeDataState(roadmap, progress, archivedRefreshPending) }
 }

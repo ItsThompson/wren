@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import os
-from datetime import UTC, datetime
+from contextlib import asynccontextmanager
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -14,12 +15,31 @@ from alembic.config import Config
 from sqlalchemy import delete as sa_delete
 
 from wren.core.db import create_db_engine, create_sessionmaker
+from wren.core.errors import Conflict, ErrorCode, NotFound
+from wren.progress.repository import SqlAlchemyProgressRepository
+from wren.progress.schemas import CompletionState, Progress
+from wren.progress.service import ProgressService
 from wren.roadmaps.models import RoadmapRecord
 from wren.roadmaps.repository import SqlAlchemyRoadmapRepository, transaction
-from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
+from wren.roadmaps.schemas import (
+    ChecklistItemInput,
+    PatchOp,
+    ResourceInput,
+    ResourceType,
+    Roadmap,
+    RoadmapInput,
+    RoadmapStatus,
+    SectionInput,
+    SetTagsOp,
+    SubsectionInput,
+    Visibility,
+)
+from wren.roadmaps.service import RoadmapService
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import AsyncIterator, Iterator
+
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 pytestmark = pytest.mark.integration
 
@@ -76,6 +96,214 @@ async def _seed(url: str) -> None:
             await session.commit()
     finally:
         await engine.dispose()
+
+
+def _roadmap_input(title: str) -> RoadmapInput:
+    return RoadmapInput(
+        title=title,
+        sections=[
+            SectionInput(
+                title="Core",
+                subsections=[
+                    SubsectionInput(
+                        proposed_id="sub_core",
+                        title="Core concept",
+                        resources=[
+                            ResourceInput(
+                                title="Guide",
+                                url="https://example.test/guide",
+                                type=ResourceType.ARTICLE,
+                            )
+                        ],
+                        checklist_items=[ChecklistItemInput(text="Read the guide")],
+                    )
+                ],
+            )
+        ],
+        suggested_path=["sub_core"],
+    )
+
+
+@asynccontextmanager
+async def _service_pair(
+    url: str,
+) -> AsyncIterator[tuple[list[RoadmapService], list[ProgressService], list[AsyncSession]]]:
+    engine = create_db_engine(url)
+    sessionmaker = create_sessionmaker(engine)
+    sessions = [sessionmaker(), sessionmaker()]
+    roadmap_repositories = [SqlAlchemyRoadmapRepository(session) for session in sessions]
+    progress_repositories = [SqlAlchemyProgressRepository(session) for session in sessions]
+    roadmap_services = [
+        RoadmapService(
+            roadmap_repository,
+            follower_counter=progress_repository.count_followers,
+            token_factory=lambda: "race",
+            clock=lambda: NOW,
+        )
+        for roadmap_repository, progress_repository in zip(
+            roadmap_repositories, progress_repositories, strict=True
+        )
+    ]
+    progress_services = [
+        ProgressService(roadmap_repository, progress_repository, clock=lambda: NOW)
+        for roadmap_repository, progress_repository in zip(
+            roadmap_repositories, progress_repositories, strict=True
+        )
+    ]
+    try:
+        yield roadmap_services, progress_services, sessions
+    finally:
+        for session in sessions:
+            await session.close()
+        await engine.dispose()
+
+
+async def _read_roadmap(url: str, roadmap_id: str) -> Roadmap:
+    engine = create_db_engine(url)
+    try:
+        async with create_sessionmaker(engine)() as session:
+            record = await SqlAlchemyRoadmapRepository(session).get(roadmap_id)
+            assert record is not None
+            return Roadmap.model_validate(record.document)
+    finally:
+        await engine.dispose()
+
+
+async def test_delete_and_first_follow_are_serialized_at_service_boundary(
+    migrated_url: str,
+) -> None:
+    async with _service_pair(migrated_url) as (roadmaps, progress, _):
+        created = await roadmaps[0].create_draft("owner", _roadmap_input("Delete follow race"))
+        await roadmaps[0].publish("owner", created.id)
+        delete_result, follow_result = await asyncio.gather(
+            roadmaps[0].delete("owner", created.id),
+            progress[1].follow("follower", created.id),
+            return_exceptions=True,
+        )
+        if delete_result is None:
+            assert isinstance(follow_result, NotFound)
+        else:
+            assert isinstance(delete_result, Conflict)
+            assert delete_result.code is ErrorCode.DELETE_HAS_FOLLOWERS
+            assert isinstance(follow_result, Progress)
+
+
+async def test_archive_and_first_follow_are_serialized_at_service_boundary(
+    migrated_url: str,
+) -> None:
+    async with _service_pair(migrated_url) as (roadmaps, progress, _):
+        created = await roadmaps[0].create_draft("owner", _roadmap_input("Archive follow race"))
+        await roadmaps[0].publish("owner", created.id)
+        archive_result, follow_result = await asyncio.gather(
+            roadmaps[0].archive("owner", created.id),
+            progress[1].follow("follower", created.id),
+            return_exceptions=True,
+        )
+        if isinstance(archive_result, Roadmap):
+            assert archive_result.status is RoadmapStatus.ARCHIVED
+            assert isinstance(follow_result, Conflict)
+        else:
+            assert isinstance(archive_result, Conflict)
+            assert isinstance(follow_result, Progress)
+        assert (await _read_roadmap(migrated_url, created.id)).status is RoadmapStatus.ARCHIVED
+
+
+async def test_same_revision_patch_writers_have_one_winner(
+    migrated_url: str,
+) -> None:
+    async with _service_pair(migrated_url) as (roadmaps, _, _):
+        created = await roadmaps[0].create_draft("owner", _roadmap_input("Patch race"))
+        operations: list[PatchOp] = [
+            SetTagsOp(op="set_tags", subsection_id="sub_core", tags=["race"])
+        ]
+        first, second = await asyncio.gather(
+            roadmaps[0].patch_draft("owner", created.id, created.revision, operations),
+            roadmaps[1].patch_draft("owner", created.id, created.revision, operations),
+            return_exceptions=True,
+        )
+        results = [first, second]
+        assert sum(isinstance(result, Conflict) for result in results) == 1
+        assert sum(not isinstance(result, Exception) for result in results) == 1
+        assert (await _read_roadmap(migrated_url, created.id)).revision == 2
+
+
+async def test_patch_and_publish_race_preserves_immutability(
+    migrated_url: str,
+) -> None:
+    async with _service_pair(migrated_url) as (roadmaps, _, _):
+        created = await roadmaps[0].create_draft("owner", _roadmap_input("Patch publish race"))
+        operations: list[PatchOp] = [
+            SetTagsOp(op="set_tags", subsection_id="sub_core", tags=["race"])
+        ]
+        patch_result, publish_result = await asyncio.gather(
+            roadmaps[0].patch_draft("owner", created.id, created.revision, operations),
+            roadmaps[1].publish("owner", created.id),
+            return_exceptions=True,
+        )
+        assert (await _read_roadmap(migrated_url, created.id)).status is RoadmapStatus.PUBLISHED
+        assert any(isinstance(result, Roadmap) for result in (patch_result, publish_result))
+        assert any(isinstance(result, Conflict) for result in (patch_result, publish_result))
+
+
+async def test_metadata_and_archive_race_keeps_both_committed_invariants(
+    migrated_url: str,
+) -> None:
+    async with _service_pair(migrated_url) as (roadmaps, _, _):
+        created = await roadmaps[0].create_draft("owner", _roadmap_input("Metadata archive race"))
+        await roadmaps[0].publish("owner", created.id)
+        metadata_result, archive_result = await asyncio.gather(
+            roadmaps[0].edit_metadata("owner", created.id, "Renamed", None, None),
+            roadmaps[1].archive("owner", created.id),
+        )
+        assert metadata_result.status is RoadmapStatus.PUBLISHED
+        assert archive_result.status is RoadmapStatus.ARCHIVED
+        stored = await _read_roadmap(migrated_url, created.id)
+        assert stored.status is RoadmapStatus.ARCHIVED
+        assert stored.title == "Renamed"
+
+
+async def test_visibility_and_patch_race_preserves_each_write(
+    migrated_url: str,
+) -> None:
+    async with _service_pair(migrated_url) as (roadmaps, _, _):
+        created = await roadmaps[0].create_draft("owner", _roadmap_input("Visibility patch race"))
+        visibility_result, patch_result = await asyncio.gather(
+            roadmaps[0].set_visibility("owner", created.id, Visibility.PUBLIC),
+            roadmaps[1].patch_draft(
+                "owner",
+                created.id,
+                created.revision,
+                [SetTagsOp(op="set_tags", subsection_id="sub_core", tags=["race"])],
+            ),
+        )
+        assert visibility_result.visibility is Visibility.PUBLIC
+        assert not isinstance(patch_result, Exception)
+        stored = await _read_roadmap(migrated_url, created.id)
+        assert stored.visibility is Visibility.PUBLIC
+        assert stored.revision == 2
+
+
+async def test_progress_and_deadline_race_preserves_unrelated_state(
+    migrated_url: str,
+) -> None:
+    async with _service_pair(migrated_url) as (roadmaps, progress, _):
+        created = await roadmaps[0].create_draft("owner", _roadmap_input("Progress deadline race"))
+        await roadmaps[0].publish("owner", created.id)
+        update_result, deadline_result = await asyncio.gather(
+            progress[0].update(
+                "reader", created.id, ["chk_read-the-guide"], CompletionState.COMPLETE
+            ),
+            progress[1].set_deadline("reader", created.id, date(2026, 12, 31)),
+        )
+        update_checked_ids = update_result.progress.checked_ids
+        assert update_checked_ids is not None
+        assert "chk_read-the-guide" in update_checked_ids
+        assert deadline_result.deadline == date(2026, 12, 31)
+        snapshot = await progress[0].get("reader", created.id, detailed=True)
+        snapshot_checked_ids = snapshot.checked_ids
+        assert snapshot_checked_ids is not None
+        assert "chk_read-the-guide" in snapshot_checked_ids
+        assert snapshot.deadline == date(2026, 12, 31)
 
 
 async def test_locked_writer_waits_and_reads_committed_revision(migrated_url: str) -> None:

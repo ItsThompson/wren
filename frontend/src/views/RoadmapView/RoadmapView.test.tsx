@@ -835,6 +835,32 @@ describe('RoadmapView web-only lifecycle', () => {
     expect(screen.queryByRole('button', { name: /^archive$/i })).not.toBeInTheDocument()
   })
 
+  it('disables cached tracking controls until an archive progress read confirms followership', async () => {
+    const user = userEvent.setup()
+    let progressReads = 0
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
+      http.get(PROGRESS_URL, () => {
+        progressReads += 1
+        return progressReads === 1
+          ? HttpResponse.json(buildProgress())
+          : new HttpResponse(null, { status: 409 })
+      }),
+      http.get('*/roadmaps/:id/next', () => HttpResponse.json({ items: [], remaining_in_path: 0, complete: false })),
+      http.post(ARCHIVE_URL, () => HttpResponse.json(buildDraft({ status: 'archived' }))),
+    )
+    renderView()
+    await screen.findByRole('progressbar', { name: /overall progress/i })
+
+    await user.click(screen.getByRole('button', { name: /^archive$/i }))
+    await user.click(screen.getByRole('button', { name: /confirm archive/i }))
+
+    await waitFor(() => expect(screen.getByText(/closed to new tracking/i)).toBeInTheDocument())
+    expect(progressReads).toBe(2)
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Deadline')).not.toBeInTheDocument()
+  })
+
   it('shows archived content read-only to a non-follower', async () => {
     server.use(
       http.get('*/roadmaps/:id', () =>
