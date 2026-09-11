@@ -65,6 +65,11 @@ function seedReads(snapshot: ProgressSnapshot, next: NextResult = buildNext()): 
 }
 
 /** Mount `useProgress` under the production-parity provider stack. */
+function requireCheckedIds(ids: Set<string> | null): Set<string> {
+  if (!ids) throw new Error('expected an authoritative progress snapshot')
+  return ids
+}
+
 function renderProgress(roadmapStatus: RoadmapStatus = 'published') {
   return renderHook(() => useProgress(ROADMAP_ID, roadmapStatus), { wrapper: createHookWrapper() })
 }
@@ -74,7 +79,9 @@ describe('useProgress reads', () => {
     seedReads(buildSnapshot({ checked_ids: ['a', 'b'], deadline: '2099-12-31' }), nextAt('sub_hashing'))
     const { result } = renderProgress()
 
-    await waitFor(() => expect([...result.current.checkedIds].sort()).toEqual(['a', 'b']))
+    await waitFor(() =>
+      expect([...requireCheckedIds(result.current.checkedIds)].sort()).toEqual(['a', 'b']),
+    )
     expect(result.current.deadline).toBe('2099-12-31')
     expect(result.current.nextSubsectionId).toBe('sub_hashing')
     expect(result.current.nextComplete).toBe(false)
@@ -90,7 +97,7 @@ describe('useProgress reads', () => {
     const { result } = renderProgress()
 
     await waitFor(() => expect(result.current.progressState).toEqual({ phase: 'failed', status: 500 }))
-    expect(result.current.checkedIds).toEqual(new Set())
+    expect(result.current.checkedIds).toBeNull()
   })
 
   it('marks an archived non-follower closed and does not enable writes', async () => {
@@ -119,13 +126,17 @@ describe('useProgress toggle', () => {
       }),
     )
     const { result } = renderProgress()
-    await waitFor(() => expect([...result.current.checkedIds]).toEqual(['a']))
+    await waitFor(() =>
+      expect([...requireCheckedIds(result.current.checkedIds)]).toEqual(['a']),
+    )
 
     act(() => result.current.toggle('b', true))
     // Optimistic: the checkbox reflects instantly, before the write resolves.
-    expect(result.current.checkedIds.has('b')).toBe(true)
+    expect(requireCheckedIds(result.current.checkedIds).has('b')).toBe(true)
 
-    await waitFor(() => expect([...result.current.checkedIds].sort()).toEqual(['a', 'b']))
+    await waitFor(() =>
+      expect([...requireCheckedIds(result.current.checkedIds)].sort()).toEqual(['a', 'b']),
+    )
     // The next key reconciled from the same POST body (not a re-fetch).
     expect(result.current.nextComplete).toBe(true)
     expect(result.current.nextSubsectionId).toBeNull()
@@ -143,13 +154,17 @@ describe('useProgress toggle', () => {
       }),
     )
     const { result } = renderProgress()
-    await waitFor(() => expect([...result.current.checkedIds].sort()).toEqual(['a', 'b']))
+    await waitFor(() =>
+      expect([...requireCheckedIds(result.current.checkedIds)].sort()).toEqual(['a', 'b']),
+    )
 
     act(() => result.current.toggle('b', false))
     // Optimistic: the uncheck drops the item instantly.
-    expect(result.current.checkedIds.has('b')).toBe(false)
+    expect(requireCheckedIds(result.current.checkedIds).has('b')).toBe(false)
 
-    await waitFor(() => expect([...result.current.checkedIds]).toEqual(['a']))
+    await waitFor(() =>
+      expect([...requireCheckedIds(result.current.checkedIds)]).toEqual(['a']),
+    )
     expect(posted).toEqual({ item_ids: ['b'], state: 'incomplete' })
   })
 
@@ -157,28 +172,32 @@ describe('useProgress toggle', () => {
     seedReads(buildSnapshot({ checked_ids: ['a'] }))
     server.use(http.post(PROGRESS_URL, () => staleConflict()))
     const { result } = renderProgress()
-    await waitFor(() => expect([...result.current.checkedIds]).toEqual(['a']))
+    await waitFor(() =>
+      expect([...requireCheckedIds(result.current.checkedIds)]).toEqual(['a']),
+    )
 
     act(() => result.current.toggle('b', true))
-    expect(result.current.checkedIds.has('b')).toBe(true)
+    expect(requireCheckedIds(result.current.checkedIds).has('b')).toBe(true)
 
     await waitFor(() => expect(result.current.notice).toEqual({ kind: 'stale' }))
     // Rolled back to the pre-toggle checked set.
-    expect(result.current.checkedIds.has('b')).toBe(false)
-    expect([...result.current.checkedIds]).toEqual(['a'])
+    expect(requireCheckedIds(result.current.checkedIds).has('b')).toBe(false)
+    expect([...requireCheckedIds(result.current.checkedIds)]).toEqual(['a'])
   })
 
   it('reverts and surfaces a save-failed notice when the write throws at the network level', async () => {
     seedReads(buildSnapshot({ checked_ids: ['a'] }))
     server.use(http.post(PROGRESS_URL, () => HttpResponse.error()))
     const { result } = renderProgress()
-    await waitFor(() => expect([...result.current.checkedIds]).toEqual(['a']))
+    await waitFor(() =>
+      expect([...requireCheckedIds(result.current.checkedIds)]).toEqual(['a']),
+    )
 
     act(() => result.current.toggle('b', true))
-    expect(result.current.checkedIds.has('b')).toBe(true)
+    expect(requireCheckedIds(result.current.checkedIds).has('b')).toBe(true)
 
     await waitFor(() => expect(result.current.notice).toEqual({ kind: 'save-failed' }))
-    expect([...result.current.checkedIds]).toEqual(['a'])
+    expect([...requireCheckedIds(result.current.checkedIds)]).toEqual(['a'])
   })
 })
 
@@ -243,7 +262,9 @@ describe('useProgress dismissNotice', () => {
     seedReads(buildSnapshot({ checked_ids: ['a'] }))
     server.use(http.post(PROGRESS_URL, () => new HttpResponse(null, { status: 500 })))
     const { result } = renderProgress()
-    await waitFor(() => expect([...result.current.checkedIds]).toEqual(['a']))
+    await waitFor(() =>
+      expect([...requireCheckedIds(result.current.checkedIds)]).toEqual(['a']),
+    )
 
     act(() => result.current.toggle('b', true))
     await waitFor(() => expect(result.current.notice).toEqual({ kind: 'save-failed' }))
@@ -271,7 +292,9 @@ describe('useProgress reload', () => {
       http.post(PROGRESS_URL, () => new HttpResponse(null, { status: 500 })),
     )
     const { result } = renderProgress()
-    await waitFor(() => expect([...result.current.checkedIds]).toEqual(['a']))
+    await waitFor(() =>
+      expect([...requireCheckedIds(result.current.checkedIds)]).toEqual(['a']),
+    )
     const progressGetsBeforeReload = progressGets
     const nextGetsBeforeReload = nextGets
 
@@ -285,7 +308,7 @@ describe('useProgress reload', () => {
 
     await waitFor(() => {
       expect(result.current.notice).toBeNull()
-      expect([...result.current.checkedIds].sort()).toEqual(['a', 'x'])
+      expect([...requireCheckedIds(result.current.checkedIds)].sort()).toEqual(['a', 'x'])
       expect(result.current.nextSubsectionId).toBe('sub_new')
     })
     expect(progressGets).toBeGreaterThan(progressGetsBeforeReload)

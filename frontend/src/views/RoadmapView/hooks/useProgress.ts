@@ -13,8 +13,8 @@ import type { ProgressNotice, ProgressReadState, RoadmapStatus } from '../types'
  * optimistic and are enabled only in the ready state.
  */
 export function useProgress(roadmapId: string, roadmapStatus: RoadmapStatus = 'published'): {
-  /** Empty for compatibility; consumers must gate it on progressState. */
-  checkedIds: Set<string>
+  /** Null until the server confirms a progress snapshot. */
+  checkedIds: Set<string> | null
   progressState: ProgressReadState
   toggle: (itemId: string, checked: boolean) => void
   deadline: string | null
@@ -64,8 +64,8 @@ export function useProgress(roadmapId: string, roadmapStatus: RoadmapStatus = 'p
     return { phase: 'loading' }
   }, [progress, progressError, roadmapStatus])
   const checkedIds = useMemo(
-    () => new Set(progress?.checked_ids ?? []),
-    [progress],
+    () => (progressState.phase === 'ready' && progress ? new Set(progress.checked_ids ?? []) : null),
+    [progress, progressState.phase],
   )
   const deadline = progress?.deadline ?? null
   const nextSubsectionId = progressState.phase === 'ready' && !nextError ? firstNextSubsectionId(next) : null

@@ -29,7 +29,7 @@ function RoadmapRouteProbe() {
   return (
     <div>
       <span data-testid="roadmap-phase">{state.phase}</span>
-      <span data-testid="roadmap-checked">{checkedIds.size}</span>
+      <span data-testid="roadmap-checked">{checkedIds?.size ?? 'unknown'}</span>
     </div>
   )
 }

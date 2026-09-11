@@ -43,6 +43,7 @@ export function useLifecycle(
   const [deleteState, setDeleteState] = useState<DeleteState>({ phase: 'idle' })
   const generationRef = useRef(0)
   const previousRoadmapIdRef = useRef(roadmapId)
+  const mountedRef = useRef(true)
 
   if (previousRoadmapIdRef.current !== roadmapId) {
     previousRoadmapIdRef.current = roadmapId
@@ -50,14 +51,21 @@ export function useLifecycle(
   }
   const generation = generationRef.current
   const isCurrent = useCallback(
-    () => generationRef.current === generation && previousRoadmapIdRef.current === roadmapId,
+    () =>
+      mountedRef.current &&
+      generationRef.current === generation &&
+      previousRoadmapIdRef.current === roadmapId,
     [generation, roadmapId],
   )
 
   useEffect(() => {
+    mountedRef.current = true
     setVisibilityState({ phase: 'idle' })
     setArchiveState({ phase: 'idle' })
     setDeleteState({ phase: 'idle' })
+    return () => {
+      mountedRef.current = false
+    }
   }, [roadmapId])
 
   const setVisibility = useCallback(

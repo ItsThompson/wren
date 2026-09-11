@@ -80,6 +80,7 @@ export function useRoadmap(roadmapId: string): {
   const { mutate: mutateCache } = useSWRConfig()
   const generationRef = useRef(0)
   const previousRoadmapIdRef = useRef(roadmapId)
+  const mountedRef = useRef(true)
 
   if (previousRoadmapIdRef.current !== roadmapId) {
     previousRoadmapIdRef.current = roadmapId
@@ -87,7 +88,10 @@ export function useRoadmap(roadmapId: string): {
   }
   const generation = generationRef.current
   const isCurrent = useCallback(
-    () => generationRef.current === generation && previousRoadmapIdRef.current === roadmapId,
+    () =>
+      mountedRef.current &&
+      generationRef.current === generation &&
+      previousRoadmapIdRef.current === roadmapId,
     [generation, roadmapId],
   )
 
@@ -139,10 +143,14 @@ export function useRoadmap(roadmapId: string): {
   // across a `:roadmapId` change, so reset these useState sub-states on change
   // or they leak from roadmap A onto roadmap B.
   useEffect(() => {
+    mountedRef.current = true
     setPublishState({ phase: 'idle' })
     setMetadataState({ phase: 'idle' })
     setForkState({ phase: 'idle' })
     setConflict(null)
+    return () => {
+      mountedRef.current = false
+    }
   }, [roadmapId])
 
   const publish = useCallback(async () => {
