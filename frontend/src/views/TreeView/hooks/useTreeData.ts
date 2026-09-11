@@ -1,3 +1,5 @@
+import { useCallback } from 'react'
+
 import { keys, useApiQuery } from '@/api'
 import type { Problem } from '@/lib/problem'
 
@@ -26,10 +28,10 @@ function toTreeDataState(
   if (roadmap.isLoading && !roadmap.data) return { phase: 'loading' }
   if (roadmap.error || !roadmap.data) return { phase: 'error' }
   let progressState: ProgressReadState = { phase: 'loading' }
-  if (archivedRefreshPending) {
-    progressState = { phase: 'loading' }
-  } else if (progress.error?.status === 409 && roadmap.data.status === 'archived') {
+  if (progress.error?.status === 409 && roadmap.data.status === 'archived') {
     progressState = { phase: 'closed' }
+  } else if (archivedRefreshPending) {
+    progressState = { phase: 'loading' }
   } else if (progress.error) {
     progressState = { phase: 'failed', status: progress.error.status }
   } else if (progress.data) {
@@ -58,14 +60,25 @@ export function useTreeData(roadmapId: string): { state: TreeDataState } {
   const roadmap = useApiQuery(keys.roadmap(roadmapId), (client) =>
     client.GET('/roadmaps/{roadmap_id}', { params: { path: { roadmap_id: roadmapId } } }),
   )
-  const progress = useApiQuery(keys.progress(roadmapId), (client) =>
+  const {
+    data: progressData,
+    error: progressError,
+    isLoading: progressLoading,
+    mutate: mutateProgress,
+  } = useApiQuery(keys.progress(roadmapId), (client) =>
     client.GET('/roadmaps/{roadmap_id}/progress', {
       params: { path: { roadmap_id: roadmapId }, query: { detailed: true } },
     }),
   )
+  const progress = { data: progressData, error: progressError, isLoading: progressLoading }
+  const invalidateArchivedProgress = useCallback(
+    () => mutateProgress(undefined, { revalidate: false }),
+    [mutateProgress],
+  )
   const archivedRefreshPending = useArchivedProgressRefresh(
     roadmap.data?.status,
-    progress.mutate,
+    mutateProgress,
+    invalidateArchivedProgress,
   )
 
   return { state: toTreeDataState(roadmap, progress, archivedRefreshPending) }

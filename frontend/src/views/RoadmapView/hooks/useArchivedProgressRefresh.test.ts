@@ -6,9 +6,10 @@ import { useArchivedProgressRefresh } from './useArchivedProgressRefresh'
 describe('useArchivedProgressRefresh', () => {
   it('holds tracking closed while a published-to-archived read refreshes', async () => {
     const refreshProgress = vi.fn(() => Promise.resolve())
+    const invalidateProgress = vi.fn(() => Promise.resolve())
     const { result, rerender } = renderHook(
       ({ status }: { status: 'published' | 'archived' }) =>
-        useArchivedProgressRefresh(status, refreshProgress),
+        useArchivedProgressRefresh(status, refreshProgress, invalidateProgress),
       { initialProps: { status: 'published' } },
     )
 
@@ -18,13 +19,39 @@ describe('useArchivedProgressRefresh', () => {
     expect(result.current).toBe(true)
     await waitFor(() => expect(result.current).toBe(false))
     expect(refreshProgress).toHaveBeenCalledOnce()
+    expect(invalidateProgress).toHaveBeenCalledOnce()
+  })
+
+  it('gates an initially archived mount until cached progress is invalidated and reread', async () => {
+    let resolveRefresh: (() => void) | undefined
+    const refreshProgress = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRefresh = resolve
+        }),
+    )
+    const invalidateProgress = vi.fn(() => Promise.resolve())
+    const { result } = renderHook(() =>
+      useArchivedProgressRefresh('archived', refreshProgress, invalidateProgress),
+    )
+
+    expect(result.current).toBe(true)
+    await waitFor(() => {
+      expect(invalidateProgress).toHaveBeenCalledOnce()
+      expect(refreshProgress).toHaveBeenCalledOnce()
+    })
+    expect(result.current).toBe(true)
+
+    resolveRefresh?.()
+    await waitFor(() => expect(result.current).toBe(false))
   })
 
   it('releases the gate when the authoritative read fails', async () => {
     const refreshProgress = vi.fn(() => Promise.reject(new Error('read failed')))
+    const invalidateProgress = vi.fn(() => Promise.resolve())
     const { result, rerender } = renderHook(
       ({ status }: { status: 'published' | 'archived' }) =>
-        useArchivedProgressRefresh(status, refreshProgress),
+        useArchivedProgressRefresh(status, refreshProgress, invalidateProgress),
       { initialProps: { status: 'published' } },
     )
 

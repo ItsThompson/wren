@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
-import { SWRConfig } from 'swr'
+import { SWRConfig, type Cache } from 'swr'
 
 import { ApiClientProvider, swrRevalidationPosture } from '@/api'
 import { AuthProvider } from '@/auth'
@@ -37,6 +37,8 @@ export interface HookWrapperOptions {
    * Wins over `authValue` when both are passed.
    */
   useRealAuth?: boolean
+  /** Optional cache instance for tests that need to seed an existing SWR read. */
+  swrCache?: Cache
 }
 
 /**
@@ -57,7 +59,13 @@ export interface HookWrapperOptions {
 export function createHookWrapper(
   options: HookWrapperOptions = {},
 ): ({ children }: { children: ReactNode }) => ReactElement {
-  const { baseUrl = TEST_API_BASE, initialEntries = ['/'], authValue, useRealAuth = false } = options
+  const {
+    baseUrl = TEST_API_BASE,
+    initialEntries = ['/'],
+    authValue,
+    useRealAuth = false,
+    swrCache,
+  } = options
 
   return function HookWrapper({ children }: { children: ReactNode }): ReactElement {
     const routed = <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>
@@ -68,7 +76,7 @@ export function createHookWrapper(
     )
 
     return (
-      <SWRConfig value={swrTestConfig}>
+      <SWRConfig value={{ ...swrTestConfig, provider: () => swrCache ?? new Map() }}>
         <ApiClientProvider baseUrl={baseUrl}>{withAuth}</ApiClientProvider>
       </SWRConfig>
     )

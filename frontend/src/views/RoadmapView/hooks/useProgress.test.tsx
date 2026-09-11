@@ -1,8 +1,10 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
+import { unstable_serialize, type Cache } from 'swr'
 import { afterAll, afterEach, beforeAll } from 'vitest'
 
+import { keys } from '@/api'
 import type { components } from '@/api'
 import { createHookWrapper } from '@/test/createHookWrapper'
 import { TEST_API_BASE } from '@/test/test-api-base'
@@ -110,6 +112,37 @@ describe('useProgress reads', () => {
     await waitFor(() => expect(result.current.progressState).toEqual({ phase: 'closed' }))
     act(() => result.current.toggle('item', true))
     expect(result.current.progressState).toEqual({ phase: 'closed' })
+  })
+
+  it('invalidates cached published progress before an initially archived read settles', async () => {
+    const swrCache: Cache = new Map()
+    swrCache.set(unstable_serialize(keys.progress(ROADMAP_ID)), {
+      data: buildSnapshot({ checked_ids: ['cached-published-item'] }),
+    })
+    swrCache.set(unstable_serialize(keys.next(ROADMAP_ID)), { data: nextAt('cached-subsection') })
+    let progressReads = 0
+    let nextReads = 0
+    server.use(
+      http.get(PROGRESS_URL, () => {
+        progressReads += 1
+        return new HttpResponse(null, { status: 409 })
+      }),
+      http.get(NEXT_URL, () => {
+        nextReads += 1
+        return new HttpResponse(null, { status: 409 })
+      }),
+    )
+
+    const { result } = renderHook(() => useProgress(ROADMAP_ID, 'archived'), {
+      wrapper: createHookWrapper({ swrCache }),
+    })
+
+    expect(result.current.progressState).toEqual({ phase: 'loading' })
+    expect(result.current.checkedIds).toBeNull()
+    await waitFor(() => expect(result.current.progressState).toEqual({ phase: 'closed' }))
+    expect(progressReads).toBeGreaterThan(0)
+    expect(nextReads).toBeGreaterThan(0)
+    expect(result.current.checkedIds).toBeNull()
   })
 })
 

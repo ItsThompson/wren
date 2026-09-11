@@ -61,11 +61,23 @@ export function useProgress(roadmapId: string, roadmapStatus: RoadmapStatus = 'p
     () => Promise.all([mutateProgress(), mutateNext()]),
     [mutateNext, mutateProgress],
   )
-  const archivedRefreshPending = useArchivedProgressRefresh(roadmapStatus, refreshArchivedProgress)
+  const invalidateArchivedProgress = useCallback(
+    () =>
+      Promise.all([
+        mutateProgress(undefined, { revalidate: false }),
+        mutateNext(undefined, { revalidate: false }),
+      ]),
+    [mutateNext, mutateProgress],
+  )
+  const archivedRefreshPending = useArchivedProgressRefresh(
+    roadmapStatus,
+    refreshArchivedProgress,
+    invalidateArchivedProgress,
+  )
 
   const progressState = useMemo<ProgressReadState>(() => {
-    if (archivedRefreshPending) return { phase: 'loading' }
     if (roadmapStatus === 'archived' && progressError?.status === 409) return { phase: 'closed' }
+    if (archivedRefreshPending) return { phase: 'loading' }
     if (progressError) return { phase: 'failed', status: progressError.status }
     if (progress) return { phase: 'ready' }
     return { phase: 'loading' }

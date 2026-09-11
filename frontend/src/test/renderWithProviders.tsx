@@ -24,10 +24,10 @@ export function renderWithProviders(
   ui: ReactElement,
   options: ProviderRenderOptions = {},
 ): RenderResult {
-  const { baseUrl, initialEntries, authValue, useRealAuth, ...renderOptions } = options
+  const { baseUrl, initialEntries, authValue, useRealAuth, swrCache, ...renderOptions } = options
 
   return render(ui, {
-    wrapper: createHookWrapper({ baseUrl, initialEntries, authValue, useRealAuth }),
+    wrapper: createHookWrapper({ baseUrl, initialEntries, authValue, useRealAuth, swrCache }),
     ...renderOptions,
   })
 }
