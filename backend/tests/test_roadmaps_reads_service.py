@@ -97,6 +97,16 @@ async def test_get_returns_the_full_roadmap_to_its_owner() -> None:
     assert roadmap.status is RoadmapStatus.DRAFT
 
 
+async def test_owner_reads_their_own_archived_roadmap() -> None:
+    service = _service(
+        build_read_roadmap(
+            owner=AUTHOR, status=RoadmapStatus.ARCHIVED, visibility=Visibility.PRIVATE
+        )
+    )
+    roadmap = await service.get(AUTHOR, ROADMAP_ID)
+    assert roadmap.status is RoadmapStatus.ARCHIVED
+
+
 async def test_get_is_404_for_a_non_owner_on_a_private_roadmap() -> None:
     service = _service(build_read_roadmap(visibility=Visibility.PRIVATE))
     with pytest.raises(NotFound):

@@ -244,20 +244,19 @@ class ProgressService:
                 "tracked.",
                 instance=f"/roadmaps/{roadmap_id}",
             )
-        if roadmap.status is RoadmapStatus.ARCHIVED and not await self._is_follower(
-            user_id, roadmap_id
-        ):
-            # Archived gains no new followers: a caller with no existing progress
-            # record cannot start tracking it (a write here would create a phantom
-            # follower via the upsert). New follows are already blocked by follow().
+        if roadmap.status is RoadmapStatus.ARCHIVED:
+            # Archived callers must already have progress, including the owner.
+            # Ownership keeps the roadmap readable but never creates participation.
+            if await self._has_progress(user_id, roadmap_id):
+                return roadmap
             raise Conflict(
                 f"Roadmap '{roadmap_id}' is archived; only its existing followers can track it.",
                 instance=f"/roadmaps/{roadmap_id}",
             )
         return roadmap
 
-    async def _is_follower(self, user_id: str, roadmap_id: str) -> bool:
-        """Whether the caller already has a progress record for the roadmap."""
+    async def _has_progress(self, user_id: str, roadmap_id: str) -> bool:
+        """Whether the caller has an existing progress record for the roadmap."""
         return await self._progress.get(user_id, roadmap_id) is not None
 
     def _reject_foreign_items(self, roadmap: Roadmap, roadmap_id: str, item_ids: list[str]) -> None:
