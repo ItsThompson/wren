@@ -1,6 +1,7 @@
 import { keys, useApiQuery } from '@/api'
 import type { Problem } from '@/lib/problem'
 
+import type { ProgressReadState } from '@/views/RoadmapView/types'
 import type { ProgressSnapshot, Roadmap, TreeDataState } from '../types'
 
 /** The subset of an SWR read result the tree mapping consumes. */
@@ -12,22 +13,29 @@ interface ReadResult<T> {
 
 /**
  * Derive the tree's phase-state from the two reads with their different
- * fatality. The roadmap read is fatal: while it loads the view shows the
- * skeleton, and any failure (or an empty body) is the single error surface. The
- * progress read is best-effort, so only its `data` is read here: any failure
- * collapses to an empty checked set, letting an anonymous viewer (or a public
- * reader with no progress record) still see the tree in its base state.
+ * fatality. The roadmap read is fatal. Progress remains explicit so loading,
+ * closed, and failed reads never claim confirmed completion; the structural
+ * tree stays readable.
  */
 function toTreeDataState(
   roadmap: ReadResult<Roadmap>,
-  progress: Pick<ReadResult<ProgressSnapshot>, 'data'>,
+  progress: ReadResult<ProgressSnapshot>,
 ): TreeDataState {
   if (roadmap.isLoading && !roadmap.data) return { phase: 'loading' }
   if (roadmap.error || !roadmap.data) return { phase: 'error' }
+  let progressState: ProgressReadState = { phase: 'loading' }
+  if (progress.error?.status === 409 && roadmap.data.status === 'archived') {
+    progressState = { phase: 'closed' }
+  } else if (progress.error) {
+    progressState = { phase: 'failed', status: progress.error.status }
+  } else if (progress.data) {
+    progressState = { phase: 'ready' }
+  }
   return {
     phase: 'loaded',
     roadmap: roadmap.data,
-    checkedIds: new Set(progress.data?.checked_ids ?? []),
+    checkedIds: progressState.phase === 'ready' && progress.data ? new Set(progress.data.checked_ids ?? []) : null,
+    progressState,
   }
 }
 

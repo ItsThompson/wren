@@ -1030,9 +1030,35 @@ export interface components {
             status: components["schemas"]["RoadmapStatus"];
             /** Revision */
             revision: number;
+            details?: components["schemas"]["OverviewDetails"] | null;
             /** Sections */
             sections?: components["schemas"]["SectionOverview"][];
             overall: components["schemas"]["OverallProgress"];
+        };
+        /**
+         * OverviewDetails
+         * @description Stored roadmap metadata exposed only by a detailed overview.
+         */
+        OverviewDetails: {
+            /** Owner */
+            owner: string;
+            /** Description */
+            description?: string | null;
+            /** Subject Tags */
+            subject_tags?: string[];
+            visibility: components["schemas"]["Visibility"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Suggested Path */
+            suggested_path?: string[];
         };
         /**
          * PatchRequest

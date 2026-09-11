@@ -12,6 +12,7 @@ export type Resource = components['schemas']['Resource']
 export type ChecklistItem = components['schemas']['ChecklistItem']
 export type Violation = components['schemas']['Violation']
 export type Visibility = components['schemas']['Visibility']
+export type RoadmapStatus = components['schemas']['RoadmapStatus']
 
 /**
  * Progress read types, also from the generated client. The published list view
@@ -40,6 +41,13 @@ export interface ProgressBinding {
  * prompt); `save-failed` is any other failure (shown as a quiet inline notice).
  */
 export type ProgressNotice = { kind: 'stale' } | { kind: 'save-failed' }
+
+/** Progress read availability. Unknown progress never acts like an empty record. */
+export type ProgressReadState =
+  | { phase: 'loading' }
+  | { phase: 'ready' }
+  | { phase: 'closed' }
+  | { phase: 'failed'; status: number | null }
 
 /**
  * The roadmap-view fetch state as a single discriminated union so the impossible

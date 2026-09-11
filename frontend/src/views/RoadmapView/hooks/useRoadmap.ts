@@ -1,9 +1,19 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
+import { useSWRConfig, type Arguments } from 'swr'
 
 import { keys, useApiQuery, useSessionClient } from '@/api'
 import { toProblem, type Problem } from '@/lib/problem'
 import { useLifecycle } from './useLifecycle'
+import {
+  addAuthoredRoadmap,
+  reconcileDashboard,
+  reconcileProfile,
+  removeRoadmapFromDashboard,
+  removeRoadmapFromProfile,
+  type Dashboard,
+  type Profile,
+} from '../util/cache-reconciliation'
 import type {
   ForkState,
   MetadataDraft,
@@ -21,6 +31,10 @@ import type {
  * flashing the skeleton, and a read error preserves the HTTP status (or `null`
  * on a network failure) for `RoadmapErrorState`.
  */
+function isProfileKey(key: Arguments): boolean {
+  return Array.isArray(key) && key[0] === '/users/{handle}'
+}
+
 function toRoadmapViewState(
   roadmap: Roadmap | undefined,
   error: Problem | undefined,
@@ -63,6 +77,20 @@ export function useRoadmap(roadmapId: string): {
 } {
   const navigate = useNavigate()
   const client = useSessionClient()
+  const { mutate: mutateCache } = useSWRConfig()
+  const generationRef = useRef(0)
+  const previousRoadmapIdRef = useRef(roadmapId)
+
+  if (previousRoadmapIdRef.current !== roadmapId) {
+    previousRoadmapIdRef.current = roadmapId
+    generationRef.current += 1
+  }
+  const generation = generationRef.current
+  const isCurrent = useCallback(
+    () => generationRef.current === generation && previousRoadmapIdRef.current === roadmapId,
+    [generation, roadmapId],
+  )
+
   const {
     data: roadmap,
     error: readError,
@@ -78,6 +106,34 @@ export function useRoadmap(roadmapId: string): {
   const [conflict, setConflict] = useState<Problem | null>(null)
 
   const state = toRoadmapViewState(roadmap, readError, isLoading)
+
+  const reconcileRoadmap = useCallback(
+    (updated: Roadmap) => {
+      void mutate(updated, { revalidate: false })
+      const becamePublic = roadmap?.visibility === 'private' && updated.visibility === 'public'
+      const dashboardNeedsRefresh = becamePublic
+      const profileNeedsRefresh = becamePublic && updated.status === 'published'
+      void mutateCache<Dashboard>(keys.dashboard(), (current) => reconcileDashboard(current, updated), {
+        revalidate: dashboardNeedsRefresh,
+      })
+      void mutateCache<Profile>(isProfileKey, (current) => reconcileProfile(current, updated), {
+        revalidate: profileNeedsRefresh,
+      })
+    },
+    [mutate, mutateCache, roadmap],
+  )
+
+  const removeRoadmapCaches = useCallback(() => {
+    void mutateCache(keys.roadmap(roadmapId), undefined, { revalidate: false })
+    void mutateCache(keys.progress(roadmapId), undefined, { revalidate: false })
+    void mutateCache(keys.next(roadmapId), undefined, { revalidate: false })
+    void mutateCache<Dashboard>(keys.dashboard(), (current) => removeRoadmapFromDashboard(current, roadmapId), {
+      revalidate: false,
+    })
+    void mutateCache<Profile>(isProfileKey, (current) => removeRoadmapFromProfile(current, roadmapId), {
+      revalidate: false,
+    })
+  }, [mutateCache, roadmapId])
 
   // Sub-state reset invariant (R2): the same RoadmapView instance stays mounted
   // across a `:roadmapId` change, so reset these useState sub-states on change
@@ -95,10 +151,9 @@ export function useRoadmap(roadmapId: string): {
       const { data, error, response } = await client.POST('/roadmaps/{roadmap_id}:publish', {
         params: { path: { roadmap_id: roadmapId } },
       })
+      if (!isCurrent()) return
       if (data) {
-        // Published: write the immutable transition into the cache in place so
-        // the view reflects it without a refetch.
-        void mutate(data, { revalidate: false })
+        reconcileRoadmap(data)
         setPublishState({ phase: 'idle' })
         return
       }
@@ -116,9 +171,9 @@ export function useRoadmap(roadmapId: string): {
       }
       setPublishState({ phase: 'failed', status: response.status })
     } catch {
-      setPublishState({ phase: 'failed', status: null })
+      if (isCurrent()) setPublishState({ phase: 'failed', status: null })
     }
-  }, [client, roadmapId, mutate])
+  }, [client, roadmapId, reconcileRoadmap, isCurrent])
 
   const editMetadata = useCallback(
     async (draft: MetadataDraft): Promise<boolean> => {
@@ -137,8 +192,9 @@ export function useRoadmap(roadmapId: string): {
             subject_tags: draft.subject_tags,
           },
         })
+        if (!isCurrent()) return false
         if (data) {
-          void mutate(data, { revalidate: false })
+          reconcileRoadmap(data)
           setMetadataState({ phase: 'idle' })
           return true
         }
@@ -150,35 +206,38 @@ export function useRoadmap(roadmapId: string): {
         setMetadataState({ phase: 'failed', status: response.status })
         return false
       } catch {
-        setMetadataState({ phase: 'failed', status: null })
+        if (isCurrent()) setMetadataState({ phase: 'failed', status: null })
         return false
       }
     },
-    [client, roadmapId, mutate],
+    [client, roadmapId, reconcileRoadmap, isCurrent],
   )
 
   const fork = useCallback(() => {
     // Fork any readable roadmap (own or public) into a fresh private draft, then
     // navigate to it so the owner can edit and publish the copy. The fork is a
-    // new resource, so there is no cache write here: navigating to its route
-    // reads it under its own key.
+    // new resource. Add its authored card before navigating to its own key.
     setForkState({ phase: 'forking' })
     void (async () => {
       try {
         const { data, response } = await client.POST('/roadmaps/{roadmap_id}:fork', {
           params: { path: { roadmap_id: roadmapId } },
         })
+        if (!isCurrent()) return
         if (data) {
+          void mutateCache<Dashboard>(keys.dashboard(), (current) => addAuthoredRoadmap(current, data), {
+            revalidate: false,
+          })
           setForkState({ phase: 'idle' })
           navigate(`/roadmaps/${data.id}`)
           return
         }
         setForkState({ phase: 'failed', status: response.status })
       } catch {
-        setForkState({ phase: 'failed', status: null })
+        if (isCurrent()) setForkState({ phase: 'failed', status: null })
       }
     })()
-  }, [client, navigate, roadmapId])
+  }, [client, navigate, roadmapId, mutateCache, isCurrent])
 
   // Web-only lifecycle (visibility / archive / delete). A visibility toggle or
   // archive reconciles the shared roadmap cache in place (replacing the old
@@ -186,11 +245,15 @@ export function useRoadmap(roadmapId: string): {
   // coherent; a successful delete leaves the now-removed roadmap's route.
   const onLifecycleChanged = useCallback(
     (updated: Roadmap) => {
-      void mutate(updated, { revalidate: false })
+      if (isCurrent()) reconcileRoadmap(updated)
     },
-    [mutate],
+    [reconcileRoadmap, isCurrent],
   )
-  const onDeleted = useCallback(() => navigate('/'), [navigate])
+  const onDeleted = useCallback(() => {
+    if (!isCurrent()) return
+    removeRoadmapCaches()
+    navigate('/')
+  }, [navigate, removeRoadmapCaches, isCurrent])
   const lifecycle = useLifecycle(client, roadmapId, {
     onChanged: onLifecycleChanged,
     onDeleted,

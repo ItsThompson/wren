@@ -2655,6 +2655,16 @@
             "type": "integer",
             "title": "Revision"
           },
+          "details": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OverviewDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sections": {
             "items": {
               "$ref": "#/components/schemas/SectionOverview"
@@ -2676,6 +2686,61 @@
         ],
         "title": "Overview",
         "description": "The ``GET /overview`` body: sections in ``section_order`` with per-section\nand overall completion, and no checklist-item bodies.\n\nThe orientation call; from here the agent drills into a node (``get_node``) or\na section (``get_section``). ``checked_items`` / ``percent`` reflect the\ncaller's own progress (zero when they have not started)."
+      },
+      "OverviewDetails": {
+        "properties": {
+          "owner": {
+            "type": "string",
+            "title": "Owner"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "subject_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subject Tags"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "suggested_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggested Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "owner",
+          "visibility",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "OverviewDetails",
+        "description": "Stored roadmap metadata exposed only by a detailed overview."
       },
       "PatchRequest": {
         "properties": {

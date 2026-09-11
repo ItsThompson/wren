@@ -63,6 +63,7 @@ export function RoadmapView() {
   const view =
     state.roadmap.status === 'draft' ? (
       <DraftPreview
+        key={state.roadmap.id}
         roadmap={state.roadmap}
         publishState={publishState}
         onPublish={publish}
@@ -71,6 +72,7 @@ export function RoadmapView() {
       />
     ) : (
       <RoadmapListView
+        key={state.roadmap.id}
         roadmap={state.roadmap}
         isOwner={isOwner}
         actions={actions}

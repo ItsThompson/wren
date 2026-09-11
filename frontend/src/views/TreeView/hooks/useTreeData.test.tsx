@@ -70,6 +70,7 @@ describe('useTreeData', () => {
         phase: 'loaded',
         roadmap: buildRoadmap(),
         checkedIds: new Set(['a1']),
+        progressState: { phase: 'ready' },
       }),
     )
   })
@@ -94,7 +95,7 @@ describe('useTreeData', () => {
     await waitFor(() => expect(result.current.state).toEqual({ phase: 'error' }))
   })
 
-  it('stays loaded with an empty checked set when the best-effort progress read fails (500)', async () => {
+  it('stays loaded with unavailable progress when the progress read fails (500)', async () => {
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildRoadmap())),
       http.get('*/roadmaps/:id/progress', () => new HttpResponse(null, { status: 500 })),
@@ -105,12 +106,29 @@ describe('useTreeData', () => {
       expect(result.current.state).toEqual({
         phase: 'loaded',
         roadmap: buildRoadmap(),
-        checkedIds: new Set(),
+        checkedIds: null,
+        progressState: { phase: 'failed', status: 500 },
       }),
     )
   })
 
-  it('stays loaded with an empty checked set when the progress read throws at the network level', async () => {
+  it('marks archived non-followers closed without inventing completion', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildRoadmap({ status: 'archived' }))),
+      http.get('*/roadmaps/:id/progress', () => new HttpResponse(null, { status: 409 })),
+    )
+    const { result } = renderTreeData()
+
+    await waitFor(() =>
+      expect(result.current.state).toMatchObject({
+        phase: 'loaded',
+        progressState: { phase: 'closed' },
+        checkedIds: null,
+      }),
+    )
+  })
+
+  it('stays loaded with unavailable progress when the progress read throws at the network level', async () => {
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildRoadmap())),
       http.get('*/roadmaps/:id/progress', () => HttpResponse.error()),
@@ -121,7 +139,8 @@ describe('useTreeData', () => {
       expect(result.current.state).toEqual({
         phase: 'loaded',
         roadmap: buildRoadmap(),
-        checkedIds: new Set(),
+        checkedIds: null,
+        progressState: { phase: 'failed', status: null },
       }),
     )
   })

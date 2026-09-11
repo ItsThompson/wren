@@ -6,6 +6,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { mockRoadmap } from '@/mocks/data'
 import { renderWithProviders } from '@/test/renderWithProviders'
+import { useDashboard } from '@/views/DashboardView/hooks/useDashboard'
+import { useProfile } from '@/views/ProfileView/hooks/useProfile'
 import type { Roadmap } from '@/views/RoadmapView/types'
 import { useRoadmap } from '@/views/RoadmapView/hooks/useRoadmap'
 
@@ -30,6 +32,7 @@ const PUBLISH_URL = `${BASE}/roadmaps/${ROADMAP_ID}:publish`
 const ARCHIVE_URL = `${BASE}/roadmaps/${ROADMAP_ID}:archive`
 const METADATA_URL = `${BASE}/roadmaps/${ROADMAP_ID}/metadata`
 const VISIBILITY_URL = `${BASE}/roadmaps/${ROADMAP_ID}/visibility`
+const DELETE_URL = `${BASE}/roadmaps/${ROADMAP_ID}`
 
 /** Phases observed across every render, to detect a stale flash (a loading relapse). */
 const phases: string[] = []
@@ -42,6 +45,21 @@ function published(overrides: Partial<Roadmap> = {}): Roadmap {
 }
 
 /** Reads one roadmap and exposes each write action as a button. */
+function DiscoveryProbe() {
+  const { state: dashboard } = useDashboard(true)
+  const { state: profile } = useProfile('ada')
+  return (
+    <div>
+      <span data-testid="dashboard-title">
+        {dashboard.phase === 'loaded' ? dashboard.authored?.[0]?.title ?? '' : ''}
+      </span>
+      <span data-testid="profile-title">
+        {profile.phase === 'loaded' ? profile.profile.roadmaps?.[0]?.title ?? '' : ''}
+      </span>
+    </div>
+  )
+}
+
 function WriteProbe() {
   const { state, publish, editMetadata, lifecycle } = useRoadmap(ROADMAP_ID)
   phases.push(state.phase)
@@ -65,8 +83,14 @@ function WriteProbe() {
       <button type="button" onClick={() => lifecycle.setVisibility('private')}>
         make-private
       </button>
+      <button type="button" onClick={() => lifecycle.setVisibility('public')}>
+        make-public
+      </button>
       <button type="button" onClick={() => lifecycle.archive()}>
         archive
+      </button>
+      <button type="button" onClick={() => lifecycle.deleteRoadmap()}>
+        delete
       </button>
     </div>
   )
@@ -87,7 +111,7 @@ function noStaleFlash(): boolean {
   return firstLoaded !== -1 && phases.slice(firstLoaded).every((phase) => phase === 'loaded')
 }
 
-describe('AC5 revalidate-after-write: server state reflected with no stale flash and no extra GET', () => {
+describe('revalidate-after-write keeps server state and avoids stale flashes', () => {
   it('publish reflects the returned published roadmap in place', async () => {
     const user = userEvent.setup()
     let roadmapGets = 0
@@ -146,6 +170,97 @@ describe('AC5 revalidate-after-write: server state reflected with no stale flash
     await waitFor(() => expect(screen.getByTestId('visibility')).toHaveTextContent('private'))
     expect(roadmapGets).toBe(1)
     expect(noStaleFlash()).toBe(true)
+  })
+
+  it('reconciles dashboard and profile cards from a returned metadata update', async () => {
+    const user = userEvent.setup()
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(published())),
+      http.get('*/me/dashboard', () => HttpResponse.json({ authored: [published()], followed: [] })),
+      http.get('*/users/:handle', () =>
+        HttpResponse.json({ handle: 'ada', display_name: 'Ada', roadmaps: [published()] }),
+      ),
+      http.patch(METADATA_URL, () => HttpResponse.json(published({ title: 'Renamed everywhere' }))),
+    )
+    renderWithProviders(
+      <>
+        <WriteProbe />
+        <DiscoveryProbe />
+      </>,
+      { baseUrl: BASE },
+    )
+    await waitFor(() => expect(screen.getByTestId('dashboard-title')).toHaveTextContent(mockRoadmap.title))
+    await waitFor(() => expect(screen.getByTestId('profile-title')).toHaveTextContent(mockRoadmap.title))
+
+    await user.click(screen.getByRole('button', { name: 'edit' }))
+
+    await waitFor(() => expect(screen.getByTestId('dashboard-title')).toHaveTextContent('Renamed everywhere'))
+    expect(screen.getByTestId('profile-title')).toHaveTextContent('Renamed everywhere')
+  })
+
+  it('removes deleted roadmaps from dashboard and profile caches', async () => {
+    const user = userEvent.setup()
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(published())),
+      http.get('*/me/dashboard', () => HttpResponse.json({ authored: [published()], followed: [] })),
+      http.get('*/users/:handle', () =>
+        HttpResponse.json({ handle: 'ada', display_name: 'Ada', roadmaps: [published()] }),
+      ),
+      http.delete(DELETE_URL, () => new HttpResponse(null, { status: 204 })),
+    )
+    renderWithProviders(
+      <>
+        <WriteProbe />
+        <DiscoveryProbe />
+      </>,
+      { baseUrl: BASE },
+    )
+    await waitFor(() => expect(screen.getByTestId('dashboard-title')).toHaveTextContent(mockRoadmap.title))
+    await waitFor(() => expect(screen.getByTestId('profile-title')).toHaveTextContent(mockRoadmap.title))
+
+    await user.click(screen.getByRole('button', { name: 'delete' }))
+
+    await waitFor(() => expect(screen.getByTestId('dashboard-title')).toHaveTextContent(''))
+    expect(screen.getByTestId('profile-title')).toHaveTextContent('')
+  })
+
+  it('revalidates discovery after a private roadmap becomes public', async () => {
+    const user = userEvent.setup()
+    const privateRoadmap = published({ visibility: 'private' })
+    let dashboardReads = 0
+    let profileReads = 0
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(privateRoadmap)),
+      http.get('*/me/dashboard', () => {
+        dashboardReads += 1
+        return HttpResponse.json(
+          dashboardReads === 1
+            ? { authored: [privateRoadmap], followed: [] }
+            : { authored: [published()], followed: [published()] },
+        )
+      }),
+      http.get('*/users/:handle', () => {
+        profileReads += 1
+        return HttpResponse.json({
+          handle: 'ada',
+          display_name: 'Ada',
+          roadmaps: profileReads === 1 ? [] : [published()],
+        })
+      }),
+      http.put(VISIBILITY_URL, () => HttpResponse.json(published())),
+    )
+    renderWithProviders(
+      <>
+        <WriteProbe />
+        <DiscoveryProbe />
+      </>,
+      { baseUrl: BASE },
+    )
+    await waitFor(() => expect(screen.getByTestId('dashboard-title')).toHaveTextContent(mockRoadmap.title))
+    await user.click(screen.getByRole('button', { name: 'make-public' }))
+
+    await waitFor(() => expect(dashboardReads).toBe(2))
+    await waitFor(() => expect(profileReads).toBe(2))
   })
 
   it('archive reflects the returned archived status in place', async () => {

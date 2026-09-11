@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react'
 
 import type { components } from '@/api'
+import type { ProgressReadState } from '@/views/RoadmapView/types'
 
 /**
  * Tree-view read types, sourced from the OpenAPI-generated client (never
@@ -58,4 +59,4 @@ export interface TreeGraph {
 export type TreeDataState =
   | { phase: 'loading' }
   | { phase: 'error' }
-  | { phase: 'loaded'; roadmap: Roadmap; checkedIds: Set<string> }
+  | { phase: 'loaded'; roadmap: Roadmap; checkedIds: Set<string> | null; progressState: ProgressReadState }

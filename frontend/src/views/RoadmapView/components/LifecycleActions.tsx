@@ -99,8 +99,9 @@ export function LifecycleActions({ roadmap, lifecycle }: LifecycleActionsProps) 
 
       {deleteState.phase === 'blocked' ? (
         <p className="mt-3 text-sm text-muted-foreground" role="alert">
-          This roadmap has followers, so it can&rsquo;t be deleted. Archive it instead to retire it
-          while existing followers keep their progress.
+          {roadmap.status === 'published'
+            ? 'This roadmap has followers, so it can’t be deleted. Archive it instead to retire it while existing followers keep their progress.'
+            : 'This roadmap has followers, so it can’t be deleted. Existing followers keep their progress.'}
         </p>
       ) : null}
 

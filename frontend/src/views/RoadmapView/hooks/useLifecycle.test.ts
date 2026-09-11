@@ -94,6 +94,36 @@ describe('useLifecycle visibility toggle', () => {
   })
 })
 
+describe('useLifecycle roadmap scoping', () => {
+  it('ignores a late response after navigation to another roadmap', async () => {
+    const otherId = 'algorithms-ii-9x2b'
+    let resolveResponse: (() => void) | undefined
+    const onChanged = vi.fn()
+    const onDeleted = vi.fn()
+    const client = createSessionClient(BASE)
+    server.use(
+      http.put(VISIBILITY_URL, async () => {
+        await new Promise<void>((resolve) => {
+          resolveResponse = resolve
+        })
+        return HttpResponse.json(buildRoadmap({ visibility: 'public' }))
+      }),
+    )
+    const view = renderHook(
+      ({ id }: { id: string }) => useLifecycle(client, id, { onChanged, onDeleted }),
+      { initialProps: { id: ROADMAP_ID } },
+    )
+
+    act(() => view.result.current.setVisibility('public'))
+    expect(view.result.current.visibilityState).toEqual({ phase: 'saving' })
+    view.rerender({ id: otherId })
+    resolveResponse?.()
+
+    await waitFor(() => expect(view.result.current.visibilityState).toEqual({ phase: 'idle' }))
+    expect(onChanged).not.toHaveBeenCalled()
+  })
+})
+
 describe('useLifecycle archive', () => {
   it('reconciles the archived roadmap and returns to idle on success', async () => {
     const archived = buildRoadmap({ status: 'archived' })
@@ -164,6 +194,22 @@ describe('useLifecycle delete', () => {
     await waitFor(() => expect(result.current.deleteState).toEqual({ phase: 'blocked' }))
     // Blocked is not a delete: the caller must not navigate away.
     expect(onDeleted).not.toHaveBeenCalled()
+  })
+
+  it('does not treat an unrelated 409 as a follower block', async () => {
+    server.use(
+      http.delete(DELETE_URL, () =>
+        HttpResponse.json(
+          { type: 'x', title: 'Conflict', status: 409, code: 'IMMUTABLE' },
+          { status: 409, headers: { 'content-type': 'application/problem+json' } },
+        ),
+      ),
+    )
+    const { result } = renderLifecycle()
+
+    act(() => result.current.deleteRoadmap())
+
+    await waitFor(() => expect(result.current.deleteState).toEqual({ phase: 'failed', status: 409 }))
   })
 
   it('carries the HTTP status when delete fails for another reason (500)', async () => {

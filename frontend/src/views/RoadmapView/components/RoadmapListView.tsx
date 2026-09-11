@@ -37,15 +37,27 @@ interface RoadmapListViewProps {
  * that node.
  */
 export function RoadmapListView({ roadmap, isOwner, actions, onReload }: RoadmapListViewProps) {
-  const { checkedIds, toggle, deadline, setDeadline, nextSubsectionId, nextComplete, notice, dismissNotice, reload } =
-    useProgress(roadmap.id)
+  const {
+    checkedIds,
+    progressState,
+    toggle,
+    deadline,
+    setDeadline,
+    nextSubsectionId,
+    nextComplete,
+    notice,
+    dismissNotice,
+    reload,
+  } = useProgress(roadmap.id, roadmap.status)
   const [activeTag, setActiveTag] = useState<string | null>(null)
   const sectionOrder = roadmap.section_order ?? []
   const sections = roadmap.sections ?? {}
   const suggestedPath = roadmap.suggested_path ?? []
   const trackTags = useMemo(() => collectTrackTags(roadmap), [roadmap])
-  const overall = overallCount(roadmap, checkedIds)
-  const progress: ProgressBinding = { checkedIds, onToggle: toggle }
+  const overall =
+    progressState.phase === 'ready' && checkedIds ? overallCount(roadmap, checkedIds) : null
+  const progress: ProgressBinding | undefined =
+    progressState.phase === 'ready' && checkedIds ? { checkedIds, onToggle: toggle } : undefined
 
   useHashScroll(true)
 
@@ -56,6 +68,9 @@ export function RoadmapListView({ roadmap, isOwner, actions, onReload }: Roadmap
   const handleStaleReload = () => {
     reload()
     onReload()
+  }
+  const handleProgressReload = () => {
+    reload()
   }
 
   return (
@@ -82,14 +97,32 @@ export function RoadmapListView({ roadmap, isOwner, actions, onReload }: Roadmap
         ) : null}
         <SubjectTags tags={roadmap.subject_tags ?? []} />
         <div className="mt-5">
-          <ProgressBar
-            checked={overall.checked}
-            total={overall.total}
-            variant="roadmap"
-            label="Overall progress"
-          />
+          {overall ? (
+            <ProgressBar
+              checked={overall.checked}
+              total={overall.total}
+              variant="roadmap"
+              label="Overall progress"
+            />
+          ) : null}
+          {progressState.phase === 'loading' ? (
+            <p className="text-sm text-muted-foreground" role="status">Loading progress…</p>
+          ) : null}
+          {progressState.phase === 'closed' ? (
+            <p className="text-sm text-muted-foreground" role="status">
+              This archived roadmap is closed to new tracking. Existing followers keep their progress.
+            </p>
+          ) : null}
+          {progressState.phase === 'failed' ? (
+            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground" role="alert">
+              <span>We couldn’t load your progress.</span>
+              <button type="button" className="text-primary underline-offset-4 hover:underline" onClick={handleProgressReload}>
+                Try again
+              </button>
+            </div>
+          ) : null}
         </div>
-        <DeadlineCountdown deadline={deadline} onSet={setDeadline} />
+        {progressState.phase === 'ready' ? <DeadlineCountdown deadline={deadline} onSet={setDeadline} /> : null}
       </header>
 
       <RoadmapActions roadmap={roadmap} isOwner={isOwner} actions={actions} />
@@ -107,7 +140,7 @@ export function RoadmapListView({ roadmap, isOwner, actions, onReload }: Roadmap
         </div>
       ) : null}
 
-      {nextComplete ? <NextComplete /> : null}
+      {progressState.phase === 'ready' && nextComplete ? <NextComplete /> : null}
 
       <FilterChips tags={trackTags} activeTag={activeTag} onToggle={toggleTag} />
 

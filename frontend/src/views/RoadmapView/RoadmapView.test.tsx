@@ -776,6 +776,7 @@ describe('RoadmapView web-only lifecycle', () => {
   const VISIBILITY_URL = `${BASE}/roadmaps/${ROADMAP_ID}/visibility`
   const ARCHIVE_URL = `${BASE}/roadmaps/${ROADMAP_ID}:archive`
   const DELETE_URL = `${BASE}/roadmaps/${ROADMAP_ID}`
+  const PROGRESS_URL = `${BASE}/roadmaps/${ROADMAP_ID}/progress`
   const OTHER_USER = {
     id: 'user-2',
     username: 'grace',
@@ -832,6 +833,23 @@ describe('RoadmapView web-only lifecycle', () => {
     // The archived badge appears and the Archive action is gone (already archived).
     expect(await screen.findByText('Archived')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^archive$/i })).not.toBeInTheDocument()
+  })
+
+  it('shows archived content read-only to a non-follower', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () =>
+        HttpResponse.json(buildDraft({ status: 'archived', visibility: 'public', owner: 'user-1' })),
+      ),
+      http.get(PROGRESS_URL, () => new HttpResponse(null, { status: 409 })),
+      http.get('*/roadmaps/:id/next', () => new HttpResponse(null, { status: 409 })),
+    )
+    renderView(OTHER_USER)
+
+    expect(await screen.findByText('Archived')).toBeInTheDocument()
+    expect(screen.getByText(/closed to new tracking/i)).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Deadline')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^fork$/i })).toBeInTheDocument()
   })
 
   it('deletes a follower-free roadmap after confirmation and navigates away', async () => {

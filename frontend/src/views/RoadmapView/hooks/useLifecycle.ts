@@ -1,6 +1,7 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { SessionClient } from '@/api'
+import { PROBLEM_CODE, toProblem } from '@/lib/problem'
 import type {
   ArchiveState,
   DeleteState,
@@ -40,6 +41,24 @@ export function useLifecycle(
   const [visibilityState, setVisibilityState] = useState<VisibilityState>({ phase: 'idle' })
   const [archiveState, setArchiveState] = useState<ArchiveState>({ phase: 'idle' })
   const [deleteState, setDeleteState] = useState<DeleteState>({ phase: 'idle' })
+  const generationRef = useRef(0)
+  const previousRoadmapIdRef = useRef(roadmapId)
+
+  if (previousRoadmapIdRef.current !== roadmapId) {
+    previousRoadmapIdRef.current = roadmapId
+    generationRef.current += 1
+  }
+  const generation = generationRef.current
+  const isCurrent = useCallback(
+    () => generationRef.current === generation && previousRoadmapIdRef.current === roadmapId,
+    [generation, roadmapId],
+  )
+
+  useEffect(() => {
+    setVisibilityState({ phase: 'idle' })
+    setArchiveState({ phase: 'idle' })
+    setDeleteState({ phase: 'idle' })
+  }, [roadmapId])
 
   const setVisibility = useCallback(
     (visibility: Visibility) => {
@@ -50,6 +69,7 @@ export function useLifecycle(
             params: { path: { roadmap_id: roadmapId } },
             body: { visibility },
           })
+          if (!isCurrent()) return
           if (data) {
             onChanged(data)
             setVisibilityState({ phase: 'idle' })
@@ -57,11 +77,11 @@ export function useLifecycle(
           }
           setVisibilityState({ phase: 'failed', status: response.status })
         } catch {
-          setVisibilityState({ phase: 'failed', status: null })
+          if (isCurrent()) setVisibilityState({ phase: 'failed', status: null })
         }
       })()
     },
-    [client, roadmapId, onChanged],
+    [client, roadmapId, onChanged, isCurrent],
   )
 
   const archive = useCallback(() => {
@@ -71,6 +91,7 @@ export function useLifecycle(
         const { data, response } = await client.POST('/roadmaps/{roadmap_id}:archive', {
           params: { path: { roadmap_id: roadmapId } },
         })
+        if (!isCurrent()) return
         if (data) {
           onChanged(data)
           setArchiveState({ phase: 'idle' })
@@ -78,34 +99,34 @@ export function useLifecycle(
         }
         setArchiveState({ phase: 'failed', status: response.status })
       } catch {
-        setArchiveState({ phase: 'failed', status: null })
+        if (isCurrent()) setArchiveState({ phase: 'failed', status: null })
       }
     })()
-  }, [client, roadmapId, onChanged])
+  }, [client, roadmapId, onChanged, isCurrent])
 
   const deleteRoadmap = useCallback(() => {
     setDeleteState({ phase: 'deleting' })
     void (async () => {
       try {
-        const { response } = await client.DELETE('/roadmaps/{roadmap_id}', {
+        const { error, response } = await client.DELETE('/roadmaps/{roadmap_id}', {
           params: { path: { roadmap_id: roadmapId } },
         })
+        if (!isCurrent()) return
         if (response.ok) {
           onDeleted()
           return
         }
-        if (response.status === 409) {
-          // DELETE_HAS_FOLLOWERS: the roadmap has followers, so delete is refused;
-          // the UI offers archive as the safe retirement path instead.
+        const problem = toProblem(error, response)
+        if (problem.code === PROBLEM_CODE.DeleteHasFollowers) {
           setDeleteState({ phase: 'blocked' })
           return
         }
         setDeleteState({ phase: 'failed', status: response.status })
       } catch {
-        setDeleteState({ phase: 'failed', status: null })
+        if (isCurrent()) setDeleteState({ phase: 'failed', status: null })
       }
     })()
-  }, [client, roadmapId, onDeleted])
+  }, [client, roadmapId, onDeleted, isCurrent])
 
   return { visibilityState, setVisibility, archiveState, archive, deleteState, deleteRoadmap }
 }

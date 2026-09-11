@@ -7,7 +7,7 @@ import type { components } from '@/api'
 import { createHookWrapper } from '@/test/createHookWrapper'
 import { TEST_API_BASE } from '@/test/test-api-base'
 
-import type { NextResult, ProgressSnapshot, ProgressUpdateResult } from '../types'
+import type { NextResult, ProgressSnapshot, ProgressUpdateResult, RoadmapStatus } from '../types'
 import { useProgress } from './useProgress'
 
 const ROADMAP_ID = 'grokking-dsa-7f3k'
@@ -65,8 +65,8 @@ function seedReads(snapshot: ProgressSnapshot, next: NextResult = buildNext()): 
 }
 
 /** Mount `useProgress` under the production-parity provider stack. */
-function renderProgress() {
-  return renderHook(() => useProgress(ROADMAP_ID), { wrapper: createHookWrapper() })
+function renderProgress(roadmapStatus: RoadmapStatus = 'published') {
+  return renderHook(() => useProgress(ROADMAP_ID, roadmapStatus), { wrapper: createHookWrapper() })
 }
 
 describe('useProgress reads', () => {
@@ -79,6 +79,30 @@ describe('useProgress reads', () => {
     expect(result.current.nextSubsectionId).toBe('sub_hashing')
     expect(result.current.nextComplete).toBe(false)
     expect(result.current.notice).toBeNull()
+    expect(result.current.progressState).toEqual({ phase: 'ready' })
+  })
+
+  it('surfaces server failures instead of treating progress as empty', async () => {
+    server.use(
+      http.get(PROGRESS_URL, () => new HttpResponse(null, { status: 500 })),
+      http.get(NEXT_URL, () => HttpResponse.json(buildNext())),
+    )
+    const { result } = renderProgress()
+
+    await waitFor(() => expect(result.current.progressState).toEqual({ phase: 'failed', status: 500 }))
+    expect(result.current.checkedIds).toEqual(new Set())
+  })
+
+  it('marks an archived non-follower closed and does not enable writes', async () => {
+    server.use(
+      http.get(PROGRESS_URL, () => new HttpResponse(null, { status: 409 })),
+      http.get(NEXT_URL, () => new HttpResponse(null, { status: 409 })),
+    )
+    const { result } = renderProgress('archived')
+
+    await waitFor(() => expect(result.current.progressState).toEqual({ phase: 'closed' }))
+    act(() => result.current.toggle('item', true))
+    expect(result.current.progressState).toEqual({ phase: 'closed' })
   })
 })
 

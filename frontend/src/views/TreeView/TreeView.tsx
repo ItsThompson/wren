@@ -25,7 +25,7 @@ export function TreeView() {
 
   const graph = useMemo(() => {
     if (state.phase !== 'loaded') return null
-    const built = buildTreeGraph(state.roadmap, state.checkedIds, id)
+    const built = buildTreeGraph(state.roadmap, state.checkedIds ?? new Set(), id)
     return { nodes: layoutTree(built.nodes, built.edges), edges: built.edges }
   }, [state, id])
 
@@ -50,6 +50,19 @@ export function TreeView() {
   return (
     <section className="mx-auto max-w-[1120px] px-4 py-8">
       <TreeHeader roadmapId={id} title={state.roadmap.title} />
+      {state.progressState.phase === 'loading' ? (
+        <p className="mt-4 text-sm text-muted-foreground" role="status">Loading progress…</p>
+      ) : null}
+      {state.progressState.phase === 'closed' ? (
+        <p className="mt-4 text-sm text-muted-foreground" role="status">
+          This archived roadmap is closed to new tracking. The tree remains available for reading.
+        </p>
+      ) : null}
+      {state.progressState.phase === 'failed' ? (
+        <p className="mt-4 text-sm text-muted-foreground" role="alert">
+          We couldn’t load your progress. Node completion is unavailable.
+        </p>
+      ) : null}
       {graph && graph.nodes.length > 0 ? (
         <TreeCanvas graph={graph} />
       ) : (
