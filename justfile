@@ -168,7 +168,7 @@ codegen-mcp:
       --input "$genin" --input-file-type openapi \
       --output-model-type pydantic_v2.BaseModel --target-python-version 3.12 \
       --use-standard-collections --use-union-operator --use-annotated --field-constraints \
-      --capitalise-enum-members --strict-nullable --disable-timestamp \
+      --capitalise-enum-members --set-default-enum-member --strict-nullable --disable-timestamp \
       --custom-file-header "$(cat mcp/scripts/generated_module_header.txt)" \
       --formatters black --formatters isort \
       --output mcp/src/wren_mcp/_schemas_generated.py

@@ -6,8 +6,8 @@ carrying exactly the Group-A component schemas the MCP server mirrors, with the
 two deterministic transforms the frozen agent contract requires:
 
 * the authoring input drops its ``visibility`` property (a web-only lifecycle
-  control with no agent tool), which also makes the ``Visibility`` enum
-  unreferenced and therefore absent from generation;
+  control with no agent tool); the read-side ``Roadmap`` model still carries
+  ``Visibility`` for the full roadmap projection;
 * the authoring input component is renamed ``RoadmapInput`` -> ``RoadmapDraftInput``
   (the name the frozen contract and ``tools_write`` import).
 
@@ -49,6 +49,7 @@ GROUP_A_COMPONENTS: frozenset[str] = frozenset(
         # Shared enums.
         "ResourceType",
         "RoadmapStatus",
+        "Visibility",
         "ChangedNodeKind",
         "ChangeType",
         "ResponseFormat",
@@ -81,6 +82,15 @@ GROUP_A_COMPONENTS: frozenset[str] = frozenset(
         # Changed-node echo + structural-rule violation.
         "ChangedNode",
         "Violation",
+        # Full roadmap and list projections.
+        "Resource",
+        "ChecklistItem",
+        "Subsection",
+        "Section",
+        "Roadmap",
+        "RoadmapCard",
+        "Dashboard",
+        "Profile",
         # Read projections (roadmaps).
         "ResourceRef",
         "PrereqRef",
@@ -88,6 +98,7 @@ GROUP_A_COMPONENTS: frozenset[str] = frozenset(
         "NodeDetail",
         "SectionOverview",
         "OverallProgress",
+        "OverviewDetails",
         "Overview",
         "SectionPage",
         "SearchHit",
@@ -101,8 +112,8 @@ GROUP_A_COMPONENTS: frozenset[str] = frozenset(
     }
 )
 
-# The property the authoring input omits, plus the enum it references. Dropping
-# the property makes the enum unreferenced, so Group A is a closed component set.
+# The property the authoring input omits. The read-side roadmap projection still
+# references the visibility enum, so it remains in the generated contract.
 _OMITTED_INPUT_PROPERTY = "visibility"
 
 # Scalar JSON types whose constrained-nullable form the generator would hoist
@@ -157,6 +168,19 @@ def _default_empty_non_null_arrays(schema: dict[str, Any]) -> None:
             prop["default"] = []
 
 
+def _default_empty_non_null_maps(schema: dict[str, Any]) -> None:
+    """Give optional object maps their backend ``default_factory=dict`` value."""
+    required = set(schema.get("required", ()))
+    for name, prop in schema.get("properties", {}).items():
+        if (
+            name not in required
+            and prop.get("type") == "object"
+            and "additionalProperties" in prop
+            and "default" not in prop
+        ):
+            prop["default"] = {}
+
+
 def _select_group_a(schemas: dict[str, Any]) -> dict[str, Any]:
     """Return the Group-A subset, failing loudly on any missing component."""
     missing = sorted(name for name in GROUP_A_COMPONENTS if name not in schemas)
@@ -169,7 +193,7 @@ def _select_group_a(schemas: dict[str, Any]) -> dict[str, Any]:
 
 
 def _drop_visibility(authoring_input: dict[str, Any]) -> None:
-    """Remove the ``visibility`` property (and any required entry) in place."""
+    """Remove the web-only ``visibility`` property and required entry in place."""
     authoring_input.get("properties", {}).pop(_OMITTED_INPUT_PROPERTY, None)
     if "required" in authoring_input:
         authoring_input["required"] = [
@@ -204,6 +228,7 @@ def build_generation_input(doc: dict[str, Any]) -> dict[str, Any]:
     for schema in schemas.values():
         _inline_nullable_constrained_scalars(schema)
         _default_empty_non_null_arrays(schema)
+        _default_empty_non_null_maps(schema)
 
     return {
         "openapi": doc.get("openapi", "3.1.0"),

@@ -21,6 +21,9 @@ from mcp_harness import AgentHarness, json_error
 _RID = "grokking-dsa-7f3k"
 
 READ_TOOL_NAMES = {
+    "roadmap_list",
+    "roadmap_get_profile",
+    "roadmap_get",
     "roadmap_get_overview",
     "roadmap_get_next",
     "roadmap_get_node",
@@ -30,9 +33,12 @@ READ_TOOL_NAMES = {
     "progress_update",
 }
 
-# readOnly for the six reads; progress_update is an explicit-set write, so it is
+# readOnly for the nine reads; progress_update is an explicit-set write, so it is
 # idempotent (a retry is a no-op) and non-destructive, not readOnly.
 EXPECTED_READ_ANNOTATIONS = {
+    "roadmap_list": {"readOnlyHint": True},
+    "roadmap_get_profile": {"readOnlyHint": True},
+    "roadmap_get": {"readOnlyHint": True},
     "roadmap_get_overview": {"readOnlyHint": True},
     "roadmap_get_next": {"readOnlyHint": True},
     "roadmap_get_node": {"readOnlyHint": True},
@@ -149,6 +155,109 @@ def test_no_read_tool_exposes_a_user_id_argument() -> None:
     for name in READ_TOOL_NAMES:
         properties = set(tools[name]["inputSchema"].get("properties", {}))
         assert not properties & {"user_id", "owner", "user"}, name
+
+
+# ---------- list/profile/get ----------
+
+
+def _roadmap_card(roadmap_id: str = "r-1") -> dict[str, Any]:
+    return {
+        "id": roadmap_id,
+        "title": "Grokking DSA",
+        "status": "published",
+        "visibility": "public",
+        "subject_tags": ["cs"],
+    }
+
+
+def _roadmap_body(**overrides: Any) -> dict[str, Any]:
+    body: dict[str, Any] = {
+        "id": _RID,
+        "owner": "user-ada",
+        "title": "Grokking DSA",
+        "description": "A roadmap.",
+        "subject_tags": ["cs"],
+        "visibility": "public",
+        "status": "published",
+        "revision": 3,
+        "sections": {
+            "sec_core": {
+                "id": "sec_core",
+                "title": "Core",
+                "subsection_order": ["sub_sql"],
+                "subsections": {
+                    "sub_sql": {
+                        "id": "sub_sql",
+                        "title": "SQL",
+                        "description": "Query fundamentals.",
+                        "tags": ["data"],
+                        "effort_estimate": "2h",
+                        "prereq_ids": ["sub_intro"],
+                        "resources": {
+                            "res_guide": {
+                                "id": "res_guide",
+                                "title": "Guide",
+                                "url": "https://example.test/sql",
+                                "type": "article",
+                            }
+                        },
+                        "resource_order": ["res_guide"],
+                        "checklist_items": {
+                            "chk_read": {"id": "chk_read", "text": "Read the guide"}
+                        },
+                        "item_order": ["chk_read"],
+                    }
+                },
+            }
+        },
+        "section_order": ["sec_core"],
+        "suggested_path": ["sub_sql"],
+        "created_at": "2026-07-01T00:00:00Z",
+        "updated_at": "2026-07-02T00:00:00Z",
+    }
+    body.update(overrides)
+    return body
+
+
+def test_roadmap_list_maps_to_the_internal_dashboard_route() -> None:
+    dashboard = {
+        "authored": [_roadmap_card("r-authored")],
+        "followed": [_roadmap_card("r-followed")],
+    }
+    harness = AgentHarness(lambda _r: httpx.Response(200, json=dashboard))
+    with harness.open() as client:
+        result = harness.call_tool(client, "roadmap_list", {})
+
+    assert result["structuredContent"]["authored"][0]["id"] == "r-authored"
+    request = harness.captured[0]
+    assert request.method == "GET"
+    assert request.url.path == "/me/dashboard"
+    assert request.headers["X-User-ID"] == "user-ada"
+
+
+def test_roadmap_get_profile_maps_to_the_internal_profile_route() -> None:
+    profile = {"handle": "ada", "display_name": "Ada", "roadmaps": [_roadmap_card()]}
+    harness = AgentHarness(lambda _r: httpx.Response(200, json=profile))
+    with harness.open() as client:
+        result = harness.call_tool(client, "roadmap_get_profile", {"handle": "ada"})
+
+    assert result["structuredContent"] == profile
+    request = harness.captured[0]
+    assert request.method == "GET"
+    assert request.url.path == "/users/ada"
+    assert request.headers["X-User-ID"] == "user-ada"
+
+
+def test_roadmap_get_maps_to_one_internal_get() -> None:
+    harness = AgentHarness(lambda _r: httpx.Response(200, json=_roadmap_body()))
+    with harness.open() as client:
+        result = harness.call_tool(client, "roadmap_get", {"roadmap_id": _RID})
+
+    assert result["structuredContent"] == _roadmap_body()
+    request = harness.captured[0]
+    assert request.method == "GET"
+    assert request.url.path == f"/roadmaps/{_RID}"
+    assert len(harness.captured) == 1
 
 
 # ---------- overview ----------

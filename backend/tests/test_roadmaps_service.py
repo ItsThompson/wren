@@ -662,6 +662,18 @@ async def test_fork_of_a_public_roadmap_by_a_non_owner_succeeds() -> None:
     assert fork.visibility is Visibility.PRIVATE
 
 
+async def test_fork_of_another_users_public_draft_is_404_without_a_copy() -> None:
+    service, repo = _service(tokens=["7f3k", "9x2b"])
+    draft = _minimal_doc()
+    draft.visibility = Visibility.PUBLIC
+    source = await service.create_draft("author", draft)
+
+    with pytest.raises(NotFound):
+        await service.fork("intruder", source.id)
+
+    assert await repo.list_owned("intruder") == []
+
+
 async def test_fork_of_a_private_roadmap_i_do_not_own_is_404() -> None:
     service, _ = _service(tokens=["7f3k", "9x2b"])
     source = await service.create_draft("author", _publishable_doc())  # private draft

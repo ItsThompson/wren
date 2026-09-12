@@ -23,9 +23,8 @@ The contract types fall into three groups, treated differently:
   mirrored at all and are documented, never compared.
 
 ``visibility`` is dropped from the generated authoring input (a web-only lifecycle
-control with no agent tool), which also prunes the orphaned ``Visibility`` enum:
-:func:`test_excluded_backend_only_types_have_no_mcp_mirror` enforces that neither
-appears anywhere in the MCP surface.
+control with no agent tool), while the full roadmap read projection retains it.
+The generated contract includes the full roadmap and list read projections.
 """
 
 from __future__ import annotations
@@ -97,12 +96,12 @@ def _mcp_contract_types() -> set[str]:
 # Group A: exactly the generated types (field equality is by construction)    #
 # --------------------------------------------------------------------------- #
 #
-# EXPECTED_GROUP_A is the ~46 Group-A type names, maintained here BY HAND and
+# EXPECTED_GROUP_A is the Group-A type names, maintained here BY HAND and
 # declared INDEPENDENTLY of the generated module and of the generation-input
 # allowlist (``mcp/scripts/build_generation_input.py``), so the equality assertion
 # below is not tautological. A drift in either direction fails:
-#   * over-inclusion (a leaked domain type such as Visibility, Roadmap, Section,
-#     Subsection, Resource, or ChecklistItem) makes the generated set a superset;
+#   * over-inclusion (a leaked domain type outside the read projections) makes the
+#     generated set a superset;
 #   * under-inclusion (a dropped Group-A type) makes it a subset.
 
 EXPECTED_GROUP_A = frozenset(
@@ -110,6 +109,7 @@ EXPECTED_GROUP_A = frozenset(
         # Shared enums.
         "ResourceType",
         "RoadmapStatus",
+        "Visibility",
         "ChangedNodeKind",
         "ChangeType",
         "ResponseFormat",
@@ -142,6 +142,15 @@ EXPECTED_GROUP_A = frozenset(
         # Changed-node echo + structural-rule violation.
         "ChangedNode",
         "Violation",
+        # Full roadmap and list projections.
+        "Resource",
+        "ChecklistItem",
+        "Subsection",
+        "Section",
+        "Roadmap",
+        "RoadmapCard",
+        "Dashboard",
+        "Profile",
         # Read projections (roadmaps).
         "ResourceRef",
         "PrereqRef",
@@ -149,6 +158,7 @@ EXPECTED_GROUP_A = frozenset(
         "NodeDetail",
         "SectionOverview",
         "OverallProgress",
+        "OverviewDetails",
         "Overview",
         "SectionPage",
         "SearchHit",
@@ -166,12 +176,10 @@ EXPECTED_GROUP_A = frozenset(
 def test_generated_module_is_exactly_group_a() -> None:
     """The generated module declares exactly the Group-A types: no more, no less.
 
-    This is the concrete enforcement of the criterion that the generated module
-    contains exactly Group A. Field equality is guaranteed by generation from the
-    backend OpenAPI, so no per-field equality is asserted; this set equality plus
-    the excluded-type symmetry guard below is what keeps the generated module free
-    of leaked domain types (``Visibility``, the full ``Roadmap``, its nested types)
-    and complete.
+    This is the concrete enforcement of the generated Group-A set. Field equality
+    is guaranteed by generation from the backend OpenAPI, so no per-field equality
+    is asserted; the set equality plus the excluded-type symmetry guard below keeps
+    the generated module complete without unrelated domain types.
     """
     assert _declared_contract_types(mcp_generated) == EXPECTED_GROUP_A, (
         "generated Group-A set drifted from EXPECTED_GROUP_A. If deliberate, "
@@ -240,12 +248,6 @@ def test_group_b_mcp_fields_are_subset_of_backend(
 EXCLUDED_MCP_ONLY = frozenset({"SearchResults"})  # structured search-hit wrapper
 EXCLUDED_BACKEND_ONLY = frozenset(
     {
-        "Resource",
-        "ChecklistItem",
-        "Subsection",
-        "Section",
-        "Roadmap",  # the full domain model (Group B projects lean views of it)
-        "Visibility",
         "VisibilityRequest",
         "PatchRequest",  # the operations=Field(min_length=1) wrapper; MCP takes the list
         "MetadataEditRequest",
@@ -276,9 +278,8 @@ def test_every_mcp_type_is_classified() -> None:
 def test_excluded_backend_only_types_have_no_mcp_mirror() -> None:
     """The documented backend-only exclusions are real and unmirrored.
 
-    Reads the whole MCP surface (generated Group A + hand-authored Group B/C), so a
-    leaked domain type (for example ``Visibility`` or the full ``Roadmap``) in the
-    generated module is caught here.
+    Reads the whole MCP surface (generated Group A + hand-authored Group B/C), so
+    an unrelated backend domain type in the generated module is caught here.
     """
     backend_types = (
         _declared_contract_types(backend)

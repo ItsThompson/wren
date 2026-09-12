@@ -41,6 +41,6 @@ describe('dev:mock fixtures render populated views', () => {
       'https://example.com/two-pointers',
     )
     // The overall progress bar renders (published tracking view, not a skeleton).
-    expect(screen.getByRole('progressbar', { name: /overall progress/i })).toBeInTheDocument()
+    expect(await screen.findByRole('progressbar', { name: /overall progress/i })).toBeInTheDocument()
   })
 })

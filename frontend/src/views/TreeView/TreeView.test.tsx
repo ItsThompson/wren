@@ -192,9 +192,10 @@ describe('TreeView', () => {
     renderTree()
     await screen.findByRole('link', { name: /^Arrays \(/ })
 
-    // No progress reachable: every node falls back to its base state.
-    expect(nodeLink('Arrays')).toHaveAttribute('data-state', 'available')
-    expect(nodeLink('Hashing')).toHaveAttribute('data-state', 'locked')
+    // No progress reachable: every node shows unavailable progress instead of a
+    // fabricated completion state.
+    expect(nodeLink('Arrays')).toHaveAttribute('data-state', 'unavailable')
+    expect(nodeLink('Hashing')).toHaveAttribute('data-state', 'unavailable')
   })
 
   it('shows a not-found message when the roadmap is unreachable (404)', async () => {

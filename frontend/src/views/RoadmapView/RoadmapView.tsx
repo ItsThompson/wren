@@ -26,6 +26,7 @@ export function RoadmapView() {
   const {
     state,
     publishState,
+    isMutationPending,
     publish,
     metadataState,
     editMetadata,
@@ -44,7 +45,14 @@ export function RoadmapView() {
   }
 
   const isOwner = user?.id != null && user.id === state.roadmap.owner
-  const actions: RoadmapActions = { metadataState, editMetadata, forkState, fork, lifecycle }
+  const actions: RoadmapActions = {
+    isMutationPending,
+    metadataState,
+    editMetadata,
+    forkState,
+    fork,
+    lifecycle,
+  }
 
   // A 409 conflict is rendered above whichever view is showing. Immutable steers
   // to fork; anything else (stale) steers to a re-read via a full refetch.
@@ -63,6 +71,7 @@ export function RoadmapView() {
   const view =
     state.roadmap.status === 'draft' ? (
       <DraftPreview
+        key={state.roadmap.id}
         roadmap={state.roadmap}
         publishState={publishState}
         onPublish={publish}
@@ -71,6 +80,7 @@ export function RoadmapView() {
       />
     ) : (
       <RoadmapListView
+        key={state.roadmap.id}
         roadmap={state.roadmap}
         isOwner={isOwner}
         actions={actions}

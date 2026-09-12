@@ -7,6 +7,7 @@ import type { RoadmapLifecycle, Roadmap } from '../types'
 interface LifecycleActionsProps {
   roadmap: Roadmap
   lifecycle: RoadmapLifecycle
+  isMutationPending: boolean
 }
 
 /**
@@ -22,13 +23,12 @@ interface LifecycleActionsProps {
  * server-side by a zero-followers check: a `blocked` result (409) steers the owner
  * to archive instead.
  */
-export function LifecycleActions({ roadmap, lifecycle }: LifecycleActionsProps) {
+export function LifecycleActions({ roadmap, lifecycle, isMutationPending }: LifecycleActionsProps) {
   const [confirming, setConfirming] = useState<'archive' | 'delete' | null>(null)
   const { visibilityState, setVisibility, archiveState, archive, deleteState, deleteRoadmap } =
     lifecycle
 
   const isPublic = roadmap.visibility === 'public'
-  const isSavingVisibility = visibilityState.phase === 'saving'
   const isArchiving = archiveState.phase === 'archiving'
   const isDeleting = deleteState.phase === 'deleting'
   const canArchive = roadmap.status === 'published'
@@ -46,7 +46,7 @@ export function LifecycleActions({ roadmap, lifecycle }: LifecycleActionsProps) 
           type="button"
           variant="ghost"
           onClick={() => setVisibility(isPublic ? 'private' : 'public')}
-          disabled={isSavingVisibility}
+          disabled={isMutationPending}
         >
           {isPublic ? <Globe aria-hidden /> : <Lock aria-hidden />}
           {isPublic ? 'Make private' : 'Make public'}
@@ -62,7 +62,7 @@ export function LifecycleActions({ roadmap, lifecycle }: LifecycleActionsProps) 
             type="button"
             variant="destructive"
             onClick={() => setConfirming('archive')}
-            disabled={isArchiving || confirming !== null}
+            disabled={isMutationPending || confirming !== null}
           >
             <Archive aria-hidden />
             {isArchiving ? 'Archiving…' : 'Archive'}
@@ -72,7 +72,7 @@ export function LifecycleActions({ roadmap, lifecycle }: LifecycleActionsProps) 
           type="button"
           variant="destructive"
           onClick={() => setConfirming('delete')}
-          disabled={isDeleting || confirming !== null}
+          disabled={isMutationPending || confirming !== null}
         >
           <Trash2 aria-hidden />
           {isDeleting ? 'Deleting…' : 'Delete'}
@@ -87,10 +87,10 @@ export function LifecycleActions({ roadmap, lifecycle }: LifecycleActionsProps) 
               : 'Archive this roadmap? It will be hidden from discovery, but existing followers keep it and their progress.'}
           </p>
           <div className="mt-3 flex flex-wrap gap-3">
-            <Button type="button" variant="destructive" onClick={confirmAction}>
+            <Button type="button" variant="destructive" onClick={confirmAction} disabled={isMutationPending}>
               {confirming === 'delete' ? 'Confirm delete' : 'Confirm archive'}
             </Button>
-            <Button type="button" variant="outline" onClick={() => setConfirming(null)}>
+            <Button type="button" variant="outline" onClick={() => setConfirming(null)} disabled={isMutationPending}>
               Cancel
             </Button>
           </div>
@@ -99,8 +99,9 @@ export function LifecycleActions({ roadmap, lifecycle }: LifecycleActionsProps) 
 
       {deleteState.phase === 'blocked' ? (
         <p className="mt-3 text-sm text-muted-foreground" role="alert">
-          This roadmap has followers, so it can&rsquo;t be deleted. Archive it instead to retire it
-          while existing followers keep their progress.
+          {roadmap.status === 'published'
+            ? 'This roadmap has followers, so it can’t be deleted. Archive it instead to retire it while existing followers keep their progress.'
+            : 'This roadmap has followers, so it can’t be deleted. Existing followers keep their progress.'}
         </p>
       ) : null}
 

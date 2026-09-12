@@ -776,6 +776,7 @@ describe('RoadmapView web-only lifecycle', () => {
   const VISIBILITY_URL = `${BASE}/roadmaps/${ROADMAP_ID}/visibility`
   const ARCHIVE_URL = `${BASE}/roadmaps/${ROADMAP_ID}:archive`
   const DELETE_URL = `${BASE}/roadmaps/${ROADMAP_ID}`
+  const PROGRESS_URL = `${BASE}/roadmaps/${ROADMAP_ID}/progress`
   const OTHER_USER = {
     id: 'user-2',
     username: 'grace',
@@ -832,6 +833,82 @@ describe('RoadmapView web-only lifecycle', () => {
     // The archived badge appears and the Archive action is gone (already archived).
     expect(await screen.findByText('Archived')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^archive$/i })).not.toBeInTheDocument()
+  })
+
+  it('disables competing roadmap writes while archive is pending', async () => {
+    const user = userEvent.setup()
+    let archiveRequests = 0
+    let releaseArchive!: () => void
+    const archiveGate = new Promise<void>((resolve) => {
+      releaseArchive = resolve
+    })
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
+      http.get('*/roadmaps/:id/progress', () => HttpResponse.json(buildProgress())),
+      http.post(ARCHIVE_URL, async () => {
+        archiveRequests += 1
+        await archiveGate
+        return HttpResponse.json(buildDraft({ status: 'archived' }))
+      }),
+    )
+    renderView()
+    await screen.findByRole('progressbar', { name: /overall progress/i })
+
+    await user.click(screen.getByRole('button', { name: /^archive$/i }))
+    await user.click(screen.getByRole('button', { name: /confirm archive/i }))
+    await waitFor(() => expect(archiveRequests).toBe(1))
+
+    expect(screen.getByRole('button', { name: /make public/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /fork/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /edit details/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /^delete$/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /archiving/i })).toBeDisabled()
+
+    releaseArchive()
+    expect(await screen.findByText('Archived')).toBeInTheDocument()
+  })
+
+  it('disables cached tracking controls until an archive progress read confirms followership', async () => {
+    const user = userEvent.setup()
+    let progressReads = 0
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
+      http.get(PROGRESS_URL, () => {
+        progressReads += 1
+        return progressReads === 1
+          ? HttpResponse.json(buildProgress())
+          : new HttpResponse(null, { status: 409 })
+      }),
+      http.get('*/roadmaps/:id/next', () => HttpResponse.json({ items: [], remaining_in_path: 0, complete: false })),
+      http.post(ARCHIVE_URL, () => HttpResponse.json(buildDraft({ status: 'archived' }))),
+    )
+    renderView()
+    await screen.findByRole('progressbar', { name: /overall progress/i })
+
+    await user.click(screen.getByRole('button', { name: /^archive$/i }))
+    await user.click(screen.getByRole('button', { name: /confirm archive/i }))
+
+    await waitFor(() => expect(screen.getByText(/closed to new tracking/i)).toBeInTheDocument())
+    expect(progressReads).toBe(2)
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Deadline')).not.toBeInTheDocument()
+  })
+
+  it('shows archived content read-only to a non-follower', async () => {
+    server.use(
+      http.get('*/roadmaps/:id', () =>
+        HttpResponse.json(buildDraft({ status: 'archived', visibility: 'public', owner: 'user-1' })),
+      ),
+      http.get(PROGRESS_URL, () => new HttpResponse(null, { status: 409 })),
+      http.get('*/roadmaps/:id/next', () => new HttpResponse(null, { status: 409 })),
+    )
+    renderView(OTHER_USER)
+
+    expect(await screen.findByText('Archived')).toBeInTheDocument()
+    expect(screen.getByText(/closed to new tracking/i)).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Deadline')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^fork$/i })).toBeInTheDocument()
   })
 
   it('deletes a follower-free roadmap after confirmation and navigates away', async () => {

@@ -35,7 +35,7 @@ export function flattenSubsections(roadmap: Roadmap): Subsection[] {
  */
 export function buildTreeGraph(
   roadmap: Roadmap,
-  checkedIds: Set<string>,
+  checkedIds: Set<string> | null,
   roadmapId: string,
 ): TreeGraph {
   const ordered = flattenSubsections(roadmap)

@@ -45,7 +45,13 @@ class RoadmapRepository(Protocol):
 
     async def get(self, roadmap_id: str) -> RoadmapRecord | None: ...
 
+    async def get_for_update(self, roadmap_id: str) -> RoadmapRecord | None: ...
+
     async def get_owned(self, roadmap_id: str, owner_id: str) -> RoadmapRecord | None: ...
+
+    async def get_owned_for_update(
+        self, roadmap_id: str, owner_id: str
+    ) -> RoadmapRecord | None: ...
 
     async def list_owned(self, owner_id: str) -> list[RoadmapRecord]: ...
 
@@ -137,6 +143,24 @@ class SqlAlchemyRoadmapRepository:
                 RoadmapRecord.id == roadmap_id, RoadmapRecord.owner == owner_id
             ),
         )
+
+    async def get_owned_for_update(self, roadmap_id: str, owner_id: str) -> RoadmapRecord | None:
+        statement = (
+            select(RoadmapRecord)
+            .where(RoadmapRecord.id == roadmap_id, RoadmapRecord.owner == owner_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return await fetch_optional(self._session, statement)
+
+    async def get_for_update(self, roadmap_id: str) -> RoadmapRecord | None:
+        statement = (
+            select(RoadmapRecord)
+            .where(RoadmapRecord.id == roadmap_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return await fetch_optional(self._session, statement)
 
     async def get(self, roadmap_id: str) -> RoadmapRecord | None:
         """Load a roadmap by id without owner scoping.

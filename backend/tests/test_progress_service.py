@@ -345,6 +345,27 @@ async def test_get_on_an_archived_roadmap_is_allowed_for_a_follower() -> None:
     assert snapshot.checked_ids == [CHK_ARRAYS_READ]
 
 
+async def test_archived_owner_without_progress_cannot_read_or_write_tracking() -> None:
+    # Ownership keeps the archived roadmap document readable, but does not make
+    # the owner an existing follower or permit a new progress row.
+    archived = build_roadmap(
+        owner=_OWNER, status=RoadmapStatus.ARCHIVED, visibility=Visibility.PRIVATE
+    )
+    service, _, progress_repo = _service(archived)
+
+    with pytest.raises(Conflict):
+        await service.get(_OWNER, archived.id, detailed=True)
+    with pytest.raises(Conflict):
+        await service.get_next(_OWNER, archived.id)
+    with pytest.raises(Conflict):
+        await service.update(_OWNER, archived.id, [CHK_ARRAYS_READ], CompletionState.COMPLETE)
+    with pytest.raises(Conflict):
+        await service.set_deadline(_OWNER, archived.id, date(2026, 12, 1))
+
+    assert await progress_repo.get(_OWNER, archived.id) is None
+    assert progress_repo.commits == 0
+
+
 async def test_update_and_next_on_an_archived_roadmap_keep_working_for_a_follower() -> None:
     roadmap = build_roadmap(visibility=Visibility.PUBLIC)
     service, roadmap_repo, _ = _service(roadmap)

@@ -1,21 +1,22 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
 import { keys, runQuery, useApiQuery, useSessionClient } from '@/api'
 import { isStaleRevision, toProblem } from '@/lib/problem'
+import { useArchivedProgressRefresh } from './useArchivedProgressRefresh'
 import { firstNextSubsectionId, patchCheckedIds, patchDeadline } from '../util/progress-derive'
-import type { ProgressNotice } from '../types'
+import type { ProgressNotice, ProgressReadState, RoadmapStatus } from '../types'
 
 /**
- * Fetch and mutate the caller's progress for one published roadmap. Both reads
- * (`keys.progress(id)`, `keys.next(id)`) go through {@link useApiQuery} and are
- * best-effort: a failure degrades to an unstarted checklist, never a fatal view
- * error. Sharing those keys with the tree/roadmap reads de-duplicates onto one
- * request and cache entry. Writes are optimistic: `toggle`/`setDeadline` update
- * the cached snapshot via SWR `optimisticData` with `rollbackOnError`; a 409
- * stale-revision surfaces the re-read prompt, any other failure a quiet notice.
+ * Fetch and mutate the caller's progress for one published or archived roadmap.
+ * The progress read exposes loading, ready, closed, and failed states so an
+ * unavailable record is never presented as an empty record. Sharing the keys
+ * with the tree view de-duplicates onto one request and cache entry. Writes are
+ * optimistic and are enabled only in the ready state.
  */
-export function useProgress(roadmapId: string): {
-  checkedIds: Set<string>
+export function useProgress(roadmapId: string, roadmapStatus: RoadmapStatus = 'published'): {
+  /** Null until the server confirms a progress snapshot. */
+  checkedIds: Set<string> | null
+  progressState: ProgressReadState
   toggle: (itemId: string, checked: boolean) => void
   deadline: string | null
   setDeadline: (deadline: string | null) => void
@@ -31,30 +32,78 @@ export function useProgress(roadmapId: string): {
 } {
   const client = useSessionClient()
   const [notice, setNotice] = useState<ProgressNotice | null>(null)
+  const generationRef = useRef(0)
+  const previousRoadmapRef = useRef(`${roadmapId}:${roadmapStatus}`)
+  const roadmapKey = `${roadmapId}:${roadmapStatus}`
+  if (previousRoadmapRef.current !== roadmapKey) {
+    previousRoadmapRef.current = roadmapKey
+    generationRef.current += 1
+  }
+  const generation = generationRef.current
+  const isCurrent = useCallback(
+    () => generationRef.current === generation && previousRoadmapRef.current === roadmapKey,
+    [generation, roadmapKey],
+  )
 
-  const { data: progress, mutate: mutateProgress } = useApiQuery(keys.progress(roadmapId), (c) =>
+  const {
+    data: progress,
+    error: progressError,
+    mutate: mutateProgress,
+  } = useApiQuery(keys.progress(roadmapId), (c) =>
     c.GET('/roadmaps/{roadmap_id}/progress', {
       params: { path: { roadmap_id: roadmapId }, query: { detailed: true } },
     }),
   )
-  const { data: next, mutate: mutateNext } = useApiQuery(keys.next(roadmapId), (c) =>
+  const { data: next, error: nextError, mutate: mutateNext } = useApiQuery(keys.next(roadmapId), (c) =>
     c.GET('/roadmaps/{roadmap_id}/next', { params: { path: { roadmap_id: roadmapId } } }),
   )
+  const refreshArchivedProgress = useCallback(
+    () => Promise.all([mutateProgress(), mutateNext()]),
+    [mutateNext, mutateProgress],
+  )
+  const invalidateArchivedProgress = useCallback(
+    () =>
+      Promise.all([
+        mutateProgress(undefined, { revalidate: false }),
+        mutateNext(undefined, { revalidate: false }),
+      ]),
+    [mutateNext, mutateProgress],
+  )
+  const archivedRefreshPending = useArchivedProgressRefresh(
+    roadmapStatus,
+    refreshArchivedProgress,
+    invalidateArchivedProgress,
+  )
 
-  const checkedIds = useMemo(() => new Set(progress?.checked_ids ?? []), [progress])
+  const progressState = useMemo<ProgressReadState>(() => {
+    if (roadmapStatus === 'archived' && progressError?.status === 409) return { phase: 'closed' }
+    if (archivedRefreshPending) return { phase: 'loading' }
+    if (progressError) return { phase: 'failed', status: progressError.status }
+    if (progress) return { phase: 'ready' }
+    return { phase: 'loading' }
+  }, [archivedRefreshPending, progress, progressError, roadmapStatus])
+  const checkedIds = useMemo(
+    () => (progressState.phase === 'ready' && progress ? new Set(progress.checked_ids ?? []) : null),
+    [progress, progressState.phase],
+  )
   const deadline = progress?.deadline ?? null
-  const nextSubsectionId = firstNextSubsectionId(next)
-  const nextComplete = next?.complete ?? false
+  const nextSubsectionId = progressState.phase === 'ready' && !nextError ? firstNextSubsectionId(next) : null
+  const nextComplete = progressState.phase === 'ready' && !nextError && next?.complete === true
 
   // runQuery only ever throws a Problem; the rejection crosses the mutate promise
   // as an unknown, so normalize it back to classify the surfaced notice.
-  const classifyFailure = useCallback((thrown: unknown) => {
-    const problem = toProblem(thrown)
-    setNotice(isStaleRevision(problem) ? { kind: 'stale' } : { kind: 'save-failed' })
-  }, [])
+  const classifyFailure = useCallback(
+    (thrown: unknown) => {
+      if (!isCurrent()) return
+      const problem = toProblem(thrown)
+      setNotice(isStaleRevision(problem) ? { kind: 'stale' } : { kind: 'save-failed' })
+    },
+    [isCurrent],
+  )
 
   const toggle = useCallback(
     (itemId: string, checked: boolean) => {
+      if (!isCurrent() || progressState.phase !== 'ready') return
       setNotice(null)
       void mutateProgress(
         async () => {
@@ -76,11 +125,12 @@ export function useProgress(roadmapId: string): {
         },
       ).catch(classifyFailure)
     },
-    [client, roadmapId, mutateProgress, mutateNext, classifyFailure],
+    [client, roadmapId, mutateProgress, mutateNext, classifyFailure, progressState.phase, isCurrent],
   )
 
   const setDeadline = useCallback(
     (nextDeadline: string | null) => {
+      if (!isCurrent() || progressState.phase !== 'ready') return
       setNotice(null)
       void mutateProgress(
         async (current) => {
@@ -101,7 +151,7 @@ export function useProgress(roadmapId: string): {
         },
       ).catch(classifyFailure)
     },
-    [client, roadmapId, mutateProgress, classifyFailure],
+    [client, roadmapId, mutateProgress, classifyFailure, progressState.phase, isCurrent],
   )
 
   const dismissNotice = useCallback(() => setNotice(null), [])
@@ -113,6 +163,7 @@ export function useProgress(roadmapId: string): {
 
   return {
     checkedIds,
+    progressState,
     toggle,
     deadline,
     setDeadline,

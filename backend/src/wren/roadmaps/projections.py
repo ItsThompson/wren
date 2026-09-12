@@ -25,6 +25,7 @@ from wren.roadmaps.read_schemas import (
     NodeDetail,
     OverallProgress,
     Overview,
+    OverviewDetails,
     PrereqRef,
     ResourceRef,
     SearchHit,
@@ -53,7 +54,19 @@ def build_overview(roadmap: Roadmap, checked: frozenset[str], *, fmt: ResponseFo
     surface (and the MCP ``roadmap_get_overview(format?)`` tool), but the overview
     is already the concise orientation summary: it carries no verbose free-text
     field to trim, so both formats produce the same body."""
-    del fmt  # overview has no verbose field to trim; accepted for tool parity
+    details = (
+        OverviewDetails(
+            owner=roadmap.owner,
+            description=roadmap.description,
+            subject_tags=list(roadmap.subject_tags),
+            visibility=roadmap.visibility,
+            created_at=roadmap.created_at,
+            updated_at=roadmap.updated_at,
+            suggested_path=list(roadmap.suggested_path),
+        )
+        if fmt is ResponseFormat.DETAILED
+        else None
+    )
     sections: list[SectionOverview] = []
     total_all = 0
     checked_all = 0
@@ -78,6 +91,7 @@ def build_overview(roadmap: Roadmap, checked: frozenset[str], *, fmt: ResponseFo
         title=roadmap.title,
         status=roadmap.status,
         revision=roadmap.revision,
+        details=details,
         sections=sections,
         overall=OverallProgress(
             total_items=total_all,

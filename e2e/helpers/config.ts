@@ -30,3 +30,6 @@ export const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL ?? 'http://localh
 
 /** The external-app origin the APIRequestContext seeds and reads against. */
 export const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:8000'
+
+/** The MCP Resource Server origin the mounted transport exposes to agents. */
+export const MCP_BASE_URL = process.env.MCP_BASE_URL ?? 'http://localhost:9000'

@@ -19,7 +19,8 @@ roadmap). An unreadable roadmap is a 404 with no existence leak.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime
 
 # Cross-domain coupling: progress reads roadmaps straight from the roadmap
@@ -82,12 +83,13 @@ class ProgressService:
         gains no new followers); an unreadable roadmap is a 404 (no existence
         leak). The record is private to ``user_id`` and never shown publicly.
         """
-        await self._require_published_readable(user_id, roadmap_id)
-        existing = await self._progress.get(user_id, roadmap_id)
-        if existing is not None:
-            return _record_to_progress(existing)
-        progress = Progress(user_id=user_id, roadmap_id=roadmap_id, updated_at=self._clock())
-        await self._persist(progress)
+        async with self._transaction():
+            await self._require_published_readable(user_id, roadmap_id, for_update=True)
+            existing = await self._progress.get(user_id, roadmap_id)
+            if existing is not None:
+                return _record_to_progress(existing)
+            progress = Progress(user_id=user_id, roadmap_id=roadmap_id, updated_at=self._clock())
+            await self._progress.upsert(progress)
         _log.info("roadmap_followed", roadmap_id=roadmap_id, user_id=user_id)
         return progress
 
@@ -117,19 +119,18 @@ class ProgressService:
         may update (the guard refuses a caller with no record, so the upsert never
         creates a new follower).
         """
-        roadmap = await self._require_trackable_readable(user_id, roadmap_id)
-        self._reject_foreign_items(roadmap, roadmap_id, item_ids)
-        progress = await self._load_or_empty(user_id, roadmap_id)
-        checked = dict(progress.checked)
-        for item_id in item_ids:
-            if state is CompletionState.COMPLETE:
-                checked[item_id] = True
-            else:
-                # Explicit-set to incomplete drops the key so the map holds only
-                # checked items (keeps it lean; the set is idempotent).
-                checked.pop(item_id, None)
-        updated = progress.model_copy(update={"checked": checked, "updated_at": self._clock()})
-        await self._persist(updated)
+        async with self._transaction():
+            roadmap = await self._require_trackable_readable(user_id, roadmap_id, for_update=True)
+            self._reject_foreign_items(roadmap, roadmap_id, item_ids)
+            progress = await self._load_or_empty(user_id, roadmap_id)
+            checked = dict(progress.checked)
+            for item_id in item_ids:
+                if state is CompletionState.COMPLETE:
+                    checked[item_id] = True
+                else:
+                    checked.pop(item_id, None)
+            updated = progress.model_copy(update={"checked": checked, "updated_at": self._clock()})
+            await self._progress.upsert(updated)
         _log.info(
             "progress_updated",
             roadmap_id=roadmap_id,
@@ -166,14 +167,19 @@ class ProgressService:
         also starts following; the same trackable guard refuses a non-follower on an
         **archived** roadmap (no phantom follower). No pacing or effort forecast is
         derived: the deadline drives a countdown only."""
-        await self._require_trackable_readable(user_id, roadmap_id)
-        progress = await self._load_or_empty(user_id, roadmap_id)
-        updated = progress.model_copy(update={"deadline": deadline, "updated_at": self._clock()})
-        await self._persist(updated)
+        async with self._transaction():
+            await self._require_trackable_readable(user_id, roadmap_id, for_update=True)
+            progress = await self._load_or_empty(user_id, roadmap_id)
+            updated = progress.model_copy(
+                update={"deadline": deadline, "updated_at": self._clock()}
+            )
+            await self._progress.upsert(updated)
         _log.info("deadline_set", roadmap_id=roadmap_id, user_id=user_id, cleared=deadline is None)
         return updated
 
-    async def _load_readable(self, user_id: str, roadmap_id: str) -> Roadmap:
+    async def _load_readable(
+        self, user_id: str, roadmap_id: str, *, for_update: bool = False
+    ) -> Roadmap:
         """Load a roadmap the caller may read: their own (any status) or a public
         one.
 
@@ -181,7 +187,11 @@ class ProgressService:
         leaks no existence. Callers layer their own status gate on top (follow vs
         track), so this never itself grants a lifecycle transition.
         """
-        record = await self._roadmaps.get(roadmap_id)
+        record = (
+            await self._roadmaps.get_for_update(roadmap_id)
+            if for_update
+            else await self._roadmaps.get(roadmap_id)
+        )
         if record is None:
             raise NotFound(f"No roadmap '{roadmap_id}'.", instance=f"/roadmaps/{roadmap_id}")
         roadmap = Roadmap.model_validate(record.document)
@@ -190,7 +200,9 @@ class ProgressService:
             raise NotFound(f"No roadmap '{roadmap_id}'.", instance=f"/roadmaps/{roadmap_id}")
         return roadmap
 
-    async def _require_published_readable(self, user_id: str, roadmap_id: str) -> Roadmap:
+    async def _require_published_readable(
+        self, user_id: str, roadmap_id: str, *, for_update: bool = False
+    ) -> Roadmap:
         """Readable **and** ``published``: the guard for **starting** to follow.
 
         A draft is not startable and an archived roadmap is hidden from discovery
@@ -198,7 +210,7 @@ class ProgressService:
         reach an archived roadmap's progress through
         :meth:`_require_trackable_readable` instead.
         """
-        roadmap = await self._load_readable(user_id, roadmap_id)
+        roadmap = await self._load_readable(user_id, roadmap_id, for_update=for_update)
         if roadmap.status is not RoadmapStatus.PUBLISHED:
             raise Conflict(
                 f"Roadmap '{roadmap_id}' is {roadmap.status.value}; only a published roadmap can "
@@ -207,7 +219,9 @@ class ProgressService:
             )
         return roadmap
 
-    async def _require_trackable_readable(self, user_id: str, roadmap_id: str) -> Roadmap:
+    async def _require_trackable_readable(
+        self, user_id: str, roadmap_id: str, *, for_update: bool = False
+    ) -> Roadmap:
         """Readable **and** trackable: the guard for reading / updating progress and
         computing next.
 
@@ -223,27 +237,26 @@ class ProgressService:
         the caller does not own is a 404 with no existence leak before any status
         or followership signal is exposed.
         """
-        roadmap = await self._load_readable(user_id, roadmap_id)
+        roadmap = await self._load_readable(user_id, roadmap_id, for_update=for_update)
         if roadmap.status is RoadmapStatus.DRAFT:
             raise Conflict(
                 f"Roadmap '{roadmap_id}' is a draft; only a published or archived roadmap can be "
                 "tracked.",
                 instance=f"/roadmaps/{roadmap_id}",
             )
-        if roadmap.status is RoadmapStatus.ARCHIVED and not await self._is_follower(
-            user_id, roadmap_id
-        ):
-            # Archived gains no new followers: a caller with no existing progress
-            # record cannot start tracking it (a write here would create a phantom
-            # follower via the upsert). New follows are already blocked by follow().
+        if roadmap.status is RoadmapStatus.ARCHIVED:
+            # Archived callers must already have progress, including the owner.
+            # Ownership keeps the roadmap readable but never creates participation.
+            if await self._has_progress(user_id, roadmap_id):
+                return roadmap
             raise Conflict(
                 f"Roadmap '{roadmap_id}' is archived; only its existing followers can track it.",
                 instance=f"/roadmaps/{roadmap_id}",
             )
         return roadmap
 
-    async def _is_follower(self, user_id: str, roadmap_id: str) -> bool:
-        """Whether the caller already has a progress record for the roadmap."""
+    async def _has_progress(self, user_id: str, roadmap_id: str) -> bool:
+        """Whether the caller has an existing progress record for the roadmap."""
         return await self._progress.get(user_id, roadmap_id) is not None
 
     def _reject_foreign_items(self, roadmap: Roadmap, roadmap_id: str, item_ids: list[str]) -> None:
@@ -265,10 +278,11 @@ class ProgressService:
             return Progress(user_id=user_id, roadmap_id=roadmap_id, updated_at=self._clock())
         return _record_to_progress(record)
 
-    async def _persist(self, progress: Progress) -> None:
-        """Upsert the caller's record inside the service-owned transaction."""
+    @asynccontextmanager
+    async def _transaction(self) -> AsyncIterator[None]:
+        """Commit roadmap and progress work together on the shared session."""
         try:
-            await self._progress.upsert(progress)
+            yield
             await self._progress.commit()
         except Exception:
             await self._progress.rollback()

@@ -32,7 +32,7 @@ function ConcurrentReadsProbe() {
   return (
     <div>
       <span data-testid="roadmap-phase">{roadmap.state.phase}</span>
-      <span data-testid="checked">{progress.checkedIds.size}</span>
+      <span data-testid="checked">{progress.checkedIds?.size ?? 'unknown'}</span>
       <span data-testid="next">{progress.nextSubsectionId ?? 'none'}</span>
     </div>
   )
