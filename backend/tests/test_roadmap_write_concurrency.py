@@ -39,7 +39,7 @@ from wren.roadmaps.schemas import (
 from wren.roadmaps.service import RoadmapService
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Iterator
+    from collections.abc import AsyncIterator, Callable, Coroutine, Iterator
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -49,6 +49,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 ROADMAP_ID = "concurrency-roadmap"
 OWNER = "concurrency-owner"
 NOW = datetime(2026, 1, 1, tzinfo=UTC)
+WRITE_TIMEOUT_SECONDS = 5
 
 
 @pytest.fixture(scope="session")
@@ -171,6 +172,28 @@ async def _read_roadmap(url: str, roadmap_id: str) -> Roadmap:
         await engine.dispose()
 
 
+@asynccontextmanager
+async def _waiting_write[Result](
+    url: str,
+    roadmap_id: str,
+    holder: AsyncSession,
+    waiter: AsyncSession,
+    write: Callable[[], Coroutine[object, object, Result]],
+) -> AsyncIterator[asyncio.Task[Result]]:
+    # Pre-acquire the first writer's lock on the same session its service uses.
+    assert await SqlAlchemyRoadmapRepository(holder).get_for_update(roadmap_id) is not None
+    backend_pid = (await waiter.execute(text("SELECT pg_backend_pid()"))).scalar_one()
+    task = asyncio.create_task(write())
+    try:
+        await asyncio.wait_for(_wait_for_lock_wait(url, backend_pid), timeout=WRITE_TIMEOUT_SECONDS)
+        assert not task.done()
+        yield task
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        await holder.rollback()
+
+
 async def test_delete_and_first_follow_are_serialized_at_service_boundary(
     migrated_url: str,
 ) -> None:
@@ -191,27 +214,53 @@ async def test_delete_and_first_follow_are_serialized_at_service_boundary(
             assert isinstance(follow_result, Progress)
 
 
-async def test_archive_and_first_follow_are_serialized_at_service_boundary(
+async def test_archive_before_first_follow_rejects_the_waiting_follower(
     migrated_url: str,
 ) -> None:
-    async with _service_pair(migrated_url) as (roadmaps, progress, _):
-        created = await roadmaps[0].create_draft("owner", _roadmap_input("Archive follow race"))
+    async with _service_pair(migrated_url) as (roadmaps, progress, sessions):
+        created = await roadmaps[0].create_draft("owner", _roadmap_input("Archive before follow"))
         await roadmaps[0].publish("owner", created.id)
         await roadmaps[0].set_visibility("owner", created.id, Visibility.PUBLIC)
-        archive_result, follow_result = await asyncio.gather(
-            roadmaps[0].archive("owner", created.id),
-            progress[1].follow("follower", created.id),
-            return_exceptions=True,
-        )
-        if isinstance(archive_result, Roadmap):
-            assert archive_result.status is RoadmapStatus.ARCHIVED
-            assert isinstance(follow_result, Conflict)
-            expected_status = RoadmapStatus.ARCHIVED
-        else:
-            assert isinstance(archive_result, Conflict)
-            assert isinstance(follow_result, Progress)
-            expected_status = RoadmapStatus.PUBLISHED
-        assert (await _read_roadmap(migrated_url, created.id)).status is expected_status
+        async with _waiting_write(
+            migrated_url,
+            created.id,
+            sessions[0],
+            sessions[1],
+            lambda: progress[1].follow("follower", created.id),
+        ) as follow_task:
+            archived = await roadmaps[0].archive("owner", created.id)
+            assert archived.status is RoadmapStatus.ARCHIVED
+            with pytest.raises(Conflict, match="only a published roadmap"):
+                await asyncio.wait_for(follow_task, timeout=WRITE_TIMEOUT_SECONDS)
+
+        assert (await _read_roadmap(migrated_url, created.id)).status is RoadmapStatus.ARCHIVED
+        assert await SqlAlchemyProgressRepository(sessions[0]).get("follower", created.id) is None
+
+
+async def test_first_follow_before_archive_preserves_the_existing_follower(
+    migrated_url: str,
+) -> None:
+    async with _service_pair(migrated_url) as (roadmaps, progress, sessions):
+        created = await roadmaps[0].create_draft("owner", _roadmap_input("Follow before archive"))
+        await roadmaps[0].publish("owner", created.id)
+        await roadmaps[0].set_visibility("owner", created.id, Visibility.PUBLIC)
+        async with _waiting_write(
+            migrated_url,
+            created.id,
+            sessions[0],
+            sessions[1],
+            lambda: roadmaps[1].archive("owner", created.id),
+        ) as archive_task:
+            followed = await progress[0].follow("follower", created.id)
+            assert followed.user_id == "follower"
+            assert followed.roadmap_id == created.id
+            archived = await asyncio.wait_for(archive_task, timeout=WRITE_TIMEOUT_SECONDS)
+            assert archived.status is RoadmapStatus.ARCHIVED
+
+        assert (await _read_roadmap(migrated_url, created.id)).status is RoadmapStatus.ARCHIVED
+        snapshot = await progress[0].get("follower", created.id, detailed=True)
+        assert snapshot.roadmap_id == created.id
+        assert snapshot.checked_ids == []
 
 
 async def test_same_revision_patch_writers_have_one_winner(
@@ -251,17 +300,42 @@ async def test_patch_and_publish_race_preserves_immutability(
         assert isinstance(patch_result, (Conflict, PatchResult))
 
 
-async def test_metadata_and_archive_race_keeps_both_committed_invariants(
-    migrated_url: str,
+@pytest.mark.parametrize("archive_first", [False, True], ids=["metadata-first", "archive-first"])
+async def test_metadata_and_archive_preserve_both_writes_in_each_lock_order(
+    migrated_url: str, archive_first: bool
 ) -> None:
-    async with _service_pair(migrated_url) as (roadmaps, _, _):
-        created = await roadmaps[0].create_draft("owner", _roadmap_input("Metadata archive race"))
-        await roadmaps[0].publish("owner", created.id)
-        metadata_result, archive_result = await asyncio.gather(
-            roadmaps[0].edit_metadata("owner", created.id, "Renamed", None, None),
-            roadmaps[1].archive("owner", created.id),
+    async with _service_pair(migrated_url) as (roadmaps, _, sessions):
+        created = await roadmaps[0].create_draft(
+            "owner", _roadmap_input(f"Metadata archive order {archive_first}")
         )
-        assert metadata_result.status is RoadmapStatus.PUBLISHED
+        await roadmaps[0].publish("owner", created.id)
+        if archive_first:
+            async with _waiting_write(
+                migrated_url,
+                created.id,
+                sessions[0],
+                sessions[1],
+                lambda: roadmaps[1].edit_metadata("owner", created.id, "Renamed", None, None),
+            ) as metadata_task:
+                archive_result = await roadmaps[0].archive("owner", created.id)
+                metadata_result = await asyncio.wait_for(
+                    metadata_task, timeout=WRITE_TIMEOUT_SECONDS
+                )
+            assert metadata_result.status is RoadmapStatus.ARCHIVED
+        else:
+            async with _waiting_write(
+                migrated_url,
+                created.id,
+                sessions[0],
+                sessions[1],
+                lambda: roadmaps[1].archive("owner", created.id),
+            ) as archive_task:
+                metadata_result = await roadmaps[0].edit_metadata(
+                    "owner", created.id, "Renamed", None, None
+                )
+                archive_result = await asyncio.wait_for(archive_task, timeout=WRITE_TIMEOUT_SECONDS)
+            assert metadata_result.status is RoadmapStatus.PUBLISHED
+        assert metadata_result.title == "Renamed"
         assert archive_result.status is RoadmapStatus.ARCHIVED
         stored = await _read_roadmap(migrated_url, created.id)
         assert stored.status is RoadmapStatus.ARCHIVED
