@@ -46,6 +46,25 @@ describe('useArchivedProgressRefresh', () => {
     await waitFor(() => expect(result.current).toBe(false))
   })
 
+  it.each(['success', 'failure'])(
+    'releases an initially archived gate after StrictMode replay and refresh %s',
+    async (outcome) => {
+      const refreshProgress = vi.fn(async () => {
+        if (outcome === 'failure') throw new Error('read failed')
+      })
+      const invalidateProgress = vi.fn(async () => undefined)
+      const { result } = renderHook(
+        () => useArchivedProgressRefresh('archived', refreshProgress, invalidateProgress),
+        { reactStrictMode: true },
+      )
+
+      expect(result.current).toBe(true)
+      await waitFor(() => expect(refreshProgress).toHaveBeenCalled())
+      expect(invalidateProgress).toHaveBeenCalled()
+      await waitFor(() => expect(result.current).toBe(false))
+    },
+  )
+
   it('releases the gate when the authoritative read fails', async () => {
     const refreshProgress = vi.fn(() => Promise.reject(new Error('read failed')))
     const invalidateProgress = vi.fn(() => Promise.resolve())

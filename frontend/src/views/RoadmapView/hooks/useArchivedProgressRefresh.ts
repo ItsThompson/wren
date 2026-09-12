@@ -22,7 +22,6 @@ export function useArchivedProgressRefresh(
     roadmapStatus === 'archived' && previousStatusRef.current !== 'archived'
 
   useEffect(() => {
-    if (previousStatusRef.current === roadmapStatus) return
     previousStatusRef.current = roadmapStatus
     if (roadmapStatus !== 'archived') {
       setRefreshPending(false)
