@@ -91,7 +91,9 @@ export function RoadmapListView({ roadmap, isOwner, isAuthenticated, actions, on
         </div>
         {roadmap.status === 'archived' ? (
           <p className="mt-2 text-sm text-muted-foreground">
-            This roadmap is archived: hidden from discovery, but you keep it and your progress.
+            {isAuthenticated
+              ? 'This roadmap is archived: hidden from discovery, but you keep it and your progress.'
+              : 'This roadmap is archived: hidden from discovery, but available here for reading.'}
           </p>
         ) : null}
         {roadmap.description ? <p className="mt-3 w-full text-muted-foreground">{roadmap.description}</p> : null}
