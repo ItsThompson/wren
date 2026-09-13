@@ -12,8 +12,7 @@ import type { paths } from '../schema'
  * `src/mocks`). Views receive a client built here with the deployment's API
  * base URL; the base is injected rather than read here so this stays testable.
  */
-export const createApiClient = (baseUrl: string): Client<paths> =>
-  createClient<paths>({ baseUrl })
+export const createApiClient = (baseUrl: string): Client<paths> => createClient<paths>({ baseUrl, credentials: 'omit' })
 
 export type ApiClient = Client<paths>
 

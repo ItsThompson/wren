@@ -4,6 +4,7 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import { mockNext, mockProgress, mockRoadmap } from '@/mocks/data'
+import { buildAuthUser, buildAuthValue } from '@/test/auth-harness'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { useProgress } from '@/views/RoadmapView/hooks/useProgress'
 import { useRoadmap } from '@/views/RoadmapView/hooks/useRoadmap'
@@ -74,7 +75,10 @@ describe('AC3 de-duplication: co-mounted routes share one request per key', () =
         <RoadmapRouteProbe />
         <TreeRouteProbe />
       </>,
-      { baseUrl: BASE },
+      {
+        baseUrl: BASE,
+        authValue: buildAuthValue({ status: 'authenticated', user: buildAuthUser() }),
+      },
     )
 
     // Both routes resolve their reads from the shared cache.
@@ -91,8 +95,6 @@ describe('AC3 de-duplication: co-mounted routes share one request per key', () =
     expect(nextGets).toBe(1)
 
     // Both routes see the same shared payload (proving one cache entry, not two).
-    expect(screen.getByTestId('roadmap-checked')).toHaveTextContent(
-      String(mockProgress.checked_ids?.length ?? 0),
-    )
+    expect(screen.getByTestId('roadmap-checked')).toHaveTextContent(String(mockProgress.checked_ids?.length ?? 0))
   })
 })

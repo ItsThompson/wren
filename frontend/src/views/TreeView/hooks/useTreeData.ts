@@ -1,9 +1,11 @@
 import { useCallback } from 'react'
 
+import { useAuth } from '@/auth'
 import { keys, useApiQuery } from '@/api'
 import type { Problem } from '@/lib/problem'
 
 import { useArchivedProgressRefresh } from '@/views/RoadmapView/hooks/useArchivedProgressRefresh'
+import { useRoadmapDocument } from '@/views/RoadmapView/hooks/useRoadmapDocument'
 import type { ProgressReadState } from '@/views/RoadmapView/types'
 import type { ProgressSnapshot, Roadmap, TreeDataState } from '../types'
 
@@ -24,9 +26,18 @@ function toTreeDataState(
   roadmap: ReadResult<Roadmap>,
   progress: ReadResult<ProgressSnapshot>,
   archivedRefreshPending: boolean,
+  isAuthenticated: boolean,
 ): TreeDataState {
   if (roadmap.isLoading && !roadmap.data) return { phase: 'loading' }
   if (roadmap.error || !roadmap.data) return { phase: 'error' }
+  if (!isAuthenticated) {
+    return {
+      phase: 'loaded',
+      roadmap: roadmap.data,
+      checkedIds: null,
+      progressState: { phase: 'not-applicable' },
+    }
+  }
   let progressState: ProgressReadState = { phase: 'loading' }
   if (progress.error?.status === 409 && roadmap.data.status === 'archived') {
     progressState = { phase: 'closed' }
@@ -57,29 +68,34 @@ function toTreeDataState(
  * request per key.
  */
 export function useTreeData(roadmapId: string): { state: TreeDataState } {
-  const roadmap = useApiQuery(keys.roadmap(roadmapId), (client) =>
-    client.GET('/roadmaps/{roadmap_id}', { params: { path: { roadmap_id: roadmapId } } }),
-  )
+  const { status: authStatus } = useAuth()
+  const roadmap = useRoadmapDocument(roadmapId)
   const {
     data: progressData,
     error: progressError,
     isLoading: progressLoading,
     mutate: mutateProgress,
-  } = useApiQuery(keys.progress(roadmapId), (client) =>
+  } = useApiQuery(authStatus === 'authenticated' ? keys.progress(roadmapId) : null, (client) =>
     client.GET('/roadmaps/{roadmap_id}/progress', {
       params: { path: { roadmap_id: roadmapId }, query: { detailed: true } },
     }),
   )
-  const progress = { data: progressData, error: progressError, isLoading: progressLoading }
+  const progress = {
+    data: progressData,
+    error: progressError,
+    isLoading: progressLoading,
+  }
   const invalidateArchivedProgress = useCallback(
     () => mutateProgress(undefined, { revalidate: false }),
     [mutateProgress],
   )
   const archivedRefreshPending = useArchivedProgressRefresh(
-    roadmap.data?.status,
+    authStatus === 'authenticated' ? roadmap.data?.status : undefined,
     mutateProgress,
     invalidateArchivedProgress,
   )
 
-  return { state: toTreeDataState(roadmap, progress, archivedRefreshPending) }
+  return {
+    state: toTreeDataState(roadmap, progress, archivedRefreshPending, authStatus === 'authenticated'),
+  }
 }

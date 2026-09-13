@@ -45,6 +45,7 @@ export type ProgressNotice = { kind: 'stale' } | { kind: 'save-failed' }
 /** Progress read availability. Unknown progress never acts like an empty record. */
 export type ProgressReadState =
   | { phase: 'loading' }
+  | { phase: 'not-applicable' }
   | { phase: 'ready' }
   | { phase: 'closed' }
   | { phase: 'failed'; status: number | null }

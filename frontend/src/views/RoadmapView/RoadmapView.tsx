@@ -22,7 +22,7 @@ import type { RoadmapActions } from './types'
  */
 export function RoadmapView() {
   const { roadmapId } = useParams()
-  const { user } = useAuth()
+  const { status, user } = useAuth()
   const {
     state,
     publishState,
@@ -58,11 +58,7 @@ export function RoadmapView() {
   // to fork; anything else (stale) steers to a re-read via a full refetch.
   const conflictNotice = conflict ? (
     isImmutable(conflict) ? (
-      <ImmutableNotice
-        detail={conflict.detail}
-        onFork={fork}
-        forking={forkState.phase === 'forking'}
-      />
+      <ImmutableNotice detail={conflict.detail} onFork={fork} forking={forkState.phase === 'forking'} />
     ) : (
       <StaleRevisionNotice detail={conflict.detail} onReload={reload} />
     )
@@ -83,6 +79,7 @@ export function RoadmapView() {
         key={state.roadmap.id}
         roadmap={state.roadmap}
         isOwner={isOwner}
+        isAuthenticated={status === 'authenticated'}
         actions={actions}
         onReload={reload}
       />

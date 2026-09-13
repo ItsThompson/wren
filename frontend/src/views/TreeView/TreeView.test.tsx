@@ -7,6 +7,7 @@ import { Route, Routes, useLocation } from 'react-router'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { renderWithProviders } from '@/test/renderWithProviders'
+import { buildAuthUser, buildAuthValue } from '@/test/auth-harness'
 
 import type { ProgressSnapshot, Roadmap, TreeNodeData } from './types'
 import { TreeView } from './TreeView'
@@ -18,7 +19,12 @@ import { TreeView } from './TreeView'
  * edges + laid-out y so the built graph is assertable end-to-end.
  */
 vi.mock('@xyflow/react', () => {
-  const Position = { Top: 'top', Bottom: 'bottom', Left: 'left', Right: 'right' }
+  const Position = {
+    Top: 'top',
+    Bottom: 'bottom',
+    Left: 'left',
+    Right: 'right',
+  }
   interface MockNode {
     id: string
     type: string
@@ -71,8 +77,18 @@ function buildRoadmap(overrides: Partial<Roadmap> = {}): Roadmap {
         subsection_order: ['a', 'b', 'c'],
         subsections: {
           a: { id: 'a', title: 'Arrays', prereq_ids: [], item_order: ['a1'] },
-          b: { id: 'b', title: 'Hashing', prereq_ids: ['a'], item_order: ['b1'] },
-          c: { id: 'c', title: 'Binary trees', prereq_ids: ['b'], item_order: ['c1'] },
+          b: {
+            id: 'b',
+            title: 'Hashing',
+            prereq_ids: ['a'],
+            item_order: ['b1'],
+          },
+          c: {
+            id: 'c',
+            title: 'Binary trees',
+            prereq_ids: ['b'],
+            item_order: ['c1'],
+          },
         },
       },
     },
@@ -115,6 +131,20 @@ function LocationProbe() {
   )
 }
 
+function renderGuestTree() {
+  server.use(http.get('*/roadmaps/:id', () => HttpResponse.json(buildRoadmap())))
+  return renderWithProviders(
+    <Routes>
+      <Route path="/roadmaps/:roadmapId/tree" element={<TreeView />} />
+    </Routes>,
+    {
+      initialEntries: [`/roadmaps/${ROADMAP_ID}/tree`],
+      baseUrl: BASE,
+      authValue: buildAuthValue(),
+    },
+  )
+}
+
 function renderTree() {
   return renderWithProviders(
     <>
@@ -124,7 +154,14 @@ function renderTree() {
       </Routes>
       <LocationProbe />
     </>,
-    { initialEntries: [`/roadmaps/${ROADMAP_ID}/tree`], baseUrl: BASE, useRealAuth: true },
+    {
+      initialEntries: [`/roadmaps/${ROADMAP_ID}/tree`],
+      baseUrl: BASE,
+      authValue: buildAuthValue({
+        status: 'authenticated',
+        user: buildAuthUser(),
+      }),
+    },
   )
 }
 
@@ -133,6 +170,14 @@ function nodeLink(title: string): HTMLElement {
 }
 
 describe('TreeView', () => {
+  it('renders a guest tree with neutral nodes and no progress notice', async () => {
+    renderGuestTree()
+
+    expect(await screen.findByRole('link', { name: /^Arrays \(progress unavailable\)$/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Log in to track progress' })).toHaveAttribute('href', '/auth')
+    expect(screen.queryByText(/loading progress/i)).not.toBeInTheDocument()
+  })
+
   it('renders subsections as nodes and prereq_ids as edges in a layered layout', async () => {
     renderTree()
 
@@ -171,7 +216,9 @@ describe('TreeView', () => {
   it('keeps locked nodes clickable and navigates to the subsection in the list view', async () => {
     const user = userEvent.setup()
     renderTree()
-    const hashing = await screen.findByRole('link', { name: /^Hashing \(locked\)/ })
+    const hashing = await screen.findByRole('link', {
+      name: /^Hashing \(locked\)/,
+    })
     expect(hashing).toHaveAttribute('href', `/roadmaps/${ROADMAP_ID}#b`)
 
     await user.click(hashing)
@@ -202,8 +249,16 @@ describe('TreeView', () => {
     server.use(
       http.get('*/roadmaps/:id', () =>
         HttpResponse.json(
-          { type: 'x', title: 'Resource not found', status: 404, code: 'NOT_FOUND' },
-          { status: 404, headers: { 'content-type': 'application/problem+json' } },
+          {
+            type: 'x',
+            title: 'Resource not found',
+            status: 404,
+            code: 'NOT_FOUND',
+          },
+          {
+            status: 404,
+            headers: { 'content-type': 'application/problem+json' },
+          },
         ),
       ),
     )
@@ -222,28 +277,18 @@ describe('TreeView', () => {
     await screen.findByRole('link', { name: /^Arrays \(/ })
 
     const tabs = screen.getByRole('navigation', { name: 'Roadmap views' })
-    expect(within(tabs).getByRole('link', { name: 'List' })).toHaveAttribute(
-      'href',
-      `/roadmaps/${ROADMAP_ID}`,
-    )
+    expect(within(tabs).getByRole('link', { name: 'List' })).toHaveAttribute('href', `/roadmaps/${ROADMAP_ID}`)
     // Tree is the active view, announced (not a link) so it never self-links.
     expect(within(tabs).queryByRole('link', { name: 'Tree' })).not.toBeInTheDocument()
   })
 
   it('shows an empty-state message when the roadmap has no subsections', async () => {
-    server.use(
-      http.get('*/roadmaps/:id', () =>
-        HttpResponse.json(buildRoadmap({ section_order: [], sections: {} })),
-      ),
-    )
+    server.use(http.get('*/roadmaps/:id', () => HttpResponse.json(buildRoadmap({ section_order: [], sections: {} }))))
     renderTree()
 
     expect(await screen.findByText('No nodes yet')).toBeInTheDocument()
     // The header still renders with a link back to the list view.
     const header = screen.getByRole('navigation', { name: 'Roadmap views' })
-    expect(within(header).getByRole('link', { name: 'List' })).toHaveAttribute(
-      'href',
-      `/roadmaps/${ROADMAP_ID}`,
-    )
+    expect(within(header).getByRole('link', { name: 'List' })).toHaveAttribute('href', `/roadmaps/${ROADMAP_ID}`)
   })
 })

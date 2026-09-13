@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router'
 import { useSWRConfig } from 'swr'
 
 import { useAuth } from '@/auth'
-import { keys, useApiQuery, useSessionClient } from '@/api'
+import { keys, useSessionClient } from '@/api'
 import { toProblem, type Problem } from '@/lib/problem'
 import { useLifecycle } from './useLifecycle'
+import { useRoadmapDocument } from './useRoadmapDocument'
 import {
   addAuthoredRoadmap,
   reconcileDashboard,
@@ -87,24 +88,18 @@ export function useRoadmap(roadmapId: string): {
   }
   const generation = generationRef.current
   const isCurrent = useCallback(
-    () =>
-      mountedRef.current &&
-      generationRef.current === generation &&
-      previousRoadmapIdRef.current === roadmapId,
+    () => mountedRef.current && generationRef.current === generation && previousRoadmapIdRef.current === roadmapId,
     [generation, roadmapId],
   )
 
-  const {
-    data: roadmap,
-    error: readError,
-    isLoading,
-    mutate,
-  } = useApiQuery(keys.roadmap(roadmapId), (sessionClient) =>
-    sessionClient.GET('/roadmaps/{roadmap_id}', { params: { path: { roadmap_id: roadmapId } } }),
-  )
+  const { data: roadmap, error: readError, isLoading, mutate } = useRoadmapDocument(roadmapId)
 
-  const [publishState, setPublishState] = useState<PublishState>({ phase: 'idle' })
-  const [metadataState, setMetadataState] = useState<MetadataEditState>({ phase: 'idle' })
+  const [publishState, setPublishState] = useState<PublishState>({
+    phase: 'idle',
+  })
+  const [metadataState, setMetadataState] = useState<MetadataEditState>({
+    phase: 'idle',
+  })
   const [forkState, setForkState] = useState<ForkState>({ phase: 'idle' })
   const [conflict, setConflict] = useState<Problem | null>(null)
 
@@ -116,15 +111,10 @@ export function useRoadmap(roadmapId: string): {
       const becamePublic = roadmap?.visibility === 'private' && updated.visibility === 'public'
       const dashboardNeedsRefresh = becamePublic
       const becamePublished = roadmap?.status !== 'published' && updated.status === 'published'
-      const profileNeedsRefresh =
-        updated.status === 'published' && (becamePublic || becamePublished)
-      void mutateCache<Dashboard>(
-        keys.dashboard(),
-        (current) => reconcileDashboard(current, updated, user?.id),
-        {
-          revalidate: dashboardNeedsRefresh,
-        },
-      )
+      const profileNeedsRefresh = updated.status === 'published' && (becamePublic || becamePublished)
+      void mutateCache<Dashboard>(keys.dashboard(), (current) => reconcileDashboard(current, updated, user?.id), {
+        revalidate: dashboardNeedsRefresh,
+      })
       if (user?.username) {
         void mutateCache<Profile>(keys.profile(user.username), (current) => reconcileProfile(current, updated), {
           revalidate: profileNeedsRefresh,
@@ -136,15 +126,21 @@ export function useRoadmap(roadmapId: string): {
 
   const removeRoadmapCaches = useCallback(() => {
     void mutateCache(keys.roadmap(roadmapId), undefined, { revalidate: false })
-    void mutateCache(keys.progress(roadmapId), undefined, { revalidate: false })
+    void mutateCache(keys.progress(roadmapId), undefined, {
+      revalidate: false,
+    })
     void mutateCache(keys.next(roadmapId), undefined, { revalidate: false })
     void mutateCache<Dashboard>(keys.dashboard(), (current) => removeRoadmapFromDashboard(current, roadmapId), {
       revalidate: false,
     })
     if (user?.username) {
-      void mutateCache<Profile>(keys.profile(user.username), (current) => removeRoadmapFromProfile(current, roadmapId), {
-        revalidate: false,
-      })
+      void mutateCache<Profile>(
+        keys.profile(user.username),
+        (current) => removeRoadmapFromProfile(current, roadmapId),
+        {
+          revalidate: false,
+        },
+      )
     }
   }, [mutateCache, roadmapId, user?.username])
 
@@ -176,7 +172,10 @@ export function useRoadmap(roadmapId: string): {
       }
       const problem = toProblem(error, response)
       if (response.status === 422) {
-        setPublishState({ phase: 'blocked', violations: problem.violations ?? [] })
+        setPublishState({
+          phase: 'blocked',
+          violations: problem.violations ?? [],
+        })
         return
       }
       if (response.status === 409) {

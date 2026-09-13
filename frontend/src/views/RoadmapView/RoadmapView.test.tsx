@@ -83,9 +83,7 @@ const server = setupServer(
   // highlight don't trip `onUnhandledRequest: 'error'`; specific tests override
   // this via `server.use` (runtime handlers take precedence over initial ones).
   // `complete: false` keeps the calm all-caught-up banner off by default.
-  http.get('*/roadmaps/:id/next', () =>
-    HttpResponse.json({ items: [], remaining_in_path: 0, complete: false }),
-  ),
+  http.get('*/roadmaps/:id/next', () => HttpResponse.json({ items: [], remaining_in_path: 0, complete: false })),
 )
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
@@ -160,6 +158,25 @@ function renderViewAtHash(hash: string) {
 }
 
 describe('RoadmapView', () => {
+  it('renders a public roadmap read-only for anonymous visitors', async () => {
+    const roadmap = buildDraft({
+      status: 'published',
+      visibility: 'public',
+      owner: 'owner-2',
+    })
+    server.use(
+      http.get('*/roadmaps/:id', () => HttpResponse.json(roadmap)),
+      http.post('*/auth/refresh', () => new HttpResponse(null, { status: 401 })),
+    )
+
+    renderView(null)
+
+    expect(await screen.findByText('Grokking DSA')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Log in to track progress' })).toHaveAttribute('href', '/auth')
+    expect(screen.queryByRole('button', { name: 'Fork' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/loading progress/i)).not.toBeInTheDocument()
+  })
+
   it('renders an owned draft in preview mode, labeled as a draft', async () => {
     server.use(http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())))
     renderView()
@@ -211,9 +228,7 @@ describe('RoadmapView', () => {
     renderView()
 
     expect(await screen.findByText('Roadmap not found')).toBeInTheDocument()
-    expect(
-      screen.getByText(/does not exist or is not shared with you/i),
-    ).toBeInTheDocument()
+    expect(screen.getByText(/does not exist or is not shared with you/i)).toBeInTheDocument()
   })
 
   it('renders the same dedicated view for a 403 as a 404 (no existence leak)', async () => {
@@ -230,9 +245,7 @@ describe('RoadmapView', () => {
     // A 403 (someone else's private roadmap) must not read differently from a
     // 404, so the roadmap's existence never leaks.
     expect(await screen.findByText('Roadmap not found')).toBeInTheDocument()
-    expect(
-      screen.getByText(/does not exist or is not shared with you/i),
-    ).toBeInTheDocument()
+    expect(screen.getByText(/does not exist or is not shared with you/i)).toBeInTheDocument()
   })
 
   it('shows a loading skeleton before the roadmap resolves', () => {
@@ -335,9 +348,7 @@ describe('RoadmapView publish', () => {
 
     // Publish is one-way: the tracking list view (progress bar + interactive
     // checklist) replaces the preview; the action and the draft badge are gone.
-    expect(
-      await screen.findByRole('progressbar', { name: /overall progress/i }),
-    ).toBeInTheDocument()
+    expect(await screen.findByRole('progressbar', { name: /overall progress/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^publish$/i })).not.toBeInTheDocument()
     expect(screen.queryByText(/draft · preview/i)).not.toBeInTheDocument()
     expect(screen.getAllByRole('checkbox').length).toBeGreaterThan(0)
@@ -350,9 +361,7 @@ describe('RoadmapView publish', () => {
     )
     renderView()
 
-    expect(
-      await screen.findByRole('progressbar', { name: /overall progress/i }),
-    ).toBeInTheDocument()
+    expect(await screen.findByRole('progressbar', { name: /overall progress/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^publish$/i })).not.toBeInTheDocument()
     expect(screen.queryByText(/draft · preview/i)).not.toBeInTheDocument()
   })
@@ -390,9 +399,7 @@ describe('RoadmapView progress tracking', () => {
     renderView()
 
     // Checklist items are interactive checkboxes (both subsections' items).
-    expect(
-      await screen.findByRole('checkbox', { name: 'Read the walkthrough' }),
-    ).toBeInTheDocument()
+    expect(await screen.findByRole('checkbox', { name: 'Read the walkthrough' })).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'Implement a counter' })).toBeInTheDocument()
     // Bars only at roadmap (1) + section (1) level: never per subsection/item.
     expect(screen.getAllByRole('progressbar')).toHaveLength(2)
@@ -417,14 +424,10 @@ describe('RoadmapView progress tracking', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Read the walkthrough' }))
 
     // Explicit-set complete for exactly the toggled item.
-    await waitFor(() =>
-      expect(posted).toEqual({ item_ids: ['chk_read'], state: 'complete' }),
-    )
+    await waitFor(() => expect(posted).toEqual({ item_ids: ['chk_read'], state: 'complete' }))
     // One of two items checked -> overall bar reads 50%.
     await waitFor(() =>
-      expect(
-        screen.getByRole('progressbar', { name: /overall progress/i }),
-      ).toHaveAttribute('aria-valuenow', '50'),
+      expect(screen.getByRole('progressbar', { name: /overall progress/i })).toHaveAttribute('aria-valuenow', '50'),
     )
   })
 
@@ -446,9 +449,7 @@ describe('RoadmapView progress tracking', () => {
     await waitFor(() => expect(checkbox).toBeChecked())
     await user.click(checkbox)
 
-    await waitFor(() =>
-      expect(posted).toEqual({ item_ids: ['chk_read'], state: 'incomplete' }),
-    )
+    await waitFor(() => expect(posted).toEqual({ item_ids: ['chk_read'], state: 'incomplete' }))
   })
 
   it('derives subsection done-state (olive check) when all its items are checked', async () => {
@@ -611,12 +612,8 @@ describe('RoadmapView fork', () => {
     const user = userEvent.setup()
     server.use(
       // Any id resolves to a draft (the source, then the fork after navigation).
-      http.get('*/roadmaps/:id', ({ params }) =>
-        HttpResponse.json(buildDraft({ id: String(params.id) })),
-      ),
-      http.post(FORK_URL, () =>
-        HttpResponse.json(buildDraft({ id: 'grokking-dsa-9x2b' }), { status: 201 }),
-      ),
+      http.get('*/roadmaps/:id', ({ params }) => HttpResponse.json(buildDraft({ id: String(params.id) }))),
+      http.post(FORK_URL, () => HttpResponse.json(buildDraft({ id: 'grokking-dsa-9x2b' }), { status: 201 })),
     )
     renderView()
     await screen.findByText('Grokking DSA')
@@ -624,16 +621,12 @@ describe('RoadmapView fork', () => {
     await user.click(screen.getByRole('button', { name: /^fork$/i }))
 
     // Fork navigates to the freshly-minted draft's route.
-    await waitFor(() =>
-      expect(screen.getByTestId('location')).toHaveTextContent('/roadmaps/grokking-dsa-9x2b'),
-    )
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/roadmaps/grokking-dsa-9x2b'))
   })
 
   it('offers Fork but not Edit details to a non-owner on a published roadmap', async () => {
     server.use(
-      http.get('*/roadmaps/:id', () =>
-        HttpResponse.json(buildDraft({ status: 'published', owner: 'user-1' })),
-      ),
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published', owner: 'user-1' }))),
       http.get('*/roadmaps/:id/progress', () => HttpResponse.json(buildProgress())),
     )
     // A different signed-in user (a reader/follower), not the owner.
@@ -703,9 +696,7 @@ describe('RoadmapView metadata edit', () => {
       }),
     )
     // The header reflects the returned roadmap and the editor closes.
-    await waitFor(() =>
-      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Renamed'),
-    )
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Renamed'))
     expect(screen.queryByRole('button', { name: /save details/i })).not.toBeInTheDocument()
   })
 
@@ -714,9 +705,7 @@ describe('RoadmapView metadata edit', () => {
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
       http.get('*/roadmaps/:id/progress', () => HttpResponse.json(buildProgress())),
-      http.patch(METADATA_URL, () =>
-        HttpResponse.json(buildDraft({ status: 'published', title: 'Renamed live' })),
-      ),
+      http.patch(METADATA_URL, () => HttpResponse.json(buildDraft({ status: 'published', title: 'Renamed live' }))),
     )
     renderView()
     await screen.findByRole('progressbar', { name: /overall progress/i })
@@ -727,13 +716,9 @@ describe('RoadmapView metadata edit', () => {
     await user.type(titleInput, 'Renamed live')
     await user.click(screen.getByRole('button', { name: /save details/i }))
 
-    await waitFor(() =>
-      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Renamed live'),
-    )
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Renamed live'))
     // Still the published tracking view (a metadata edit is not a lifecycle change).
-    expect(
-      screen.getByRole('progressbar', { name: /overall progress/i }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('progressbar', { name: /overall progress/i })).toBeInTheDocument()
   })
 
   it('keeps the editor open and shows a retry message when the edit fails (500)', async () => {
@@ -875,9 +860,7 @@ describe('RoadmapView web-only lifecycle', () => {
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
       http.get(PROGRESS_URL, () => {
         progressReads += 1
-        return progressReads === 1
-          ? HttpResponse.json(buildProgress())
-          : new HttpResponse(null, { status: 409 })
+        return progressReads === 1 ? HttpResponse.json(buildProgress()) : new HttpResponse(null, { status: 409 })
       }),
       http.get('*/roadmaps/:id/next', () => HttpResponse.json({ items: [], remaining_in_path: 0, complete: false })),
       http.post(ARCHIVE_URL, () => HttpResponse.json(buildDraft({ status: 'archived' }))),
@@ -988,9 +971,7 @@ describe('RoadmapView web-only lifecycle', () => {
 
   it('hides all lifecycle actions from a non-owner', async () => {
     server.use(
-      http.get('*/roadmaps/:id', () =>
-        HttpResponse.json(buildDraft({ status: 'published', owner: 'user-1' })),
-      ),
+      http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published', owner: 'user-1' }))),
       http.get('*/roadmaps/:id/progress', () => HttpResponse.json(buildProgress())),
     )
     renderView(OTHER_USER)
@@ -1090,10 +1071,11 @@ describe('RoadmapView list view (tags, filter chips, next highlight)', () => {
 
     const group = await screen.findByRole('group', { name: /filter by tag/i })
     // One chip per track tag, in first-appearance order; subject tags excluded.
-    expect(within(group).getAllByRole('button').map((chip) => chip.textContent)).toEqual([
-      'arrays',
-      'hashing',
-    ])
+    expect(
+      within(group)
+        .getAllByRole('button')
+        .map((chip) => chip.textContent),
+    ).toEqual(['arrays', 'hashing'])
   })
 
   it('filters subsections to the selected tag and clears on re-select', async () => {
@@ -1166,9 +1148,9 @@ describe('RoadmapView list view (tags, filter chips, next highlight)', () => {
     renderView()
 
     // The track-tag pill inside the node card carries the stable hash hue.
-    const card = (
-      await screen.findByRole('heading', { level: 3, name: 'Arrays & two pointers' })
-    ).closest('article') as HTMLElement
+    const card = (await screen.findByRole('heading', { level: 3, name: 'Arrays & two pointers' })).closest(
+      'article',
+    ) as HTMLElement
     const pill = within(card).getByText('arrays')
     expect(pill.style.getPropertyValue('--tag-hue')).toBe(colorForTag('arrays'))
 
@@ -1188,8 +1170,7 @@ describe('RoadmapView list view (tags, filter chips, next highlight)', () => {
               subsection_id: 'sub_arrays',
               item_id: 'chk_read',
               text: 'Read the walkthrough',
-              why_now:
-                'Next unchecked subsection in the suggested path; it has no prerequisites.',
+              why_now: 'Next unchecked subsection in the suggested path; it has no prerequisites.',
             },
           ],
           remaining_in_path: 2,
@@ -1206,9 +1187,9 @@ describe('RoadmapView list view (tags, filter chips, next highlight)', () => {
         screen.getByRole('heading', { level: 3, name: 'Arrays & two pointers' }).closest('article'),
       ).toHaveAttribute('aria-current', 'step'),
     )
-    expect(
-      screen.getByRole('heading', { level: 3, name: 'Hashing' }).closest('article'),
-    ).not.toHaveAttribute('aria-current')
+    expect(screen.getByRole('heading', { level: 3, name: 'Hashing' }).closest('article')).not.toHaveAttribute(
+      'aria-current',
+    )
   })
 })
 
@@ -1230,9 +1211,7 @@ describe('RoadmapView states (loading/empty/error, 409/422, tabs, anchor)', () =
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft({ status: 'published' }))),
       http.get(PROGRESS_URL, () => HttpResponse.json(buildProgress())),
-      http.post(PROGRESS_URL, () =>
-        conflict('STALE_REVISION', 'This roadmap changed; re-read and retry.'),
-      ),
+      http.post(PROGRESS_URL, () => conflict('STALE_REVISION', 'This roadmap changed; re-read and retry.')),
     )
     renderView()
 
@@ -1274,9 +1253,7 @@ describe('RoadmapView states (loading/empty/error, 409/422, tabs, anchor)', () =
     const user = userEvent.setup()
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
-      http.post(PUBLISH_URL, () =>
-        conflict('IMMUTABLE', 'Already published; fork to change.'),
-      ),
+      http.post(PUBLISH_URL, () => conflict('IMMUTABLE', 'Already published; fork to change.')),
     )
     renderView()
     await screen.findByText('Grokking DSA')
@@ -1308,10 +1285,7 @@ describe('RoadmapView states (loading/empty/error, 409/422, tabs, anchor)', () =
     await screen.findByRole('progressbar', { name: /overall progress/i })
 
     const tabs = screen.getByRole('navigation', { name: 'Roadmap views' })
-    expect(within(tabs).getByRole('link', { name: 'Tree' })).toHaveAttribute(
-      'href',
-      `/roadmaps/${ROADMAP_ID}/tree`,
-    )
+    expect(within(tabs).getByRole('link', { name: 'Tree' })).toHaveAttribute('href', `/roadmaps/${ROADMAP_ID}/tree`)
   })
 
   it('renders per-subsection anchor targets and scrolls to the URL hash', async () => {
@@ -1363,9 +1337,7 @@ describe('RoadmapView sub-state reset on roadmapId change (R2 invariant)', () =>
       http.post('*/auth/refresh', () => HttpResponse.json(AUTH_USER)),
       // Both roadmap A and roadmap B resolve to an owned draft (echo the id), so
       // the only thing that could differ between them is a leaked sub-state.
-      http.get('*/roadmaps/:id', ({ params }) =>
-        HttpResponse.json(buildDraft({ id: String(params.id) })),
-      ),
+      http.get('*/roadmaps/:id', ({ params }) => HttpResponse.json(buildDraft({ id: String(params.id) }))),
       http.post(PUBLISH_URL, () => blockedPublish()),
     )
     renderWithProviders(
@@ -1381,9 +1353,7 @@ describe('RoadmapView sub-state reset on roadmapId change (R2 invariant)', () =>
     await screen.findByText('Grokking DSA')
     await user.click(screen.getByRole('button', { name: /^publish$/i }))
     // Roadmap A's publish is hard-blocked: the violation is shown inline.
-    expect(
-      await screen.findByText('subsection sub_hashing has no resources'),
-    ).toBeInTheDocument()
+    expect(await screen.findByText('subsection sub_hashing has no resources')).toBeInTheDocument()
 
     // Navigate to roadmap B WITHOUT unmounting RoadmapView: React Router keeps the
     // same instance across a `:roadmapId` change, so the plain-useState publish
@@ -1394,11 +1364,8 @@ describe('RoadmapView sub-state reset on roadmapId change (R2 invariant)', () =>
     // from roadmap A is gone: the sub-state reset fired on the route change.
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /^publish$/i })).toBeInTheDocument()
-      expect(
-        screen.queryByText('subsection sub_hashing has no resources'),
-      ).not.toBeInTheDocument()
+      expect(screen.queryByText('subsection sub_hashing has no resources')).not.toBeInTheDocument()
     })
     expect(screen.getByText(/draft · preview/i)).toBeInTheDocument()
   })
 })
-

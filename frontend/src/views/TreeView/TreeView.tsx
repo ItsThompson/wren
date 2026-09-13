@@ -2,6 +2,8 @@ import { useMemo } from 'react'
 import { Link, useParams } from 'react-router'
 
 import { EmptyState, ErrorState } from '@/components/states'
+import { useAuth } from '@/auth'
+import { ReadOnlyNotice } from '@/views/RoadmapView/components/ReadOnlyNotice'
 import { TreeCanvas } from './components/TreeCanvas'
 import { TreeHeader } from './components/TreeHeader'
 import { TreeSkeleton } from './components/TreeSkeleton'
@@ -20,6 +22,7 @@ import { buildTreeGraph } from './util/tree-graph'
  */
 export function TreeView() {
   const { roadmapId } = useParams()
+  const { status: authStatus } = useAuth()
   const id = roadmapId ?? ''
   const { state } = useTreeData(id)
 
@@ -50,8 +53,11 @@ export function TreeView() {
   return (
     <section className="mx-auto max-w-[1120px] px-4 py-8">
       <TreeHeader roadmapId={id} title={state.roadmap.title} />
+      {authStatus === 'anonymous' ? <ReadOnlyNotice /> : null}
       {state.progressState.phase === 'loading' ? (
-        <p className="mt-4 text-sm text-muted-foreground" role="status">Loading progress…</p>
+        <p className="mt-4 text-sm text-muted-foreground" role="status">
+          Loading progress…
+        </p>
       ) : null}
       {state.progressState.phase === 'closed' ? (
         <p className="mt-4 text-sm text-muted-foreground" role="status">

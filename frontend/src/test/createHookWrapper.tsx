@@ -1,8 +1,9 @@
-import type { ReactElement, ReactNode } from 'react'
+import { useRef, type ReactElement, type ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
 import { SWRConfig, type Cache } from 'swr'
 
 import { ApiClientProvider, swrRevalidationPosture } from '@/api'
+import { SessionCacheBoundary } from '@/api/SessionCacheBoundary'
 import { AuthProvider } from '@/auth'
 import { AuthContext } from '@/auth/auth-context'
 import type { AuthContextValue } from '@/auth/types'
@@ -59,25 +60,26 @@ export interface HookWrapperOptions {
 export function createHookWrapper(
   options: HookWrapperOptions = {},
 ): ({ children }: { children: ReactNode }) => ReactElement {
-  const {
-    baseUrl = TEST_API_BASE,
-    initialEntries = ['/'],
-    authValue,
-    useRealAuth = false,
-    swrCache,
-  } = options
+  const { baseUrl = TEST_API_BASE, initialEntries = ['/'], authValue, useRealAuth = false, swrCache } = options
 
   return function HookWrapper({ children }: { children: ReactNode }): ReactElement {
+    const initialCacheRef = useRef<Cache | undefined>(swrCache)
+    const initialCache = initialCacheRef.current
+    initialCacheRef.current = undefined
     const routed = <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>
-    const withAuth = useRealAuth ? (
-      <AuthProvider>{routed}</AuthProvider>
-    ) : (
-      <AuthContext.Provider value={authValue ?? buildAuthValue()}>{routed}</AuthContext.Provider>
-    )
-
     return (
-      <SWRConfig value={{ ...swrTestConfig, provider: () => swrCache ?? new Map() }}>
-        <ApiClientProvider baseUrl={baseUrl}>{withAuth}</ApiClientProvider>
+      <SWRConfig value={swrTestConfig}>
+        <ApiClientProvider baseUrl={baseUrl}>
+          {useRealAuth ? (
+            <AuthProvider>
+              <SessionCacheBoundary initialCache={initialCache}>{routed}</SessionCacheBoundary>
+            </AuthProvider>
+          ) : (
+            <AuthContext.Provider value={authValue ?? buildAuthValue()}>
+              <SessionCacheBoundary initialCache={initialCache}>{routed}</SessionCacheBoundary>
+            </AuthContext.Provider>
+          )}
+        </ApiClientProvider>
       </SWRConfig>
     )
   }

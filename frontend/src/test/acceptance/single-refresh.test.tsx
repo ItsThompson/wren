@@ -4,6 +4,7 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import { mockAuthUser, mockNext, mockProgress, mockRoadmap } from '@/mocks/data'
+import { buildAuthUser, buildAuthValue } from '@/test/auth-harness'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { useProgress } from '@/views/RoadmapView/hooks/useProgress'
 import { useRoadmap } from '@/views/RoadmapView/hooks/useRoadmap'
@@ -63,33 +64,28 @@ describe('AC4 single-refresh lock: concurrent 401s coalesce to one refresh', () 
       // the middleware replays after the shared refresh rotates the cookie.
       http.get('*/roadmaps/:id/progress', () => {
         progressGets += 1
-        return progressGets === 1
-          ? new HttpResponse(null, { status: 401 })
-          : HttpResponse.json(mockProgress)
+        return progressGets === 1 ? new HttpResponse(null, { status: 401 }) : HttpResponse.json(mockProgress)
       }),
       http.get('*/roadmaps/:id/next', () => {
         nextGets += 1
-        return nextGets === 1
-          ? new HttpResponse(null, { status: 401 })
-          : HttpResponse.json(mockNext)
+        return nextGets === 1 ? new HttpResponse(null, { status: 401 }) : HttpResponse.json(mockNext)
       }),
       http.get('*/roadmaps/:id', () => {
         roadmapGets += 1
-        return roadmapGets === 1
-          ? new HttpResponse(null, { status: 401 })
-          : HttpResponse.json(mockRoadmap)
+        return roadmapGets === 1 ? new HttpResponse(null, { status: 401 }) : HttpResponse.json(mockRoadmap)
       }),
     )
 
-    renderWithProviders(<ConcurrentReadsProbe />, { baseUrl: BASE })
+    renderWithProviders(<ConcurrentReadsProbe />, {
+      baseUrl: BASE,
+      authValue: buildAuthValue({ status: 'authenticated', user: buildAuthUser() }),
+    })
 
     // The roadmap read retried and resolved.
     await waitFor(() => expect(screen.getByTestId('roadmap-phase')).toHaveTextContent('loaded'))
     // The progress + next reads retried and resolved (checked set + next item present).
     await waitFor(() =>
-      expect(screen.getByTestId('checked')).toHaveTextContent(
-        String(mockProgress.checked_ids?.length ?? 0),
-      ),
+      expect(screen.getByTestId('checked')).toHaveTextContent(String(mockProgress.checked_ids?.length ?? 0)),
     )
 
     // Exactly one refresh coalesced all concurrent 401s.

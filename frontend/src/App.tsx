@@ -2,6 +2,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router'
 import { SWRConfig } from 'swr'
 
 import { ApiClientProvider, swrRevalidationPosture } from '@/api'
+import { SessionCacheBoundary } from '@/api/SessionCacheBoundary'
 import { AuthProvider } from '@/auth'
 
 import { appRoutes } from './routes'
@@ -20,7 +21,9 @@ export function App() {
     <SWRConfig value={swrRevalidationPosture}>
       <ApiClientProvider baseUrl={API_BASE_URL}>
         <AuthProvider>
-          <RouterProvider router={router} />
+          <SessionCacheBoundary>
+            <RouterProvider router={router} />
+          </SessionCacheBoundary>
         </AuthProvider>
       </ApiClientProvider>
     </SWRConfig>

@@ -3,6 +3,7 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { Route, Routes } from 'react-router'
 
+import { buildAuthUser, buildAuthValue } from '@/test/auth-harness'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { RoadmapView } from '@/views/RoadmapView'
 import { handlers } from './handlers'
@@ -26,16 +27,18 @@ describe('dev:mock fixtures render populated views', () => {
       <Routes>
         <Route path="/roadmaps/:roadmapId" element={<RoadmapView />} />
       </Routes>,
-      { initialEntries: [`/roadmaps/${mockRoadmap.id}`], baseUrl: BASE, useRealAuth: true },
+      {
+        initialEntries: [`/roadmaps/${mockRoadmap.id}`],
+        baseUrl: BASE,
+        authValue: buildAuthValue({ status: 'authenticated', user: buildAuthUser() }),
+      },
     )
 
     // The roadmap header, a section, a node card, a track tag, and a resource
     // link all render from the ID-keyed map fixtures (not empty states).
     expect(await screen.findByRole('heading', { level: 1, name: /Grokking Data Structures/ })).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 2, name: 'Foundations' })).toBeInTheDocument()
-    expect(
-      screen.getByRole('heading', { level: 3, name: 'Arrays & two pointers' }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 3, name: 'Arrays & two pointers' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Two-pointer technique' })).toHaveAttribute(
       'href',
       'https://example.com/two-pointers',
