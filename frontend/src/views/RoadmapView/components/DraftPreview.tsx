@@ -36,7 +36,7 @@ export function DraftPreview({ roadmap, publishState, onPublish, isOwner, action
         </div>
 
         {roadmap.description ? (
-          <p className="mt-3 max-w-[52ch] text-muted-foreground">{roadmap.description}</p>
+          <p className="mt-3 w-full text-muted-foreground">{roadmap.description}</p>
         ) : null}
 
         <SubjectTags tags={roadmap.subject_tags ?? []} />
