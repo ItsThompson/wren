@@ -1,27 +1,31 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState } from "react";
 
-import { InlineNotice, StaleRevisionNotice } from '@/components/states'
-import { RoadmapViewTabs } from '@/components/RoadmapViewTabs'
-import { useHashScroll } from '../hooks/useHashScroll'
-import { useProgress } from '../hooks/useProgress'
-import { overallCount } from '../util/progress-derive'
-import { collectTrackTags } from '../util/track-tags'
-import type { ProgressBinding, RoadmapActions as Actions, Roadmap } from '../types'
-import { DeadlineCountdown } from './DeadlineCountdown'
-import { FilterChips } from './FilterChips'
-import { NextComplete } from './NextComplete'
-import { ProgressBar } from './ProgressBar'
-import { RoadmapActions } from './RoadmapActions'
-import { SectionBlock } from './SectionBlock'
-import { SubjectTags } from './SubjectTags'
+import { InlineNotice, StaleRevisionNotice } from "@/components/states";
+import { RoadmapViewTabs } from "@/components/RoadmapViewTabs";
+import { useHashScroll } from "../hooks/useHashScroll";
+import { useProgress } from "../hooks/useProgress";
+import { overallCount } from "../util/progress-derive";
+import { collectTrackTags } from "../util/track-tags";
+import type {
+  ProgressBinding,
+  RoadmapActions as Actions,
+  Roadmap,
+} from "../types";
+import { DeadlineCountdown } from "./DeadlineCountdown";
+import { FilterChips } from "./FilterChips";
+import { NextComplete } from "./NextComplete";
+import { ProgressBar } from "./ProgressBar";
+import { RoadmapActions } from "./RoadmapActions";
+import { SectionBlock } from "./SectionBlock";
+import { SubjectTags } from "./SubjectTags";
 
 interface RoadmapListViewProps {
-  roadmap: Roadmap
+  roadmap: Roadmap;
   /** Whether the signed-in user owns this roadmap (owner-only metadata edit). */
-  isOwner: boolean
-  actions: Actions
+  isOwner: boolean;
+  actions: Actions;
   /** Refetch the roadmap itself; paired with a progress reload for a re-read. */
-  onReload: () => void
+  onReload: () => void;
 }
 
 /**
@@ -36,7 +40,12 @@ interface RoadmapListViewProps {
  * "next" highlight. A `#{subsectionId}` hash (e.g. from the tree view) scrolls to
  * that node.
  */
-export function RoadmapListView({ roadmap, isOwner, actions, onReload }: RoadmapListViewProps) {
+export function RoadmapListView({
+  roadmap,
+  isOwner,
+  actions,
+  onReload,
+}: RoadmapListViewProps) {
   const {
     checkedIds,
     progressState,
@@ -48,30 +57,35 @@ export function RoadmapListView({ roadmap, isOwner, actions, onReload }: Roadmap
     notice,
     dismissNotice,
     reload,
-  } = useProgress(roadmap.id, roadmap.status)
-  const [activeTag, setActiveTag] = useState<string | null>(null)
-  const sectionOrder = roadmap.section_order ?? []
-  const sections = roadmap.sections ?? {}
-  const suggestedPath = roadmap.suggested_path ?? []
-  const trackTags = useMemo(() => collectTrackTags(roadmap), [roadmap])
+  } = useProgress(roadmap.id, roadmap.status);
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const sectionOrder = roadmap.section_order ?? [];
+  const sections = roadmap.sections ?? {};
+  const suggestedPath = roadmap.suggested_path ?? [];
+  const trackTags = useMemo(() => collectTrackTags(roadmap), [roadmap]);
   const overall =
-    progressState.phase === 'ready' && checkedIds ? overallCount(roadmap, checkedIds) : null
+    progressState.phase === "ready" && checkedIds
+      ? overallCount(roadmap, checkedIds)
+      : null;
   const progress: ProgressBinding | undefined =
-    progressState.phase === 'ready' && checkedIds ? { checkedIds, onToggle: toggle } : undefined
+    progressState.phase === "ready" && checkedIds
+      ? { checkedIds, onToggle: toggle }
+      : undefined;
 
-  useHashScroll(true)
+  useHashScroll(true);
 
   // Selecting the active tag again clears the filter and restores all sections.
-  const toggleTag = (tag: string) => setActiveTag((current) => (current === tag ? null : tag))
+  const toggleTag = (tag: string) =>
+    setActiveTag((current) => (current === tag ? null : tag));
 
   // A stale-write re-read reloads both the roadmap document and the progress.
   const handleStaleReload = () => {
-    reload()
-    onReload()
-  }
+    reload();
+    onReload();
+  };
   const handleProgressReload = () => {
-    reload()
-  }
+    reload();
+  };
 
   return (
     <section className="reading-width py-10">
@@ -79,7 +93,7 @@ export function RoadmapListView({ roadmap, isOwner, actions, onReload }: Roadmap
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="display-l text-foreground">{roadmap.title}</h1>
-            {roadmap.status === 'archived' ? (
+            {roadmap.status === "archived" ? (
               <span className="rounded-full border border-muted-foreground/50 px-3 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Archived
               </span>
@@ -87,13 +101,16 @@ export function RoadmapListView({ roadmap, isOwner, actions, onReload }: Roadmap
           </div>
           <RoadmapViewTabs roadmapId={roadmap.id} active="list" />
         </div>
-        {roadmap.status === 'archived' ? (
+        {roadmap.status === "archived" ? (
           <p className="mt-2 text-sm text-muted-foreground">
-            This roadmap is archived: hidden from discovery, but you keep it and your progress.
+            This roadmap is archived: hidden from discovery, but you keep it and
+            your progress.
           </p>
         ) : null}
         {roadmap.description ? (
-          <p className="mt-3 max-w-[52ch] text-muted-foreground">{roadmap.description}</p>
+          <p className="mt-3 w-full text-muted-foreground">
+            {roadmap.description}
+          </p>
         ) : null}
         <SubjectTags tags={roadmap.subject_tags ?? []} />
         <div className="mt-5">
@@ -105,48 +122,67 @@ export function RoadmapListView({ roadmap, isOwner, actions, onReload }: Roadmap
               label="Overall progress"
             />
           ) : null}
-          {progressState.phase === 'loading' ? (
-            <p className="text-sm text-muted-foreground" role="status">Loading progress…</p>
-          ) : null}
-          {progressState.phase === 'closed' ? (
+          {progressState.phase === "loading" ? (
             <p className="text-sm text-muted-foreground" role="status">
-              This archived roadmap is closed to new tracking. Existing followers keep their progress.
+              Loading progress…
             </p>
           ) : null}
-          {progressState.phase === 'failed' ? (
-            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground" role="alert">
+          {progressState.phase === "closed" ? (
+            <p className="text-sm text-muted-foreground" role="status">
+              This archived roadmap is closed to new tracking. Existing
+              followers keep their progress.
+            </p>
+          ) : null}
+          {progressState.phase === "failed" ? (
+            <div
+              className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground"
+              role="alert"
+            >
               <span>We couldn’t load your progress.</span>
-              <button type="button" className="text-primary underline-offset-4 hover:underline" onClick={handleProgressReload}>
+              <button
+                type="button"
+                className="text-primary underline-offset-4 hover:underline"
+                onClick={handleProgressReload}
+              >
                 Try again
               </button>
             </div>
           ) : null}
         </div>
-        {progressState.phase === 'ready' ? <DeadlineCountdown deadline={deadline} onSet={setDeadline} /> : null}
+        {progressState.phase === "ready" ? (
+          <DeadlineCountdown deadline={deadline} onSet={setDeadline} />
+        ) : null}
       </header>
 
       <RoadmapActions roadmap={roadmap} isOwner={isOwner} actions={actions} />
 
-      {notice?.kind === 'stale' ? (
+      {notice?.kind === "stale" ? (
         <div className="mt-6">
           <StaleRevisionNotice onReload={handleStaleReload} />
         </div>
       ) : null}
-      {notice?.kind === 'save-failed' ? (
+      {notice?.kind === "save-failed" ? (
         <div className="mt-6">
           <InlineNotice onDismiss={dismissNotice}>
-            We couldn’t save that change, so we undid it. Check your connection and try again.
+            We couldn’t save that change, so we undid it. Check your connection
+            and try again.
           </InlineNotice>
         </div>
       ) : null}
 
-      {progressState.phase === 'ready' && nextComplete ? <NextComplete /> : null}
+      {progressState.phase === "ready" && nextComplete ? (
+        <NextComplete />
+      ) : null}
 
-      <FilterChips tags={trackTags} activeTag={activeTag} onToggle={toggleTag} />
+      <FilterChips
+        tags={trackTags}
+        activeTag={activeTag}
+        onToggle={toggleTag}
+      />
 
       <div className="mt-8">
         {sectionOrder.map((id) => {
-          const section = sections[id]
+          const section = sections[id];
           return section ? (
             <SectionBlock
               key={id}
@@ -156,9 +192,9 @@ export function RoadmapListView({ roadmap, isOwner, actions, onReload }: Roadmap
               activeTag={activeTag}
               nextSubsectionId={nextSubsectionId}
             />
-          ) : null
+          ) : null;
         })}
       </div>
     </section>
-  )
+  );
 }
