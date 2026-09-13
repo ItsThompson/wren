@@ -188,6 +188,21 @@ def test_internal_app_omits_the_web_only_routes() -> None:
     assert keys.isdisjoint(_WEB_ONLY_PROGRESS_ROUTES)
 
 
+def test_external_factory_constructs_with_mixed_document_and_required_policies() -> None:
+    roadmaps = create_roadmaps_router(_dummy_provider, _dummy_provider, app=App.EXTERNAL)
+    keys = _roadmap_route_keys(roadmaps.routes)
+    assert RouteKey(method="GET", path="/roadmaps/{roadmap_id}") in keys
+    assert RouteKey(method="POST", path="/roadmaps") in keys
+
+
+def test_internal_factory_omits_intentionally_external_only_routes() -> None:
+    roadmaps = create_roadmaps_router(_dummy_provider, _dummy_provider, app=App.INTERNAL)
+    progress = create_progress_router(_dummy_provider, app=App.INTERNAL)
+    keys = _roadmap_route_keys(roadmaps.routes) | _roadmap_route_keys(progress.routes)
+    assert _WEB_LIFECYCLE_ROUTES.isdisjoint(keys)
+    assert _WEB_ONLY_PROGRESS_ROUTES.isdisjoint(keys)
+
+
 def test_mounted_surface_is_exactly_the_registry_declaration() -> None:
     # Mounting is registry-driven (load-bearing): the roadmaps + progress routes
     # the factories mount on each app are EXACTLY the /roadmaps-prefixed routes that
