@@ -5,8 +5,11 @@ from __future__ import annotations
 from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
 
 
-def can_read(roadmap: Roadmap, user_id: str) -> bool:
-    """Return whether ``user_id`` may retrieve the roadmap document."""
-    if roadmap.owner == user_id:
+def can_read(roadmap: Roadmap, user_id: str | None) -> bool:
+    """Return whether a resolved reader may retrieve the roadmap document."""
+    if user_id is not None and roadmap.owner == user_id:
         return True
-    return roadmap.visibility is Visibility.PUBLIC and roadmap.status is not RoadmapStatus.DRAFT
+    return roadmap.visibility is Visibility.PUBLIC and roadmap.status in {
+        RoadmapStatus.PUBLISHED,
+        RoadmapStatus.ARCHIVED,
+    }

@@ -58,7 +58,7 @@ async def _no_checked_items(_user_id: str, _roadmap_id: str) -> frozenset[str]:
     return frozenset()
 
 
-async def load_readable(repo: RoadmapRepository, user_id: str, roadmap_id: str) -> Roadmap:
+async def load_readable(repo: RoadmapRepository, user_id: str | None, roadmap_id: str) -> Roadmap:
     """Load a roadmap the caller may **read**: their own (any status) or a public
     one.
 
@@ -101,7 +101,7 @@ class RoadmapReadService:
         # can force truncation on a small fixture.
         self._section_page_size = section_page_size
 
-    async def get(self, user_id: str, roadmap_id: str) -> Roadmap:
+    async def get(self, user_id: str | None, roadmap_id: str) -> Roadmap:
         """Return the full roadmap to a caller who may read it (owner draft preview
         or readable published).
 
@@ -191,7 +191,7 @@ class RoadmapReadService:
         roadmap = await self._load_readable_document(user_id, roadmap_id)
         return projections.search(roadmap, query, tags)
 
-    async def _load_readable(self, user_id: str, roadmap_id: str) -> Roadmap:
+    async def _load_readable(self, user_id: str | None, roadmap_id: str) -> Roadmap:
         """Load a roadmap the caller may read (own-or-public), delegating to the
         single-sourced :func:`load_readable` rule.
 
@@ -202,7 +202,7 @@ class RoadmapReadService:
         """
         return await load_readable(self._repo, user_id, roadmap_id)
 
-    async def _load_readable_document(self, user_id: str, roadmap_id: str) -> Roadmap:
+    async def _load_readable_document(self, user_id: str | None, roadmap_id: str) -> Roadmap:
         """Load a roadmap the caller may read as a study-time reader (owner draft
         preview or readable published).
 

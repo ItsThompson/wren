@@ -326,9 +326,63 @@ def test_get_is_404_to_a_non_owner_without_leaking_existence(
     assert response.json()["code"] == "NOT_FOUND"
 
 
-def test_get_requires_authentication(make_settings: MakeSettings) -> None:
+def test_get_unknown_roadmap_is_not_found_without_authentication(
+    make_settings: MakeSettings,
+) -> None:
     client, _ = _build_client(make_settings)
     response = client.get("/roadmaps/anything-0000")
+    assert response.status_code == 404
+    assert response.json()["code"] == "NOT_FOUND"
+
+
+def test_anonymous_reads_public_published_document_without_progress_access(
+    make_settings: MakeSettings,
+) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client, username="owner", email="owner@example.com")
+    created_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+    assert client.post(f"/roadmaps/{created_id}:publish").status_code == 200
+    assert (
+        client.put(f"/roadmaps/{created_id}/visibility", json={"visibility": "public"}).status_code
+        == 200
+    )
+
+    client.cookies.clear()
+    response = client.get(f"/roadmaps/{created_id}")
+    assert response.status_code == 200
+    assert response.json()["sections"]
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_anonymous_reads_public_archived_document_and_not_draft(
+    make_settings: MakeSettings,
+) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k", "9x2b"])
+    _login(client)
+    published_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
+    assert client.post(f"/roadmaps/{published_id}:publish").status_code == 200
+    assert (
+        client.put(
+            f"/roadmaps/{published_id}/visibility", json={"visibility": "public"}
+        ).status_code
+        == 200
+    )
+    assert client.post(f"/roadmaps/{published_id}:archive").status_code == 200
+    draft_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
+
+    client.cookies.clear()
+    assert client.get(f"/roadmaps/{published_id}").status_code == 200
+    draft_response = client.get(f"/roadmaps/{draft_id}")
+    assert draft_response.status_code == 404
+    assert draft_response.json()["code"] == "NOT_FOUND"
+
+
+def test_anonymous_optional_read_rejects_invalid_cookie(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings)
+    response = client.get(
+        "/roadmaps/anything-0000",
+        headers={"Cookie": "wren_session=invalid"},
+    )
     assert response.status_code == 401
 
 

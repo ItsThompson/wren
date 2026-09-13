@@ -21,6 +21,7 @@ from wren.core.identity import (
     SESSION_COOKIE_NAME,
     USER_ID_HEADER,
     StripInboundIdentityMiddleware,
+    optional_user,
     require_internal_user,
     require_user,
 )
@@ -113,6 +114,39 @@ def test_external_strips_spoofed_x_user_id_and_uses_the_cookie(make_settings: Ma
     # Identity is the cookie's user; the spoofed header never reached the handler.
     assert body["user_id"] == _COOKIE_USER
     assert body["seen_x_user_id"] is None
+
+
+def test_optional_user_returns_none_without_a_cookie(make_settings: MakeSettings) -> None:
+    router = APIRouter()
+
+    @router.get("/whoami")
+    async def whoami(user_id: str | None = Depends(optional_user)) -> dict[str, str | None]:
+        return {"user_id": user_id}
+
+    app: FastAPI = create_app(
+        make_settings(), routers=[router], exception_handlers=build_exception_handlers()
+    )
+    app.state.session_verifier = _async_cookie_verifier
+    client = TestClient(app)
+    response = client.get("/whoami")
+    assert response.status_code == 200
+    assert response.json() == {"user_id": None}
+
+
+def test_optional_user_rejects_an_invalid_cookie(make_settings: MakeSettings) -> None:
+    router = APIRouter()
+
+    @router.get("/whoami")
+    async def whoami(user_id: str | None = Depends(optional_user)) -> dict[str, str | None]:
+        return {"user_id": user_id}
+
+    app: FastAPI = create_app(
+        make_settings(), routers=[router], exception_handlers=build_exception_handlers()
+    )
+    app.state.session_verifier = _async_cookie_verifier
+    client = TestClient(app)
+    response = client.get("/whoami", headers={"Cookie": f"{SESSION_COOKIE_NAME}=bogus"})
+    assert response.status_code == 401
 
 
 def test_external_401_without_a_cookie(make_settings: MakeSettings) -> None:

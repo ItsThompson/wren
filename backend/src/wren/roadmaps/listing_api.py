@@ -21,7 +21,7 @@ from collections.abc import Callable
 
 from fastapi import APIRouter, Depends
 
-from wren.core.route_registry import App, identity_for_app
+from wren.core.route_registry import App, RouteKey, required_identity_for_route
 from wren.roadmaps.list_schemas import Dashboard, Profile
 from wren.roadmaps.listing import ListingService
 
@@ -34,11 +34,13 @@ def create_listing_router(
 ) -> APIRouter:
     """Build the dashboard + profile router for one app trust boundary."""
     router = APIRouter(tags=["listing"])
-    identity = identity_for_app(app)
+    dashboard_identity = required_identity_for_route(
+        app, RouteKey(method="GET", path="/me/dashboard")
+    )
 
     @router.get("/me/dashboard")
     async def get_dashboard(
-        user_id: str = Depends(identity),
+        user_id: str = Depends(dashboard_identity),
         service: ListingService = Depends(service_provider),
     ) -> Dashboard:
         # Private, caller-scoped: everything the caller authored (any status) plus
@@ -57,7 +59,13 @@ def create_listing_router(
         "/users/{handle}",
         get_profile,
         methods=["GET"],
-        dependencies=[Depends(identity)] if app is App.INTERNAL else None,
+        dependencies=[
+            Depends(
+                required_identity_for_route(app, RouteKey(method="GET", path="/users/{handle}"))
+            )
+        ]
+        if app is App.INTERNAL
+        else None,
     )
 
     return router

@@ -6,8 +6,8 @@ and how the caller's ``user_id`` is resolved. Rather than fork the router or pas
 those two facts in by hand, :func:`create_progress_router` takes an :class:`App`
 selector and reads both from the route registry:
 
-- **identity** (policy): :func:`identity_for_app` resolves the identity dependency
-  the app's routes gate on, from their declared access level: ``require_user``
+- **identity** (policy): exact route entries resolve the identity dependency
+  from their declared access level: ``require_user``
   (external cookie) or ``require_internal_user`` (the trusted ``X-User-ID`` behind
   ``INTERNAL_API_TOKEN``).
 - **mounting** (composition): the factory defines every progress route, then
@@ -32,8 +32,16 @@ from collections.abc import Callable
 
 from fastapi import APIRouter, Depends
 
+from wren.core.identity import require_user
 from wren.core.read_contract import ResponseFormat
-from wren.core.route_registry import App, identity_for_app, restrict_to_declared
+from wren.core.route_registry import (
+    App,
+    RequiredIdentity,
+    RouteKey,
+    required_identity_for_route,
+    restrict_to_declared,
+    route_access,
+)
 from wren.progress.schemas import (
     DeadlineRequest,
     NextResult,
@@ -61,12 +69,24 @@ def create_progress_router(service_provider: ProgressServiceProvider, *, app: Ap
     another user's progress.
     """
     router = APIRouter(prefix=ROADMAPS_PATH, tags=["progress"])
-    identity = identity_for_app(app)
+    registry = route_access(app)
+
+    def required_identity(method: str, path: str) -> RequiredIdentity:
+        key = RouteKey(method=method, path=path)
+        if key not in registry:
+            return require_user
+        return required_identity_for_route(app, key)
+
+    follow_identity = required_identity("POST", "/roadmaps/{roadmap_id}/follow")
+    progress_read_identity = required_identity("GET", "/roadmaps/{roadmap_id}/progress")
+    progress_write_identity = required_identity("POST", "/roadmaps/{roadmap_id}/progress")
+    next_identity = required_identity("GET", "/roadmaps/{roadmap_id}/next")
+    deadline_identity = required_identity("PUT", "/roadmaps/{roadmap_id}/deadline")
 
     @router.post("/{roadmap_id}/follow", status_code=201)
     async def follow_roadmap(
         roadmap_id: str,
-        user_id: str = Depends(identity),
+        user_id: str = Depends(follow_identity),
         service: ProgressService = Depends(service_provider),
     ) -> Progress:
         return await service.follow(user_id, roadmap_id)
@@ -75,7 +95,7 @@ def create_progress_router(service_provider: ProgressServiceProvider, *, app: Ap
     async def get_progress(
         roadmap_id: str,
         detailed: bool = False,
-        user_id: str = Depends(identity),
+        user_id: str = Depends(progress_read_identity),
         service: ProgressService = Depends(service_provider),
     ) -> ProgressSnapshot:
         return await service.get(user_id, roadmap_id, detailed)
@@ -84,7 +104,7 @@ def create_progress_router(service_provider: ProgressServiceProvider, *, app: Ap
     async def update_progress(
         roadmap_id: str,
         body: ProgressUpdateRequest,
-        user_id: str = Depends(identity),
+        user_id: str = Depends(progress_write_identity),
         service: ProgressService = Depends(service_provider),
     ) -> ProgressUpdateResult:
         return await service.update(user_id, roadmap_id, body.item_ids, body.state)
@@ -93,7 +113,7 @@ def create_progress_router(service_provider: ProgressServiceProvider, *, app: Ap
     async def get_next(
         roadmap_id: str,
         format: ResponseFormat = ResponseFormat.CONCISE,
-        user_id: str = Depends(identity),
+        user_id: str = Depends(next_identity),
         service: ProgressService = Depends(service_provider),
     ) -> NextResult:
         # Server-computed next items with a structural why_now + resource links;
@@ -104,7 +124,7 @@ def create_progress_router(service_provider: ProgressServiceProvider, *, app: Ap
     async def set_deadline(
         roadmap_id: str,
         body: DeadlineRequest,
-        user_id: str = Depends(identity),
+        user_id: str = Depends(deadline_identity),
         service: ProgressService = Depends(service_provider),
     ) -> Progress:
         # Set (a date) or clear (null) the per-user deadline; editable anytime,
