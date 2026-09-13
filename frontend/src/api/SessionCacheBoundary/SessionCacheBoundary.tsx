@@ -22,9 +22,12 @@ export function SessionCacheBoundary({ children, initialCache }: SessionCacheBou
     }
   }
   const cacheIdentity = transitionedRef.current ? resolvedIdentity : 'stable'
+  const initialCacheRef = useRef<Cache | undefined>(initialCache)
+  const cacheForProvider = initialCacheRef.current
+  initialCacheRef.current = undefined
 
   return (
-    <SessionCacheProvider key={cacheIdentity} initialCache={initialCache}>
+    <SessionCacheProvider key={cacheIdentity} initialCache={cacheForProvider}>
       {children}
     </SessionCacheProvider>
   )
