@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { createMemoryRouter, RouterProvider } from 'react-router'
 import useSWR from 'swr'
 import { describe, expect, it } from 'vitest'
 
@@ -18,13 +19,16 @@ function CacheProbe() {
   )
 }
 
-function AuthSwitchProbe() {
+function AuthSwitchProbe({ withRouter = false }: { withRouter?: boolean }) {
   const [authValue, setAuthValue] = useState(buildAuthValue())
+  const content = withRouter ? (
+    <RouterProvider router={createMemoryRouter([{ path: '/', element: <CacheProbe /> }])} />
+  ) : (
+    <CacheProbe />
+  )
   return (
     <AuthContext.Provider value={authValue}>
-      <SessionCacheBoundary>
-        <CacheProbe />
-      </SessionCacheBoundary>
+      <SessionCacheBoundary>{content}</SessionCacheBoundary>
       <button
         onClick={() =>
           setAuthValue(
@@ -48,6 +52,14 @@ describe('SessionCacheBoundary', () => {
 
     await user.click(screen.getByRole('button', { name: 'seed' }))
     expect(screen.getByTestId('cached-value')).toHaveTextContent('private data')
+
+    await user.click(screen.getByRole('button', { name: 'switch account' }))
+    expect(screen.getByTestId('cached-value')).toHaveTextContent('empty')
+  })
+
+  it('keeps router consumers mounted across an identity transition', async () => {
+    const user = userEvent.setup()
+    render(<AuthSwitchProbe withRouter />)
 
     await user.click(screen.getByRole('button', { name: 'switch account' }))
     expect(screen.getByTestId('cached-value')).toHaveTextContent('empty')
