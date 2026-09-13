@@ -13,8 +13,7 @@ type PublicApiCall<R extends OpenApiResultBase> = (client: ApiClient) => Promise
 /**
  * SWR read bound to the shared public client. Identical key/call/options/return
  * shape to {@link useApiQuery}; kept as a distinct hook rather than an `{ auth }`
- * flag because only one read is public (`useProfile`) and specific interfaces
- * beat a generic mode toggle.
+ * flag so credential-free reads cannot accidentally use the session client.
  */
 export function usePublicApiQuery<R extends OpenApiResultBase>(
   key: ApiKey | null,

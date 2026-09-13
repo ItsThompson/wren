@@ -1,35 +1,16 @@
-"""REST adapter factory for roadmaps, one factory for both trust boundaries.
+"""REST adapter factory for roadmaps across both trust boundaries.
 
-The external app (:8000) and the internal app (:8001) mount the same ``/roadmaps``
-handlers: the handler bodies are identical and differ only in which routes mount
-and how the caller's ``user_id`` is resolved. Rather than fork the router or pass
-those two facts in by hand, :func:`create_roadmaps_router` takes an :class:`App`
-selector and reads both from the route registry:
+The external and internal apps mount the same handlers. The route registry selects
+both the identity dependency and the routes each app exposes. ``require_user``
+resolves external cookie identity, while ``require_internal_user`` trusts the
+internal token boundary. ``restrict_to_declared`` removes external-only lifecycle
+routes from the internal app.
 
-- **identity** (policy): exact route entries resolve the identity dependency
-  from their declared access level: ``require_user``
-  (external cookie; a spoofed ``X-User-ID`` is stripped upstream) or
-  ``require_internal_user`` (the trusted ``X-User-ID`` behind ``INTERNAL_API_TOKEN``).
-- **mounting** (composition): the factory defines every roadmaps route, then
-  :func:`restrict_to_declared` keeps only those the app's registry declares. The
-  web-only lifecycle routes (visibility / archive / delete) are declared for the
-  external app only, so the internal app (the MCP surface) never mounts them.
-
-Thin handlers: each resolves the caller via the resolved ``identity`` dependency,
-calls one :class:`RoadmapService` / :class:`RoadmapReadService` method, and lets
-the shared exception handler render any ``WrenError`` as RFC 9457 problem+json.
-The services are injected via ``service_provider`` / ``read_service_provider`` so
-production binds a request-scoped DB session while tests substitute an
-in-memory-backed service.
-
-The lifecycle commands use the ``:verb`` action sub-resource form
-(``POST /roadmaps/{id}:validate`` / ``:publish`` / ``:fork``); ``publish``
-hard-blocks with a 422 carrying the ``Violation`` list, while ``validate`` always
-returns 200 with a (possibly empty) list and ``fork`` returns 201 with the new
-draft. ``PATCH /roadmaps/{id}/metadata`` is the presentation-only edit that stays
-allowed post-publish (not ``If-Match``-guarded). The three web-only lifecycle
-actions are external-app only: delete is guarded by a zero-followers check (409
-``DELETE_HAS_FOLLOWERS`` otherwise) and archive is the safe retirement path.
+Handlers resolve identity, call one injected service method, and rely on shared
+exception handling for ``WrenError`` responses. Providers keep service creation
+request-scoped in production and replaceable in tests. Lifecycle commands use
+``:verb`` action routes; metadata remains editable after publish, while archive
+provides the safe retirement path.
 """
 
 from __future__ import annotations
@@ -85,16 +66,7 @@ def create_roadmaps_router(
     *,
     app: App,
 ) -> APIRouter:
-    """Build the /roadmaps router for ``app``, driven by the route registry.
-
-    Injects the authoring/lifecycle service provider (writes + lifecycle) and the
-    read service provider (the study-time reads, each request-scoped). The identity
-    every handler resolves and the subset of routes mounted both come from ``app``'s
-    registry (see the module docstring), so the surface difference between the two
-    apps lives in one table rather than a flag or a forked module. The service
-    scopes every query to the resolved user, so the internal app can trust the
-    injected identity without a route ever reaching another user's roadmap.
-    """
+    """Build the /roadmaps router for ``app`` from the route registry."""
     router = APIRouter(prefix=ROADMAPS_PATH, tags=["roadmaps"])
     registry = route_access(app)
 
