@@ -17,5 +17,6 @@ export function useRoadmapDocument(roadmapId: string) {
   )
 
   if (status === 'authenticated') return sessionQuery
+  if (status === 'loading') return { ...publicQuery, isLoading: true }
   return publicQuery
 }

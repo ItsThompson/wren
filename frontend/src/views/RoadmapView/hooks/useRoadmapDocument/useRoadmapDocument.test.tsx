@@ -26,6 +26,17 @@ afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
 describe('useRoadmapDocument', () => {
+  it('waits for auth resolution before reading', () => {
+    const { result } = renderHook(() => useRoadmapDocument(ROADMAP_ID), {
+      wrapper: createHookWrapper({
+        authValue: buildAuthValue({ status: 'loading', user: null }),
+      }),
+    })
+
+    expect(result.current.isLoading).toBe(true)
+    expect(result.current.data).toBeUndefined()
+  })
+
   it('uses the public client for an anonymous reader', async () => {
     let credentials: RequestCredentials | undefined
     server.use(
