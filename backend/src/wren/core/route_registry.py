@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
-from wren.core.identity import require_internal_user, require_user
+from wren.core.identity import optional_user, require_internal_user, require_user
 
 if TYPE_CHECKING:
     from fastapi import APIRouter, FastAPI
@@ -263,8 +263,6 @@ def optional_identity_for_route(app: App, key: RouteKey) -> OptionalIdentity:
     level = _route_access(app, key)
     if level is not AccessLevel.OPTIONAL_SESSION:
         raise RuntimeError(f"{key} must resolve an optional session dependency")
-    from wren.core.identity import optional_user
-
     return optional_user
 
 
