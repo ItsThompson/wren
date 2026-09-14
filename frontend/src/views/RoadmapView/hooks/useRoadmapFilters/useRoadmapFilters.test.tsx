@@ -68,6 +68,10 @@ describe('useRoadmapFilters', () => {
     expect(result.current.state.shownTopicCount).toBe(1)
     expect(result.current.state.matchingSubsectionIds).toEqual(new Set(['sub-2']))
 
+    act(() => result.current.actions.toggleTag('a'))
+    expect(result.current.state.selectedTags).toEqual(new Set(['b']))
+    expect(result.current.state.shownTopicCount).toBe(2)
+
     act(() => result.current.actions.clearFilters())
     expect(result.current.state.selectedTags).toEqual(new Set())
     expect(result.current.state.matchMode).toBe('all')

@@ -1112,6 +1112,9 @@ describe('RoadmapView list view (tags, filter chips, next highlight)', () => {
     renderView()
 
     const panel = await screen.findByRole('group', { name: /roadmap filters/i })
+    const progressBeforeFiltering = (await screen.findAllByRole('progressbar')).map((progressbar) =>
+      progressbar.getAttribute('aria-valuenow'),
+    )
     const tagGroup = within(panel).getByRole('group', { name: /filter by tag/i })
     await user.click(within(tagGroup).getByRole('button', { name: 'arrays' }))
     await user.click(within(tagGroup).getByRole('button', { name: 'hashing' }))
@@ -1126,6 +1129,10 @@ describe('RoadmapView list view (tags, filter chips, next highlight)', () => {
     expect(within(panel).getByText('Showing 1 of 4 topics')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 3, name: 'Arrays and hashing together' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { level: 3, name: 'Arrays & two pointers' })).not.toBeInTheDocument()
+    const progressAfterFiltering = (await screen.findAllByRole('progressbar')).map((progressbar) =>
+      progressbar.getAttribute('aria-valuenow'),
+    )
+    expect(progressAfterFiltering).toEqual(progressBeforeFiltering)
   })
 
   it('shows a no-results state and clear restores topics while preserving ALL', async () => {
