@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 
+import { useAuth } from '@/auth'
 import { keys, runQuery, useApiQuery, useSessionClient } from '@/api'
 import { isStaleRevision, toProblem } from '@/lib/problem'
 import { useArchivedProgressRefresh } from './useArchivedProgressRefresh'
@@ -13,7 +14,10 @@ import type { ProgressNotice, ProgressReadState, RoadmapStatus } from '../types'
  * with the tree view de-duplicates onto one request and cache entry. Writes are
  * optimistic and are enabled only in the ready state.
  */
-export function useProgress(roadmapId: string, roadmapStatus: RoadmapStatus = 'published'): {
+export function useProgress(
+  roadmapId: string,
+  roadmapStatus: RoadmapStatus = 'published',
+): {
   /** Null until the server confirms a progress snapshot. */
   checkedIds: Set<string> | null
   progressState: ProgressReadState
@@ -30,6 +34,7 @@ export function useProgress(roadmapId: string, roadmapStatus: RoadmapStatus = 'p
   /** Refetch progress + next (the re-read recovery for a stale write). */
   reload: () => void
 } {
+  const { status: authStatus } = useAuth()
   const client = useSessionClient()
   const [notice, setNotice] = useState<ProgressNotice | null>(null)
   const generationRef = useRef(0)
@@ -49,39 +54,42 @@ export function useProgress(roadmapId: string, roadmapStatus: RoadmapStatus = 'p
     data: progress,
     error: progressError,
     mutate: mutateProgress,
-  } = useApiQuery(keys.progress(roadmapId), (c) =>
+  } = useApiQuery(authStatus === 'authenticated' ? keys.progress(roadmapId) : null, (c) =>
     c.GET('/roadmaps/{roadmap_id}/progress', {
       params: { path: { roadmap_id: roadmapId }, query: { detailed: true } },
     }),
   )
-  const { data: next, error: nextError, mutate: mutateNext } = useApiQuery(keys.next(roadmapId), (c) =>
-    c.GET('/roadmaps/{roadmap_id}/next', { params: { path: { roadmap_id: roadmapId } } }),
+  const {
+    data: next,
+    error: nextError,
+    mutate: mutateNext,
+  } = useApiQuery(authStatus === 'authenticated' ? keys.next(roadmapId) : null, (c) =>
+    c.GET('/roadmaps/{roadmap_id}/next', {
+      params: { path: { roadmap_id: roadmapId } },
+    }),
   )
   const refreshArchivedProgress = useCallback(
     () => Promise.all([mutateProgress(), mutateNext()]),
     [mutateNext, mutateProgress],
   )
   const invalidateArchivedProgress = useCallback(
-    () =>
-      Promise.all([
-        mutateProgress(undefined, { revalidate: false }),
-        mutateNext(undefined, { revalidate: false }),
-      ]),
+    () => Promise.all([mutateProgress(undefined, { revalidate: false }), mutateNext(undefined, { revalidate: false })]),
     [mutateNext, mutateProgress],
   )
   const archivedRefreshPending = useArchivedProgressRefresh(
-    roadmapStatus,
+    authStatus === 'authenticated' ? roadmapStatus : undefined,
     refreshArchivedProgress,
     invalidateArchivedProgress,
   )
 
   const progressState = useMemo<ProgressReadState>(() => {
+    if (authStatus !== 'authenticated') return { phase: 'not-applicable' }
     if (roadmapStatus === 'archived' && progressError?.status === 409) return { phase: 'closed' }
     if (archivedRefreshPending) return { phase: 'loading' }
     if (progressError) return { phase: 'failed', status: progressError.status }
     if (progress) return { phase: 'ready' }
     return { phase: 'loading' }
-  }, [archivedRefreshPending, progress, progressError, roadmapStatus])
+  }, [archivedRefreshPending, authStatus, progress, progressError, roadmapStatus])
   const checkedIds = useMemo(
     () => (progressState.phase === 'ready' && progress ? new Set(progress.checked_ids ?? []) : null),
     [progress, progressState.phase],
@@ -110,7 +118,10 @@ export function useProgress(roadmapId: string, roadmapStatus: RoadmapStatus = 'p
           const result = await runQuery(() =>
             client.POST('/roadmaps/{roadmap_id}/progress', {
               params: { path: { roadmap_id: roadmapId } },
-              body: { item_ids: [itemId], state: checked ? 'complete' : 'incomplete' },
+              body: {
+                item_ids: [itemId],
+                state: checked ? 'complete' : 'incomplete',
+              },
             }),
           )
           // Reconcile the best-effort next key from the same response so the two

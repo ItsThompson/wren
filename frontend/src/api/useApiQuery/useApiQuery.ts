@@ -11,8 +11,8 @@ import type { ApiKey } from '../keys'
 type ApiCall<R extends OpenApiResultBase> = (client: SessionClient) => Promise<R>
 
 /**
- * SWR read bound to the shared session client (every authenticated read except
- * the public `useProfile`). The abstraction this epic exists to create: the
+ * SWR read bound to the shared session client for authenticated reads. The
+ * abstraction this hook provides:
  * `key` carries cache identity, the `call` thunk carries the response typing
  * inferred from the path literal, and `runQuery` supplies the throw-adapter.
  *

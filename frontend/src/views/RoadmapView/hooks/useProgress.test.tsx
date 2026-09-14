@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll } from 'vitest'
 import { keys } from '@/api'
 import type { components } from '@/api'
 import { createHookWrapper } from '@/test/createHookWrapper'
+import { buildAuthUser, buildAuthValue } from '@/test/auth-harness'
 import { TEST_API_BASE } from '@/test/test-api-base'
 
 import type { NextResult, ProgressSnapshot, ProgressUpdateResult, RoadmapStatus } from '../types'
@@ -24,7 +25,14 @@ afterAll(() => server.close())
 
 /** A minimal detailed `ProgressSnapshot` in the generated shape; override per test. */
 function buildSnapshot(overrides: Partial<ProgressSnapshot> = {}): ProgressSnapshot {
-  return { roadmap_id: ROADMAP_ID, total_items: 4, checked_items: 0, percent: 0, checked_ids: [], ...overrides }
+  return {
+    roadmap_id: ROADMAP_ID,
+    total_items: 4,
+    checked_items: 0,
+    percent: 0,
+    checked_ids: [],
+    ...overrides,
+  }
 }
 
 /** A `GET /next` body; defaults to "nothing next / not complete". */
@@ -35,7 +43,14 @@ function buildNext(overrides: Partial<NextResult> = {}): NextResult {
 /** A `NextResult` whose first item points at `subsectionId` (the highlight). */
 function nextAt(subsectionId: string): NextResult {
   return buildNext({
-    items: [{ subsection_id: subsectionId, item_id: `${subsectionId}_item`, text: 't', why_now: 'w' }],
+    items: [
+      {
+        subsection_id: subsectionId,
+        item_id: `${subsectionId}_item`,
+        text: 't',
+        why_now: 'w',
+      },
+    ],
     remaining_in_path: 1,
   })
 }
@@ -47,13 +62,25 @@ function buildUpdateResult(snapshot: ProgressSnapshot, next: NextResult): Progre
 
 /** The `Progress` record the `PUT /deadline` endpoint echoes back. */
 function buildProgressRecord(deadline: string | null): components['schemas']['Progress'] {
-  return { user_id: 'user-1', roadmap_id: ROADMAP_ID, deadline, checked: {}, updated_at: '2026-07-15T00:00:00Z' }
+  return {
+    user_id: 'user-1',
+    roadmap_id: ROADMAP_ID,
+    deadline,
+    checked: {},
+    updated_at: '2026-07-15T00:00:00Z',
+  }
 }
 
 /** A 409 problem+json body carrying the STALE_REVISION code (the re-read branch). */
 function staleConflict() {
   return HttpResponse.json(
-    { type: 'x', title: 'Conflict', status: 409, code: 'STALE_REVISION', detail: 're-read' },
+    {
+      type: 'x',
+      title: 'Conflict',
+      status: 409,
+      code: 'STALE_REVISION',
+      detail: 're-read',
+    },
     { status: 409, headers: { 'content-type': 'application/problem+json' } },
   )
 }
@@ -73,7 +100,14 @@ function requireCheckedIds(ids: Set<string> | null): Set<string> {
 }
 
 function renderProgress(roadmapStatus: RoadmapStatus = 'published') {
-  return renderHook(() => useProgress(ROADMAP_ID, roadmapStatus), { wrapper: createHookWrapper() })
+  return renderHook(() => useProgress(ROADMAP_ID, roadmapStatus), {
+    wrapper: createHookWrapper({
+      authValue: buildAuthValue({
+        status: 'authenticated',
+        user: buildAuthUser(),
+      }),
+    }),
+  })
 }
 
 describe('useProgress reads', () => {
@@ -81,9 +115,7 @@ describe('useProgress reads', () => {
     seedReads(buildSnapshot({ checked_ids: ['a', 'b'], deadline: '2099-12-31' }), nextAt('sub_hashing'))
     const { result } = renderProgress()
 
-    await waitFor(() =>
-      expect([...requireCheckedIds(result.current.checkedIds)].sort()).toEqual(['a', 'b']),
-    )
+    await waitFor(() => expect([...requireCheckedIds(result.current.checkedIds)].sort()).toEqual(['a', 'b']))
     expect(result.current.deadline).toBe('2099-12-31')
     expect(result.current.nextSubsectionId).toBe('sub_hashing')
     expect(result.current.nextComplete).toBe(false)
@@ -98,7 +130,12 @@ describe('useProgress reads', () => {
     )
     const { result } = renderProgress()
 
-    await waitFor(() => expect(result.current.progressState).toEqual({ phase: 'failed', status: 500 }))
+    await waitFor(() =>
+      expect(result.current.progressState).toEqual({
+        phase: 'failed',
+        status: 500,
+      }),
+    )
     expect(result.current.checkedIds).toBeNull()
   })
 
@@ -119,7 +156,9 @@ describe('useProgress reads', () => {
     swrCache.set(unstable_serialize(keys.progress(ROADMAP_ID)), {
       data: buildSnapshot({ checked_ids: ['cached-published-item'] }),
     })
-    swrCache.set(unstable_serialize(keys.next(ROADMAP_ID)), { data: nextAt('cached-subsection') })
+    swrCache.set(unstable_serialize(keys.next(ROADMAP_ID)), {
+      data: nextAt('cached-subsection'),
+    })
     let progressReads = 0
     let nextReads = 0
     server.use(
@@ -134,7 +173,13 @@ describe('useProgress reads', () => {
     )
 
     const { result } = renderHook(() => useProgress(ROADMAP_ID, 'archived'), {
-      wrapper: createHookWrapper({ swrCache }),
+      wrapper: createHookWrapper({
+        swrCache,
+        authValue: buildAuthValue({
+          status: 'authenticated',
+          user: buildAuthUser(),
+        }),
+      }),
     })
 
     expect(result.current.progressState).toEqual({ phase: 'loading' })
@@ -155,21 +200,19 @@ describe('useProgress toggle', () => {
         posted = await request.json()
         // The write both extends the checked set and completes the path: proves the
         // progress key AND the next key reconcile from the single response.
-        return HttpResponse.json(buildUpdateResult(buildSnapshot({ checked_ids: ['a', 'b'] }), buildNext({ complete: true })))
+        return HttpResponse.json(
+          buildUpdateResult(buildSnapshot({ checked_ids: ['a', 'b'] }), buildNext({ complete: true })),
+        )
       }),
     )
     const { result } = renderProgress()
-    await waitFor(() =>
-      expect([...requireCheckedIds(result.current.checkedIds)]).toEqual(['a']),
-    )
+    await waitFor(() => expect([...requireCheckedIds(result.current.checkedIds)]).toEqual(['a']))
 
     act(() => result.current.toggle('b', true))
     // Optimistic: the checkbox reflects instantly, before the write resolves.
     expect(requireCheckedIds(result.current.checkedIds).has('b')).toBe(true)
 
-    await waitFor(() =>
-      expect([...requireCheckedIds(result.current.checkedIds)].sort()).toEqual(['a', 'b']),
-    )
+    await waitFor(() => expect([...requireCheckedIds(result.current.checkedIds)].sort()).toEqual(['a', 'b']))
     // The next key reconciled from the same POST body (not a re-fetch).
     expect(result.current.nextComplete).toBe(true)
     expect(result.current.nextSubsectionId).toBeNull()
@@ -187,17 +230,13 @@ describe('useProgress toggle', () => {
       }),
     )
     const { result } = renderProgress()
-    await waitFor(() =>
-      expect([...requireCheckedIds(result.current.checkedIds)].sort()).toEqual(['a', 'b']),
-    )
+    await waitFor(() => expect([...requireCheckedIds(result.current.checkedIds)].sort()).toEqual(['a', 'b']))
 
     act(() => result.current.toggle('b', false))
     // Optimistic: the uncheck drops the item instantly.
     expect(requireCheckedIds(result.current.checkedIds).has('b')).toBe(false)
 
-    await waitFor(() =>
-      expect([...requireCheckedIds(result.current.checkedIds)]).toEqual(['a']),
-    )
+    await waitFor(() => expect([...requireCheckedIds(result.current.checkedIds)]).toEqual(['a']))
     expect(posted).toEqual({ item_ids: ['b'], state: 'incomplete' })
   })
 
@@ -205,9 +244,7 @@ describe('useProgress toggle', () => {
     seedReads(buildSnapshot({ checked_ids: ['a'] }))
     server.use(http.post(PROGRESS_URL, () => staleConflict()))
     const { result } = renderProgress()
-    await waitFor(() =>
-      expect([...requireCheckedIds(result.current.checkedIds)]).toEqual(['a']),
-    )
+    await waitFor(() => expect([...requireCheckedIds(result.current.checkedIds)]).toEqual(['a']))
 
     act(() => result.current.toggle('b', true))
     expect(requireCheckedIds(result.current.checkedIds).has('b')).toBe(true)
@@ -222,9 +259,7 @@ describe('useProgress toggle', () => {
     seedReads(buildSnapshot({ checked_ids: ['a'] }))
     server.use(http.post(PROGRESS_URL, () => HttpResponse.error()))
     const { result } = renderProgress()
-    await waitFor(() =>
-      expect([...requireCheckedIds(result.current.checkedIds)]).toEqual(['a']),
-    )
+    await waitFor(() => expect([...requireCheckedIds(result.current.checkedIds)]).toEqual(['a']))
 
     act(() => result.current.toggle('b', true))
     expect(requireCheckedIds(result.current.checkedIds).has('b')).toBe(true)
@@ -295,9 +330,7 @@ describe('useProgress dismissNotice', () => {
     seedReads(buildSnapshot({ checked_ids: ['a'] }))
     server.use(http.post(PROGRESS_URL, () => new HttpResponse(null, { status: 500 })))
     const { result } = renderProgress()
-    await waitFor(() =>
-      expect([...requireCheckedIds(result.current.checkedIds)]).toEqual(['a']),
-    )
+    await waitFor(() => expect([...requireCheckedIds(result.current.checkedIds)]).toEqual(['a']))
 
     act(() => result.current.toggle('b', true))
     await waitFor(() => expect(result.current.notice).toEqual({ kind: 'save-failed' }))
@@ -325,9 +358,7 @@ describe('useProgress reload', () => {
       http.post(PROGRESS_URL, () => new HttpResponse(null, { status: 500 })),
     )
     const { result } = renderProgress()
-    await waitFor(() =>
-      expect([...requireCheckedIds(result.current.checkedIds)]).toEqual(['a']),
-    )
+    await waitFor(() => expect([...requireCheckedIds(result.current.checkedIds)]).toEqual(['a']))
     const progressGetsBeforeReload = progressGets
     const nextGetsBeforeReload = nextGets
 

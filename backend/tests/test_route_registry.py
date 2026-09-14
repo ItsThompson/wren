@@ -12,7 +12,7 @@ from fastapi import APIRouter, FastAPI
 from wren.api.main import app as external_app
 from wren.api_internal.main import app as internal_app
 from wren.core.app_factory import create_app
-from wren.core.identity import require_internal_user, require_user
+from wren.core.identity import require_user
 from wren.core.route_registry import (
     EXTERNAL_ROUTE_ACCESS,
     INTERNAL_ROUTE_ACCESS,
@@ -20,9 +20,9 @@ from wren.core.route_registry import (
     App,
     RouteKey,
     RouteRegistry,
-    _roadmaps_identity,
-    identity_for_app,
     mounted_product_routes,
+    optional_identity_for_route,
+    required_identity_for_route,
     verify_route_coverage,
 )
 from wren.core.settings import AppSettings
@@ -103,29 +103,21 @@ def test_real_internal_app_has_full_route_coverage() -> None:
     assert report.is_covered, f"internal app has undeclared routes: {report.undeclared}"
 
 
-def test_identity_for_app_resolves_each_apps_dependency() -> None:
-    # The policy half of the load-bearing registry: the external app resolves the
-    # human-session dependency, the internal app the trusted-header one.
-    assert identity_for_app(App.EXTERNAL) is require_user
-    assert identity_for_app(App.INTERNAL) is require_internal_user
+def test_document_route_resolves_optional_external_identity() -> None:
+    identity = optional_identity_for_route(App.EXTERNAL, _ROADMAP_ROUTE)
+    assert identity.__name__ == "optional_user"
 
 
-def test_roadmaps_identity_rejects_mixed_access_levels() -> None:
-    # A /roadmaps route set that does not share one access level is a registry
-    # misconfiguration; resolving an identity from it must fail loudly.
-    mixed: RouteRegistry = {
-        RouteKey(method="POST", path="/roadmaps"): AccessLevel.EXTERNAL_COOKIE,
-        RouteKey(method="GET", path="/roadmaps/{roadmap_id}"): AccessLevel.INTERNAL_TRUSTED,
-    }
-    with pytest.raises(RuntimeError, match="one access level"):
-        _roadmaps_identity(mixed, App.EXTERNAL)
+def test_required_route_resolves_exact_identity() -> None:
+    identity = required_identity_for_route(App.EXTERNAL, RouteKey(method="POST", path="/roadmaps"))
+    assert identity is require_user
 
 
-def test_roadmaps_identity_rejects_a_level_with_no_identity() -> None:
-    # A level that maps to no identity dependency (PUBLIC/OAUTH) cannot gate the
-    # /roadmaps surface; resolving it must fail loudly rather than return None.
-    public: RouteRegistry = {
-        RouteKey(method="GET", path="/roadmaps/{roadmap_id}"): AccessLevel.PUBLIC,
-    }
-    with pytest.raises(RuntimeError, match="must resolve an identity"):
-        _roadmaps_identity(public, App.EXTERNAL)
+def test_required_identity_rejects_optional_route() -> None:
+    with pytest.raises(RuntimeError, match="required identity"):
+        required_identity_for_route(App.EXTERNAL, _ROADMAP_ROUTE)
+
+
+def test_identity_resolver_rejects_unknown_route() -> None:
+    with pytest.raises(RuntimeError, match="no access level declared"):
+        required_identity_for_route(App.EXTERNAL, RouteKey(method="GET", path="/roadmaps/unknown"))

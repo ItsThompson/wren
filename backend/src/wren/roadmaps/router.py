@@ -1,35 +1,16 @@
-"""REST adapter factory for roadmaps, one factory for both trust boundaries.
+"""REST adapter factory for roadmaps across both trust boundaries.
 
-The external app (:8000) and the internal app (:8001) mount the same ``/roadmaps``
-handlers: the handler bodies are identical and differ only in which routes mount
-and how the caller's ``user_id`` is resolved. Rather than fork the router or pass
-those two facts in by hand, :func:`create_roadmaps_router` takes an :class:`App`
-selector and reads both from the route registry:
+The external and internal apps mount the same handlers. The route registry selects
+both the identity dependency and the routes each app exposes. ``require_user``
+resolves external cookie identity, while ``require_internal_user`` trusts the
+internal token boundary. ``restrict_to_declared`` removes external-only lifecycle
+routes from the internal app.
 
-- **identity** (policy): :func:`identity_for_app` resolves the identity dependency
-  the app's routes gate on, from their declared access level: ``require_user``
-  (external cookie; a spoofed ``X-User-ID`` is stripped upstream) or
-  ``require_internal_user`` (the trusted ``X-User-ID`` behind ``INTERNAL_API_TOKEN``).
-- **mounting** (composition): the factory defines every roadmaps route, then
-  :func:`restrict_to_declared` keeps only those the app's registry declares. The
-  web-only lifecycle routes (visibility / archive / delete) are declared for the
-  external app only, so the internal app (the MCP surface) never mounts them.
-
-Thin handlers: each resolves the caller via the resolved ``identity`` dependency,
-calls one :class:`RoadmapService` / :class:`RoadmapReadService` method, and lets
-the shared exception handler render any ``WrenError`` as RFC 9457 problem+json.
-The services are injected via ``service_provider`` / ``read_service_provider`` so
-production binds a request-scoped DB session while tests substitute an
-in-memory-backed service.
-
-The lifecycle commands use the ``:verb`` action sub-resource form
-(``POST /roadmaps/{id}:validate`` / ``:publish`` / ``:fork``); ``publish``
-hard-blocks with a 422 carrying the ``Violation`` list, while ``validate`` always
-returns 200 with a (possibly empty) list and ``fork`` returns 201 with the new
-draft. ``PATCH /roadmaps/{id}/metadata`` is the presentation-only edit that stays
-allowed post-publish (not ``If-Match``-guarded). The three web-only lifecycle
-actions are external-app only: delete is guarded by a zero-followers check (409
-``DELETE_HAS_FOLLOWERS`` otherwise) and archive is the safe retirement path.
+Handlers resolve identity, call one injected service method, and rely on shared
+exception handling for ``WrenError`` responses. Providers keep service creation
+request-scoped in production and replaceable in tests. Lifecycle commands use
+``:verb`` action routes; metadata remains editable after publish, while archive
+provides the safe retirement path.
 """
 
 from __future__ import annotations
@@ -37,9 +18,20 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from fastapi import APIRouter, Depends, Header, Query
+from starlette.responses import Response
 
+from wren.core.identity import require_user
 from wren.core.read_contract import ResponseFormat
-from wren.core.route_registry import App, identity_for_app, restrict_to_declared
+from wren.core.route_registry import (
+    AccessLevel,
+    App,
+    RequiredIdentity,
+    RouteKey,
+    optional_identity_for_route,
+    required_identity_for_route,
+    restrict_to_declared,
+    route_access,
+)
 from wren.roadmaps.config import ROADMAPS_PATH
 from wren.roadmaps.read_schemas import (
     NodeDetail,
@@ -74,23 +66,43 @@ def create_roadmaps_router(
     *,
     app: App,
 ) -> APIRouter:
-    """Build the /roadmaps router for ``app``, driven by the route registry.
-
-    Injects the authoring/lifecycle service provider (writes + lifecycle) and the
-    read service provider (the study-time reads, each request-scoped). The identity
-    every handler resolves and the subset of routes mounted both come from ``app``'s
-    registry (see the module docstring), so the surface difference between the two
-    apps lives in one table rather than a flag or a forked module. The service
-    scopes every query to the resolved user, so the internal app can trust the
-    injected identity without a route ever reaching another user's roadmap.
-    """
+    """Build the /roadmaps router for ``app`` from the route registry."""
     router = APIRouter(prefix=ROADMAPS_PATH, tags=["roadmaps"])
-    identity = identity_for_app(app)
+    registry = route_access(app)
+
+    def required_identity(method: str, path: str) -> RequiredIdentity:
+        key = RouteKey(method=method, path=path)
+        if key not in registry:
+            return require_user
+        return required_identity_for_route(app, key)
+
+    document_key = RouteKey(method="GET", path="/roadmaps/{roadmap_id}")
+    document_level = registry[document_key]
+    document_identity = (
+        optional_identity_for_route(app, document_key)
+        if document_level is AccessLevel.OPTIONAL_SESSION
+        else required_identity_for_route(app, document_key)
+    )
+
+    create_identity = required_identity("POST", "/roadmaps")
+    patch_identity = required_identity("PATCH", "/roadmaps/{roadmap_id}")
+    replace_identity = required_identity("PUT", "/roadmaps/{roadmap_id}")
+    validate_identity = required_identity("POST", "/roadmaps/{roadmap_id}:validate")
+    publish_identity = required_identity("POST", "/roadmaps/{roadmap_id}:publish")
+    fork_identity = required_identity("POST", "/roadmaps/{roadmap_id}:fork")
+    metadata_identity = required_identity("PATCH", "/roadmaps/{roadmap_id}/metadata")
+    visibility_identity = required_identity("PUT", "/roadmaps/{roadmap_id}/visibility")
+    archive_identity = required_identity("POST", "/roadmaps/{roadmap_id}:archive")
+    delete_identity = required_identity("DELETE", "/roadmaps/{roadmap_id}")
+    overview_identity = required_identity("GET", "/roadmaps/{roadmap_id}/overview")
+    node_identity = required_identity("GET", "/roadmaps/{roadmap_id}/nodes/{subsection_id}")
+    section_identity = required_identity("GET", "/roadmaps/{roadmap_id}/sections/{section_id}")
+    search_identity = required_identity("GET", "/roadmaps/{roadmap_id}/search")
 
     @router.post("", status_code=201)
     async def create_roadmap(
         body: RoadmapInput,
-        user_id: str = Depends(identity),
+        user_id: str = Depends(create_identity),
         service: RoadmapService = Depends(service_provider),
     ) -> RoadmapCreated:
         return await service.create_draft(user_id, body)
@@ -98,19 +110,21 @@ def create_roadmaps_router(
     @router.get("/{roadmap_id}")
     async def get_roadmap(
         roadmap_id: str,
-        user_id: str = Depends(identity),
+        response: Response,
+        user_id: str | None = Depends(document_identity),
         service: RoadmapReadService = Depends(read_service_provider),
     ) -> Roadmap:
         # Full document to a reader: the owner (any status, draft
         # preview) or a non-owner reading a public published/archived roadmap by
         # link. A private roadmap or a non-owner's public draft is a 404 (no leak).
+        response.headers["Cache-Control"] = "no-store"
         return await service.get(user_id, roadmap_id)
 
     @router.get("/{roadmap_id}/overview")
     async def get_overview(
         roadmap_id: str,
         format: ResponseFormat = ResponseFormat.CONCISE,
-        user_id: str = Depends(identity),
+        user_id: str = Depends(overview_identity),
         service: RoadmapReadService = Depends(read_service_provider),
     ) -> Overview:
         # Orientation projection: per-section + overall counts, no item bodies.
@@ -121,7 +135,7 @@ def create_roadmaps_router(
         roadmap_id: str,
         subsection_id: str,
         format: ResponseFormat = ResponseFormat.CONCISE,
-        user_id: str = Depends(identity),
+        user_id: str = Depends(node_identity),
         service: RoadmapReadService = Depends(read_service_provider),
     ) -> NodeDetail:
         # One subsection: resource links (never inlined bodies), resolved prereqs,
@@ -134,7 +148,7 @@ def create_roadmaps_router(
         section_id: str,
         cursor: str | None = None,
         include: SectionInclude = SectionInclude.BOTH,
-        user_id: str = Depends(identity),
+        user_id: str = Depends(section_identity),
         service: RoadmapReadService = Depends(read_service_provider),
     ) -> SectionPage:
         # Paginated drill-down: server-set page size + opaque cursor; a stale or
@@ -146,7 +160,7 @@ def create_roadmaps_router(
         roadmap_id: str,
         q: str | None = None,
         tags: list[str] | None = Query(default=None),
-        user_id: str = Depends(identity),
+        user_id: str = Depends(search_identity),
         service: RoadmapReadService = Depends(read_service_provider),
     ) -> list[SearchHit]:
         # Search, not list-all: an empty query with no tag filter returns [].
@@ -157,7 +171,7 @@ def create_roadmaps_router(
         roadmap_id: str,
         body: PatchRequest,
         if_match: int = Header(alias="If-Match"),
-        user_id: str = Depends(identity),
+        user_id: str = Depends(patch_identity),
         service: RoadmapService = Depends(service_provider),
     ) -> PatchResult:
         # If-Match carries the target revision: a mismatch is a
@@ -170,7 +184,7 @@ def create_roadmaps_router(
         roadmap_id: str,
         body: RoadmapInput,
         if_match: int = Header(alias="If-Match"),
-        user_id: str = Depends(identity),
+        user_id: str = Depends(replace_identity),
         service: RoadmapService = Depends(service_provider),
     ) -> RoadmapReplaced:
         # The full-document import escape hatch, never the
@@ -183,7 +197,7 @@ def create_roadmaps_router(
     @router.post("/{roadmap_id}:validate")
     async def validate_roadmap(
         roadmap_id: str,
-        user_id: str = Depends(identity),
+        user_id: str = Depends(validate_identity),
         service: RoadmapService = Depends(service_provider),
     ) -> ValidateResult:
         violations = await service.validate(user_id, roadmap_id)
@@ -192,7 +206,7 @@ def create_roadmaps_router(
     @router.post("/{roadmap_id}:publish")
     async def publish_roadmap(
         roadmap_id: str,
-        user_id: str = Depends(identity),
+        user_id: str = Depends(publish_identity),
         service: RoadmapService = Depends(service_provider),
     ) -> Roadmap:
         return await service.publish(user_id, roadmap_id)
@@ -200,7 +214,7 @@ def create_roadmaps_router(
     @router.post("/{roadmap_id}:fork", status_code=201)
     async def fork_roadmap(
         roadmap_id: str,
-        user_id: str = Depends(identity),
+        user_id: str = Depends(fork_identity),
         service: RoadmapService = Depends(service_provider),
     ) -> Roadmap:
         # Fork any roadmap the caller can read (own, or public): a new draft with a
@@ -212,7 +226,7 @@ def create_roadmaps_router(
     async def edit_roadmap_metadata(
         roadmap_id: str,
         body: MetadataEditRequest,
-        user_id: str = Depends(identity),
+        user_id: str = Depends(metadata_identity),
         service: RoadmapService = Depends(service_provider),
     ) -> Roadmap:
         # Presentation-only edit, allowed even when published: not
@@ -227,7 +241,7 @@ def create_roadmaps_router(
     async def set_roadmap_visibility(
         roadmap_id: str,
         body: VisibilityRequest,
-        user_id: str = Depends(identity),
+        user_id: str = Depends(visibility_identity),
         service: RoadmapService = Depends(service_provider),
     ) -> Roadmap:
         # Web-only visibility toggle: mounted on the external
@@ -238,7 +252,7 @@ def create_roadmaps_router(
     @router.post("/{roadmap_id}:archive")
     async def archive_roadmap(
         roadmap_id: str,
-        user_id: str = Depends(identity),
+        user_id: str = Depends(archive_identity),
         service: RoadmapService = Depends(service_provider),
     ) -> Roadmap:
         # Web-only archive: the safe retirement path (hides
@@ -250,7 +264,7 @@ def create_roadmaps_router(
     @router.delete("/{roadmap_id}", status_code=204)
     async def delete_roadmap(
         roadmap_id: str,
-        user_id: str = Depends(identity),
+        user_id: str = Depends(delete_identity),
         service: RoadmapService = Depends(service_provider),
     ) -> None:
         # Web-only delete: external app only, no internal-app

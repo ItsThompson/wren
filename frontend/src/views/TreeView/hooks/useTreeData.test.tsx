@@ -4,6 +4,7 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import { createHookWrapper } from '@/test/createHookWrapper'
+import { buildAuthUser, buildAuthValue } from '@/test/auth-harness'
 
 import type { ProgressSnapshot, Roadmap } from '../types'
 import { useTreeData } from './useTreeData'
@@ -27,7 +28,12 @@ function buildRoadmap(overrides: Partial<Roadmap> = {}): Roadmap {
         subsection_order: ['a', 'b'],
         subsections: {
           a: { id: 'a', title: 'Arrays', prereq_ids: [], item_order: ['a1'] },
-          b: { id: 'b', title: 'Hashing', prereq_ids: ['a'], item_order: ['b1'] },
+          b: {
+            id: 'b',
+            title: 'Hashing',
+            prereq_ids: ['a'],
+            item_order: ['b1'],
+          },
         },
       },
     },
@@ -54,7 +60,14 @@ afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
 function renderTreeData() {
-  return renderHook(() => useTreeData(ROADMAP_ID), { wrapper: createHookWrapper() })
+  return renderHook(() => useTreeData(ROADMAP_ID), {
+    wrapper: createHookWrapper({
+      authValue: buildAuthValue({
+        status: 'authenticated',
+        user: buildAuthUser(),
+      }),
+    }),
+  })
 }
 
 describe('useTreeData', () => {

@@ -69,6 +69,20 @@ class StripInboundIdentityMiddleware:
         await self.app(scope, receive, send)
 
 
+async def optional_user(request: Request) -> str | None:
+    """Resolve an optional human session, preserving invalid-cookie failures."""
+    verify: SessionVerifier = get_session_verifier(request.app)
+    cookie = request.cookies.get(SESSION_COOKIE_NAME)
+    if cookie is None:
+        return None
+    user_id = await verify(cookie)
+    if user_id is None:
+        _log.warning("session_invalid", reason="invalid_or_expired")
+        raise Unauthorized("Session is invalid or expired.")
+    structlog.contextvars.bind_contextvars(user_id=user_id)
+    return user_id
+
+
 async def require_user(request: Request) -> str:
     """External dependency: resolve ``user_id`` from the session cookie.
 

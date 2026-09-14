@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
-from wren.core.identity import require_internal_user, require_user
+from wren.core.identity import optional_user, require_internal_user, require_user
 
 if TYPE_CHECKING:
     from fastapi import APIRouter, FastAPI
@@ -39,6 +39,7 @@ class AccessLevel(StrEnum):
     """How a route resolves and gates identity."""
 
     PUBLIC = "public"  # no authentication (landing, well-known metadata, /skill)
+    OPTIONAL_SESSION = "optional-session"  # anonymous or human session cookie
     EXTERNAL_COOKIE = "external-cookie"  # require_user (human session cookie)
     INTERNAL_TRUSTED = "internal-trusted"  # require_internal_user (trusted X-User-ID)
     OAUTH = "oauth"  # OAuth 2.1 bearer / AS handshake endpoints
@@ -57,10 +58,10 @@ class App(StrEnum):
     INTERNAL = "internal"
 
 
-# A FastAPI identity dependency (``require_user`` / ``require_internal_user``) or
-# ``None`` for an unauthenticated access level. The roadmaps/progress factories
-# resolve this from a route's access level via :data:`IDENTITY_BY_ACCESS`.
-Identity = Callable[..., Awaitable[str]]
+# FastAPI identity dependencies. Required and optional identities remain distinct
+# so a write route cannot accidentally accept an anonymous session.
+RequiredIdentity = Callable[..., Awaitable[str]]
+OptionalIdentity = Callable[..., Awaitable[str | None]]
 
 
 @dataclass(frozen=True, order=True)
@@ -85,10 +86,10 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     RouteKey(method="POST", path="/auth/login"): AccessLevel.PUBLIC,
     RouteKey(method="POST", path="/auth/refresh"): AccessLevel.PUBLIC,
     RouteKey(method="POST", path="/auth/logout"): AccessLevel.PUBLIC,
-    # Roadmap authoring: create a draft and read an owned roadmap. Both
-    # resolve the human session via require_user (owner-scoped in the service).
+    # Roadmap authoring resolves the human session via require_user. The full
+    # document read accepts anonymous readers and applies domain readability.
     RouteKey(method="POST", path="/roadmaps"): AccessLevel.EXTERNAL_COOKIE,
-    RouteKey(method="GET", path="/roadmaps/{roadmap_id}"): AccessLevel.EXTERNAL_COOKIE,
+    RouteKey(method="GET", path="/roadmaps/{roadmap_id}"): AccessLevel.OPTIONAL_SESSION,
     # Iterative edit: the atomic op-list PATCH under If-Match optimistic
     # concurrency. Owner-scoped draft-only write, resolving the human session via
     # require_user (the service rejects a stale revision with 409 and an invalid
@@ -222,15 +223,12 @@ INTERNAL_ROUTE_ACCESS: RouteRegistry = {
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/next"): AccessLevel.INTERNAL_TRUSTED,
 }
 
-# The identity dependency each access level resolves. The roadmaps/progress
-# factories key into this by a route's declared access level, so per-route policy
-# lives in the registry, not a hand-passed argument. PUBLIC/OAUTH resolve no
-# identity (those surfaces are not driven by this mechanism, so they map to None).
-IDENTITY_BY_ACCESS: Mapping[AccessLevel, Identity | None] = {
+# Required identity dependencies keyed by access level. Optional sessions use a
+# dedicated resolver because they return an absent identity without weakening
+# required route types.
+_REQUIRED_IDENTITY_BY_ACCESS: Mapping[AccessLevel, RequiredIdentity] = {
     AccessLevel.EXTERNAL_COOKIE: require_user,
     AccessLevel.INTERNAL_TRUSTED: require_internal_user,
-    AccessLevel.PUBLIC: None,
-    AccessLevel.OAUTH: None,
 }
 
 # The per-app registry, so the factories resolve both composition (membership =
@@ -251,36 +249,29 @@ def route_access(app: App) -> RouteRegistry:
 _PRODUCT_METHODS = frozenset({"GET", "POST", "PUT", "PATCH", "DELETE"})
 
 
-def identity_for_app(app: App) -> Identity:
-    """The identity dependency ``app``'s roadmaps/progress routes resolve.
-
-    Every such route on one app shares a single access level (external cookie or
-    internal trusted), so the roadmaps/progress factories resolve the identity once
-    from the registry rather than taking it as an argument. This is the policy half
-    of "the registry is load-bearing": change a route's declared access level and
-    the resolved dependency follows.
-    """
-    return _roadmaps_identity(route_access(app), app)
+def required_identity_for_route(app: App, key: RouteKey) -> RequiredIdentity:
+    """Resolve a required identity from one exact registry entry."""
+    level = _route_access(app, key)
+    try:
+        return _REQUIRED_IDENTITY_BY_ACCESS[level]
+    except KeyError as error:
+        raise RuntimeError(f"{key} must resolve a required identity dependency") from error
 
 
-def _roadmaps_identity(registry: RouteRegistry, label: object) -> Identity:
-    """The one identity dependency the ``/roadmaps`` routes in ``registry`` gate on.
+def optional_identity_for_route(app: App, key: RouteKey) -> OptionalIdentity:
+    """Resolve the optional-session identity from one exact registry entry."""
+    level = _route_access(app, key)
+    if level is not AccessLevel.OPTIONAL_SESSION:
+        raise RuntimeError(f"{key} must resolve an optional session dependency")
+    return optional_user
 
-    ``label`` (an :class:`App`) names the source in the error messages only. Raises
-    if those routes do not share exactly one access level, or if that level maps to
-    no identity: both are registry misconfigurations the caller cannot recover from.
-    Split from :func:`identity_for_app` so the invariant is testable against a
-    hand-built registry without the module-level tables.
-    """
-    levels = {level for key, level in registry.items() if key.path.startswith("/roadmaps")}
-    if len(levels) != 1:
-        raise RuntimeError(
-            f"expected one access level for /roadmaps routes on {label}, got {sorted(levels)}"
-        )
-    identity = IDENTITY_BY_ACCESS[next(iter(levels))]
-    if identity is None:
-        raise RuntimeError(f"/roadmaps routes on {label} must resolve an identity dependency")
-    return identity
+
+def _route_access(app: App, key: RouteKey) -> AccessLevel:
+    registry = route_access(app)
+    try:
+        return registry[key]
+    except KeyError as error:
+        raise RuntimeError(f"no access level declared for {key} on {app}") from error
 
 
 def restrict_to_declared(router: APIRouter, app: App) -> None:
