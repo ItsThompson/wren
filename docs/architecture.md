@@ -53,7 +53,7 @@ Two Docker bridge networks separate the tiers. `app-net` carries every first-par
 
 | Component | Role | Canonical source |
 |-----------|------|------------------|
-| External app (`:8000`) | Internet-facing. Authenticates humans by session cookie. Hosts the public REST API and the OAuth 2.1 authorization server. | `backend/src/wren/api/` |
+| External app (`:8000`) | Internet-facing. Authenticates humans by session cookie and serves public roadmap document reads. Hosts the REST API and OAuth 2.1 authorization server. | `backend/src/wren/api/` |
 | Internal app (`:8001`) | App-net only. Trusts an injected `X-User-ID` header behind `INTERNAL_API_TOKEN`. Mounts the roadmap and progress routers over the same service layer. Never mounts the web-only lifecycle routes. | `backend/src/wren/api_internal/` |
 | MCP Resource Server (`:9000`) | The agent front door. An OAuth 2.1 Resource Server that verifies the agent bearer token, then forwards each tool call to the internal app. Carries no backend domain dependency; shares infra via `wren-common`. | `mcp/src/wren_mcp/` |
 | Frontend SPA (`:80`) | The React app for humans. Talks to the external app over a typed REST client. Served by nginx in the container. | `frontend/` |
@@ -71,7 +71,7 @@ Both apps come from `create_app`. They differ only by injected settings and by w
 | MCP RS (`:9000`) | Internet via the tunnel | Agent Bearer token, audience-bound | Forward the agent token downstream, or serve any path but PRM and `/mcp` at ingress |
 | Data tier | app-net (data-net) only | Connection pool credentials | Be reachable from the edge |
 
-Every request resolves to exactly one `user_id`, and the server never trusts one from a request body or a tool argument. See `auth.md` for how each boundary resolves identity and fails safe.
+Every authenticated request resolves to exactly one `user_id`; public roadmap document reads may be anonymous. The server never trusts one from a request body or a tool argument. See `auth.md` for how each boundary resolves identity and fails safe.
 
 ## Design decisions
 

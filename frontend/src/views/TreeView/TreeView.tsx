@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Link, useParams } from 'react-router'
 
 import { EmptyState, ErrorState } from '@/components/states'
+import { PageTitle } from '@/components/PageTitle'
 import { useAuth } from '@/auth'
 import { ReadOnlyNotice } from '@/views/RoadmapView/components/ReadOnlyNotice'
 import { TreeCanvas } from './components/TreeCanvas'
@@ -32,51 +33,64 @@ export function TreeView() {
     return { nodes: layoutTree(built.nodes, built.edges), edges: built.edges }
   }, [state, id])
 
-  if (state.phase === 'loading') return <TreeSkeleton />
+  if (state.phase === 'loading') {
+    return (
+      <>
+        <PageTitle title="Roadmap" />
+        <TreeSkeleton />
+      </>
+    )
+  }
 
   if (state.phase === 'error') {
     // A 404/403 is indistinguishable by design (no-existence-leak convention);
     // a network failure lands here too. One calm dedicated view.
     return (
-      <ErrorState
-        title="Roadmap not found"
-        description="This roadmap does not exist or is not shared with you."
-        action={
-          <Link to="/dashboard" className="text-primary underline-offset-4 hover:underline">
-            Back to your dashboard
-          </Link>
-        }
-      />
+      <>
+        <PageTitle title="Roadmap" />
+        <ErrorState
+          title="Roadmap not found"
+          description="This roadmap does not exist or is not shared with you."
+          action={
+            <Link to="/dashboard" className="text-primary underline-offset-4 hover:underline">
+              Back to your dashboard
+            </Link>
+          }
+        />
+      </>
     )
   }
 
   return (
-    <section className="mx-auto max-w-[1120px] px-4 py-8">
-      <TreeHeader roadmapId={id} title={state.roadmap.title} />
-      {authStatus === 'anonymous' ? <ReadOnlyNotice /> : null}
-      {state.progressState.phase === 'loading' ? (
-        <p className="mt-4 text-sm text-muted-foreground" role="status">
-          Loading progress…
-        </p>
-      ) : null}
-      {state.progressState.phase === 'closed' ? (
-        <p className="mt-4 text-sm text-muted-foreground" role="status">
-          This archived roadmap is closed to new tracking. The tree remains available for reading.
-        </p>
-      ) : null}
-      {state.progressState.phase === 'failed' ? (
-        <p className="mt-4 text-sm text-muted-foreground" role="alert">
-          We couldn’t load your progress. Node completion is unavailable.
-        </p>
-      ) : null}
-      {graph && graph.nodes.length > 0 ? (
-        <TreeCanvas graph={graph} />
-      ) : (
-        <EmptyState
-          title="No nodes yet"
-          description="This roadmap doesn’t have any subsections to map. Open the list view to add some."
-        />
-      )}
-    </section>
+    <>
+      <PageTitle title={state.roadmap.title} />
+      <section className="mx-auto max-w-[1120px] px-4 py-8">
+        <TreeHeader roadmapId={id} title={state.roadmap.title} />
+        {authStatus === 'anonymous' ? <ReadOnlyNotice /> : null}
+        {state.progressState.phase === 'loading' ? (
+          <p className="mt-4 text-sm text-muted-foreground" role="status">
+            Loading progress…
+          </p>
+        ) : null}
+        {state.progressState.phase === 'closed' ? (
+          <p className="mt-4 text-sm text-muted-foreground" role="status">
+            This archived roadmap is closed to new tracking. The tree remains available for reading.
+          </p>
+        ) : null}
+        {state.progressState.phase === 'failed' ? (
+          <p className="mt-4 text-sm text-muted-foreground" role="alert">
+            We couldn’t load your progress. Node completion is unavailable.
+          </p>
+        ) : null}
+        {graph && graph.nodes.length > 0 ? (
+          <TreeCanvas graph={graph} />
+        ) : (
+          <EmptyState
+            title="No nodes yet"
+            description="This roadmap doesn’t have any subsections to map. Open the list view to add some."
+          />
+        )}
+      </section>
+    </>
   )
 }

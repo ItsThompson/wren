@@ -105,7 +105,7 @@ flowchart TD
 | `keys/keys.ts` | The single source of SWR cache identity. Each builder returns a path literal plus a params tuple. |
 | `fetcher/fetcher.ts` | `runQuery`: turns one `openapi-fetch` result into SWR's throw-based model. Returns the typed body on success; throws a `Problem` otherwise. |
 | `useApiQuery/useApiQuery.ts` | A read bound to the session client. A `null` key disables the read. |
-| `usePublicApiQuery/usePublicApiQuery.ts` | A read bound to the credential-free public client. Today only the profile read uses it. |
+| `usePublicApiQuery/usePublicApiQuery.ts` | A read bound to the credential-free public client. Profile and public roadmap document reads use it. |
 | `swr-config/swr-config.ts` | The pinned revalidation posture: fetch once on mount, no background revalidation, a 2s dedup window. |
 
 Reads register their key in `keys.ts`. A write reuses the same builder so the `mutate()` call targets the same cache entry. A write that returns the updated resource reconciles the cache in place with `mutate(returned, { revalidate: false })`, so co-mounted views stay coherent with no refetch and no stale flash.
@@ -129,12 +129,13 @@ Each view is one route target. A view is a thin orchestrator: it reads route par
 | `TreeView` | `useTreeData` | roadmap read, progress read |
 | `NotFoundView` | none | none |
 
-`RoadmapView` branches on `roadmap.status`. A draft renders a read-only preview plus a publish panel; a draft is not startable. A published or archived roadmap renders the interactive list with progress. `TreeView` reads the same roadmap and progress keys as `RoadmapView`, so the two views de-duplicate onto one request per key.
+`RoadmapView` branches on `roadmap.status` and auth state. A draft renders a read-only preview plus a publish panel; a draft is not startable. An authenticated user sees published or archived content with progress, while an anonymous reader sees the same content in read-only mode. `TreeView` follows the same rule and de-duplicates its roadmap request with `RoadmapView`.
 
-Two hard boundaries govern the roadmap UI:
+Three hard boundaries govern the roadmap UI:
 
 - Draft versus published: checkboxes and progress appear only after publish.
-- Owner versus reader: any reader can fork; only the owner can edit metadata and run lifecycle.
+- Anonymous versus authenticated: public published and archived documents are readable without a session; progress and mutations require one.
+- Owner versus reader: an authenticated reader can fork; only the owner can edit metadata and run lifecycle.
 
 Lifecycle (visibility, archive, delete) is web-only. Delete is guarded server-side by a zero-followers check; a 409 `DELETE_HAS_FOLLOWERS` steers the owner to archive instead. See `authoring.md` for the publish and immutability contract.
 
@@ -148,7 +149,7 @@ Web-specific behavior:
 - Done-state is derived from the checked-item set, never stored. The list and the tree share one `isSubsectionDone` rule, so both surfaces always agree.
 - `useProgress.setDeadline` calls `PUT /deadline`; the deadline drives a countdown only. It is web-only and unmirrored in the MCP contract (see `progress.md`).
 
-The study-time reads (overview, node, section, search) are the agent's token-efficient projections. The web app uses the full roadmap read plus progress. See `progress.md` for the read surface and the `concise` versus `detailed` switch.
+The study-time reads (overview, node, section, search) are the agent's token-efficient projections. The authenticated web app uses the full roadmap read plus progress. Anonymous web readers use only the full roadmap read and cannot request progress. See `progress.md` for the read surface and the `concise` versus `detailed` switch.
 
 ## Component library and design tokens
 

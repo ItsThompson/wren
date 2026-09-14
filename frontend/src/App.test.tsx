@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import type { RouteObject } from 'react-router'
 
 import { OnboardingGate } from '@/components/OnboardingGate'
+import { PageTitle } from '@/components/PageTitle'
 
 import { App } from './App'
 import { appRoutes } from './routes'
@@ -10,6 +11,13 @@ import { appRoutes } from './routes'
 /** The React component type mounted for a route, or `undefined` for layout/no element. */
 function elementType(route: RouteObject | undefined) {
   return route && isValidElement(route.element) ? route.element.type : undefined
+}
+
+function routeTitle(route: RouteObject | undefined): string | undefined {
+  if (!route || !isValidElement<{ title?: string }>(route.element) || route.element.type !== PageTitle) {
+    return undefined
+  }
+  return route.element.props.title
 }
 
 const appShellRoute = appRoutes.find((route) => route.path === '/')
@@ -32,6 +40,33 @@ describe('App routing', () => {
         name: /learn anything, in the right order/i,
       }),
     ).toBeInTheDocument()
+    expect(document.title).toBe('Wren: learn anything, in the right order')
+  })
+})
+
+describe('App route titles', () => {
+  it('declares specific titles and keeps the landing page on the default', () => {
+    const titleByPath = new Map(
+      [...shellChildren, ...(gateRoute?.children ?? [])].map((route) => [
+        route.path ?? '(index)',
+        routeTitle(route),
+      ]),
+    )
+
+    expect(titleByPath).toEqual(
+      new Map([
+        ['(index)', undefined],
+        ['auth', 'Log in'],
+        ['authorize', 'Authorize agent'],
+        ['dashboard', 'Dashboard'],
+        ['user/:handle', 'Profile'],
+        ['settings/connections', 'Connected agents'],
+        ['roadmaps/:roadmapId/tree', 'Roadmap'],
+        ['roadmaps/:roadmapId', 'Roadmap'],
+        ['*', 'Page not found'],
+      ]),
+    )
+    expect(routeTitle(appRoutes.find((route) => route.path === '/onboarding'))).toBe('Get started')
   })
 })
 

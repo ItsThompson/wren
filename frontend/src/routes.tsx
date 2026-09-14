@@ -2,6 +2,7 @@ import type { RouteObject } from 'react-router'
 
 import { AppShell } from '@/components/AppShell'
 import { OnboardingGate } from '@/components/OnboardingGate'
+import { PageTitle } from '@/components/PageTitle'
 import { AuthView } from '@/views/AuthView'
 import { ConnectedClientsView } from '@/views/ConnectedClientsView'
 import { ConsentView } from '@/views/ConsentView'
@@ -26,9 +27,11 @@ export const appRoutes: RouteObject[] = [
     // for a signed-in, un-onboarded user.
     path: '/onboarding',
     element: (
-      <OnboardingRouteGuard>
-        <OnboardingView />
-      </OnboardingRouteGuard>
+      <PageTitle title="Get started">
+        <OnboardingRouteGuard>
+          <OnboardingView />
+        </OnboardingRouteGuard>
+      </PageTitle>
     ),
   },
   {
@@ -38,21 +41,37 @@ export const appRoutes: RouteObject[] = [
       // Ungated (public or exempt). `/authorize` is the OAuth-consent surface:
       // its placement OUTSIDE `OnboardingGate` is the mechanism that keeps
       // an un-onboarded user mid agent-authorization from being bounced away.
-      { index: true, element: <LandingView /> },
-      { path: 'auth', element: <AuthView /> },
-      { path: 'authorize', element: <ConsentView /> },
+      { index: true, element: <PageTitle><LandingView /></PageTitle> },
+      {
+        path: 'auth',
+        element: (
+          <PageTitle title="Log in">
+            <AuthView />
+          </PageTitle>
+        ),
+      },
+      { path: 'authorize', element: <PageTitle title="Authorize agent"><ConsentView /></PageTitle> },
 
       // Gated: an authenticated, un-onboarded user is redirected to /onboarding
       // before the matched view mounts.
       {
         element: <OnboardingGate />,
         children: [
-          { path: 'dashboard', element: <DashboardView /> },
-          { path: 'user/:handle', element: <ProfileView /> },
-          { path: 'settings/connections', element: <ConnectedClientsView /> },
-          { path: 'roadmaps/:roadmapId/tree', element: <TreeView /> },
-          { path: 'roadmaps/:roadmapId', element: <RoadmapView /> },
-          { path: '*', element: <NotFoundView /> },
+          { path: 'dashboard', element: <PageTitle title="Dashboard"><DashboardView /></PageTitle> },
+          { path: 'user/:handle', element: <PageTitle title="Profile"><ProfileView /></PageTitle> },
+          {
+            path: 'settings/connections',
+            element: <PageTitle title="Connected agents"><ConnectedClientsView /></PageTitle>,
+          },
+          {
+            path: 'roadmaps/:roadmapId/tree',
+            element: <PageTitle title="Roadmap"><TreeView /></PageTitle>,
+          },
+          {
+            path: 'roadmaps/:roadmapId',
+            element: <PageTitle title="Roadmap"><RoadmapView /></PageTitle>,
+          },
+          { path: '*', element: <PageTitle title="Page not found"><NotFoundView /></PageTitle> },
         ],
       },
     ],

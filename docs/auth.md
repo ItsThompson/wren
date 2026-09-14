@@ -1,6 +1,6 @@
 # Authentication and authorization
 
-Wren has two kinds of caller and two matching trust boundaries. Humans reach the external app with a session cookie. AI agents reach the MCP server with an OAuth 2.1 bearer token. This guide describes both models, the OAuth authorization server, and the request flows.
+Wren has two kinds of caller and two matching trust boundaries. Humans reach the external app with a session cookie, or anonymously for public roadmap document reads. AI agents reach the MCP server with an OAuth 2.1 bearer token. This guide describes both models, the OAuth authorization server, and the request flows.
 
 This guide documents the current implemented state. It cites canonical source paths instead of copying code. For the REST route catalog and the error contract, see `api.md`.
 
@@ -12,11 +12,12 @@ Canonical sources:
 
 ## Trust boundaries
 
-Every request resolves to exactly one `user_id`. The server never trusts a `user_id` from a request body or a tool argument. The two resolution paths live in `core/`.
+Every authenticated request resolves to exactly one `user_id`. A public document request may resolve anonymously. The server never trusts a `user_id` from a request body or a tool argument. The resolution paths live in `core/`.
 
 | Boundary | App | Dependency | How identity resolves | Fail-safe behavior |
 |----------|-----|------------|-----------------------|--------------------|
-| Human session | External `:8000` | `require_user` | Reads only the `wren_session` cookie. Verifies an HS256 JWT and runs a per-request `sid` blacklist lookup. | An unset or wrong-type verifier seam denies every session. |
+| Optional human session | External `:8000` | `optional_user` | Reads the `wren_session` cookie when present. Verifies an HS256 JWT and runs a per-request `sid` blacklist lookup; no cookie resolves anonymously. | An unset or wrong-type verifier seam denies cookie-backed reads. Invalid cookies return 401. |
+| Required human session | External `:8000` | `require_user` | Reads only the `wren_session` cookie. Verifies an HS256 JWT and runs a per-request `sid` blacklist lookup. | An unset or wrong-type verifier seam denies every session. |
 | Trusted header | Internal `:8001` | `require_internal_user` | Requires a valid `X-Internal-Api-Token`, then trusts the `X-User-ID` header. | An empty token denies every call. |
 | Agent bearer | MCP RS `:9000` | JWKS verify | Verifies the RS256 access token against the AS JWKS, audience-bound to the MCP resource. | A failed verify returns 401. |
 
@@ -138,6 +139,6 @@ A reused (already-revoked) refresh token triggers `revoke_grant_refresh_tokens(g
 ## Security model
 
 - Site-URL pinning is the highest-risk auth item. Every issuer, metadata, and endpoint URL the AS publishes is built from pinned config (`PUBLIC_BASE_URL`, `APP_PUBLIC_URL`, `MCP_PUBLIC_URL`), never from the request host. The tunnel reaches the origin over an internal URL, so a request-derived URL would break client issuer and audience validation. See `oauth/`.
-- Fail-safe deny holds at every boundary. Unset or wrong-type state seams, empty secrets, and missing keys all deny or fail fast.
+- Fail-safe deny holds at every boundary. Unset or wrong-type state seams, empty secrets, and missing keys all deny or fail fast. The optional session path permits requests without a cookie; a supplied cookie must still be valid or the request fails with 401.
 - The strip middleware runs on the external app only. Adding it to the internal app would break the trusted-header model. Never trust `X-User-ID` on the external app.
 - The two error contracts on the OAuth router are intentional. Agent protocol endpoints raise `OAuthError` (RFC 6749 JSON). SPA-facing endpoints raise `WrenError` (problem+json). See `api.md` for the error contract.

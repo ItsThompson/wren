@@ -181,6 +181,7 @@ describe('TreeView', () => {
   it('renders subsections as nodes and prereq_ids as edges in a layered layout', async () => {
     renderTree()
 
+    expect(document.title).toBe('Wren: Roadmap')
     // One node per subsection.
     expect(await screen.findByRole('link', { name: /^Arrays \(/ })).toBeInTheDocument()
     expect(screen.getAllByTestId('rf-node')).toHaveLength(3)
@@ -263,6 +264,7 @@ describe('TreeView', () => {
       ),
     )
     renderTree()
+    expect(document.title).toBe('Wren: Roadmap')
     expect(await screen.findByText('Roadmap not found')).toBeInTheDocument()
   })
 

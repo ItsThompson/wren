@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router'
 
 import { useAuth } from '@/auth'
+import { PageTitle } from '@/components/PageTitle'
 import { LoginForm } from './components/LoginForm'
 import { RegisterForm } from './components/RegisterForm'
 
@@ -26,19 +27,22 @@ export function AuthView() {
 
   const isLogin = mode === 'login'
   return (
-    <section className="reading-width max-w-[26rem] py-16">
-      <h1 className="display-xl mb-8 text-foreground">{isLogin ? 'Welcome back' : 'Join Wren'}</h1>
-      {isLogin ? <LoginForm /> : <RegisterForm />}
-      <p className="mt-6 text-sm text-muted-foreground">
-        {isLogin ? 'New to Wren?' : 'Already have an account?'}{' '}
-        <button
-          type="button"
-          onClick={() => setMode(isLogin ? 'register' : 'login')}
-          className="font-medium text-primary underline-offset-4 hover:underline"
-        >
-          {isLogin ? 'Create an account' : 'Log in'}
-        </button>
-      </p>
-    </section>
+    <>
+      <PageTitle title={isLogin ? 'Log in' : 'Join Wren'} />
+      <section className="reading-width max-w-[26rem] py-16">
+        <h1 className="display-xl mb-8 text-foreground">{isLogin ? 'Welcome back' : 'Join Wren'}</h1>
+        {isLogin ? <LoginForm /> : <RegisterForm />}
+        <p className="mt-6 text-sm text-muted-foreground">
+          {isLogin ? 'New to Wren?' : 'Already have an account?'}{' '}
+          <button
+            type="button"
+            onClick={() => setMode(isLogin ? 'register' : 'login')}
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            {isLogin ? 'Create an account' : 'Log in'}
+          </button>
+        </p>
+      </section>
+    </>
   )
 }

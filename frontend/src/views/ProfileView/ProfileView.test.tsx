@@ -62,6 +62,7 @@ describe('ProfileView', () => {
     renderView()
 
     expect(await screen.findByRole('heading', { name: 'Ada Lovelace' })).toBeInTheDocument()
+    expect(document.title).toBe('Wren: Ada Lovelace')
     expect(screen.getByText('@ada')).toBeInTheDocument()
     expect(screen.getByText('Grokking DSA')).toBeInTheDocument()
     // A published-public card shows its badges.
@@ -91,6 +92,7 @@ describe('ProfileView', () => {
     renderView('nobody')
 
     expect(await screen.findByText('No such profile.')).toBeInTheDocument()
+    expect(document.title).toBe('Wren: Profile')
     expect(screen.getByText('@nobody')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to Wren' })).toHaveAttribute('href', '/')
   })
@@ -101,6 +103,7 @@ describe('ProfileView', () => {
     )
     renderView()
 
+    expect(document.title).toBe('Wren: Profile')
     expect(await screen.findByText(/couldn’t load this profile/i)).toBeInTheDocument()
 
     server.use(

@@ -1,6 +1,6 @@
 # Progress and the study loop
 
-Progress is wren's second top-level entity. A learner follows a published roadmap, tracks completion against its structure, and asks the server what to do next. This guide describes the study loop, the follow model, the study-time reads, and the progress-to-roadmaps coupling.
+Progress is wren's second top-level entity. An authenticated learner follows a published roadmap, tracks completion against its structure, and asks the server what to do next. Public roadmap content can be read without an account, but progress remains authenticated. This guide describes the study loop, the follow model, the study-time reads, and the progress-to-roadmaps coupling.
 
 This guide documents the current implemented state and cites canonical source paths. See `authoring.md` for how roadmap content is created, `api.md` for the progress endpoints, and `architecture.md` for the system shape.
 
@@ -8,6 +8,10 @@ Canonical sources:
 
 - Progress rules, server-computed next, and derived snapshot: `backend/src/wren/progress/`
 - Study-time reads: `backend/src/wren/roadmaps/`
+
+## Public reading
+
+A public published or archived roadmap can be opened without signing in. Anonymous readers can use its list and tree views and open resource links. Drafts, private roadmaps, and unknown IDs remain undisclosed. Sign in to check items, view progress, or receive next-item suggestions.
 
 ## The study loop
 
@@ -64,7 +68,7 @@ The "what to do next" computation runs on the server, never on the agent (`progr
 
 ## Study-time read surface
 
-The study-time reads live in `RoadmapReadService`, a separate service from authoring (`roadmaps/`). They are the read surface a follower uses while studying. The counts reflect the caller's own progress.
+The study-time reads live in `RoadmapReadService`, a separate service from authoring (`roadmaps/`). They are the read surface an authenticated follower uses while studying. The counts reflect the caller's own progress. Anonymous readers use the full document read for list and tree views; projections remain authentication-gated.
 
 | Read | Endpoint | Purpose |
 |------|----------|---------|
