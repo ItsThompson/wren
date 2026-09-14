@@ -13,6 +13,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+import pytest
 from fastapi.testclient import TestClient
 
 from tests.support.fakes.accounts_fakes import (
@@ -220,6 +221,25 @@ def test_create_malformed_body_is_a_422_problem_json(make_settings: MakeSettings
 #
 # Authoring inputs forbid unknown fields so a misspelled agent field yields a
 # recoverable 422 naming it (not a silent drop), and reject an empty title.
+
+
+@pytest.mark.parametrize(
+    ("extra_field", "extra_value"),
+    [("published_visibility", None), ("visibility", "private")],
+    ids=["null-publication-visibility", "legacy-visibility-field"],
+)
+def test_create_rejects_null_and_legacy_visibility_fields(
+    make_settings: MakeSettings, extra_field: str, extra_value: object
+) -> None:
+    client, roadmap_repo = _build_client(make_settings)
+    _login(client)
+    response = client.post("/roadmaps", json={**_MINIMAL_ROADMAP, extra_field: extra_value})
+    assert response.status_code == 422
+    body = response.json()
+    assert response.headers["content-type"] == "application/problem+json"
+    assert body["code"] == "VALIDATION"
+    assert any(extra_field in field for field in body["fields"])
+    assert roadmap_repo._by_id == {}
 
 
 def test_create_with_an_unknown_field_is_a_422_naming_it(make_settings: MakeSettings) -> None:
