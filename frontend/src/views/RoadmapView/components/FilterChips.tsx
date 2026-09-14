@@ -3,36 +3,29 @@ import { tagPillStyle } from '../util/tag-pill-style'
 interface FilterChipsProps {
   /** The distinct track tags to offer as filters (first-appearance order). */
   tags: string[]
-  /** The single active filter tag, or null when nothing is filtered. */
-  activeTag: string | null
-  /** Toggle a tag's filter (selecting the active tag again clears it). */
+  /** The independently selected filter tags. */
+  selectedTags: ReadonlySet<string>
+  /** Toggle one tag without changing the other selections. */
   onToggle: (tag: string) => void
 }
 
-/**
- * The track-tag filter chips above the sections. Each chip reuses the track-tag
- * pill look ({@link tagPillStyle});
- * the active chip switches to the LOUD accent tint + terracotta text (an active
- * filter is a loud surface). Selecting the active chip
- * again clears the filter and restores every subsection. Nothing renders when a
- * roadmap has no track tags.
- */
-export function FilterChips({ tags, activeTag, onToggle }: FilterChipsProps) {
+/** The independently selectable, naturally wrapping track-tag filter chips. */
+export function FilterChips({ tags, selectedTags, onToggle }: FilterChipsProps) {
   if (tags.length === 0) return null
 
   return (
-    <div className="mt-6 flex flex-wrap items-center gap-2" role="group" aria-label="Filter by tag">
+    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter by tag">
       {tags.map((tag) => {
-        const active = tag === activeTag
+        const selected = selectedTags.has(tag)
         return (
           <button
             key={tag}
             type="button"
-            aria-pressed={active}
+            aria-pressed={selected}
             onClick={() => onToggle(tag)}
-            style={active ? undefined : tagPillStyle(tag)}
-            className={`rounded-full px-2.5 py-0.5 font-mono text-[11.5px] tracking-[0.02em] transition-colors ${
-              active ? 'bg-accent font-medium text-accent-foreground' : 'hover:opacity-80'
+            style={selected ? undefined : tagPillStyle(tag)}
+            className={`rounded-full px-2.5 py-0.5 font-mono text-[11.5px] tracking-[0.02em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+              selected ? 'bg-accent font-medium text-accent-foreground' : 'hover:opacity-80'
             }`}
           >
             {tag}
