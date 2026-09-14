@@ -23,9 +23,9 @@ export function FilterChips({ tags, selectedTags, onToggle }: FilterChipsProps) 
             type="button"
             aria-pressed={selected}
             onClick={() => onToggle(tag)}
-            style={selected ? undefined : tagPillStyle(tag)}
-            className={`rounded-full px-2.5 py-0.5 font-mono text-[11.5px] tracking-[0.02em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-              selected ? 'bg-accent font-medium text-accent-foreground' : 'hover:opacity-80'
+            style={tagPillStyle(tag)}
+            className={`rounded-full border px-2.5 py-0.5 font-mono text-[11.5px] tracking-[0.02em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+              selected ? 'border-accent' : 'border-transparent hover:opacity-80'
             }`}
           >
             {tag}
