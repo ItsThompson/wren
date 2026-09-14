@@ -165,7 +165,7 @@ def _roadmap_card(roadmap_id: str = "r-1") -> dict[str, Any]:
         "id": roadmap_id,
         "title": "Grokking DSA",
         "status": "published",
-        "visibility": "public",
+        "published_visibility": "public",
         "subject_tags": ["cs"],
     }
 
@@ -177,7 +177,7 @@ def _roadmap_body(**overrides: Any) -> dict[str, Any]:
         "title": "Grokking DSA",
         "description": "A roadmap.",
         "subject_tags": ["cs"],
-        "visibility": "public",
+        "published_visibility": "public",
         "status": "published",
         "revision": 3,
         "sections": {

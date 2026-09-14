@@ -22,8 +22,8 @@ The contract types fall into three groups, treated differently:
 * **Group C (:data:`EXCLUDED_MCP_ONLY` / :data:`EXCLUDED_BACKEND_ONLY`)** are not
   mirrored at all and are documented, never compared.
 
-``visibility`` is dropped from the generated authoring input (a web-only lifecycle
-control with no agent tool), while the full roadmap read projection retains it.
+``published_visibility`` is dropped from the generated authoring input (a web-only
+lifecycle control with no agent tool), while the full roadmap read projection retains it.
 The generated contract includes the full roadmap and list read projections.
 """
 
@@ -109,14 +109,14 @@ EXPECTED_GROUP_A = frozenset(
         # Shared enums.
         "ResourceType",
         "RoadmapStatus",
-        "Visibility",
+        "PublishedVisibility",
         "ChangedNodeKind",
         "ChangeType",
         "ResponseFormat",
         "SectionInclude",
         "SearchHitKind",
         "CompletionState",
-        # Authoring inputs (RoadmapInput -> RoadmapDraftInput; no visibility field).
+        # Authoring inputs (RoadmapInput -> RoadmapDraftInput; no publication setting).
         "ResourceInput",
         "ChecklistItemInput",
         "SubsectionInput",
@@ -248,7 +248,7 @@ def test_group_b_mcp_fields_are_subset_of_backend(
 EXCLUDED_MCP_ONLY = frozenset({"SearchResults"})  # structured search-hit wrapper
 EXCLUDED_BACKEND_ONLY = frozenset(
     {
-        "VisibilityRequest",
+        "PublishedVisibilityRequest",
         "PatchRequest",  # the operations=Field(min_length=1) wrapper; MCP takes the list
         "MetadataEditRequest",
         "Progress",

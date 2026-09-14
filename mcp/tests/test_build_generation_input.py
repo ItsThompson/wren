@@ -19,7 +19,7 @@ from build_generation_input import (
     GROUP_A_COMPONENTS,
     _default_empty_non_null_arrays,
     _default_empty_non_null_maps,
-    _drop_visibility,
+    _drop_published_visibility,
     _inline_nullable_constrained_scalars,
     _lift_patch_op_union,
     _select_group_a,
@@ -135,22 +135,22 @@ def test_default_not_added_to_a_nullable_map() -> None:
     assert "default" not in schema["properties"]["sections"]
 
 
-# --- _drop_visibility --------------------------------------------------------
+# --- _drop_published_visibility ----------------------------------------------
 
 
-def test_drop_visibility_removes_the_property_and_required_entry() -> None:
+def test_drop_published_visibility_removes_the_property_and_required_entry() -> None:
     authoring: dict[str, Any] = {
-        "properties": {"title": {"type": "string"}, "visibility": {"type": "string"}},
-        "required": ["title", "visibility"],
+        "properties": {"title": {"type": "string"}, "published_visibility": {"type": "string"}},
+        "required": ["title", "published_visibility"],
     }
-    _drop_visibility(authoring)
-    assert "visibility" not in authoring["properties"]
+    _drop_published_visibility(authoring)
+    assert "published_visibility" not in authoring["properties"]
     assert authoring["required"] == ["title"]
 
 
-def test_drop_visibility_without_a_required_key() -> None:
-    authoring: dict[str, Any] = {"properties": {"visibility": {"type": "string"}}}
-    _drop_visibility(authoring)
+def test_drop_published_visibility_without_a_required_key() -> None:
+    authoring: dict[str, Any] = {"properties": {"published_visibility": {"type": "string"}}}
+    _drop_published_visibility(authoring)
     assert authoring["properties"] == {}
 
 
@@ -204,9 +204,9 @@ def _raw_schemas() -> dict[str, Any]:
     }
     schemas["RoadmapInput"]["properties"] = {
         "title": {"type": "string"},
-        "visibility": {"type": "string"},
+        "published_visibility": {"type": "string"},
     }
-    schemas["RoadmapInput"]["required"] = ["title", "visibility"]
+    schemas["RoadmapInput"]["required"] = ["title", "published_visibility"]
     # PatchRequest is excluded from Group A but must still carry the union the
     # hand-authored PatchOp alias mirrors, for the union guard to pass.
     schemas["PatchRequest"] = {
@@ -217,7 +217,7 @@ def _raw_schemas() -> dict[str, Any]:
     return schemas
 
 
-def test_build_generation_input_selects_renames_and_drops_visibility() -> None:
+def test_build_generation_input_selects_renames_and_drops_published_visibility() -> None:
     doc: dict[str, Any] = {
         "openapi": "3.1.0",
         "info": {"title": "t", "version": "0"},
@@ -232,6 +232,6 @@ def test_build_generation_input_selects_renames_and_drops_visibility() -> None:
     assert "PatchRequest" not in schemas  # excluded from Group A
 
     draft = schemas["RoadmapDraftInput"]
-    assert "visibility" not in draft["properties"]
-    assert "visibility" not in draft["required"]
+    assert "published_visibility" not in draft["properties"]
+    assert "published_visibility" not in draft["required"]
     assert result["paths"] == {}

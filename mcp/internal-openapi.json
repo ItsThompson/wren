@@ -1249,7 +1249,7 @@
         "additionalProperties": true,
         "type": "object",
         "title": "MetadataEditRequest",
-        "description": "The ``PATCH /roadmaps/{id}/metadata`` body: the presentation-only fields\nthat stay mutable after publish.\n\nOnly ``title`` / ``description`` / ``subject_tags`` are editable here; a field\nleft out (``None``) is unchanged (last-write-wins, deliberately not\n``If-Match``-guarded and never bumps the structural ``revision``). ``extra`` is\n``allow``ed so a smuggled structural, lifecycle, or identity field (e.g.\n``sections`` / ``visibility`` / ``status`` / ``revision``) is *captured* rather\nthan silently dropped, then rejected as immutable by\n:meth:`reject_structural_fields`: the metadata endpoint can never touch\nanything but presentation."
+        "description": "The ``PATCH /roadmaps/{id}/metadata`` body: the presentation-only fields\nthat stay mutable after publish.\n\nOnly ``title`` / ``description`` / ``subject_tags`` are editable here; a field\nleft out (``None``) is unchanged (last-write-wins, deliberately not\n``If-Match``-guarded and never bumps the structural ``revision``). ``extra`` is\n``allow``ed so a smuggled structural, lifecycle, or identity field (e.g.\n``sections`` / ``published_visibility`` / ``status`` / ``revision``) is *captured* rather\nthan silently dropped, then rejected as immutable by\n:meth:`reject_structural_fields`: the metadata endpoint can never touch\nanything but presentation."
       },
       "NextItem": {
         "properties": {
@@ -1488,8 +1488,8 @@
             "type": "array",
             "title": "Subject Tags"
           },
-          "visibility": {
-            "$ref": "#/components/schemas/Visibility"
+          "published_visibility": {
+            "$ref": "#/components/schemas/PublishedVisibility"
           },
           "created_at": {
             "type": "string",
@@ -1512,7 +1512,7 @@
         "type": "object",
         "required": [
           "owner",
-          "visibility",
+          "published_visibility",
           "created_at",
           "updated_at"
         ],
@@ -1791,6 +1791,14 @@
         ],
         "title": "ProgressUpdateResult",
         "description": "The ``POST /progress`` body: the fresh snapshot after the set plus the\nnext suggestion. The snapshot is returned in detailed\nmode so the client can reconcile its checkbox state to the server truth."
+      },
+      "PublishedVisibility": {
+        "type": "string",
+        "enum": [
+          "public",
+          "private"
+        ],
+        "title": "PublishedVisibility"
       },
       "RemoveEdgeOp": {
         "properties": {
@@ -2089,9 +2097,9 @@
             "type": "array",
             "title": "Subject Tags"
           },
-          "visibility": {
-            "$ref": "#/components/schemas/Visibility",
-            "default": "private"
+          "published_visibility": {
+            "$ref": "#/components/schemas/PublishedVisibility",
+            "default": "public"
           },
           "status": {
             "$ref": "#/components/schemas/RoadmapStatus",
@@ -2158,8 +2166,8 @@
           "status": {
             "$ref": "#/components/schemas/RoadmapStatus"
           },
-          "visibility": {
-            "$ref": "#/components/schemas/Visibility"
+          "published_visibility": {
+            "$ref": "#/components/schemas/PublishedVisibility"
           },
           "subject_tags": {
             "items": {
@@ -2174,10 +2182,10 @@
           "id",
           "title",
           "status",
-          "visibility"
+          "published_visibility"
         ],
         "title": "RoadmapCard",
-        "description": "A roadmap summarized for a list/grid card.\n\n``status`` drives the Draft/Published/Archived badge and ``visibility`` the\nlock/globe badge. Content (sections, items, progress)\nis never inlined: a card links to the full roadmap view for that."
+        "description": "A roadmap summarized for a list/grid card.\n\n``status`` drives the Draft/Published/Archived badge and ``published_visibility``\nthe lock/globe badge. Content (sections, items, progress)\nis never inlined: a card links to the full roadmap view for that."
       },
       "RoadmapCreated": {
         "properties": {
@@ -2211,9 +2219,9 @@
             "type": "array",
             "title": "Subject Tags"
           },
-          "visibility": {
-            "$ref": "#/components/schemas/Visibility",
-            "default": "private"
+          "published_visibility": {
+            "$ref": "#/components/schemas/PublishedVisibility",
+            "default": "public"
           },
           "status": {
             "$ref": "#/components/schemas/RoadmapStatus",
@@ -2310,9 +2318,9 @@
             "type": "array",
             "title": "Subject Tags"
           },
-          "visibility": {
-            "$ref": "#/components/schemas/Visibility",
-            "default": "private"
+          "published_visibility": {
+            "$ref": "#/components/schemas/PublishedVisibility",
+            "default": "public"
           },
           "sections": {
             "items": {
@@ -2369,9 +2377,9 @@
             "type": "array",
             "title": "Subject Tags"
           },
-          "visibility": {
-            "$ref": "#/components/schemas/Visibility",
-            "default": "private"
+          "published_visibility": {
+            "$ref": "#/components/schemas/PublishedVisibility",
+            "default": "public"
           },
           "status": {
             "$ref": "#/components/schemas/RoadmapStatus",
@@ -3140,14 +3148,6 @@
         ],
         "title": "Violation",
         "description": "One structural rule failure, model-recoverable by naming the rule and IDs.\n\nProduced by the structural validator (``validation.py``) and carried in a\n``Validation`` error's problem+json body. Lives\nin the error contract because it is part of the wire shape every client reads."
-      },
-      "Visibility": {
-        "type": "string",
-        "enum": [
-          "public",
-          "private"
-        ],
-        "title": "Visibility"
       }
     }
   }
