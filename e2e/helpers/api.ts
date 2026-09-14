@@ -14,13 +14,19 @@ import type { TestUser } from './users'
  * carries the session across its subsequent calls.
  */
 
+/** Optional track tags for the two fixture subsections. */
+export interface PublishableRoadmapTagOptions {
+  arrays?: string[]
+  hashing?: string[]
+}
+
 /**
  * A minimal publishable roadmap: two sequenced subsections (arrays -> hashing),
  * each with a resource and checklist items, a complete `suggested_path`, and
  * public visibility so a second user can follow it. Rebuilt per create so tests
  * never share a mutable literal.
  */
-export function buildPublishableRoadmap() {
+export function buildPublishableRoadmap(tags: PublishableRoadmapTagOptions = {}) {
   return {
     title: 'Grokking DSA',
     visibility: 'public',
@@ -32,6 +38,7 @@ export function buildPublishableRoadmap() {
           {
             proposed_id: 'sub_arrays',
             title: 'Arrays',
+            tags: tags.arrays ?? [],
             resources: [{ title: 'Guide', url: 'https://x.test', type: 'article' }],
             checklist_items: [
               { proposed_id: 'chk_read', text: 'Read it' },
@@ -41,6 +48,7 @@ export function buildPublishableRoadmap() {
           {
             proposed_id: 'sub_hashing',
             title: 'Hashing',
+            tags: tags.hashing ?? [],
             prereq_ids: ['sub_arrays'],
             resources: [{ title: 'Vid', url: 'https://y.test', type: 'video' }],
             checklist_items: [{ proposed_id: 'chk_hash', text: 'Implement a counter' }],
@@ -65,8 +73,11 @@ export async function createAuthedContext(
   return context
 }
 
-export async function createPublishableRoadmap(context: APIRequestContext): Promise<string> {
-  const response = await context.post('/roadmaps', { data: buildPublishableRoadmap() })
+export async function createPublishableRoadmap(
+  context: APIRequestContext,
+  tags: PublishableRoadmapTagOptions = {},
+): Promise<string> {
+  const response = await context.post('/roadmaps', { data: buildPublishableRoadmap(tags) })
   expect(response.status(), await response.text()).toBe(201)
   const body = (await response.json()) as { id: string }
   return body.id
