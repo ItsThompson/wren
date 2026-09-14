@@ -26,6 +26,14 @@ Wren's Model Context Protocol (MCP) server.
 Keep this idea in mind for the rest of the guide: agents author, humans follow
 and track.
 
+## Browse public roadmaps
+
+You can open a public published roadmap from a shared link without an account.
+Use its list and tree views to read the roadmap and open its resources. Archived
+public roadmaps remain available by link but are hidden from discovery. Sign in
+to check items, view progress, or receive next-item suggestions. Draft and private
+roadmaps are not available to anonymous readers.
+
 ## Create an account
 
 Sign up at [usewren.com](https://usewren.com). After you register, Wren walks you

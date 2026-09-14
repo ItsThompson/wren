@@ -20,6 +20,7 @@ Every mounted product route declares an access level in `route_registry.py`. A c
 | Access level | Meaning |
 |--------------|---------|
 | `PUBLIC` | No authentication (landing metadata, profile, `/skill`, `/auth/*`). |
+| `OPTIONAL_SESSION` | `optional_user`: anonymous access or a valid human session cookie. |
 | `EXTERNAL_COOKIE` | `require_user`: the human session cookie. |
 | `INTERNAL_TRUSTED` | `require_internal_user`: the trusted `X-User-ID` behind `INTERNAL_API_TOKEN`. |
 | `OAUTH` | The OAuth 2.1 AS handshake surface (unauthenticated protocol endpoints). |
@@ -32,7 +33,8 @@ The same path can carry different levels on the two apps. For example `POST /roa
 |-------|--------|------------------|------------------|
 | Accounts sessions | `/auth` | `PUBLIC` | not mounted |
 | Onboarding + dashboard | `/me` | `EXTERNAL_COOKIE` (profile is `PUBLIC`) | not mounted |
-| Roadmaps authoring and reads | `/roadmaps` | `EXTERNAL_COOKIE` | `INTERNAL_TRUSTED` |
+| Roadmap document read | `/roadmaps/{id}` | `OPTIONAL_SESSION` | `INTERNAL_TRUSTED` |
+| Roadmaps authoring and study reads | `/roadmaps` | `EXTERNAL_COOKIE` | `INTERNAL_TRUSTED` |
 | Roadmaps web-only lifecycle | `/roadmaps` | `EXTERNAL_COOKIE` | not mounted |
 | Progress | `/roadmaps/{id}` | `EXTERNAL_COOKIE` | `INTERNAL_TRUSTED` |
 | OAuth 2.1 AS | various | `OAUTH` / `EXTERNAL_COOKIE` | not mounted |
@@ -52,7 +54,7 @@ route and no MCP tool.
 | Method and path | Purpose | Notes |
 |-----------------|---------|-------|
 | `POST /roadmaps` | Create a draft | 201, returns `RoadmapCreated` with a `proposed_id -> minted_id` remap |
-| `GET /roadmaps/{id}` | Full document | Owner any status; non-owner only a public published or archived roadmap |
+| `GET /roadmaps/{id}` | Full document | Owner any status; anonymous/non-owner only public published/archived content; `no-store` |
 | `GET /roadmaps/{id}/overview` | Orientation counts | `format=concise\|detailed` |
 | `GET /roadmaps/{id}/nodes/{sid}` | One subsection | Unknown id returns 404 naming the valid siblings |
 | `GET /roadmaps/{id}/sections/{sid}` | Paginated drill-down | `cursor` (opaque), `include=subsections\|items\|both` |
