@@ -30,6 +30,7 @@ from wren.roadmaps.read_service import RoadmapReadService
 from wren.roadmaps.repository import SqlAlchemyRoadmapRepository
 from wren.roadmaps.schemas import (
     ChecklistItemInput,
+    PublishedVisibility,
     ResourceInput,
     ResourceType,
     RoadmapInput,
@@ -245,6 +246,82 @@ async def test_create_draft_persists_and_owner_read_round_trips(
         await database.engine.dispose()
 
 
+async def _fetch_visibility_pair(url: str, roadmap_id: str) -> tuple[str, str]:
+    engine = create_async_engine(url)
+    try:
+        async with engine.connect() as conn:
+            row = (
+                await conn.execute(
+                    text(
+                        "SELECT published_visibility, "
+                        "document->>'published_visibility' AS document_visibility "
+                        "FROM roadmaps WHERE id = :id"
+                    ),
+                    {"id": roadmap_id},
+                )
+            ).one()
+    finally:
+        await engine.dispose()
+    scalar = row.published_visibility
+    document = row.document_visibility
+    assert isinstance(scalar, str)
+    assert isinstance(document, str)
+    return scalar, document
+
+
+async def test_normal_writes_keep_scalar_and_document_visibility_synchronized(
+    migrated_roadmaps_url: str,
+) -> None:
+    database = create_database(migrated_roadmaps_url)
+    try:
+        async with database.sessionmaker() as session:
+            service = RoadmapService(
+                SqlAlchemyRoadmapRepository(session), follower_counter=constant_follower_counter()
+            )
+            created = await service.create_draft("owner-normal", _doc())
+            assert await _fetch_visibility_pair(migrated_roadmaps_url, created.id) == (
+                "public",
+                "public",
+            )
+
+            private = _doc("Private").model_copy(
+                update={"published_visibility": PublishedVisibility.PRIVATE}
+            )
+            private_created = await service.create_draft("owner-normal", private)
+            assert await _fetch_visibility_pair(migrated_roadmaps_url, private_created.id) == (
+                "private",
+                "private",
+            )
+
+            omitted_replacement = await service.replace_draft(
+                "owner-normal", private_created.id, 1, _doc("Private replacement")
+            )
+            assert omitted_replacement.published_visibility is PublishedVisibility.PRIVATE
+            assert await _fetch_visibility_pair(migrated_roadmaps_url, private_created.id) == (
+                "private",
+                "private",
+            )
+
+            explicit_replacement = _doc("Public replacement").model_copy(
+                update={"published_visibility": PublishedVisibility.PUBLIC}
+            )
+            await service.replace_draft("owner-normal", private_created.id, 2, explicit_replacement)
+            assert await _fetch_visibility_pair(migrated_roadmaps_url, private_created.id) == (
+                "public",
+                "public",
+            )
+
+            await service.set_published_visibility(
+                "owner-normal", private_created.id, PublishedVisibility.PRIVATE
+            )
+            assert await _fetch_visibility_pair(migrated_roadmaps_url, private_created.id) == (
+                "private",
+                "private",
+            )
+    finally:
+        await database.engine.dispose()
+
+
 async def test_roadmap_id_existence_check_sees_persisted_rows(
     migrated_roadmaps_url: str,
 ) -> None:
@@ -447,9 +524,13 @@ async def _update_published_row(url: str, roadmap_id: str, visibility: str) -> N
                 text(
                     "UPDATE roadmaps SET published_visibility = :visibility, "
                     "document = jsonb_set(document, '{published_visibility}', "
-                    "to_jsonb(CAST(:visibility AS text))) WHERE id = :id"
+                    "to_jsonb(CAST(:document_visibility AS text))) WHERE id = :id"
                 ),
-                {"id": roadmap_id, "visibility": visibility},
+                {
+                    "id": roadmap_id,
+                    "visibility": visibility,
+                    "document_visibility": visibility,
+                },
             )
     finally:
         await engine.dispose()

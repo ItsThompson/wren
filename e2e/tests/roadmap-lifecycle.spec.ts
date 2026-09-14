@@ -6,6 +6,7 @@ import {
   createAgentAccessToken,
   createAuthedContext,
   createPublishableRoadmap,
+  forkRoadmap,
   followRoadmap,
   getDashboard,
   getProfile,
@@ -14,6 +15,7 @@ import {
   publishRoadmap,
   setPublishedVisibility,
 } from '../helpers/api'
+import { API_BASE_URL } from '../helpers/config'
 import { uniqueUser } from '../helpers/users'
 
 test.describe('roadmap lifecycle and discovery', () => {
@@ -60,14 +62,42 @@ test.describe('roadmap lifecycle and discovery', () => {
 
     await setPublishedVisibility(author, roadmapId, 'private')
     const privateDashboard = await getDashboard(author)
-    expect(privateDashboard.filter((card) => card.id === roadmapId)).toHaveLength(2)
+    const privateCards = privateDashboard.filter((card) => card.id === roadmapId)
+    expect(privateCards).toHaveLength(2)
+    expect(privateCards).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ status: 'published', published_visibility: 'private' }),
+      ]),
+    )
 
     await archiveRoadmap(author, roadmapId)
     const archivedProfile = await getProfile(author, authorUser.username)
     expect(archivedProfile.roadmaps ?? []).not.toContainEqual(expect.objectContaining({ id: roadmapId }))
     const archivedDashboard = await getDashboard(author)
-    expect(archivedDashboard.filter((card) => card.id === roadmapId)).toHaveLength(2)
+    const archivedCards = archivedDashboard.filter((card) => card.id === roadmapId)
+    expect(archivedCards).toHaveLength(2)
+    expect(archivedCards).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ status: 'archived', published_visibility: 'private' }),
+      ]),
+    )
 
     await author.dispose()
+  })
+
+  test('forks a private source into an owner-only public-on-publish draft', async ({ playwright }) => {
+    const owner = await createAuthedContext(playwright.request, uniqueUser('fork-owner'))
+    const sourceId = await createPublishableRoadmap(owner, { publishedVisibility: 'private' })
+    await publishRoadmap(owner, sourceId)
+
+    const fork = await forkRoadmap(owner, sourceId)
+    expect(fork).toMatchObject({ status: 'draft', published_visibility: 'public' })
+    if (typeof fork.id !== 'string') throw new Error('fork response did not return an ID')
+    const forkId = fork.id
+    const guest = await playwright.request.newContext({ baseURL: API_BASE_URL })
+    expect((await guest.get(`/roadmaps/${forkId}`)).status()).toBe(404)
+
+    await guest.dispose()
+    await owner.dispose()
   })
 })

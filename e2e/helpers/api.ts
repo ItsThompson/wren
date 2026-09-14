@@ -90,6 +90,15 @@ export async function publishRoadmap(context: APIRequestContext, id: string): Pr
   expect(response.status(), await response.text()).toBe(200)
 }
 
+export async function forkRoadmap(
+  context: APIRequestContext,
+  id: string,
+): Promise<Record<string, unknown>> {
+  const response = await context.post(`/roadmaps/${id}:fork`)
+  expect(response.status(), await response.text()).toBe(201)
+  return (await response.json()) as Record<string, unknown>
+}
+
 export async function followRoadmap(context: APIRequestContext, id: string): Promise<void> {
   const response = await context.post(`/roadmaps/${id}/follow`)
   expect(response.status(), await response.text()).toBe(201)

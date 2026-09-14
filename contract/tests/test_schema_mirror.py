@@ -173,6 +173,17 @@ EXPECTED_GROUP_A = frozenset(
 )
 
 
+def test_authoring_omits_visibility_and_reads_expose_publication_visibility() -> None:
+    backend_fields = set(backend.RoadmapInput.model_fields)
+    authoring_fields = set(mcp.RoadmapDraftInput.model_fields)
+    assert "published_visibility" in backend_fields
+    assert "published_visibility" not in authoring_fields
+    assert "visibility" not in authoring_fields
+    assert "published_visibility" in mcp.Roadmap.model_fields
+    assert "published_visibility" in mcp.RoadmapCard.model_fields
+    assert "published_visibility" in mcp.OverviewDetails.model_fields
+
+
 def test_generated_module_is_exactly_group_a() -> None:
     """The generated module declares exactly the Group-A types: no more, no less.
 

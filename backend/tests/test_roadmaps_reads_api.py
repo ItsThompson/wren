@@ -300,6 +300,17 @@ def test_non_owner_gets_404_on_a_public_draft(make_settings: MakeSettings) -> No
     client, _ = _build_client(make_settings, draft)
     _login(client, username="reader", email="reader@example.com")
     assert client.get(f"/roadmaps/{ROADMAP_ID}/overview").status_code == 404
+    assert client.get(f"/roadmaps/{ROADMAP_ID}").status_code == 404
+
+
+def test_non_owner_gets_404_on_a_private_archived_roadmap(make_settings: MakeSettings) -> None:
+    archived = build_read_roadmap(
+        status=RoadmapStatus.ARCHIVED, published_visibility=PublishedVisibility.PRIVATE
+    )
+    client, _ = _build_client(make_settings, archived)
+    _login(client, username="reader", email="reader@example.com")
+    assert client.get(f"/roadmaps/{ROADMAP_ID}").status_code == 404
+    assert client.get(f"/roadmaps/{ROADMAP_ID}/overview").status_code == 404
 
 
 def test_non_owner_can_read_a_public_archived_roadmap_by_link(make_settings: MakeSettings) -> None:

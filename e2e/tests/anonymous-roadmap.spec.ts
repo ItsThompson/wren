@@ -18,6 +18,9 @@ test.describe('anonymous roadmap reading', () => {
   }) => {
     const owner = await createAuthedContext(playwright.request, uniqueUser('anonymous-owner'))
     const roadmapId = await createPublishableRoadmap(owner)
+    const draftGuest = await playwright.request.newContext({ baseURL: API_BASE_URL })
+    expect((await draftGuest.get(`/roadmaps/${roadmapId}`)).status()).toBe(404)
+    await draftGuest.dispose()
     await publishRoadmap(owner, roadmapId)
     const expectedDocument = await getRoadmap(owner, roadmapId)
 

@@ -1008,7 +1008,7 @@ def test_published_rejects_structural_write_but_allows_metadata_edit(
 # --- web-only lifecycle: publication-access toggle --------------------------
 
 
-def test_set_visibility_toggles_public_and_private(make_settings: MakeSettings) -> None:
+def test_set_published_visibility_toggles_public_and_private(make_settings: MakeSettings) -> None:
     client, _ = _build_client(make_settings, tokens=["7f3k"])
     _login(client)
     created_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
@@ -1027,7 +1027,7 @@ def test_set_visibility_toggles_public_and_private(make_settings: MakeSettings) 
     assert made_private.json()["published_visibility"] == "private"
 
 
-def test_set_visibility_does_not_bump_the_revision(make_settings: MakeSettings) -> None:
+def test_set_published_visibility_does_not_bump_the_revision(make_settings: MakeSettings) -> None:
     client, _ = _build_client(make_settings, tokens=["7f3k"])
     _login(client)
     created_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
@@ -1037,7 +1037,7 @@ def test_set_visibility_does_not_bump_the_revision(make_settings: MakeSettings) 
     assert body["revision"] == 1
 
 
-def test_set_visibility_rejects_a_bad_value_as_422(make_settings: MakeSettings) -> None:
+def test_set_published_visibility_rejects_a_bad_value_as_422(make_settings: MakeSettings) -> None:
     client, _ = _build_client(make_settings, tokens=["7f3k"])
     _login(client)
     created_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
@@ -1048,7 +1048,7 @@ def test_set_visibility_rejects_a_bad_value_as_422(make_settings: MakeSettings) 
     assert response.headers["content-type"] == "application/problem+json"
 
 
-def test_set_visibility_is_404_to_a_non_owner(make_settings: MakeSettings) -> None:
+def test_set_published_visibility_is_404_to_a_non_owner(make_settings: MakeSettings) -> None:
     client, _ = _build_client(make_settings, tokens=["7f3k"])
     _login(client, username="owner", email="owner@example.com")
     created_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]

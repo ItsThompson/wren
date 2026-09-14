@@ -19,16 +19,23 @@ export function PublishedVisibilityControl({
   onChange,
 }: PublishedVisibilityControlProps) {
   const isPublic = publishedVisibility === 'public'
-  const label = status === 'draft' ? 'Public when published' : isPublic ? 'Public access' : 'Private access'
-  const helper = status === 'draft'
-    ? 'Drafts remain private until you publish this roadmap.'
-    : status === 'archived'
-      ? isPublic
+  const copyByStatus = {
+    draft: {
+      label: 'Public when published',
+      helper: 'Drafts remain private until you publish this roadmap.',
+    },
+    published: {
+      label: isPublic ? 'Public access' : 'Private access',
+      helper: isPublic ? 'Anyone with the link can read this roadmap.' : 'Only you can read this roadmap.',
+    },
+    archived: {
+      label: isPublic ? 'Public access' : 'Private access',
+      helper: isPublic
         ? 'Anyone with the link can read this roadmap. It is hidden from discovery.'
-        : 'Only you can read this roadmap. It is hidden from discovery.'
-      : isPublic
-        ? 'Anyone with the link can read this roadmap.'
-        : 'Only you can read this roadmap.'
+        : 'Only you can read this roadmap. It is hidden from discovery.',
+    },
+  }[status]
+  const { label, helper } = copyByStatus
   const Icon = isPublic ? Globe : Lock
 
   return (

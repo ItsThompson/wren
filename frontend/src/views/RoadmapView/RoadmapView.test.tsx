@@ -992,17 +992,26 @@ describe('RoadmapView web-only lifecycle', () => {
 
   it('surfaces a retry message when a publication-access toggle fails (500)', async () => {
     const user = userEvent.setup()
+    let put: unknown
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
-      http.put(PUBLISHED_VISIBILITY_URL, () => new HttpResponse(null, { status: 500 })),
+      http.put(PUBLISHED_VISIBILITY_URL, async ({ request }) => {
+        put = await request.json()
+        return new HttpResponse(null, { status: 500 })
+      }),
     )
     renderView()
     await screen.findByText('Grokking DSA')
 
-    await user.click(screen.getByRole('button', { name: /public when published/i }))
+    const control = screen.getByRole('button', { name: /public when published/i })
+    expect(control).toHaveAttribute('aria-pressed', 'false')
+    await user.click(control)
     expect(await screen.findByText(/couldn.t update publication access/i)).toBeInTheDocument()
-    // Unchanged: the control still shows the future public state.
-    expect(screen.getByRole('button', { name: /public when published/i })).toBeInTheDocument()
+    expect(put).toEqual({ published_visibility: 'public' })
+    expect(screen.getByRole('button', { name: /public when published/i })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
   })
 
   it('surfaces a retry message when archive fails (500)', async () => {

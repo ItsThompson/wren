@@ -194,7 +194,13 @@ def _select_group_a(schemas: dict[str, Any]) -> dict[str, Any]:
 
 def _drop_published_visibility(authoring_input: dict[str, Any]) -> None:
     """Remove the web-only publication setting from the authoring input."""
-    authoring_input.get("properties", {}).pop(_OMITTED_INPUT_PROPERTY, None)
+    properties = authoring_input.get("properties", {})
+    if "visibility" in properties:
+        raise SystemExit(
+            "RoadmapInput contains the removed visibility authoring property; "
+            "reconcile the backend schema before generating MCP models."
+        )
+    properties.pop(_OMITTED_INPUT_PROPERTY, None)
     if "required" in authoring_input:
         authoring_input["required"] = [
             name for name in authoring_input["required"] if name != _OMITTED_INPUT_PROPERTY

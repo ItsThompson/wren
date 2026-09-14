@@ -154,6 +154,17 @@ def test_drop_published_visibility_without_a_required_key() -> None:
     assert authoring["properties"] == {}
 
 
+def test_drop_published_visibility_rejects_the_legacy_property() -> None:
+    authoring: dict[str, Any] = {
+        "properties": {
+            "visibility": {"type": "string"},
+            "published_visibility": {"type": "string"},
+        }
+    }
+    with pytest.raises(SystemExit, match="removed visibility authoring property"):
+        _drop_published_visibility(authoring)
+
+
 # --- _select_group_a ---------------------------------------------------------
 
 
