@@ -60,8 +60,8 @@ function toTreeDataState(
  * Fetch everything the tree view needs for one roadmap through two SWR reads:
  * the full roadmap document (subsections + `prereq_ids`, the DAG edges) and the
  * caller's progress snapshot (for done-state). Both bind the shared session
- * client from context (credentials + transparent refresh), so a private draft
- * resolves for its owner and errors for anyone else.
+ * client from context (credentials + transparent refresh), so a draft resolves
+ * for its owner and errors for anyone else.
  *
  * The reads share `keys.roadmap(id)` / `keys.progress(id)` with `useRoadmap` and
  * `useProgress`, so views co-mounted on the same roadmap de-duplicate onto one

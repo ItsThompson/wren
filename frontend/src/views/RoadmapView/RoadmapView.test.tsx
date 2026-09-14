@@ -786,7 +786,7 @@ describe('RoadmapView web-only lifecycle', () => {
     renderView()
     await screen.findByText('Grokking DSA')
 
-    // Private draft: the control offers the future public state.
+    // Owner-only draft: the control offers the future public state.
     await user.click(screen.getByRole('button', { name: /public when published/i }))
 
     await waitFor(() => expect(put).toEqual({ published_visibility: 'public' }))

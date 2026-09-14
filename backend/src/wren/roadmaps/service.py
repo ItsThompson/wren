@@ -80,7 +80,7 @@ class RoadmapService:
         self._clock = clock
 
     async def create_draft(self, user_id: str, doc: RoadmapInput) -> RoadmapCreated:
-        """Mint slug IDs, resolve references, and persist a private draft.
+        """Mint slug IDs and persist an owner-only draft set public on publish.
 
         Returns the full roadmap at ``revision`` 1 plus the ``proposed_id ->
         minted_id`` remap for any de-duped proposal.

@@ -8,7 +8,7 @@ interface RoadmapErrorStateProps {
 
 /**
  * The roadmap read failed. A 404/403 means the roadmap is not the caller's to
- * read (a private draft is invisible to non-owners),
+ * read (a draft is invisible to non-owners),
  * and both render the SAME dedicated view so a private roadmap's existence never
  * leaks (no-existence-leak convention); anything else is a generic
  * load failure. Uses the shared text-first `ErrorState` (never color alone).

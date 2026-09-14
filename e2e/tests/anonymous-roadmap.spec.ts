@@ -66,4 +66,30 @@ test.describe('anonymous roadmap reading', () => {
     await guestContext.close()
     await owner.dispose()
   })
+
+  test('keeps explicit private publication access owner-only across lifecycle states', async ({
+    playwright,
+  }) => {
+    const owner = await createAuthedContext(playwright.request, uniqueUser('private-owner'))
+    const guest = await playwright.request.newContext({ baseURL: API_BASE_URL })
+    const roadmapId = await createPublishableRoadmap(owner, { publishedVisibility: 'private' })
+
+    expect((await getRoadmap(owner, roadmapId)).published_visibility).toBe('private')
+    expect((await guest.get(`/roadmaps/${roadmapId}`)).status()).toBe(404)
+
+    await publishRoadmap(owner, roadmapId)
+    expect((await guest.get(`/roadmaps/${roadmapId}`)).status()).toBe(404)
+
+    await setPublishedVisibility(owner, roadmapId, 'public')
+    expect((await guest.get(`/roadmaps/${roadmapId}`)).status()).toBe(200)
+
+    await archiveRoadmap(owner, roadmapId)
+    expect((await guest.get(`/roadmaps/${roadmapId}`)).status()).toBe(200)
+
+    await setPublishedVisibility(owner, roadmapId, 'private')
+    expect((await guest.get(`/roadmaps/${roadmapId}`)).status()).toBe(404)
+
+    await guest.dispose()
+    await owner.dispose()
+  })
 })

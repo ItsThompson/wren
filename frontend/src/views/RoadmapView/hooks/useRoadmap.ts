@@ -47,8 +47,8 @@ function toRoadmapViewState(
 /**
  * Fetch one roadmap by ID for the owner and drive its publish action
  * (`:publish`). The read derives from `useApiQuery(keys.roadmap(id))` on the
- * shared session client (credentials + transparent refresh), so a private draft
- * resolves for its owner and returns 404/403 to anyone else, and any co-mounted
+ * shared session client (credentials + transparent refresh), so a draft resolves
+ * for its owner and returns 404/403 to anyone else, and any co-mounted
  * reader of the same key (e.g. the tree route) shares one request and one cache
  * entry.
  *
@@ -230,8 +230,8 @@ export function useRoadmap(roadmapId: string): {
   )
 
   const fork = useCallback(() => {
-    // Fork any readable roadmap (own or public) into a fresh private draft, then
-    // navigate to it so the owner can edit and publish the copy. The fork is a
+    // Fork any readable roadmap (own or public) into a fresh owner-only draft
+    // set public on publish, then navigate to it so the owner can edit the copy. The fork is a
     // new resource. Add its authored card before navigating to its own key.
     setForkState({ phase: 'forking' })
     void (async () => {
