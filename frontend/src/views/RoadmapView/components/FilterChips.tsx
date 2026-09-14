@@ -24,8 +24,8 @@ export function FilterChips({ tags, selectedTags, onToggle }: FilterChipsProps) 
             aria-pressed={selected}
             onClick={() => onToggle(tag)}
             style={tagPillStyle(tag)}
-            className={`rounded-full border px-2.5 py-0.5 font-mono text-[11.5px] tracking-[0.02em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-              selected ? 'border-accent' : 'border-transparent hover:opacity-80'
+            className={`rounded-full border-2 px-2.5 py-0.5 font-mono text-[11.5px] tracking-[0.02em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+              selected ? 'border-primary' : 'border-transparent hover:opacity-80'
             }`}
           >
             {tag}
