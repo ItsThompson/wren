@@ -31,9 +31,35 @@ describe('RoadmapFilterPanel', () => {
 
     const panel = screen.getByRole('group', { name: 'Roadmap filters' })
     expect(within(panel).getByText('Showing 3 of 3 topics')).toBeInTheDocument()
-    expect(within(panel).getByRole('button', { name: 'arrays' })).toHaveAttribute('aria-pressed', 'true')
-    expect(within(panel).getByRole('button', { name: 'hashing' })).toHaveAttribute('aria-pressed', 'false')
+    const selectedChip = within(panel).getByRole('button', { name: 'arrays' })
+    const unselectedChip = within(panel).getByRole('button', { name: 'hashing' })
+    expect(selectedChip).toHaveAttribute('aria-pressed', 'true')
+    expect(selectedChip).toHaveClass('border-accent')
+    expect(selectedChip.style.getPropertyValue('--tag-hue')).not.toBe('')
+    expect(unselectedChip).toHaveAttribute('aria-pressed', 'false')
+    expect(unselectedChip).toHaveClass('border-transparent')
+    expect(unselectedChip.style.getPropertyValue('--tag-hue')).not.toBe('')
     expect(within(panel).getByRole('button', { name: 'Clear filters' })).toBeEnabled()
+  })
+
+  it('keeps tag styling when a chip becomes selected and adds only an outline', () => {
+    const { rerender } = render(<RoadmapFilterPanel state={buildState()} actions={buildActions()} />)
+    const unselectedChip = screen.getByRole('button', { name: 'arrays' })
+    const initialStyle = {
+      hue: unselectedChip.style.getPropertyValue('--tag-hue'),
+      backgroundColor: unselectedChip.style.backgroundColor,
+      color: unselectedChip.style.color,
+    }
+
+    rerender(
+      <RoadmapFilterPanel state={buildState({ selectedTags: new Set(['arrays']) })} actions={buildActions()} />,
+    )
+
+    const selectedChip = screen.getByRole('button', { name: 'arrays' })
+    expect(selectedChip).toHaveClass('border-accent')
+    expect(selectedChip.style.getPropertyValue('--tag-hue')).toBe(initialStyle.hue)
+    expect(selectedChip.style.backgroundColor).toBe(initialStyle.backgroundColor)
+    expect(selectedChip.style.color).toBe(initialStyle.color)
   })
 
   it('forwards chip and mode actions without allowing an empty mode', async () => {
