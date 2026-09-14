@@ -2,6 +2,7 @@ import { useParams } from 'react-router'
 
 import { useAuth } from '@/auth'
 import { ImmutableNotice, StaleRevisionNotice } from '@/components/states'
+import { PageTitle } from '@/components/PageTitle'
 import { isImmutable } from '@/lib/problem'
 import { DraftPreview } from './components/DraftPreview'
 import { RoadmapErrorState } from './components/RoadmapErrorState'
@@ -38,10 +39,20 @@ export function RoadmapView() {
   } = useRoadmap(roadmapId ?? '')
 
   if (state.phase === 'loading') {
-    return <RoadmapSkeleton />
+    return (
+      <>
+        <PageTitle title="Roadmap" />
+        <RoadmapSkeleton />
+      </>
+    )
   }
   if (state.phase === 'error') {
-    return <RoadmapErrorState status={state.status} />
+    return (
+      <>
+        <PageTitle title="Roadmap" />
+        <RoadmapErrorState status={state.status} />
+      </>
+    )
   }
 
   const isOwner = user?.id != null && user.id === state.roadmap.owner
@@ -87,6 +98,7 @@ export function RoadmapView() {
 
   return (
     <>
+      <PageTitle title={state.roadmap.title} />
       {conflictNotice ? <div className="reading-width pt-6">{conflictNotice}</div> : null}
       {view}
     </>

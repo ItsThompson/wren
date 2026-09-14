@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useParams } from 'react-router'
 
 import { EmptyState } from '@/components/states'
+import { PageTitle } from '@/components/PageTitle'
 import { RoadmapCardGrid } from '@/components/RoadmapCardGrid'
 import { Button } from '@/components/ui/button'
 import { ProfileHeader } from './components/ProfileHeader'
@@ -23,21 +24,34 @@ export function ProfileView() {
   const { state, reload } = useProfile(handle ?? '')
 
   if (state.phase === 'loading') {
-    return <ProfileSkeleton />
+    return (
+      <>
+        <PageTitle title="Profile" />
+        <ProfileSkeleton />
+      </>
+    )
   }
   if (state.phase === 'notfound') {
-    return <ProfileNotFound handle={handle ?? ''} />
+    return (
+      <>
+        <PageTitle title="Profile" />
+        <ProfileNotFound handle={handle ?? ''} />
+      </>
+    )
   }
   if (state.phase === 'error') {
     return (
-      <section className="reading-width py-24 text-center">
-        <p className="text-muted-foreground">We couldn&rsquo;t load this profile.</p>
-        <div className="mt-6 flex justify-center">
-          <Button variant="outline" onClick={reload}>
-            Try again
-          </Button>
-        </div>
-      </section>
+      <>
+        <PageTitle title="Profile" />
+        <section className="reading-width py-24 text-center">
+          <p className="text-muted-foreground">We couldn&rsquo;t load this profile.</p>
+          <div className="mt-6 flex justify-center">
+            <Button variant="outline" onClick={reload}>
+              Try again
+            </Button>
+          </div>
+        </section>
+      </>
     )
   }
 
@@ -50,9 +64,12 @@ export function ProfileView() {
   }
 
   return (
-    <section className="mx-auto max-w-[1120px] px-5 py-10">
-      <ProfileHeader displayName={state.profile.display_name} handle={state.profile.handle} />
-      <div className="mt-8">{grid}</div>
-    </section>
+    <>
+      <PageTitle title={state.profile.display_name} />
+      <section className="mx-auto max-w-[1120px] px-5 py-10">
+        <ProfileHeader displayName={state.profile.display_name} handle={state.profile.handle} />
+        <div className="mt-8">{grid}</div>
+      </section>
+    </>
   )
 }

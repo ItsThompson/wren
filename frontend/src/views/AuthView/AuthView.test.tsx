@@ -11,6 +11,7 @@ describe('AuthView', () => {
     expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument()
     expect(screen.queryByText('Username')).not.toBeInTheDocument()
+    expect(document.title).toBe('Wren: Log in')
   })
 
   it('switches to the register form', async () => {
@@ -22,6 +23,7 @@ describe('AuthView', () => {
     expect(screen.getByRole('heading', { name: 'Join Wren' })).toBeInTheDocument()
     expect(screen.getByText('Username')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create account' })).toBeInTheDocument()
+    expect(document.title).toBe('Wren: Join Wren')
   })
 
   it('opens the register form when the URL asks for register mode', () => {
@@ -29,6 +31,7 @@ describe('AuthView', () => {
 
     expect(screen.getByRole('heading', { name: 'Join Wren' })).toBeInTheDocument()
     expect(screen.getByText('Username')).toBeInTheDocument()
+    expect(document.title).toBe('Wren: Join Wren')
   })
 
   it('still defaults to the login form when the mode param is absent', () => {

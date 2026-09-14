@@ -172,6 +172,7 @@ describe('RoadmapView', () => {
     renderView(null)
 
     expect(await screen.findByText('Grokking DSA')).toBeInTheDocument()
+    expect(document.title).toBe('Wren: Grokking DSA')
     expect(screen.getByRole('link', { name: 'Log in to track progress' })).toHaveAttribute('href', '/auth')
     expect(screen.queryByRole('button', { name: 'Fork' })).not.toBeInTheDocument()
     expect(screen.queryByText(/loading progress/i)).not.toBeInTheDocument()
@@ -227,6 +228,7 @@ describe('RoadmapView', () => {
     )
     renderView()
 
+    expect(document.title).toBe('Wren: Roadmap')
     expect(await screen.findByText('Roadmap not found')).toBeInTheDocument()
     expect(screen.getByText(/does not exist or is not shared with you/i)).toBeInTheDocument()
   })
@@ -251,6 +253,7 @@ describe('RoadmapView', () => {
   it('shows a loading skeleton before the roadmap resolves', () => {
     server.use(http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())))
     renderView()
+    expect(document.title).toBe('Wren: Roadmap')
     expect(screen.getByLabelText('Loading roadmap')).toBeInTheDocument()
   })
 
