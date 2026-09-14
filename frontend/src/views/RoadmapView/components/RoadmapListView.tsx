@@ -1,20 +1,19 @@
-import { useMemo, useState } from 'react'
-
 import { InlineNotice, StaleRevisionNotice } from '@/components/states'
 import { RoadmapViewTabs } from '@/components/RoadmapViewTabs'
 import { useHashScroll } from '../hooks/useHashScroll'
 import { useProgress } from '../hooks/useProgress'
+import { useRoadmapFilters } from '../hooks/useRoadmapFilters'
 import { overallCount } from '../util/progress-derive'
-import { collectTrackTags } from '../util/track-tags'
 import type { ProgressBinding, RoadmapActions as Actions, Roadmap } from '../types'
 import { DeadlineCountdown } from './DeadlineCountdown'
-import { FilterChips } from './FilterChips'
+import { FilterEmptyState } from './FilterEmptyState'
 import { NextComplete } from './NextComplete'
 import { ProgressBar } from './ProgressBar'
 import { RoadmapActions } from './RoadmapActions'
 import { SectionBlock } from './SectionBlock'
 import { SubjectTags } from './SubjectTags'
 import { ReadOnlyNotice } from './ReadOnlyNotice'
+import { RoadmapFilterPanel } from './RoadmapFilterPanel'
 
 interface RoadmapListViewProps {
   roadmap: Roadmap
@@ -52,19 +51,15 @@ export function RoadmapListView({ roadmap, isOwner, isAuthenticated, actions, on
     dismissNotice,
     reload,
   } = useProgress(roadmap.id, roadmap.status)
-  const [activeTag, setActiveTag] = useState<string | null>(null)
   const sectionOrder = roadmap.section_order ?? []
   const sections = roadmap.sections ?? {}
   const suggestedPath = roadmap.suggested_path ?? []
-  const trackTags = useMemo(() => collectTrackTags(roadmap), [roadmap])
+  const { state: filterState, actions: filterActions } = useRoadmapFilters(roadmap)
   const overall = progressState.phase === 'ready' && checkedIds ? overallCount(roadmap, checkedIds) : null
   const progress: ProgressBinding | undefined =
     progressState.phase === 'ready' && checkedIds ? { checkedIds, onToggle: toggle } : undefined
 
   useHashScroll(true)
-
-  // Selecting the active tag again clears the filter and restores all sections.
-  const toggleTag = (tag: string) => setActiveTag((current) => (current === tag ? null : tag))
 
   // A stale-write re-read reloads both the roadmap document and the progress.
   const handleStaleReload = () => {
@@ -147,23 +142,27 @@ export function RoadmapListView({ roadmap, isOwner, isAuthenticated, actions, on
 
       {isAuthenticated && progressState.phase === 'ready' && nextComplete ? <NextComplete /> : null}
 
-      <FilterChips tags={trackTags} activeTag={activeTag} onToggle={toggleTag} />
+      <RoadmapFilterPanel state={filterState} actions={filterActions} />
 
-      <div className="mt-8">
-        {sectionOrder.map((id) => {
-          const section = sections[id]
-          return section ? (
-            <SectionBlock
-              key={id}
-              section={section}
-              suggestedPath={suggestedPath}
-              progress={progress}
-              activeTag={activeTag}
-              nextSubsectionId={nextSubsectionId}
-            />
-          ) : null
-        })}
-      </div>
+      {filterState.selectedTags.size > 0 && filterState.shownTopicCount === 0 ? (
+        <FilterEmptyState onClear={filterActions.clearFilters} />
+      ) : (
+        <div className="mt-8">
+          {sectionOrder.map((id) => {
+            const section = sections[id]
+            return section ? (
+              <SectionBlock
+                key={id}
+                section={section}
+                suggestedPath={suggestedPath}
+                progress={progress}
+                matchingSubsectionIds={filterState.matchingSubsectionIds}
+                nextSubsectionId={nextSubsectionId}
+              />
+            ) : null
+          })}
+        </div>
+      )}
     </section>
   )
 }

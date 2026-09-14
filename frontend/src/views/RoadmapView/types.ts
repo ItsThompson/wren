@@ -14,6 +14,23 @@ export type Violation = components['schemas']['Violation']
 export type Visibility = components['schemas']['Visibility']
 export type RoadmapStatus = components['schemas']['RoadmapStatus']
 
+export type FilterMatchMode = 'any' | 'all'
+
+export interface RoadmapFilterState {
+  availableTags: string[]
+  selectedTags: ReadonlySet<string>
+  matchMode: FilterMatchMode
+  matchingSubsectionIds: ReadonlySet<string> | null
+  shownTopicCount: number
+  totalTopicCount: number
+}
+
+export interface RoadmapFilterActions {
+  toggleTag: (tag: string) => void
+  setMatchMode: (mode: FilterMatchMode) => void
+  clearFilters: () => void
+}
+
 /**
  * Progress read types, also from the generated client. The published list view
  * fetches the detailed snapshot (for `checked_ids`) and posts explicit-set

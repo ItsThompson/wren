@@ -1,4 +1,4 @@
-import { collectTrackTags } from './track-tags'
+import { collectTrackTags, deriveTrackTagMatches } from './track-tags'
 import type { Roadmap, Section, Subsection } from '../../types'
 
 function subsection(id: string, tags: string[]): Subsection {
@@ -76,5 +76,60 @@ describe('collectTrackTags', () => {
   it('returns an empty list when no subsection has a track tag', () => {
     const model = roadmap([section('s1', [subsection('a', [])])])
     expect(collectTrackTags(model)).toEqual([])
+  })
+})
+
+describe('deriveTrackTagMatches', () => {
+  const model = roadmap([
+    section('s1', [
+      subsection('a', ['frontend', 'beginner']),
+      subsection('b', ['backend', 'beginner']),
+    ]),
+    section('s2', [subsection('c', ['frontend', 'advanced'])]),
+  ])
+
+  it('returns all valid subsections and a null match set when no tags are selected', () => {
+    const result = deriveTrackTagMatches(model, new Set(), 'all')
+
+    expect(result.availableTags).toEqual(['frontend', 'beginner', 'backend', 'advanced'])
+    expect(result.matchingSubsectionIds).toBeNull()
+    expect(result.shownTopicCount).toBe(3)
+    expect(result.totalTopicCount).toBe(3)
+  })
+
+  it('returns the union of matching topics in ANY mode', () => {
+    const result = deriveTrackTagMatches(model, new Set(['frontend', 'backend']), 'any')
+
+    expect([...result.matchingSubsectionIds ?? []]).toEqual(['a', 'b', 'c'])
+    expect(result.shownTopicCount).toBe(3)
+  })
+
+  it('returns the intersection of matching topics in ALL mode', () => {
+    const result = deriveTrackTagMatches(model, new Set(['frontend', 'beginner']), 'all')
+
+    expect([...result.matchingSubsectionIds ?? []]).toEqual(['a'])
+    expect(result.shownTopicCount).toBe(1)
+  })
+
+  it('returns zero matches when no topic contains every selected tag', () => {
+    const result = deriveTrackTagMatches(model, new Set(['backend', 'advanced']), 'all')
+
+    expect(result.matchingSubsectionIds).toEqual(new Set())
+    expect(result.shownTopicCount).toBe(0)
+    expect(result.totalTopicCount).toBe(3)
+  })
+
+  it('ignores malformed structural references consistently', () => {
+    const malformed = roadmap([section('s1', [subsection('a', ['frontend'])])], ['missing', 's1'])
+    const malformedSection = malformed.sections?.s1
+    if (!malformedSection) throw new Error('expected test section')
+    malformedSection.subsection_order = ['missing-subsection', 'a']
+
+    const result = deriveTrackTagMatches(malformed, new Set(['frontend']), 'any')
+
+    expect(result.availableTags).toEqual(['frontend'])
+    expect([...result.matchingSubsectionIds ?? []]).toEqual(['a'])
+    expect(result.shownTopicCount).toBe(1)
+    expect(result.totalTopicCount).toBe(1)
   })
 })

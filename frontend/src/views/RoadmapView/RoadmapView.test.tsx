@@ -537,7 +537,7 @@ describe('RoadmapView deadline countdown', () => {
 
     // Clear only appears once a deadline has hydrated.
     await waitFor(() => expect(screen.getByLabelText('Deadline')).toHaveValue('2099-12-31'))
-    await user.click(screen.getByRole('button', { name: /clear/i }))
+    await user.click(screen.getByRole('button', { name: /^Clear$/ }))
 
     await waitFor(() => expect(put).toEqual({ deadline: null }))
     await waitFor(() => expect(screen.getByLabelText('Deadline')).toHaveValue(''))
@@ -1024,20 +1024,17 @@ describe('RoadmapView list view (tags, filter chips, next highlight)', () => {
   const PROGRESS_URL = `${BASE}/roadmaps/${ROADMAP_ID}/progress`
   const NEXT_URL = `${BASE}/roadmaps/${ROADMAP_ID}/next`
 
-  /**
-   * A published roadmap with two subsections carrying distinct track tags, so
-   * the filter chips and per-subsection filtering are exercisable end-to-end.
-   */
+  /** A published roadmap with overlapping track tags for list-view acceptance coverage. */
   function filterableRoadmap(): Roadmap {
     return buildDraft({
       status: 'published',
       section_order: ['sec_foundations'],
-      suggested_path: ['sub_arrays', 'sub_hashing'],
+      suggested_path: ['sub_arrays', 'sub_hashing', 'sub_both', 'sub_graphs'],
       sections: {
         sec_foundations: {
           id: 'sec_foundations',
           title: 'Foundations',
-          subsection_order: ['sub_arrays', 'sub_hashing'],
+          subsection_order: ['sub_arrays', 'sub_hashing', 'sub_both', 'sub_graphs'],
           subsections: {
             sub_arrays: {
               id: 'sub_arrays',
@@ -1059,53 +1056,107 @@ describe('RoadmapView list view (tags, filter chips, next highlight)', () => {
               item_order: ['chk_hash'],
               checklist_items: { chk_hash: { id: 'chk_hash', text: 'Implement a counter' } },
             },
+            sub_both: {
+              id: 'sub_both',
+              title: 'Arrays and hashing together',
+              tags: ['arrays', 'hashing'],
+              prereq_ids: [],
+              resource_order: [],
+              resources: {},
+              item_order: ['chk_both'],
+              checklist_items: { chk_both: { id: 'chk_both', text: 'Compare approaches' } },
+            },
+            sub_graphs: {
+              id: 'sub_graphs',
+              title: 'Graph traversal',
+              tags: ['graphs'],
+              prereq_ids: [],
+              resource_order: [],
+              resources: {},
+              item_order: ['chk_graphs'],
+              checklist_items: { chk_graphs: { id: 'chk_graphs', text: 'Traverse a graph' } },
+            },
           },
         },
       },
     })
   }
 
-  it('renders one filter chip per distinct track tag', async () => {
+  function setupFilterableRoadmap() {
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(filterableRoadmap())),
       http.get(PROGRESS_URL, () => HttpResponse.json(buildProgress())),
     )
+  }
+
+  it('renders the two-row panel with default ANY mode, full count, and disabled clear', async () => {
+    setupFilterableRoadmap()
     renderView()
 
-    const group = await screen.findByRole('group', { name: /filter by tag/i })
-    // One chip per track tag, in first-appearance order; subject tags excluded.
+    const panel = await screen.findByRole('group', { name: /roadmap filters/i })
+    expect(within(panel).getByRole('radio', { name: 'ANY' })).toHaveAttribute('aria-checked', 'true')
+    expect(within(panel).getByRole('radio', { name: 'ALL' })).toHaveAttribute('aria-checked', 'false')
+    expect(within(panel).getByText('Showing 4 of 4 topics')).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: 'Clear filters' })).toBeDisabled()
+    const tagGroup = within(panel).getByRole('group', { name: /filter by tag/i })
     expect(
-      within(group)
+      within(tagGroup)
         .getAllByRole('button')
         .map((chip) => chip.textContent),
-    ).toEqual(['arrays', 'hashing'])
+    ).toEqual(['arrays', 'hashing', 'graphs'])
   })
 
-  it('filters subsections to the selected tag and clears on re-select', async () => {
+  it('supports multi-selection with ANY and ALL intersection semantics', async () => {
     const user = userEvent.setup()
-    server.use(
-      http.get('*/roadmaps/:id', () => HttpResponse.json(filterableRoadmap())),
-      http.get(PROGRESS_URL, () => HttpResponse.json(buildProgress())),
-    )
+    setupFilterableRoadmap()
     renderView()
 
-    const group = await screen.findByRole('group', { name: /filter by tag/i })
-    const arraysChip = within(group).getByRole('button', { name: 'arrays' })
-    // Both subsections visible before any filter.
+    const panel = await screen.findByRole('group', { name: /roadmap filters/i })
+    const progressBeforeFiltering = (await screen.findAllByRole('progressbar')).map((progressbar) =>
+      progressbar.getAttribute('aria-valuenow'),
+    )
+    const tagGroup = within(panel).getByRole('group', { name: /filter by tag/i })
+    await user.click(within(tagGroup).getByRole('button', { name: 'arrays' }))
+    await user.click(within(tagGroup).getByRole('button', { name: 'hashing' }))
+
+    expect(within(panel).getByText('Showing 3 of 4 topics')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 3, name: 'Arrays & two pointers' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 3, name: 'Hashing' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 3, name: 'Arrays and hashing together' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 3, name: 'Graph traversal' })).not.toBeInTheDocument()
 
-    await user.click(arraysChip)
+    await user.click(within(panel).getByRole('radio', { name: 'ALL' }))
+    expect(within(panel).getByText('Showing 1 of 4 topics')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 3, name: 'Arrays and hashing together' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 3, name: 'Arrays & two pointers' })).not.toBeInTheDocument()
+    const progressAfterFiltering = (await screen.findAllByRole('progressbar')).map((progressbar) =>
+      progressbar.getAttribute('aria-valuenow'),
+    )
+    expect(progressAfterFiltering).toEqual(progressBeforeFiltering)
+  })
 
-    // Active chip is styled/announced active; only the matching subsection shows.
-    expect(arraysChip).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('heading', { level: 3, name: 'Arrays & two pointers' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { level: 3, name: 'Hashing' })).not.toBeInTheDocument()
+  it('shows a no-results state and clear restores topics while preserving ALL', async () => {
+    const user = userEvent.setup()
+    setupFilterableRoadmap()
+    renderView()
 
-    // Re-selecting the active chip clears the filter and restores all subsections.
-    await user.click(arraysChip)
-    expect(arraysChip).toHaveAttribute('aria-pressed', 'false')
-    expect(screen.getByRole('heading', { level: 3, name: 'Hashing' })).toBeInTheDocument()
+    const panel = await screen.findByRole('group', { name: /roadmap filters/i })
+    const tagGroup = within(panel).getByRole('group', { name: /filter by tag/i })
+    await user.click(within(tagGroup).getByRole('button', { name: 'arrays' }))
+    await user.click(within(tagGroup).getByRole('button', { name: 'graphs' }))
+    await user.click(within(panel).getByRole('radio', { name: 'ALL' }))
+
+    expect(within(panel).getByText('Showing 0 of 4 topics')).toBeInTheDocument()
+    expect(screen.getByText('No topics match these filters')).toBeInTheDocument()
+    const emptyClear = within(screen.getByRole('group', { name: 'Filter results' })).getByRole('button', {
+      name: 'Clear filters',
+    })
+    expect(emptyClear).toBeInTheDocument()
+
+    await user.click(emptyClear)
+    expect(within(panel).getByRole('radio', { name: 'ALL' })).toHaveAttribute('aria-checked', 'true')
+    expect(within(panel).getByText('Showing 4 of 4 topics')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 3, name: 'Graph traversal' })).toBeInTheDocument()
   })
 
   it('renders no filter chips when the roadmap has no track tags', async () => {
