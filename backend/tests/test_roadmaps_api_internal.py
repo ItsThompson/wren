@@ -330,7 +330,7 @@ def test_edit_metadata_smuggled_structural_field_is_a_409_immutable(
 
 
 def test_visibility_archive_delete_have_no_internal_route(make_settings: MakeSettings) -> None:
-    # Visibility / archive / delete are web-only: they have no internal-app route
+    # PublishedVisibility / archive / delete are web-only: they have no internal-app route
     # (and no MCP tool). The MCP surface therefore cannot reach them. A published
     # source exists so the assertions reflect routing, not a missing roadmap.
     client, _ = _build_client(make_settings, tokens=["7f3k"])
@@ -344,18 +344,20 @@ def test_visibility_archive_delete_have_no_internal_route(make_settings: MakeSet
     # The roadmap is untouched.
     assert client.get(f"/roadmaps/{source_id}", headers=_trusted()).status_code == 200
 
-    # POST :archive and PUT /visibility are not mounted on the internal app: they
+    # POST :archive and PUT /published-visibility are not mounted on the internal app: they
     # never succeed (404 unmounted sub-resource, or 405 when the greedy
     # {roadmap_id} capture matches a different method on /roadmaps/{id}).
     assert client.post(f"/roadmaps/{source_id}:archive", headers=_trusted()).status_code in (
         404,
         405,
     )
-    visibility = client.put(
-        f"/roadmaps/{source_id}/visibility", headers=_trusted(), json={"visibility": "public"}
+    publication_visibility = client.put(
+        f"/roadmaps/{source_id}/published-visibility",
+        headers=_trusted(),
+        json={"published_visibility": "public"},
     )
-    assert visibility.status_code in (404, 405)
+    assert publication_visibility.status_code in (404, 405)
     # Still published, never archived or made public through the internal surface.
     body = client.get(f"/roadmaps/{source_id}", headers=_trusted()).json()
     assert body["status"] == "published"
-    assert body["visibility"] == "private"
+    assert body["published_visibility"] == "public"

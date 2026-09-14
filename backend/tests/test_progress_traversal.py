@@ -14,11 +14,11 @@ from wren.progress.schemas import Progress
 from wren.progress.traversal import all_item_ids, checked_item_ids
 from wren.roadmaps.schemas import (
     ChecklistItem,
+    PublishedVisibility,
     Roadmap,
     RoadmapStatus,
     Section,
     Subsection,
-    Visibility,
 )
 
 _NOW = datetime(2026, 7, 15, tzinfo=UTC)
@@ -39,7 +39,7 @@ def _roadmap(item_order: list[str], checklist_ids: list[str]) -> Roadmap:
         id="r-0000",
         owner="owner",
         title="R",
-        visibility=Visibility.PUBLIC,
+        published_visibility=PublishedVisibility.PUBLIC,
         status=RoadmapStatus.PUBLISHED,
         revision=1,
         sections={"sec_x": section},

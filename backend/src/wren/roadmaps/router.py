@@ -45,12 +45,12 @@ from wren.roadmaps.schemas import (
     MetadataEditRequest,
     PatchRequest,
     PatchResult,
+    PublishedVisibilityRequest,
     Roadmap,
     RoadmapCreated,
     RoadmapInput,
     RoadmapReplaced,
     ValidateResult,
-    VisibilityRequest,
 )
 from wren.roadmaps.service import RoadmapService
 
@@ -91,7 +91,9 @@ def create_roadmaps_router(
     publish_identity = required_identity("POST", "/roadmaps/{roadmap_id}:publish")
     fork_identity = required_identity("POST", "/roadmaps/{roadmap_id}:fork")
     metadata_identity = required_identity("PATCH", "/roadmaps/{roadmap_id}/metadata")
-    visibility_identity = required_identity("PUT", "/roadmaps/{roadmap_id}/visibility")
+    published_visibility_identity = required_identity(
+        "PUT", "/roadmaps/{roadmap_id}/published-visibility"
+    )
     archive_identity = required_identity("POST", "/roadmaps/{roadmap_id}:archive")
     delete_identity = required_identity("DELETE", "/roadmaps/{roadmap_id}")
     overview_identity = required_identity("GET", "/roadmaps/{roadmap_id}/overview")
@@ -237,17 +239,18 @@ def create_roadmaps_router(
             user_id, roadmap_id, body.title, body.description, body.subject_tags
         )
 
-    @router.put("/{roadmap_id}/visibility")
-    async def set_roadmap_visibility(
+    @router.put("/{roadmap_id}/published-visibility")
+    async def set_roadmap_published_visibility(
         roadmap_id: str,
-        body: VisibilityRequest,
-        user_id: str = Depends(visibility_identity),
+        body: PublishedVisibilityRequest,
+        user_id: str = Depends(published_visibility_identity),
         service: RoadmapService = Depends(service_provider),
     ) -> Roadmap:
-        # Web-only visibility toggle: mounted on the external
-        # app only, no internal-app route and no MCP tool. Owner-scoped in the
-        # service (a non-owner is a 404, no existence leak); last-write-wins.
-        return await service.set_visibility(user_id, roadmap_id, body.visibility)
+        # Web-only publication-access toggle: external app only, no internal-app
+        # route and no MCP tool. Owner-scoped in the service.
+        return await service.set_published_visibility(
+            user_id, roadmap_id, body.published_visibility
+        )
 
     @router.post("/{roadmap_id}:archive")
     async def archive_roadmap(

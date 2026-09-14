@@ -41,7 +41,7 @@ from wren.progress.schemas import (
 )
 from wren.progress.summary import summarize
 from wren.progress.traversal import all_item_ids
-from wren.roadmaps import Roadmap, RoadmapStatus, Visibility
+from wren.roadmaps import PublishedVisibility, Roadmap, RoadmapStatus
 from wren_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -195,7 +195,10 @@ class ProgressService:
         if record is None:
             raise NotFound(f"No roadmap '{roadmap_id}'.", instance=f"/roadmaps/{roadmap_id}")
         roadmap = Roadmap.model_validate(record.document)
-        if roadmap.owner != user_id and roadmap.visibility is not Visibility.PUBLIC:
+        if (
+            roadmap.owner != user_id
+            and roadmap.published_visibility is not PublishedVisibility.PUBLIC
+        ):
             # Private roadmap owned by someone else: 404, no existence leak.
             raise NotFound(f"No roadmap '{roadmap_id}'.", instance=f"/roadmaps/{roadmap_id}")
         return roadmap

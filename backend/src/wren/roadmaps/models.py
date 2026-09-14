@@ -2,7 +2,7 @@
 
 The authoritative roadmap is the nested document, stored whole in the
 ``document`` JSONB column; the scalar columns (``owner``, ``status``,
-``visibility``, ``revision``, ``title``) are a write-derived denormalized index
+``published_visibility``, ``revision``, ``title``) are a write-derived denormalized index
 for the owner-scoping and listing queries, never a second
 source of truth. The repository is the only writer, so it derives every column
 from the domain :class:`~wren.roadmaps.schemas.Roadmap` and they cannot drift.
@@ -37,7 +37,7 @@ class RoadmapRecord(Base):
     owner: Mapped[str] = mapped_column(String(32), index=True)
     title: Mapped[str] = mapped_column(String(200))
     status: Mapped[str] = mapped_column(String(16))
-    visibility: Mapped[str] = mapped_column(String(16))
+    published_visibility: Mapped[str] = mapped_column(String(16))
     revision: Mapped[int] = mapped_column(Integer)
     document: Mapped[dict[str, Any]] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

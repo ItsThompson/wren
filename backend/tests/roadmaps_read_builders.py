@@ -17,13 +17,13 @@ from typing import TYPE_CHECKING
 
 from wren.roadmaps.schemas import (
     ChecklistItem,
+    PublishedVisibility,
     Resource,
     ResourceType,
     Roadmap,
     RoadmapStatus,
     Section,
     Subsection,
-    Visibility,
 )
 
 if TYPE_CHECKING:
@@ -56,7 +56,7 @@ def build_read_roadmap(
     roadmap_id: str = ROADMAP_ID,
     owner: str = AUTHOR,
     status: RoadmapStatus = RoadmapStatus.PUBLISHED,
-    visibility: Visibility = Visibility.PUBLIC,
+    published_visibility: PublishedVisibility = PublishedVisibility.PUBLIC,
 ) -> Roadmap:
     """A two-section published roadmap with descriptions, varied resources, tags,
     a prereq DAG, and a valid ``suggested_path`` (arrays -> hashing -> graphs).
@@ -125,7 +125,7 @@ def build_read_roadmap(
         title="Grokking DSA",
         description="A structured path through data structures and algorithms.",
         subject_tags=["cs"],
-        visibility=visibility,
+        published_visibility=published_visibility,
         status=status,
         revision=1,
         sections={"sec_core": core, "sec_advanced": advanced},

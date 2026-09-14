@@ -50,7 +50,7 @@ MakeSettings = Callable[..., AppSettings]
 
 _PUBLISHABLE_ROADMAP = {
     "title": "Grokking DSA",
-    "visibility": "public",
+    "published_visibility": "public",
     "suggested_path": ["sub_arrays", "sub_hashing"],
     "sections": [
         {

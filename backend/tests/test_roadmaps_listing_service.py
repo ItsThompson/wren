@@ -19,7 +19,7 @@ from tests.support.fakes.roadmaps_fakes import InMemoryRoadmapRepository
 from wren.core.errors import NotFound
 from wren.roadmaps.listing import FollowedReader, HandleResolver, ListingService, ProfileOwner
 from wren.roadmaps.models import RoadmapRecord
-from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
+from wren.roadmaps.schemas import PublishedVisibility, Roadmap, RoadmapStatus
 
 _NOW = datetime(2026, 7, 15, tzinfo=UTC)
 
@@ -32,7 +32,7 @@ def _roadmap(
     owner: str,
     *,
     status: RoadmapStatus = RoadmapStatus.DRAFT,
-    visibility: Visibility = Visibility.PRIVATE,
+    published_visibility: PublishedVisibility = PublishedVisibility.PRIVATE,
     title: str = "A Roadmap",
     subject_tags: list[str] | None = None,
     updated_at: datetime = _NOW,
@@ -42,7 +42,7 @@ def _roadmap(
         owner=owner,
         title=title,
         subject_tags=subject_tags or [],
-        visibility=visibility,
+        published_visibility=published_visibility,
         status=status,
         revision=1,
         created_at=_NOW,
@@ -56,7 +56,7 @@ def _record(roadmap: Roadmap) -> RoadmapRecord:
         owner=roadmap.owner,
         title=roadmap.title,
         status=roadmap.status.value,
-        visibility=roadmap.visibility.value,
+        published_visibility=roadmap.published_visibility.value,
         revision=roadmap.revision,
         document=roadmap.model_dump(mode="json"),
         created_at=roadmap.created_at,
@@ -100,9 +100,24 @@ def _service(
 
 async def test_dashboard_lists_authored_at_every_status() -> None:
     service = _service(
-        _roadmap("r-draft", ADA, status=RoadmapStatus.DRAFT, visibility=Visibility.PRIVATE),
-        _roadmap("r-pub", ADA, status=RoadmapStatus.PUBLISHED, visibility=Visibility.PUBLIC),
-        _roadmap("r-arch", ADA, status=RoadmapStatus.ARCHIVED, visibility=Visibility.PUBLIC),
+        _roadmap(
+            "r-draft",
+            ADA,
+            status=RoadmapStatus.DRAFT,
+            published_visibility=PublishedVisibility.PRIVATE,
+        ),
+        _roadmap(
+            "r-pub",
+            ADA,
+            status=RoadmapStatus.PUBLISHED,
+            published_visibility=PublishedVisibility.PUBLIC,
+        ),
+        _roadmap(
+            "r-arch",
+            ADA,
+            status=RoadmapStatus.ARCHIVED,
+            published_visibility=PublishedVisibility.PUBLIC,
+        ),
     )
     dashboard = await service.dashboard(ADA)
     assert {card.id for card in dashboard.authored} == {"r-draft", "r-pub", "r-arch"}
@@ -112,8 +127,18 @@ async def test_dashboard_lists_authored_at_every_status() -> None:
 async def test_dashboard_is_scoped_to_the_caller() -> None:
     # Another user's roadmap is never in the caller's authored list.
     service = _service(
-        _roadmap("r-ada", ADA, status=RoadmapStatus.PUBLISHED, visibility=Visibility.PUBLIC),
-        _roadmap("r-bob", BOB, status=RoadmapStatus.PUBLISHED, visibility=Visibility.PUBLIC),
+        _roadmap(
+            "r-ada",
+            ADA,
+            status=RoadmapStatus.PUBLISHED,
+            published_visibility=PublishedVisibility.PUBLIC,
+        ),
+        _roadmap(
+            "r-bob",
+            BOB,
+            status=RoadmapStatus.PUBLISHED,
+            published_visibility=PublishedVisibility.PUBLIC,
+        ),
     )
     dashboard = await service.dashboard(ADA)
     assert [card.id for card in dashboard.authored] == ["r-ada"]
@@ -121,12 +146,17 @@ async def test_dashboard_is_scoped_to_the_caller() -> None:
 
 async def test_dashboard_followed_loads_cross_user_roadmaps_in_follow_order() -> None:
     service = _service(
-        _roadmap("r-bob", BOB, status=RoadmapStatus.PUBLISHED, visibility=Visibility.PUBLIC),
+        _roadmap(
+            "r-bob",
+            BOB,
+            status=RoadmapStatus.PUBLISHED,
+            published_visibility=PublishedVisibility.PUBLIC,
+        ),
         _roadmap(
             "r-cara",
             "user_cara",
             status=RoadmapStatus.PUBLISHED,
-            visibility=Visibility.PUBLIC,
+            published_visibility=PublishedVisibility.PUBLIC,
         ),
         followed_reader=_follows("r-cara", "r-bob"),
     )
@@ -139,7 +169,12 @@ async def test_dashboard_followed_loads_cross_user_roadmaps_in_follow_order() ->
 async def test_dashboard_authored_and_followed_overlap() -> None:
     # A roadmap the caller both authored and follows appears in both lists.
     service = _service(
-        _roadmap("r-ada", ADA, status=RoadmapStatus.PUBLISHED, visibility=Visibility.PUBLIC),
+        _roadmap(
+            "r-ada",
+            ADA,
+            status=RoadmapStatus.PUBLISHED,
+            published_visibility=PublishedVisibility.PUBLIC,
+        ),
         followed_reader=_follows("r-ada"),
     )
     dashboard = await service.dashboard(ADA)
@@ -149,9 +184,24 @@ async def test_dashboard_authored_and_followed_overlap() -> None:
 
 async def test_dashboard_omits_followed_private_and_draft_cards() -> None:
     service = _service(
-        _roadmap("r-private", BOB, status=RoadmapStatus.PUBLISHED, visibility=Visibility.PRIVATE),
-        _roadmap("r-draft", BOB, status=RoadmapStatus.DRAFT, visibility=Visibility.PUBLIC),
-        _roadmap("r-public", BOB, status=RoadmapStatus.PUBLISHED, visibility=Visibility.PUBLIC),
+        _roadmap(
+            "r-private",
+            BOB,
+            status=RoadmapStatus.PUBLISHED,
+            published_visibility=PublishedVisibility.PRIVATE,
+        ),
+        _roadmap(
+            "r-draft",
+            BOB,
+            status=RoadmapStatus.DRAFT,
+            published_visibility=PublishedVisibility.PUBLIC,
+        ),
+        _roadmap(
+            "r-public",
+            BOB,
+            status=RoadmapStatus.PUBLISHED,
+            published_visibility=PublishedVisibility.PUBLIC,
+        ),
         followed_reader=_follows("r-private", "r-draft", "r-public"),
     )
 
@@ -184,7 +234,7 @@ async def test_dashboard_card_carries_badge_and_tag_fields() -> None:
             "r-ada",
             ADA,
             status=RoadmapStatus.PUBLISHED,
-            visibility=Visibility.PUBLIC,
+            published_visibility=PublishedVisibility.PUBLIC,
             title="Grokking DSA",
             subject_tags=["cs", "interview-prep"],
         ),
@@ -192,7 +242,7 @@ async def test_dashboard_card_carries_badge_and_tag_fields() -> None:
     card = (await service.dashboard(ADA)).authored[0]
     assert card.title == "Grokking DSA"
     assert card.status is RoadmapStatus.PUBLISHED
-    assert card.visibility is Visibility.PUBLIC
+    assert card.published_visibility is PublishedVisibility.PUBLIC
     assert card.subject_tags == ["cs", "interview-prep"]
 
 
@@ -202,10 +252,30 @@ async def test_dashboard_card_carries_badge_and_tag_fields() -> None:
 async def test_profile_returns_published_public_only() -> None:
     owner = ProfileOwner(user_id=ADA, handle="ada", display_name="ada")
     service = _service(
-        _roadmap("r-draft", ADA, status=RoadmapStatus.DRAFT, visibility=Visibility.PUBLIC),
-        _roadmap("r-private", ADA, status=RoadmapStatus.PUBLISHED, visibility=Visibility.PRIVATE),
-        _roadmap("r-archived", ADA, status=RoadmapStatus.ARCHIVED, visibility=Visibility.PUBLIC),
-        _roadmap("r-public", ADA, status=RoadmapStatus.PUBLISHED, visibility=Visibility.PUBLIC),
+        _roadmap(
+            "r-draft",
+            ADA,
+            status=RoadmapStatus.DRAFT,
+            published_visibility=PublishedVisibility.PUBLIC,
+        ),
+        _roadmap(
+            "r-private",
+            ADA,
+            status=RoadmapStatus.PUBLISHED,
+            published_visibility=PublishedVisibility.PRIVATE,
+        ),
+        _roadmap(
+            "r-archived",
+            ADA,
+            status=RoadmapStatus.ARCHIVED,
+            published_visibility=PublishedVisibility.PUBLIC,
+        ),
+        _roadmap(
+            "r-public",
+            ADA,
+            status=RoadmapStatus.PUBLISHED,
+            published_visibility=PublishedVisibility.PUBLIC,
+        ),
         handle_resolver=_handles(owner),
     )
     profile = await service.profile("ada")
@@ -216,8 +286,18 @@ async def test_profile_returns_published_public_only() -> None:
 async def test_profile_excludes_another_users_public_roadmaps() -> None:
     owner = ProfileOwner(user_id=ADA, handle="ada", display_name="ada")
     service = _service(
-        _roadmap("r-ada", ADA, status=RoadmapStatus.PUBLISHED, visibility=Visibility.PUBLIC),
-        _roadmap("r-bob", BOB, status=RoadmapStatus.PUBLISHED, visibility=Visibility.PUBLIC),
+        _roadmap(
+            "r-ada",
+            ADA,
+            status=RoadmapStatus.PUBLISHED,
+            published_visibility=PublishedVisibility.PUBLIC,
+        ),
+        _roadmap(
+            "r-bob",
+            BOB,
+            status=RoadmapStatus.PUBLISHED,
+            published_visibility=PublishedVisibility.PUBLIC,
+        ),
         handle_resolver=_handles(owner),
     )
     profile = await service.profile("ada")

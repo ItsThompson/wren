@@ -447,16 +447,16 @@ def test_visibility_toggle_end_to_end_over_http(
         )
         assert register.status_code == 201, register.text
         roadmap_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
-        assert client.get(f"/roadmaps/{roadmap_id}").json()["visibility"] == "private"
+        assert client.get(f"/roadmaps/{roadmap_id}").json()["published_visibility"] == "private"
 
         made_public = client.put(
-            f"/roadmaps/{roadmap_id}/visibility", json={"visibility": "public"}
+            f"/roadmaps/{roadmap_id}/published-visibility", json={"published_visibility": "public"}
         )
         assert made_public.status_code == 200, made_public.text
-        assert made_public.json()["visibility"] == "public"
+        assert made_public.json()["published_visibility"] == "public"
         # Persisted, and the structural revision is untouched by the toggle.
         fetched = client.get(f"/roadmaps/{roadmap_id}").json()
-        assert fetched["visibility"] == "public"
+        assert fetched["published_visibility"] == "public"
         assert fetched["revision"] == 1
 
 
@@ -507,7 +507,8 @@ def test_delete_blocked_by_followers_then_archive_keeps_follower_end_to_end_over
         assert client.post(f"/roadmaps/{roadmap_id}:publish").status_code == 200
         assert (
             client.put(
-                f"/roadmaps/{roadmap_id}/visibility", json={"visibility": "public"}
+                f"/roadmaps/{roadmap_id}/published-visibility",
+                json={"published_visibility": "public"},
             ).status_code
             == 200
         )
@@ -595,7 +596,8 @@ def test_dashboard_and_profile_end_to_end_over_http(
         assert client.post(f"/roadmaps/{public_id}:publish").status_code == 200
         assert (
             client.put(
-                f"/roadmaps/{public_id}/visibility", json={"visibility": "public"}
+                f"/roadmaps/{public_id}/published-visibility",
+                json={"published_visibility": "public"},
             ).status_code
             == 200
         )

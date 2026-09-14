@@ -169,7 +169,19 @@ def test_create_returns_201_with_a_minted_roadmap_id(make_settings: MakeSettings
     assert body["id"] == "grokking-dsa-7f3k"
     assert body["status"] == "draft"
     assert body["revision"] == 1
-    assert body["visibility"] == "private"
+    assert body["published_visibility"] == "public"
+
+
+def test_create_with_private_publication_setting_persists_private(
+    make_settings: MakeSettings,
+) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    response = client.post(
+        "/roadmaps", json={**_MINIMAL_ROADMAP, "published_visibility": "private"}
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["published_visibility"] == "private"
 
 
 def test_create_mints_prefixed_slug_ids_for_every_node(make_settings: MakeSettings) -> None:
@@ -343,7 +355,9 @@ def test_anonymous_reads_public_published_document_without_progress_access(
     created_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
     assert client.post(f"/roadmaps/{created_id}:publish").status_code == 200
     assert (
-        client.put(f"/roadmaps/{created_id}/visibility", json={"visibility": "public"}).status_code
+        client.put(
+            f"/roadmaps/{created_id}/published-visibility", json={"published_visibility": "public"}
+        ).status_code
         == 200
     )
 
@@ -363,7 +377,8 @@ def test_anonymous_reads_public_archived_document_and_not_draft(
     assert client.post(f"/roadmaps/{published_id}:publish").status_code == 200
     assert (
         client.put(
-            f"/roadmaps/{published_id}/visibility", json={"visibility": "public"}
+            f"/roadmaps/{published_id}/published-visibility",
+            json={"published_visibility": "public"},
         ).status_code
         == 200
     )
@@ -696,6 +711,38 @@ def test_replace_imports_the_full_document_and_bumps_the_revision(
     assert "sub_graphs" in fetched["sections"]["sec_core"]["subsections"]
 
 
+def test_replace_omitting_publication_setting_preserves_stored_value(
+    make_settings: MakeSettings,
+) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created = client.post(
+        "/roadmaps", json={**_PUBLISHABLE_ROADMAP, "published_visibility": "private"}
+    ).json()
+    response = client.put(
+        f"/roadmaps/{created['id']}", headers={"If-Match": "1"}, json=_REPLACE_ROADMAP
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["published_visibility"] == "private"
+
+
+def test_replace_explicit_publication_setting_applies_value(
+    make_settings: MakeSettings,
+) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created = client.post(
+        "/roadmaps", json={**_PUBLISHABLE_ROADMAP, "published_visibility": "private"}
+    ).json()
+    response = client.put(
+        f"/roadmaps/{created['id']}",
+        headers={"If-Match": "1"},
+        json={**_REPLACE_ROADMAP, "published_visibility": "public"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["published_visibility"] == "public"
+
+
 def test_replace_with_a_stale_if_match_is_a_409(make_settings: MakeSettings) -> None:
     client, _ = _build_client(make_settings, tokens=["7f3k"])
     _login(client)
@@ -799,8 +846,8 @@ def _make_public(repo: InMemoryRoadmapRepository, roadmap_id: str) -> None:
     readability path can be exercised over HTTP."""
     record = repo._by_id[roadmap_id]
     record.status = "published"
-    record.visibility = "public"
-    record.document = {**record.document, "status": "published", "visibility": "public"}
+    record.published_visibility = "public"
+    record.document = {**record.document, "status": "published", "published_visibility": "public"}
 
 
 def test_fork_returns_201_with_a_fresh_draft(make_settings: MakeSettings) -> None:
@@ -811,11 +858,11 @@ def test_fork_returns_201_with_a_fresh_draft(make_settings: MakeSettings) -> Non
     response = client.post(f"/roadmaps/{source_id}:fork")
     assert response.status_code == 201, response.text
     body = response.json()
-    # A brand-new roadmap ID, a fresh private draft owned by the forking user.
+    # A brand-new roadmap ID, a fresh public-on-publish draft owned by the forking user.
     assert body["id"] == "grokking-dsa-9x2b"
     assert body["id"] != source_id
     assert body["status"] == "draft"
-    assert body["visibility"] == "private"
+    assert body["published_visibility"] == "public"
     assert body["revision"] == 1
     # Content copied verbatim (same child IDs, uniqueness is within-roadmap).
     assert "sub_arrays" in body["sections"]["sec_foundations"]["subsections"]
@@ -837,7 +884,7 @@ def test_fork_of_a_public_roadmap_by_a_non_owner_succeeds(make_settings: MakeSet
     assert response.status_code == 201, response.text
     body = response.json()
     assert body["status"] == "draft"
-    assert body["visibility"] == "private"
+    assert body["published_visibility"] == "public"
     # The forker can now read their own fork.
     assert client.get(f"/roadmaps/{body['id']}").status_code == 200
 
@@ -903,17 +950,17 @@ def test_edit_metadata_smuggled_structural_field_is_a_409_immutable(
     _login(client)
     source_id = client.post("/roadmaps", json=_PUBLISHABLE_ROADMAP).json()["id"]
 
-    # A caller cannot smuggle a visibility/structural change through the metadata
+    # A caller cannot smuggle a publication-access/structural change through the metadata
     # endpoint: it is rejected as immutable rather than silently applied/ignored.
     response = client.patch(
         f"/roadmaps/{source_id}/metadata",
-        json={"title": "Renamed", "visibility": "public", "sections": []},
+        json={"title": "Renamed", "published_visibility": "public", "sections": []},
     )
     assert response.status_code == 409
     assert response.headers["content-type"] == "application/problem+json"
     body = response.json()
     assert body["code"] == "IMMUTABLE"
-    assert "visibility" in body["detail"] and "sections" in body["detail"]
+    assert "published_visibility" in body["detail"] and "sections" in body["detail"]
     # Nothing was applied: the title is unchanged.
     assert client.get(f"/roadmaps/{source_id}").json()["title"] == "Grokking DSA"
 
@@ -958,7 +1005,7 @@ def test_published_rejects_structural_write_but_allows_metadata_edit(
     assert metadata.json()["title"] == "Renamed live"
 
 
-# --- web-only lifecycle: visibility toggle ----------------------------------
+# --- web-only lifecycle: publication-access toggle --------------------------
 
 
 def test_set_visibility_toggles_public_and_private(make_settings: MakeSettings) -> None:
@@ -966,21 +1013,27 @@ def test_set_visibility_toggles_public_and_private(make_settings: MakeSettings) 
     _login(client)
     created_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
 
-    made_public = client.put(f"/roadmaps/{created_id}/visibility", json={"visibility": "public"})
+    made_public = client.put(
+        f"/roadmaps/{created_id}/published-visibility", json={"published_visibility": "public"}
+    )
     assert made_public.status_code == 200, made_public.text
-    assert made_public.json()["visibility"] == "public"
-    assert client.get(f"/roadmaps/{created_id}").json()["visibility"] == "public"
+    assert made_public.json()["published_visibility"] == "public"
+    assert client.get(f"/roadmaps/{created_id}").json()["published_visibility"] == "public"
 
-    made_private = client.put(f"/roadmaps/{created_id}/visibility", json={"visibility": "private"})
+    made_private = client.put(
+        f"/roadmaps/{created_id}/published-visibility", json={"published_visibility": "private"}
+    )
     assert made_private.status_code == 200
-    assert made_private.json()["visibility"] == "private"
+    assert made_private.json()["published_visibility"] == "private"
 
 
 def test_set_visibility_does_not_bump_the_revision(make_settings: MakeSettings) -> None:
     client, _ = _build_client(make_settings, tokens=["7f3k"])
     _login(client)
     created_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
-    body = client.put(f"/roadmaps/{created_id}/visibility", json={"visibility": "public"}).json()
+    body = client.put(
+        f"/roadmaps/{created_id}/published-visibility", json={"published_visibility": "public"}
+    ).json()
     assert body["revision"] == 1
 
 
@@ -988,7 +1041,9 @@ def test_set_visibility_rejects_a_bad_value_as_422(make_settings: MakeSettings) 
     client, _ = _build_client(make_settings, tokens=["7f3k"])
     _login(client)
     created_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
-    response = client.put(f"/roadmaps/{created_id}/visibility", json={"visibility": "secret"})
+    response = client.put(
+        f"/roadmaps/{created_id}/published-visibility", json={"published_visibility": "secret"}
+    )
     assert response.status_code == 422
     assert response.headers["content-type"] == "application/problem+json"
 
@@ -1000,15 +1055,37 @@ def test_set_visibility_is_404_to_a_non_owner(make_settings: MakeSettings) -> No
 
     client.cookies.clear()
     _login(client, username="intruder", email="intruder@example.com")
-    response = client.put(f"/roadmaps/{created_id}/visibility", json={"visibility": "public"})
+    response = client.put(
+        f"/roadmaps/{created_id}/published-visibility", json={"published_visibility": "public"}
+    )
     assert response.status_code == 404
     assert response.json()["code"] == "NOT_FOUND"
 
 
-def test_set_visibility_requires_authentication(make_settings: MakeSettings) -> None:
+def test_set_published_visibility_requires_authentication(make_settings: MakeSettings) -> None:
     client, _ = _build_client(make_settings)
-    response = client.put("/roadmaps/anything-0000/visibility", json={"visibility": "public"})
+    response = client.put(
+        "/roadmaps/anything-0000/published-visibility", json={"published_visibility": "public"}
+    )
     assert response.status_code == 401
+
+
+def test_old_visibility_route_is_not_supported(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
+    response = client.put(f"/roadmaps/{created_id}/visibility", json={"visibility": "private"})
+    assert response.status_code in (404, 405)
+
+
+def test_old_visibility_request_field_is_rejected(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings, tokens=["7f3k"])
+    _login(client)
+    created_id = client.post("/roadmaps", json=_MINIMAL_ROADMAP).json()["id"]
+    response = client.put(
+        f"/roadmaps/{created_id}/published-visibility", json={"visibility": "private"}
+    )
+    assert response.status_code == 422
 
 
 # --- web-only lifecycle: archive --------------------------------------------

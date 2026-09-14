@@ -27,13 +27,13 @@ from wren.progress.next import compute
 from wren.progress.schemas import Progress
 from wren.roadmaps.schemas import (
     ChecklistItem,
+    PublishedVisibility,
     Resource,
     ResourceType,
     Roadmap,
     RoadmapStatus,
     Section,
     Subsection,
-    Visibility,
 )
 
 _NOW = datetime(2026, 7, 15, tzinfo=UTC)
@@ -117,7 +117,7 @@ def _two_node_roadmap(path: list[str]) -> Roadmap:
         id="r-0000",
         owner="owner",
         title="R",
-        visibility=Visibility.PUBLIC,
+        published_visibility=PublishedVisibility.PUBLIC,
         status=RoadmapStatus.PUBLISHED,
         revision=1,
         sections={"sec_x": section},
@@ -174,7 +174,7 @@ def test_order_arrays_out_of_sync_with_their_maps_are_skipped() -> None:
         id="r-0000",
         owner="owner",
         title="R",
-        visibility=Visibility.PUBLIC,
+        published_visibility=PublishedVisibility.PUBLIC,
         status=RoadmapStatus.PUBLISHED,
         revision=1,
         sections={"sec_x": section},
@@ -327,7 +327,7 @@ def _roadmap_and_progress(draw: st.DrawFn) -> tuple[Roadmap, Progress]:
         id="r-0000",
         owner="owner",
         title="R",
-        visibility=Visibility.PUBLIC,
+        published_visibility=PublishedVisibility.PUBLIC,
         status=RoadmapStatus.PUBLISHED,
         revision=1,
         sections={

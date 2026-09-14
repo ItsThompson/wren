@@ -15,13 +15,13 @@ from datetime import UTC, datetime
 from wren.roadmaps.models import RoadmapRecord
 from wren.roadmaps.schemas import (
     ChecklistItem,
+    PublishedVisibility,
     Resource,
     ResourceType,
     Roadmap,
     RoadmapStatus,
     Section,
     Subsection,
-    Visibility,
 )
 
 _NOW = datetime(2026, 7, 15, tzinfo=UTC)
@@ -73,7 +73,7 @@ def build_roadmap(
     roadmap_id: str = "grokking-dsa-7f3k",
     owner: str = "owner",
     status: RoadmapStatus = RoadmapStatus.PUBLISHED,
-    visibility: Visibility = Visibility.PUBLIC,
+    published_visibility: PublishedVisibility = PublishedVisibility.PUBLIC,
 ) -> Roadmap:
     """A two-section published roadmap with a prereq DAG and a valid path.
 
@@ -103,7 +103,7 @@ def build_roadmap(
         owner=owner,
         title="Grokking DSA",
         subject_tags=["cs"],
-        visibility=visibility,
+        published_visibility=published_visibility,
         status=status,
         revision=1,
         sections={"sec_foundations": foundations, "sec_advanced": advanced},
@@ -121,7 +121,7 @@ def make_record(roadmap: Roadmap) -> RoadmapRecord:
         owner=roadmap.owner,
         title=roadmap.title,
         status=roadmap.status.value,
-        visibility=roadmap.visibility.value,
+        published_visibility=roadmap.published_visibility.value,
         revision=roadmap.revision,
         document=roadmap.model_dump(mode="json"),
         created_at=roadmap.created_at,

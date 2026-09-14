@@ -17,7 +17,7 @@ from tests.support.fakes.progress_builders import (
 )
 from wren.progress.schemas import Progress
 from wren.progress.summary import summarize
-from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
+from wren.roadmaps.schemas import PublishedVisibility, Roadmap, RoadmapStatus
 
 _NOW = datetime(2026, 7, 15, tzinfo=UTC)
 
@@ -76,7 +76,7 @@ def test_empty_roadmap_reports_zero_without_dividing_by_zero() -> None:
         id="r-0000",
         owner="owner",
         title="Empty",
-        visibility=Visibility.PUBLIC,
+        published_visibility=PublishedVisibility.PUBLIC,
         status=RoadmapStatus.PUBLISHED,
         revision=1,
         sections={},

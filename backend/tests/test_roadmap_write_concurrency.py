@@ -26,6 +26,7 @@ from wren.roadmaps.schemas import (
     ChecklistItemInput,
     PatchOp,
     PatchResult,
+    PublishedVisibility,
     ResourceInput,
     ResourceType,
     Roadmap,
@@ -34,7 +35,6 @@ from wren.roadmaps.schemas import (
     SectionInput,
     SetTagsOp,
     SubsectionInput,
-    Visibility,
 )
 from wren.roadmaps.service import RoadmapService
 
@@ -80,14 +80,14 @@ async def _seed(url: str) -> None:
                     owner=OWNER,
                     title="Concurrency",
                     status=RoadmapStatus.DRAFT.value,
-                    visibility=Visibility.PRIVATE.value,
+                    published_visibility=PublishedVisibility.PRIVATE.value,
                     revision=1,
                     document=Roadmap(
                         id=ROADMAP_ID,
                         owner=OWNER,
                         title="Concurrency",
                         status=RoadmapStatus.DRAFT,
-                        visibility=Visibility.PRIVATE,
+                        published_visibility=PublishedVisibility.PRIVATE,
                         revision=1,
                         created_at=NOW,
                         updated_at=NOW,
@@ -200,7 +200,7 @@ async def test_delete_and_first_follow_are_serialized_at_service_boundary(
     async with _service_pair(migrated_url) as (roadmaps, progress, _):
         created = await roadmaps[0].create_draft("owner", _roadmap_input("Delete follow race"))
         await roadmaps[0].publish("owner", created.id)
-        await roadmaps[0].set_visibility("owner", created.id, Visibility.PUBLIC)
+        await roadmaps[0].set_published_visibility("owner", created.id, PublishedVisibility.PUBLIC)
         delete_result, follow_result = await asyncio.gather(
             roadmaps[0].delete("owner", created.id),
             progress[1].follow("follower", created.id),
@@ -220,7 +220,7 @@ async def test_archive_before_first_follow_rejects_the_waiting_follower(
     async with _service_pair(migrated_url) as (roadmaps, progress, sessions):
         created = await roadmaps[0].create_draft("owner", _roadmap_input("Archive before follow"))
         await roadmaps[0].publish("owner", created.id)
-        await roadmaps[0].set_visibility("owner", created.id, Visibility.PUBLIC)
+        await roadmaps[0].set_published_visibility("owner", created.id, PublishedVisibility.PUBLIC)
         async with _waiting_write(
             migrated_url,
             created.id,
@@ -243,7 +243,7 @@ async def test_first_follow_before_archive_preserves_the_existing_follower(
     async with _service_pair(migrated_url) as (roadmaps, progress, sessions):
         created = await roadmaps[0].create_draft("owner", _roadmap_input("Follow before archive"))
         await roadmaps[0].publish("owner", created.id)
-        await roadmaps[0].set_visibility("owner", created.id, Visibility.PUBLIC)
+        await roadmaps[0].set_published_visibility("owner", created.id, PublishedVisibility.PUBLIC)
         async with _waiting_write(
             migrated_url,
             created.id,
@@ -346,9 +346,11 @@ async def test_visibility_and_patch_race_preserves_each_write(
     migrated_url: str,
 ) -> None:
     async with _service_pair(migrated_url) as (roadmaps, _, _):
-        created = await roadmaps[0].create_draft("owner", _roadmap_input("Visibility patch race"))
+        created = await roadmaps[0].create_draft(
+            "owner", _roadmap_input("PublishedVisibility patch race")
+        )
         visibility_result, patch_result = await asyncio.gather(
-            roadmaps[0].set_visibility("owner", created.id, Visibility.PUBLIC),
+            roadmaps[0].set_published_visibility("owner", created.id, PublishedVisibility.PUBLIC),
             roadmaps[1].patch_draft(
                 "owner",
                 created.id,
@@ -356,10 +358,10 @@ async def test_visibility_and_patch_race_preserves_each_write(
                 [SetTagsOp(op="set_tags", subsection_id="sub_core", tags=["race"])],
             ),
         )
-        assert visibility_result.visibility is Visibility.PUBLIC
+        assert visibility_result.published_visibility is PublishedVisibility.PUBLIC
         assert not isinstance(patch_result, Exception)
         stored = await _read_roadmap(migrated_url, created.id)
-        assert stored.visibility is Visibility.PUBLIC
+        assert stored.published_visibility is PublishedVisibility.PUBLIC
         assert stored.revision == 2
 
 
@@ -369,7 +371,7 @@ async def test_progress_and_deadline_race_preserves_unrelated_state(
     async with _service_pair(migrated_url) as (roadmaps, progress, _):
         created = await roadmaps[0].create_draft("owner", _roadmap_input("Progress deadline race"))
         await roadmaps[0].publish("owner", created.id)
-        await roadmaps[0].set_visibility("owner", created.id, Visibility.PUBLIC)
+        await roadmaps[0].set_published_visibility("owner", created.id, PublishedVisibility.PUBLIC)
         update_result, deadline_result = await asyncio.gather(
             progress[0].update(
                 "reader", created.id, ["chk_read-the-guide"], CompletionState.COMPLETE

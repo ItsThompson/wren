@@ -26,7 +26,7 @@ from wren.core.errors import Conflict, NotFound, Validation
 from wren.core.read_contract import ResponseFormat
 from wren.progress.schemas import CompletionState
 from wren.progress.service import ProgressService
-from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
+from wren.roadmaps.schemas import PublishedVisibility, Roadmap, RoadmapStatus
 
 _OWNER = "owner"
 _FOLLOWER = "follower"
@@ -71,7 +71,9 @@ async def test_follow_is_idempotent() -> None:
 
 
 async def test_follow_a_draft_is_a_409() -> None:
-    draft = build_roadmap(status=RoadmapStatus.DRAFT, visibility=Visibility.PUBLIC)
+    draft = build_roadmap(
+        status=RoadmapStatus.DRAFT, published_visibility=PublishedVisibility.PUBLIC
+    )
     service, _, _ = _service(draft)
 
     with pytest.raises(Conflict):
@@ -85,7 +87,7 @@ async def test_follow_an_unknown_roadmap_is_a_404() -> None:
 
 
 async def test_follow_a_private_roadmap_owned_by_another_is_a_404_no_leak() -> None:
-    private = build_roadmap(owner=_OWNER, visibility=Visibility.PRIVATE)
+    private = build_roadmap(owner=_OWNER, published_visibility=PublishedVisibility.PRIVATE)
     service, _, _ = _service(private)
 
     with pytest.raises(NotFound):
@@ -93,7 +95,7 @@ async def test_follow_a_private_roadmap_owned_by_another_is_a_404_no_leak() -> N
 
 
 async def test_owner_can_follow_their_own_private_published_roadmap() -> None:
-    private = build_roadmap(owner=_OWNER, visibility=Visibility.PRIVATE)
+    private = build_roadmap(owner=_OWNER, published_visibility=PublishedVisibility.PRIVATE)
     service, _, _ = _service(private)
 
     progress = await service.follow(_OWNER, private.id)
@@ -279,7 +281,9 @@ async def test_set_deadline_is_scoped_per_user() -> None:
 async def test_set_deadline_on_a_public_archived_roadmap_by_a_non_follower_is_a_409() -> None:
     # Archived gains no new followers: a non-follower's set_deadline is refused
     # before any write, so no phantom progress row is created.
-    archived = build_roadmap(status=RoadmapStatus.ARCHIVED, visibility=Visibility.PUBLIC)
+    archived = build_roadmap(
+        status=RoadmapStatus.ARCHIVED, published_visibility=PublishedVisibility.PUBLIC
+    )
     service, _, progress_repo = _service(archived)
 
     with pytest.raises(Conflict):
@@ -333,7 +337,7 @@ async def test_a_persist_failure_rolls_back_and_propagates() -> None:
 async def test_get_on_an_archived_roadmap_is_allowed_for_a_follower() -> None:
     # Archiving hides a roadmap from discovery but must NOT break its existing
     # followers: a follower keeps reading their progress after it is archived.
-    roadmap = build_roadmap(visibility=Visibility.PUBLIC)
+    roadmap = build_roadmap(published_visibility=PublishedVisibility.PUBLIC)
     service, roadmap_repo, _ = _service(roadmap)
     await service.update(_FOLLOWER, roadmap.id, [CHK_ARRAYS_READ], CompletionState.COMPLETE)
 
@@ -349,7 +353,9 @@ async def test_archived_owner_without_progress_cannot_read_or_write_tracking() -
     # Ownership keeps the archived roadmap document readable, but does not make
     # the owner an existing follower or permit a new progress row.
     archived = build_roadmap(
-        owner=_OWNER, status=RoadmapStatus.ARCHIVED, visibility=Visibility.PRIVATE
+        owner=_OWNER,
+        status=RoadmapStatus.ARCHIVED,
+        published_visibility=PublishedVisibility.PRIVATE,
     )
     service, _, progress_repo = _service(archived)
 
@@ -367,7 +373,7 @@ async def test_archived_owner_without_progress_cannot_read_or_write_tracking() -
 
 
 async def test_update_and_next_on_an_archived_roadmap_keep_working_for_a_follower() -> None:
-    roadmap = build_roadmap(visibility=Visibility.PUBLIC)
+    roadmap = build_roadmap(published_visibility=PublishedVisibility.PUBLIC)
     service, roadmap_repo, _ = _service(roadmap)
     await service.follow(_FOLLOWER, roadmap.id)
     await roadmap_repo.save(roadmap.model_copy(update={"status": RoadmapStatus.ARCHIVED}))
@@ -385,7 +391,9 @@ async def test_update_and_next_on_an_archived_roadmap_keep_working_for_a_followe
 async def test_follow_on_an_archived_roadmap_is_a_409_no_new_followers() -> None:
     # Archived = retired from discovery, so it gains NO new followers: a fresh
     # follow is a 409 (existing followers keep access via get/update/get_next).
-    archived = build_roadmap(status=RoadmapStatus.ARCHIVED, visibility=Visibility.PUBLIC)
+    archived = build_roadmap(
+        status=RoadmapStatus.ARCHIVED, published_visibility=PublishedVisibility.PUBLIC
+    )
     service, _, _ = _service(archived)
     with pytest.raises(Conflict):
         await service.follow(_FOLLOWER, archived.id)
@@ -395,7 +403,9 @@ async def test_read_of_an_archived_private_roadmap_by_a_non_follower_is_a_404_no
     # A non-owner, non-follower cannot read an archived PRIVATE roadmap: 404 with
     # no existence leak (readability is checked before the trackable status gate).
     archived = build_roadmap(
-        owner=_OWNER, status=RoadmapStatus.ARCHIVED, visibility=Visibility.PRIVATE
+        owner=_OWNER,
+        status=RoadmapStatus.ARCHIVED,
+        published_visibility=PublishedVisibility.PRIVATE,
     )
     service, _, _ = _service(archived)
     with pytest.raises(NotFound):
@@ -409,7 +419,9 @@ async def test_update_on_a_public_archived_roadmap_by_a_non_follower_creates_no_
     # roadmap is refused before any write, so the upsert cannot mint a new
     # progress row (which would be a new follower and could block the owner's
     # delete). Archived gains no new followers, via update just as via follow.
-    archived = build_roadmap(status=RoadmapStatus.ARCHIVED, visibility=Visibility.PUBLIC)
+    archived = build_roadmap(
+        status=RoadmapStatus.ARCHIVED, published_visibility=PublishedVisibility.PUBLIC
+    )
     service, _, progress_repo = _service(archived)
     with pytest.raises(Conflict):
         await service.update(_FOLLOWER, archived.id, [CHK_ARRAYS_READ], CompletionState.COMPLETE)
@@ -422,7 +434,9 @@ async def test_update_on_a_public_archived_roadmap_by_a_non_follower_creates_no_
 async def test_get_next_on_a_public_archived_roadmap_by_a_non_follower_is_a_409() -> None:
     # A non-follower cannot start tracking an archived roadmap, so get_next is
     # refused too (archived is closed to new participation).
-    archived = build_roadmap(status=RoadmapStatus.ARCHIVED, visibility=Visibility.PUBLIC)
+    archived = build_roadmap(
+        status=RoadmapStatus.ARCHIVED, published_visibility=PublishedVisibility.PUBLIC
+    )
     service, _, _ = _service(archived)
     with pytest.raises(Conflict):
         await service.get_next(_FOLLOWER, archived.id)
@@ -431,7 +445,9 @@ async def test_get_next_on_a_public_archived_roadmap_by_a_non_follower_is_a_409(
 async def test_get_on_a_public_archived_roadmap_by_a_non_follower_is_a_409() -> None:
     # Consistent with update/get_next: a non-follower cannot track an archived
     # roadmap. (A private archived roadmap is a 404 first; this one is public.)
-    archived = build_roadmap(status=RoadmapStatus.ARCHIVED, visibility=Visibility.PUBLIC)
+    archived = build_roadmap(
+        status=RoadmapStatus.ARCHIVED, published_visibility=PublishedVisibility.PUBLIC
+    )
     service, _, _ = _service(archived)
     with pytest.raises(Conflict):
         await service.get(_FOLLOWER, archived.id, detailed=True)

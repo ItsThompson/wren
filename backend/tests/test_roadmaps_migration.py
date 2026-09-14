@@ -170,7 +170,7 @@ async def test_repository_rollback_after_a_duplicate_insert(migrated_roadmaps_ur
                 owner="owner-3",
                 title="dup",
                 status="draft",
-                visibility="private",
+                published_visibility="private",
                 revision=1,
                 document=existing.document,
                 created_at=existing.created_at,

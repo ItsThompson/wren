@@ -24,7 +24,7 @@ from sqlalchemy import select, update
 
 from wren.core.db import fetch_optional
 from wren.roadmaps.models import RoadmapRecord
-from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
+from wren.roadmaps.schemas import PublishedVisibility, Roadmap, RoadmapStatus
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Sequence
@@ -117,7 +117,7 @@ class SqlAlchemyRoadmapRepository:
                 owner=roadmap.owner,
                 title=roadmap.title,
                 status=roadmap.status.value,
-                visibility=roadmap.visibility.value,
+                published_visibility=roadmap.published_visibility.value,
                 revision=roadmap.revision,
                 document=roadmap.model_dump(mode="json"),
                 updated_at=roadmap.updated_at,
@@ -201,7 +201,7 @@ class SqlAlchemyRoadmapRepository:
             .where(
                 RoadmapRecord.owner == owner_id,
                 RoadmapRecord.status == RoadmapStatus.PUBLISHED.value,
-                RoadmapRecord.visibility == Visibility.PUBLIC.value,
+                RoadmapRecord.published_visibility == PublishedVisibility.PUBLIC.value,
             )
             .order_by(RoadmapRecord.updated_at.desc(), RoadmapRecord.id)
         )

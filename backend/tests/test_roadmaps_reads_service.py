@@ -31,7 +31,7 @@ from wren.core.read_contract import ResponseFormat
 from wren.progress.schemas import Progress
 from wren.roadmaps.read_schemas import SectionInclude
 from wren.roadmaps.read_service import CheckedReader, RoadmapReadService
-from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
+from wren.roadmaps.schemas import PublishedVisibility, Roadmap, RoadmapStatus
 from wren.roadmaps.wiring import _checked_reader
 
 _NON_OWNER = "reader"
@@ -75,14 +75,18 @@ async def test_non_owner_reads_a_public_archived_roadmap() -> None:
 
 
 async def test_non_owner_gets_not_found_on_a_private_roadmap() -> None:
-    service = _service(build_read_roadmap(visibility=Visibility.PRIVATE))
+    service = _service(build_read_roadmap(published_visibility=PublishedVisibility.PRIVATE))
     with pytest.raises(NotFound):
         await service.get_overview(_NON_OWNER, ROADMAP_ID, ResponseFormat.CONCISE)
 
 
 async def test_non_owner_gets_not_found_on_a_public_draft() -> None:
     # A public draft is not discoverable: a non-owner cannot read it (no leak).
-    service = _service(build_read_roadmap(status=RoadmapStatus.DRAFT, visibility=Visibility.PUBLIC))
+    service = _service(
+        build_read_roadmap(
+            status=RoadmapStatus.DRAFT, published_visibility=PublishedVisibility.PUBLIC
+        )
+    )
     with pytest.raises(NotFound):
         await service.get_node(_NON_OWNER, ROADMAP_ID, SUB_ARRAYS, ResponseFormat.CONCISE)
 
@@ -100,7 +104,9 @@ async def test_get_returns_the_full_roadmap_to_its_owner() -> None:
 async def test_owner_reads_their_own_archived_roadmap() -> None:
     service = _service(
         build_read_roadmap(
-            owner=AUTHOR, status=RoadmapStatus.ARCHIVED, visibility=Visibility.PRIVATE
+            owner=AUTHOR,
+            status=RoadmapStatus.ARCHIVED,
+            published_visibility=PublishedVisibility.PRIVATE,
         )
     )
     roadmap = await service.get(AUTHOR, ROADMAP_ID)
@@ -108,7 +114,7 @@ async def test_owner_reads_their_own_archived_roadmap() -> None:
 
 
 async def test_get_is_404_for_a_non_owner_on_a_private_roadmap() -> None:
-    service = _service(build_read_roadmap(visibility=Visibility.PRIVATE))
+    service = _service(build_read_roadmap(published_visibility=PublishedVisibility.PRIVATE))
     with pytest.raises(NotFound):
         await service.get(_NON_OWNER, ROADMAP_ID)
 

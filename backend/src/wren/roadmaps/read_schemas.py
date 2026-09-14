@@ -26,7 +26,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
-from wren.roadmaps.schemas import ResourceType, RoadmapStatus, Visibility
+from wren.roadmaps.schemas import PublishedVisibility, ResourceType, RoadmapStatus
 
 
 class SectionInclude(StrEnum):
@@ -125,7 +125,7 @@ class OverviewDetails(BaseModel):
     owner: str
     description: str | None = None
     subject_tags: list[str] = Field(default_factory=list)
-    visibility: Visibility
+    published_visibility: PublishedVisibility
     created_at: datetime
     updated_at: datetime
     suggested_path: list[str] = Field(default_factory=list)

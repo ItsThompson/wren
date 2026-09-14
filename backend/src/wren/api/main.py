@@ -83,7 +83,7 @@ onboarding_router = create_onboarding_router(service_provider, identity=require_
 
 # Roadmap authoring + reads over the same service layer. The App selector drives
 # both mounting (the external app also mounts the web-only lifecycle routes
-# visibility / archive / delete) and identity (require_user) from the route
+# publication-visibility / archive / delete) and identity (require_user) from the route
 # registry; the internal app passes App.INTERNAL for the smaller trusted surface.
 roadmaps_router = create_roadmaps_router(
     build_roadmap_service_provider(),
