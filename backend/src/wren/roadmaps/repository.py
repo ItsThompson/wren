@@ -8,7 +8,7 @@ substitute an in-memory repository at this interface; production binds
 Transaction ownership: ``core.db.get_session`` is yield-only, so the service
 calls :meth:`commit`/:meth:`rollback` here. Reads are **owner-scoped** at the
 query level (``WHERE id = :id AND owner = :owner``), so a non-owner's request for
-a private draft resolves to ``None`` -> 404, leaking no existence.
+an owner-only draft resolves to ``None`` -> 404, leaking no existence.
 ``roadmap_id_exists`` is deliberately global (across all owners): it
 backs the mint-time uniqueness check for the globally-unique roadmap ID and
 returns only a boolean, never another user's data.
