@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Archive, Globe, Lock, Trash2 } from 'lucide-react'
+import { Archive, Trash2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import type { RoadmapLifecycle, Roadmap } from '../types'
+import { PublishedVisibilityControl } from './PublishedVisibilityControl'
 
 interface LifecycleActionsProps {
   roadmap: Roadmap
@@ -12,11 +13,11 @@ interface LifecycleActionsProps {
 
 /**
  * The owner-only web-only lifecycle bar (destructive = brick fill,
- * confirm-gated): a visibility toggle plus the
+ * confirm-gated): a publication-access toggle plus the
  * confirm-gated archive and delete actions. No agent surface exists for any of
  * these; they are human-web only.
  *
- * Visibility is a reversible ghost toggle (lock/globe) so it is not confirm-gated.
+ * PublishedVisibility is a reversible ghost toggle (lock/globe) so it is not confirm-gated.
  * Archive and delete are destructive (brick `destructive` Button) and require an
  * inline confirm step before firing. Archive is offered only on a published
  * roadmap (the linear draft -> published -> archived lifecycle). Delete is guarded
@@ -25,10 +26,9 @@ interface LifecycleActionsProps {
  */
 export function LifecycleActions({ roadmap, lifecycle, isMutationPending }: LifecycleActionsProps) {
   const [confirming, setConfirming] = useState<'archive' | 'delete' | null>(null)
-  const { visibilityState, setVisibility, archiveState, archive, deleteState, deleteRoadmap } =
+  const { publishedVisibilityState, setPublishedVisibility, archiveState, archive, deleteState, deleteRoadmap } =
     lifecycle
 
-  const isPublic = roadmap.visibility === 'public'
   const isArchiving = archiveState.phase === 'archiving'
   const isDeleting = deleteState.phase === 'deleting'
   const canArchive = roadmap.status === 'published'
@@ -41,20 +41,13 @@ export function LifecycleActions({ roadmap, lifecycle, isMutationPending }: Life
 
   return (
     <section className="mt-6 border-t border-border pt-6" aria-label="Roadmap lifecycle">
-      <div className="flex flex-wrap items-center gap-3">
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => setVisibility(isPublic ? 'private' : 'public')}
-          disabled={isMutationPending}
-        >
-          {isPublic ? <Globe aria-hidden /> : <Lock aria-hidden />}
-          {isPublic ? 'Make private' : 'Make public'}
-        </Button>
-        <span className="text-sm text-muted-foreground">
-          {isPublic ? 'Public: anyone with the link can find this.' : 'Private: only you can see this.'}
-        </span>
-      </div>
+      <PublishedVisibilityControl
+        status={roadmap.status}
+        publishedVisibility={roadmap.published_visibility}
+        saving={publishedVisibilityState.phase === 'saving'}
+        disabled={isMutationPending}
+        onChange={setPublishedVisibility}
+      />
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         {canArchive ? (
@@ -117,9 +110,9 @@ export function LifecycleActions({ roadmap, lifecycle, isMutationPending }: Life
         </p>
       ) : null}
 
-      {visibilityState.phase === 'failed' ? (
+      {publishedVisibilityState.phase === 'failed' ? (
         <p className="mt-3 text-sm text-muted-foreground" role="alert">
-          We couldn&rsquo;t update visibility. Please try again.
+          We couldn&rsquo;t update publication access. Please try again.
         </p>
       ) : null}
     </section>

@@ -12,7 +12,7 @@ import { useDashboard } from './hooks/useDashboard'
  * DashboardView: the caller's
  * private home. It lists everything they authored (draft / private / public) in a
  * "Yours" section and everything they follow in a "Following" section, each card
- * carrying status + visibility badges. Fetching is gated on an
+ * carrying status + publication-access badges. Fetching is gated on an
  * authenticated session; the body routes loading / anonymous / error / empty /
  * loaded inside a shared page frame.
  */

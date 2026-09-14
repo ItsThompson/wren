@@ -12,7 +12,7 @@ import {
   getRoadmap,
   listMcpTools,
   publishRoadmap,
-  setVisibility,
+  setPublishedVisibility,
 } from '../helpers/api'
 import { uniqueUser } from '../helpers/users'
 
@@ -47,7 +47,7 @@ test.describe('roadmap lifecycle and discovery', () => {
       id: roadmapId,
       owner: expect.any(String),
       status: 'published',
-      visibility: 'public',
+      published_visibility: 'public',
       sections: expect.any(Object),
       section_order: ['sec_foundations'],
       suggested_path: ['sub_arrays', 'sub_hashing'],
@@ -58,7 +58,7 @@ test.describe('roadmap lifecycle and discovery', () => {
       (section.subsections as Record<string, Record<string, unknown>>).sub_arrays.resources,
     ).toBeTruthy()
 
-    await setVisibility(author, roadmapId, 'private')
+    await setPublishedVisibility(author, roadmapId, 'private')
     const privateDashboard = await getDashboard(author)
     expect(privateDashboard.filter((card) => card.id === roadmapId)).toHaveLength(2)
 

@@ -108,7 +108,7 @@ export function useRoadmap(roadmapId: string): {
   const reconcileRoadmap = useCallback(
     (updated: Roadmap) => {
       void mutate(updated, { revalidate: false })
-      const becamePublic = roadmap?.visibility === 'private' && updated.visibility === 'public'
+      const becamePublic = roadmap?.published_visibility === 'private' && updated.published_visibility === 'public'
       const dashboardNeedsRefresh = becamePublic
       const becamePublished = roadmap?.status !== 'published' && updated.status === 'published'
       const profileNeedsRefresh = updated.status === 'published' && (becamePublic || becamePublished)
@@ -255,7 +255,7 @@ export function useRoadmap(roadmapId: string): {
     })()
   }, [client, navigate, roadmapId, mutateCache, isCurrent])
 
-  // Web-only lifecycle (visibility / archive / delete). A visibility toggle or
+  // Web-only lifecycle (publication-access / archive / delete). A publication-access toggle or
   // archive reconciles the shared roadmap cache in place (replacing the old
   // view `setState` callback), so the tree route and the roadmap route stay
   // coherent; a successful delete leaves the now-removed roadmap's route.
@@ -278,7 +278,7 @@ export function useRoadmap(roadmapId: string): {
     publishState.phase === 'publishing' ||
     metadataState.phase === 'saving' ||
     forkState.phase === 'forking' ||
-    lifecycle.visibilityState.phase === 'saving' ||
+    lifecycle.publishedVisibilityState.phase === 'saving' ||
     lifecycle.archiveState.phase === 'archiving' ||
     lifecycle.deleteState.phase === 'deleting'
 

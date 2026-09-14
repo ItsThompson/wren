@@ -2,7 +2,7 @@ import { Link } from 'react-router'
 
 import type { components } from '@/api'
 import { StatusBadge } from '../badges/StatusBadge'
-import { VisibilityBadge } from '../badges/VisibilityBadge'
+import { PublishedVisibilityBadge } from '../badges/PublishedVisibilityBadge'
 
 type RoadmapCardData = components['schemas']['RoadmapCard']
 
@@ -13,7 +13,7 @@ interface RoadmapCardProps {
 /**
  * A roadmap summarized as a card for the dashboard and profile grids. The whole
  * card is a real link to the roadmap view; it shows
- * the title, the status + visibility badges, and neutral subject-tag chips
+ * the title, the status + publication-access badges, and neutral subject-tag chips
  * (subject tags are never hash-colored: only subsection track tags get color).
  */
 export function RoadmapCard({ roadmap }: RoadmapCardProps) {
@@ -26,7 +26,10 @@ export function RoadmapCard({ roadmap }: RoadmapCardProps) {
       <h3 className="text-lg leading-snug font-semibold text-foreground">{roadmap.title}</h3>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <StatusBadge status={roadmap.status} />
-        <VisibilityBadge visibility={roadmap.visibility} />
+        <PublishedVisibilityBadge
+          publishedVisibility={roadmap.published_visibility}
+          status={roadmap.status}
+        />
       </div>
       {subjectTags.length > 0 && (
         <ul className="mt-3 flex flex-wrap gap-1.5">

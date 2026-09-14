@@ -14,7 +14,7 @@ import { useRoadmap } from '@/views/RoadmapView/hooks/useRoadmap'
 
 /**
  * Revalidate-after-write. Every write that returns the updated resource
- * (publish / editMetadata / visibility / archive) reconciles the read cache in
+ * (publish / editMetadata / publication access / archive) reconciles the read cache in
  * place via `mutate(returned, { revalidate: false })`, so the view reflects the
  * new server state with NO stale flash (the phase never returns to `loading`
  * after the first load) and NO unnecessary extra GET (the mount read is the only
@@ -32,7 +32,7 @@ const ROADMAP_ID = mockRoadmap.id
 const PUBLISH_URL = `${BASE}/roadmaps/${ROADMAP_ID}:publish`
 const ARCHIVE_URL = `${BASE}/roadmaps/${ROADMAP_ID}:archive`
 const METADATA_URL = `${BASE}/roadmaps/${ROADMAP_ID}/metadata`
-const VISIBILITY_URL = `${BASE}/roadmaps/${ROADMAP_ID}/visibility`
+const PUBLISHED_VISIBILITY_URL = `${BASE}/roadmaps/${ROADMAP_ID}/published-visibility`
 const DELETE_URL = `${BASE}/roadmaps/${ROADMAP_ID}`
 const AUTH_VALUE = buildAuthValue({ status: 'authenticated', user: buildAuthUser() })
 
@@ -40,10 +40,10 @@ const AUTH_VALUE = buildAuthValue({ status: 'authenticated', user: buildAuthUser
 const phases: string[] = []
 
 function draft(overrides: Partial<Roadmap> = {}): Roadmap {
-  return { ...mockRoadmap, status: 'draft', visibility: 'private', ...overrides }
+  return { ...mockRoadmap, status: 'draft', published_visibility: 'private', ...overrides }
 }
 function published(overrides: Partial<Roadmap> = {}): Roadmap {
-  return { ...mockRoadmap, status: 'published', visibility: 'public', ...overrides }
+  return { ...mockRoadmap, status: 'published', published_visibility: 'public', ...overrides }
 }
 
 /** Reads one roadmap and exposes each write action as a button. */
@@ -79,7 +79,7 @@ function WriteProbe() {
       <span data-testid="phase">{state.phase}</span>
       <span data-testid="title">{state.phase === 'loaded' ? state.roadmap.title : ''}</span>
       <span data-testid="status">{state.phase === 'loaded' ? state.roadmap.status : ''}</span>
-      <span data-testid="visibility">{state.phase === 'loaded' ? state.roadmap.visibility : ''}</span>
+      <span data-testid="published_visibility">{state.phase === 'loaded' ? state.roadmap.published_visibility : ''}</span>
       <button type="button" onClick={() => void publish()}>
         publish
       </button>
@@ -91,10 +91,10 @@ function WriteProbe() {
       >
         edit
       </button>
-      <button type="button" onClick={() => lifecycle.setVisibility('private')}>
+      <button type="button" onClick={() => lifecycle.setPublishedVisibility('private')}>
         make-private
       </button>
-      <button type="button" onClick={() => lifecycle.setVisibility('public')}>
+      <button type="button" onClick={() => lifecycle.setPublishedVisibility('public')}>
         make-public
       </button>
       <button type="button" onClick={() => lifecycle.archive()}>
@@ -163,7 +163,7 @@ describe('revalidate-after-write keeps server state and avoids stale flashes', (
     expect(noStaleFlash()).toBe(true)
   })
 
-  it('visibility toggle reflects the returned visibility in place', async () => {
+  it('publication-access toggle reflects the returned setting in place', async () => {
     const user = userEvent.setup()
     let roadmapGets = 0
     server.use(
@@ -171,14 +171,14 @@ describe('revalidate-after-write keeps server state and avoids stale flashes', (
         roadmapGets += 1
         return HttpResponse.json(published())
       }),
-      http.put(VISIBILITY_URL, () => HttpResponse.json(published({ visibility: 'private' }))),
+      http.put(PUBLISHED_VISIBILITY_URL, () => HttpResponse.json(published({ published_visibility: 'private' }))),
     )
     renderWithProviders(<WriteProbe />, { baseUrl: BASE })
-    await waitFor(() => expect(screen.getByTestId('visibility')).toHaveTextContent('public'))
+    await waitFor(() => expect(screen.getByTestId('published_visibility')).toHaveTextContent('public'))
 
     await user.click(screen.getByRole('button', { name: 'make-private' }))
 
-    await waitFor(() => expect(screen.getByTestId('visibility')).toHaveTextContent('private'))
+    await waitFor(() => expect(screen.getByTestId('published_visibility')).toHaveTextContent('private'))
     expect(roadmapGets).toBe(1)
     expect(noStaleFlash()).toBe(true)
   })
@@ -237,7 +237,7 @@ describe('revalidate-after-write keeps server state and avoids stale flashes', (
 
   it('revalidates discovery after a private roadmap becomes public', async () => {
     const user = userEvent.setup()
-    const privateRoadmap = published({ visibility: 'private' })
+    const privateRoadmap = published({ published_visibility: 'private' })
     let dashboardReads = 0
     let profileReads = 0
     server.use(
@@ -258,7 +258,7 @@ describe('revalidate-after-write keeps server state and avoids stale flashes', (
           roadmaps: profileReads === 1 ? [] : [published()],
         })
       }),
-      http.put(VISIBILITY_URL, () => HttpResponse.json(published())),
+      http.put(PUBLISHED_VISIBILITY_URL, () => HttpResponse.json(published())),
     )
     renderWithProviders(
       <>
@@ -276,7 +276,7 @@ describe('revalidate-after-write keeps server state and avoids stale flashes', (
 
   it('reconciles a public draft into a mounted profile when it publishes', async () => {
     const user = userEvent.setup()
-    const publicDraft = draft({ visibility: 'public' })
+    const publicDraft = draft({ published_visibility: 'public' })
     let profileReads = 0
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(publicDraft)),

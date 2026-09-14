@@ -6,7 +6,7 @@ import {
   createPublishableRoadmap,
   getRoadmap,
   publishRoadmap,
-  setVisibility,
+  setPublishedVisibility,
 } from '../helpers/api'
 import { API_BASE_URL, FRONTEND_BASE_URL } from '../helpers/config'
 import { uniqueUser } from '../helpers/users'
@@ -37,7 +37,7 @@ test.describe('anonymous roadmap reading', () => {
     await expect(page.getByText('Read it')).toBeVisible()
     await expect(page.getByRole('link', { name: 'Log in to track progress' })).toBeVisible()
     await expect(page.getByText('Fork')).not.toBeVisible()
-    expect(expectedDocument).toMatchObject({ status: 'published', visibility: 'public' })
+    expect(expectedDocument).toMatchObject({ status: 'published', published_visibility: 'public' })
 
     await page.goto(`/roadmaps/${roadmapId}/tree`)
     await expect(page.getByRole('link', { name: /Arrays \(progress unavailable\)/ })).toBeVisible()
@@ -47,7 +47,7 @@ test.describe('anonymous roadmap reading', () => {
     await expect(page.getByRole('heading', { level: 3, name: 'Hashing' })).toBeVisible()
 
     const personalRequests = apiRequests.filter(({ path }) =>
-      /\/progress$|\/next$|\/follow$|:publish$|:archive$|\/visibility$|\/metadata$/.test(path),
+      /\/progress$|\/next$|\/follow$|:publish$|:archive$|\/published-visibility$|\/metadata$/.test(path),
     )
     expect(personalRequests).toEqual([])
     const documentRequests = apiRequests.filter(({ path }) => path === `/roadmaps/${roadmapId}`)
@@ -59,7 +59,7 @@ test.describe('anonymous roadmap reading', () => {
     await expect(page.getByText('Archived', { exact: true })).toBeVisible()
     await expect(page.getByText(/available here for reading/i)).toBeVisible()
 
-    await setVisibility(owner, roadmapId, 'private')
+    await setPublishedVisibility(owner, roadmapId, 'private')
     await page.reload()
     await expect(page.getByText('Roadmap not found')).toBeVisible()
 

@@ -23,13 +23,13 @@ export interface PublishableRoadmapTagOptions {
 /**
  * A minimal publishable roadmap: two sequenced subsections (arrays -> hashing),
  * each with a resource and checklist items, a complete `suggested_path`, and
- * public visibility so a second user can follow it. Rebuilt per create so tests
+ * public publication access so a second user can follow it. Rebuilt per create so tests
  * never share a mutable literal.
  */
 export function buildPublishableRoadmap(tags: PublishableRoadmapTagOptions = {}) {
   return {
     title: 'Grokking DSA',
-    visibility: 'public',
+    published_visibility: 'public',
     suggested_path: ['sub_arrays', 'sub_hashing'],
     sections: [
       {
@@ -141,12 +141,12 @@ export async function getProfile(
   return (await response.json()) as { roadmaps?: Record<string, unknown>[] }
 }
 
-export async function setVisibility(
+export async function setPublishedVisibility(
   context: APIRequestContext,
   id: string,
-  visibility: 'public' | 'private',
+  published_visibility: 'public' | 'private',
 ): Promise<void> {
-  const response = await context.put(`/roadmaps/${id}/visibility`, { data: { visibility } })
+  const response = await context.put(`/roadmaps/${id}/published-visibility`, { data: { published_visibility } })
   expect(response.status(), await response.text()).toBe(200)
 }
 

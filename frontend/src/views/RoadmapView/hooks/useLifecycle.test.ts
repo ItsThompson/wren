@@ -10,7 +10,7 @@ import { useLifecycle } from './useLifecycle'
 
 const BASE = 'https://api.test'
 const ROADMAP_ID = 'grokking-dsa-7f3k'
-const VISIBILITY_URL = `${BASE}/roadmaps/${ROADMAP_ID}/visibility`
+const PUBLISHED_VISIBILITY_URL = `${BASE}/roadmaps/${ROADMAP_ID}/published-visibility`
 const ARCHIVE_URL = `${BASE}/roadmaps/${ROADMAP_ID}:archive`
 const DELETE_URL = `${BASE}/roadmaps/${ROADMAP_ID}`
 
@@ -26,7 +26,7 @@ function buildRoadmap(overrides: Partial<Roadmap> = {}): Roadmap {
     id: ROADMAP_ID,
     owner: 'user-1',
     title: 'Grokking DSA',
-    visibility: 'private',
+    published_visibility: 'private',
     status: 'draft',
     revision: 1,
     created_at: '2026-07-15T00:00:00Z',
@@ -48,48 +48,48 @@ function renderLifecycle() {
   return { ...view, onChanged, onDeleted }
 }
 
-describe('useLifecycle visibility toggle', () => {
+describe('useLifecycle publication-access toggle', () => {
   it('reconciles the returned roadmap and returns to idle on success', async () => {
-    const updated = buildRoadmap({ visibility: 'public' })
+    const updated = buildRoadmap({ published_visibility: 'public' })
     let put: unknown
     server.use(
-      http.put(VISIBILITY_URL, async ({ request }) => {
+      http.put(PUBLISHED_VISIBILITY_URL, async ({ request }) => {
         put = await request.json()
         return HttpResponse.json(updated)
       }),
     )
     const { result, onChanged } = renderLifecycle()
 
-    act(() => result.current.setVisibility('public'))
-    expect(result.current.visibilityState).toEqual({ phase: 'saving' })
+    act(() => result.current.setPublishedVisibility('public'))
+    expect(result.current.publishedVisibilityState).toEqual({ phase: 'saving' })
 
-    await waitFor(() => expect(result.current.visibilityState).toEqual({ phase: 'idle' }))
-    // The request carries the requested visibility (matched by URL + method).
-    expect(put).toEqual({ visibility: 'public' })
+    await waitFor(() => expect(result.current.publishedVisibilityState).toEqual({ phase: 'idle' }))
+    // The request carries the requested publication setting (matched by URL + method).
+    expect(put).toEqual({ published_visibility: 'public' })
     // The returned roadmap is handed to the cache reconciler.
     expect(onChanged).toHaveBeenCalledWith(updated)
   })
 
   it('carries the HTTP status when the toggle fails (500)', async () => {
-    server.use(http.put(VISIBILITY_URL, () => new HttpResponse(null, { status: 500 })))
+    server.use(http.put(PUBLISHED_VISIBILITY_URL, () => new HttpResponse(null, { status: 500 })))
     const { result, onChanged } = renderLifecycle()
 
-    act(() => result.current.setVisibility('public'))
+    act(() => result.current.setPublishedVisibility('public'))
 
     await waitFor(() =>
-      expect(result.current.visibilityState).toEqual({ phase: 'failed', status: 500 }),
+      expect(result.current.publishedVisibilityState).toEqual({ phase: 'failed', status: 500 }),
     )
     expect(onChanged).not.toHaveBeenCalled()
   })
 
   it('carries a null status when the toggle throws at the network level', async () => {
-    server.use(http.put(VISIBILITY_URL, () => HttpResponse.error()))
+    server.use(http.put(PUBLISHED_VISIBILITY_URL, () => HttpResponse.error()))
     const { result } = renderLifecycle()
 
-    act(() => result.current.setVisibility('public'))
+    act(() => result.current.setPublishedVisibility('public'))
 
     await waitFor(() =>
-      expect(result.current.visibilityState).toEqual({ phase: 'failed', status: null }),
+      expect(result.current.publishedVisibilityState).toEqual({ phase: 'failed', status: null }),
     )
   })
 })
@@ -102,11 +102,11 @@ describe('useLifecycle roadmap scoping', () => {
     const onDeleted = vi.fn()
     const client = createSessionClient(BASE)
     server.use(
-      http.put(VISIBILITY_URL, async () => {
+      http.put(PUBLISHED_VISIBILITY_URL, async () => {
         await new Promise<void>((resolve) => {
           resolveResponse = resolve
         })
-        return HttpResponse.json(buildRoadmap({ visibility: 'public' }))
+        return HttpResponse.json(buildRoadmap({ published_visibility: 'public' }))
       }),
     )
     const view = renderHook(
@@ -114,12 +114,12 @@ describe('useLifecycle roadmap scoping', () => {
       { initialProps: { id: ROADMAP_ID } },
     )
 
-    act(() => view.result.current.setVisibility('public'))
-    expect(view.result.current.visibilityState).toEqual({ phase: 'saving' })
+    act(() => view.result.current.setPublishedVisibility('public'))
+    expect(view.result.current.publishedVisibilityState).toEqual({ phase: 'saving' })
     view.rerender({ id: otherId })
     resolveResponse?.()
 
-    await waitFor(() => expect(view.result.current.visibilityState).toEqual({ phase: 'idle' }))
+    await waitFor(() => expect(view.result.current.publishedVisibilityState).toEqual({ phase: 'idle' }))
     expect(onChanged).not.toHaveBeenCalled()
   })
 })

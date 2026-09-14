@@ -20,7 +20,7 @@ function roadmap(sections: Section[], sectionOrder?: string[]): Roadmap {
     owner: 'u1',
     title: 'R',
     subject_tags: ['subject-not-a-track-tag'],
-    visibility: 'public',
+    published_visibility: 'public',
     status: 'published',
     revision: 1,
     section_order: sectionOrder ?? sections.map((section) => section.id),

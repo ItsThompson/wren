@@ -52,7 +52,7 @@ describe('ProfileView', () => {
               id: 'grokking-dsa-7f3k',
               title: 'Grokking DSA',
               status: 'published',
-              visibility: 'public',
+              published_visibility: 'public',
               subject_tags: ['cs'],
             },
           ],

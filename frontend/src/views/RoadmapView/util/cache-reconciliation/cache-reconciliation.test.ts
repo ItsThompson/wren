@@ -15,7 +15,7 @@ function roadmap(overrides: Partial<Roadmap> = {}): Roadmap {
     id: 'r1',
     owner: 'u1',
     title: 'Roadmap',
-    visibility: 'public',
+    published_visibility: 'public',
     status: 'published',
     revision: 1,
     created_at: '2026-01-01T00:00:00Z',
@@ -24,7 +24,7 @@ function roadmap(overrides: Partial<Roadmap> = {}): Roadmap {
   }
 }
 
-const card = { id: 'r1', title: 'Old', status: 'published' as const, visibility: 'public' as const }
+const card = { id: 'r1', title: 'Old', status: 'published' as const, published_visibility: 'public' as const }
 const dashboard: Dashboard = { authored: [card], followed: [card] }
 const profile: Profile = { handle: 'ada', display_name: 'Ada', roadmaps: [card] }
 
@@ -40,11 +40,11 @@ describe('roadmap cache reconciliation', () => {
   it('removes private or archived cards from the appropriate discovery projection', () => {
     const archived = roadmap({ status: 'archived' })
     expect(reconcileProfile(profile, archived)?.roadmaps).toEqual([])
-    expect(reconcileDashboard(dashboard, roadmap({ visibility: 'private' }))?.followed).toEqual([])
+    expect(reconcileDashboard(dashboard, roadmap({ published_visibility: 'private' }))?.followed).toEqual([])
   })
 
   it('keeps an owner self-follow card when the roadmap becomes private', () => {
-    const ownedPrivate = roadmap({ owner: 'u1', visibility: 'private' })
+    const ownedPrivate = roadmap({ owner: 'u1', published_visibility: 'private' })
     expect(reconcileDashboard(dashboard, ownedPrivate, 'u1')?.followed).toEqual([
       roadmapToCard(ownedPrivate),
     ])
@@ -57,9 +57,9 @@ describe('roadmap cache reconciliation', () => {
   })
 
   it('adds a newly forked roadmap once to authored dashboard data', () => {
-    const fork = roadmap({ id: 'r2', status: 'draft', visibility: 'private' })
+    const fork = roadmap({ id: 'r2', status: 'draft', published_visibility: 'private' })
     const added = addAuthoredRoadmap({ authored: [], followed: [] }, fork)
-    expect(added?.authored).toEqual([{ id: 'r2', title: 'Roadmap', status: 'draft', visibility: 'private' }])
+    expect(added?.authored).toEqual([{ id: 'r2', title: 'Roadmap', status: 'draft', published_visibility: 'private' }])
     expect(addAuthoredRoadmap(added, fork)).toBe(added)
   })
 
