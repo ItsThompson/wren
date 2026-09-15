@@ -11,6 +11,8 @@ as model-recoverable tool errors.
 
 from __future__ import annotations
 
+import json
+
 import httpx
 
 from mcp_harness import AgentHarness, json_error
@@ -75,7 +77,7 @@ def test_the_write_tools_are_registered() -> None:
     assert names >= WRITE_TOOL_NAMES
 
 
-def test_no_visibility_archive_or_delete_tool_is_exposed() -> None:
+def test_no_publication_visibility_archive_or_delete_tool_is_exposed() -> None:
     harness = AgentHarness(lambda _r: httpx.Response(200, json={}))
     with harness.open() as client:
         names = {tool["name"] for tool in harness.list_tools(client)}
@@ -127,6 +129,10 @@ def test_create_maps_to_post_roadmaps_with_resolved_identity() -> None:
     assert request.method == "POST"
     assert request.url.path == "/roadmaps"
     assert request.headers["X-User-ID"] == "user-ada"
+    payload = json.loads(request.content)
+    assert payload["title"] == "Grokking DSA"
+    assert "published_visibility" not in payload
+    assert "visibility" not in payload
 
 
 # ---------- patch ----------
@@ -249,6 +255,9 @@ def test_replace_reads_current_revision_then_imports_under_if_match() -> None:
     assert put_request.method == "PUT"
     assert put_request.headers["If-Match"] == "5"
     assert put_request.headers["X-User-ID"] == "user-ada"
+    payload = json.loads(put_request.content)
+    assert "published_visibility" not in payload
+    assert "visibility" not in payload
 
 
 def test_replace_on_published_roadmap_is_rejected_as_immutable() -> None:

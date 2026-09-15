@@ -22,6 +22,7 @@ from wren.roadmaps.schemas import (
     AddItemOp,
     AddSubsectionOp,
     ChecklistItemInput,
+    PublishedVisibility,
     ResourceInput,
     ResourceType,
     Roadmap,
@@ -30,7 +31,6 @@ from wren.roadmaps.schemas import (
     SectionInput,
     SetTagsOp,
     SubsectionInput,
-    Visibility,
 )
 from wren.roadmaps.service import RoadmapService
 from wren.roadmaps.validation import StructuralRule
@@ -135,12 +135,12 @@ async def test_create_draft_mints_a_title_slug_random_id() -> None:
     assert repo.commits == 1
 
 
-async def test_create_draft_is_draft_revision_1_private() -> None:
+async def test_create_draft_defaults_to_public_on_publish() -> None:
     service, _ = _service()
     created = await service.create_draft("user-1", _minimal_doc())
     assert created.status is RoadmapStatus.DRAFT
     assert created.revision == 1
-    assert created.visibility is Visibility.PRIVATE
+    assert created.published_visibility is PublishedVisibility.PUBLIC
     assert created.owner == "user-1"
 
 
@@ -600,7 +600,10 @@ async def _publish_public(repo: InMemoryRoadmapRepository, roadmap: Roadmap) -> 
     seam, like the archived-state simulation."""
     await repo.save(
         roadmap.model_copy(
-            update={"status": RoadmapStatus.PUBLISHED, "visibility": Visibility.PUBLIC}
+            update={
+                "status": RoadmapStatus.PUBLISHED,
+                "published_visibility": PublishedVisibility.PUBLIC,
+            }
         )
     )
 
@@ -614,7 +617,7 @@ async def test_fork_creates_a_fresh_draft_owned_by_the_forker() -> None:
     assert fork.id != source.id
     assert fork.owner == "owner"
     assert fork.status is RoadmapStatus.DRAFT
-    assert fork.visibility is Visibility.PRIVATE
+    assert fork.published_visibility is PublishedVisibility.PUBLIC
     assert fork.revision == 1
 
 
@@ -659,13 +662,13 @@ async def test_fork_of_a_public_roadmap_by_a_non_owner_succeeds() -> None:
     fork = await service.fork("forker", source.id)
     assert fork.owner == "forker"
     assert fork.status is RoadmapStatus.DRAFT
-    assert fork.visibility is Visibility.PRIVATE
+    assert fork.published_visibility is PublishedVisibility.PUBLIC
 
 
 async def test_fork_of_another_users_public_draft_is_404_without_a_copy() -> None:
     service, repo = _service(tokens=["7f3k", "9x2b"])
     draft = _minimal_doc()
-    draft.visibility = Visibility.PUBLIC
+    draft.published_visibility = PublishedVisibility.PUBLIC
     source = await service.create_draft("author", draft)
 
     with pytest.raises(NotFound):
@@ -737,11 +740,11 @@ async def test_edit_metadata_changes_only_the_three_presentation_fields() -> Non
     assert edited.title == "Renamed"
     assert edited.description == "New blurb"
     assert edited.subject_tags == ["cs", "interview"]
-    # Structure, visibility, and status are untouched.
+    # Structure, publication access, and status are untouched.
     assert edited.sections == created.sections
     assert edited.section_order == created.section_order
     assert edited.suggested_path == created.suggested_path
-    assert edited.visibility is created.visibility
+    assert edited.published_visibility is created.published_visibility
     assert edited.status is RoadmapStatus.DRAFT
     # Committed once through the shared transaction helper (create + this edit).
     assert repo.commits == 2
@@ -805,39 +808,49 @@ async def test_edit_metadata_is_404_for_a_non_owner() -> None:
         )
 
 
-# --- replace preserves the stored visibility -------------------------------
+# --- replace preserves the stored publication access -----------------------
 
 
 async def test_replace_preserves_the_stored_drafts_visibility() -> None:
     # A full-document import replaces content but must NOT silently flip the
-    # draft's visibility: visibility is a web-only lifecycle toggle, not part of
+    # draft's published_visibility: publication access is a web-only lifecycle toggle, not part of
     # the imported document's authority.
     service, repo = _service()
     created = await service.create_draft("user-1", _publishable_doc())
     # Make the draft public via the sanctioned lifecycle path.
-    await service.set_visibility("user-1", created.id, Visibility.PUBLIC)
-    # _replace_doc() defaults to visibility=private; the replace must ignore it.
+    await service.set_published_visibility("user-1", created.id, PublishedVisibility.PUBLIC)
+    # _replace_doc() defaults to published_visibility=private; the replace must ignore it.
     replaced = await service.replace_draft("user-1", created.id, created.revision, _replace_doc())
-    assert replaced.visibility is Visibility.PUBLIC
+    assert replaced.published_visibility is PublishedVisibility.PUBLIC
     # And it is persisted public, not reset to the imported doc's private default.
-    assert (await _read(repo, "user-1", created.id)).visibility is Visibility.PUBLIC
+    assert (
+        await _read(repo, "user-1", created.id)
+    ).published_visibility is PublishedVisibility.PUBLIC
 
 
-# --- web-only lifecycle: set_visibility -------------------------------------
+# --- web-only lifecycle: set_published_visibility -------------------------------------
 
 
-async def test_set_visibility_toggles_public_and_back_to_private() -> None:
+async def test_set_published_visibility_toggles_public_and_back_to_private() -> None:
     service, repo = _service()
     created = await service.create_draft("user-1", _publishable_doc())
-    assert created.visibility is Visibility.PRIVATE
+    assert created.published_visibility is PublishedVisibility.PUBLIC
 
-    made_public = await service.set_visibility("user-1", created.id, Visibility.PUBLIC)
-    assert made_public.visibility is Visibility.PUBLIC
-    assert (await _read(repo, "user-1", created.id)).visibility is Visibility.PUBLIC
+    made_public = await service.set_published_visibility(
+        "user-1", created.id, PublishedVisibility.PUBLIC
+    )
+    assert made_public.published_visibility is PublishedVisibility.PUBLIC
+    assert (
+        await _read(repo, "user-1", created.id)
+    ).published_visibility is PublishedVisibility.PUBLIC
 
-    made_private = await service.set_visibility("user-1", created.id, Visibility.PRIVATE)
-    assert made_private.visibility is Visibility.PRIVATE
-    assert (await _read(repo, "user-1", created.id)).visibility is Visibility.PRIVATE
+    made_private = await service.set_published_visibility(
+        "user-1", created.id, PublishedVisibility.PRIVATE
+    )
+    assert made_private.published_visibility is PublishedVisibility.PRIVATE
+    assert (
+        await _read(repo, "user-1", created.id)
+    ).published_visibility is PublishedVisibility.PRIVATE
     # Each toggle commits through the shared transaction helper (create + 2 sets).
     assert repo.commits == 3
 
@@ -845,8 +858,10 @@ async def test_set_visibility_toggles_public_and_back_to_private() -> None:
 async def test_set_visibility_does_not_alter_content_or_the_revision() -> None:
     service, repo = _service()
     created = await service.create_draft("user-1", _publishable_doc())
-    toggled = await service.set_visibility("user-1", created.id, Visibility.PUBLIC)
-    # Structure and the structural revision are untouched by a visibility toggle.
+    toggled = await service.set_published_visibility(
+        "user-1", created.id, PublishedVisibility.PUBLIC
+    )
+    # Structure and the structural revision are untouched by a publication-access toggle.
     assert toggled.sections == created.sections
     assert toggled.section_order == created.section_order
     assert toggled.suggested_path == created.suggested_path
@@ -855,13 +870,15 @@ async def test_set_visibility_does_not_alter_content_or_the_revision() -> None:
 
 
 async def test_set_visibility_works_on_a_published_roadmap() -> None:
-    # Visibility is a lifecycle field editable on any status: a published roadmap
+    # PublishedVisibility is a lifecycle field editable on any status: a published roadmap
     # can still be toggled public/private (it governs discovery, not structure).
     service, _ = _service()
     created = await service.create_draft("user-1", _publishable_doc())
     await service.publish("user-1", created.id)
-    toggled = await service.set_visibility("user-1", created.id, Visibility.PUBLIC)
-    assert toggled.visibility is Visibility.PUBLIC
+    toggled = await service.set_published_visibility(
+        "user-1", created.id, PublishedVisibility.PUBLIC
+    )
+    assert toggled.published_visibility is PublishedVisibility.PUBLIC
     assert toggled.status is RoadmapStatus.PUBLISHED
 
 
@@ -869,7 +886,7 @@ async def test_set_visibility_is_404_for_a_non_owner() -> None:
     service, _ = _service()
     created = await service.create_draft("owner", _publishable_doc())
     with pytest.raises(NotFound):
-        await service.set_visibility("intruder", created.id, Visibility.PUBLIC)
+        await service.set_published_visibility("intruder", created.id, PublishedVisibility.PUBLIC)
 
 
 # --- web-only lifecycle: archive --------------------------------------------
@@ -966,7 +983,7 @@ async def test_delete_guard_reads_a_real_follower_count() -> None:
     source = await roadmaps.create_draft("owner", _publishable_doc())
     await roadmaps.publish("owner", source.id)
     # Public so a different user can reach and follow it.
-    await roadmaps.set_visibility("owner", source.id, Visibility.PUBLIC)
+    await roadmaps.set_published_visibility("owner", source.id, PublishedVisibility.PUBLIC)
     # A different user follows it: the delete guard now sees one follower.
     await progress.follow("follower", source.id)
     with pytest.raises(Conflict) as excinfo:

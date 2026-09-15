@@ -28,7 +28,7 @@ function buildRoadmap(tags: string[][]): Roadmap {
     owner: 'owner',
     title: 'Roadmap',
     subject_tags: [],
-    visibility: 'public',
+    published_visibility: 'public',
     status: 'published',
     revision: 1,
     section_order: ['section'],

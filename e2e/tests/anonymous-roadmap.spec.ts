@@ -6,7 +6,7 @@ import {
   createPublishableRoadmap,
   getRoadmap,
   publishRoadmap,
-  setVisibility,
+  setPublishedVisibility,
 } from '../helpers/api'
 import { API_BASE_URL, FRONTEND_BASE_URL } from '../helpers/config'
 import { uniqueUser } from '../helpers/users'
@@ -18,6 +18,9 @@ test.describe('anonymous roadmap reading', () => {
   }) => {
     const owner = await createAuthedContext(playwright.request, uniqueUser('anonymous-owner'))
     const roadmapId = await createPublishableRoadmap(owner)
+    const draftGuest = await playwright.request.newContext({ baseURL: API_BASE_URL })
+    expect((await draftGuest.get(`/roadmaps/${roadmapId}`)).status()).toBe(404)
+    await draftGuest.dispose()
     await publishRoadmap(owner, roadmapId)
     const expectedDocument = await getRoadmap(owner, roadmapId)
 
@@ -37,7 +40,7 @@ test.describe('anonymous roadmap reading', () => {
     await expect(page.getByText('Read it')).toBeVisible()
     await expect(page.getByRole('link', { name: 'Log in to track progress' })).toBeVisible()
     await expect(page.getByText('Fork')).not.toBeVisible()
-    expect(expectedDocument).toMatchObject({ status: 'published', visibility: 'public' })
+    expect(expectedDocument).toMatchObject({ status: 'published', published_visibility: 'public' })
 
     await page.goto(`/roadmaps/${roadmapId}/tree`)
     await expect(page.getByRole('link', { name: /Arrays \(progress unavailable\)/ })).toBeVisible()
@@ -47,7 +50,7 @@ test.describe('anonymous roadmap reading', () => {
     await expect(page.getByRole('heading', { level: 3, name: 'Hashing' })).toBeVisible()
 
     const personalRequests = apiRequests.filter(({ path }) =>
-      /\/progress$|\/next$|\/follow$|:publish$|:archive$|\/visibility$|\/metadata$/.test(path),
+      /\/progress$|\/next$|\/follow$|:publish$|:archive$|\/published-visibility$|\/metadata$/.test(path),
     )
     expect(personalRequests).toEqual([])
     const documentRequests = apiRequests.filter(({ path }) => path === `/roadmaps/${roadmapId}`)
@@ -59,11 +62,37 @@ test.describe('anonymous roadmap reading', () => {
     await expect(page.getByText('Archived', { exact: true })).toBeVisible()
     await expect(page.getByText(/available here for reading/i)).toBeVisible()
 
-    await setVisibility(owner, roadmapId, 'private')
+    await setPublishedVisibility(owner, roadmapId, 'private')
     await page.reload()
     await expect(page.getByText('Roadmap not found')).toBeVisible()
 
     await guestContext.close()
+    await owner.dispose()
+  })
+
+  test('keeps explicit private publication access owner-only across lifecycle states', async ({
+    playwright,
+  }) => {
+    const owner = await createAuthedContext(playwright.request, uniqueUser('private-owner'))
+    const guest = await playwright.request.newContext({ baseURL: API_BASE_URL })
+    const roadmapId = await createPublishableRoadmap(owner, { publishedVisibility: 'private' })
+
+    expect((await getRoadmap(owner, roadmapId)).published_visibility).toBe('private')
+    expect((await guest.get(`/roadmaps/${roadmapId}`)).status()).toBe(404)
+
+    await publishRoadmap(owner, roadmapId)
+    expect((await guest.get(`/roadmaps/${roadmapId}`)).status()).toBe(404)
+
+    await setPublishedVisibility(owner, roadmapId, 'public')
+    expect((await guest.get(`/roadmaps/${roadmapId}`)).status()).toBe(200)
+
+    await archiveRoadmap(owner, roadmapId)
+    expect((await guest.get(`/roadmaps/${roadmapId}`)).status()).toBe(200)
+
+    await setPublishedVisibility(owner, roadmapId, 'private')
+    expect((await guest.get(`/roadmaps/${roadmapId}`)).status()).toBe(404)
+
+    await guest.dispose()
     await owner.dispose()
   })
 })

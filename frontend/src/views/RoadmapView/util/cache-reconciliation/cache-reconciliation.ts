@@ -10,19 +10,19 @@ export function roadmapToCard(roadmap: Roadmap): RoadmapCard {
     id: roadmap.id,
     title: roadmap.title,
     status: roadmap.status,
-    visibility: roadmap.visibility,
+    published_visibility: roadmap.published_visibility,
     subject_tags: roadmap.subject_tags,
   }
 }
 
 function canAppearInFollowed(roadmap: Roadmap, viewerId?: string): boolean {
   const isOwner = roadmap.owner === viewerId
-  return (isOwner || roadmap.visibility === 'public') &&
+  return (isOwner || roadmap.published_visibility === 'public') &&
     (roadmap.status === 'published' || roadmap.status === 'archived')
 }
 
 function canAppearInProfile(roadmap: Roadmap): boolean {
-  return roadmap.visibility === 'public' && roadmap.status === 'published'
+  return roadmap.published_visibility === 'public' && roadmap.status === 'published'
 }
 
 function replaceCard(cards: RoadmapCard[], roadmap: Roadmap, allowed: boolean): RoadmapCard[] {

@@ -29,7 +29,7 @@ function buildDraft(overrides: Partial<Roadmap> = {}): Roadmap {
     title: 'Grokking DSA',
     description: 'A prerequisite-aware path.',
     subject_tags: ['computer-science'],
-    visibility: 'private',
+    published_visibility: 'private',
     status: 'draft',
     revision: 1,
     section_order: ['sec_foundations'],
@@ -161,7 +161,7 @@ describe('RoadmapView', () => {
   it('renders a public roadmap read-only for anonymous visitors', async () => {
     const roadmap = buildDraft({
       status: 'published',
-      visibility: 'public',
+      published_visibility: 'public',
       owner: 'owner-2',
     })
     server.use(
@@ -761,7 +761,7 @@ describe('RoadmapView metadata edit', () => {
 })
 
 describe('RoadmapView web-only lifecycle', () => {
-  const VISIBILITY_URL = `${BASE}/roadmaps/${ROADMAP_ID}/visibility`
+  const PUBLISHED_VISIBILITY_URL = `${BASE}/roadmaps/${ROADMAP_ID}/published-visibility`
   const ARCHIVE_URL = `${BASE}/roadmaps/${ROADMAP_ID}:archive`
   const DELETE_URL = `${BASE}/roadmaps/${ROADMAP_ID}`
   const PROGRESS_URL = `${BASE}/roadmaps/${ROADMAP_ID}/progress`
@@ -777,21 +777,24 @@ describe('RoadmapView web-only lifecycle', () => {
     let put: unknown
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
-      http.put(VISIBILITY_URL, async ({ request }) => {
+      http.put(PUBLISHED_VISIBILITY_URL, async ({ request }) => {
         put = await request.json()
-        const body = put as { visibility: 'public' | 'private' }
-        return HttpResponse.json(buildDraft({ visibility: body.visibility }))
+        const body = put as { published_visibility: 'public' | 'private' }
+        return HttpResponse.json(buildDraft({ published_visibility: body.published_visibility }))
       }),
     )
     renderView()
     await screen.findByText('Grokking DSA')
 
-    // Private draft: the toggle offers "Make public".
-    await user.click(screen.getByRole('button', { name: /make public/i }))
+    // Owner-only draft: the control offers the future public state.
+    await user.click(screen.getByRole('button', { name: /public when published/i }))
 
-    await waitFor(() => expect(put).toEqual({ visibility: 'public' }))
-    // The returned roadmap replaces the loaded one, so the control flips.
-    expect(await screen.findByRole('button', { name: /make private/i })).toBeInTheDocument()
+    await waitFor(() => expect(put).toEqual({ published_visibility: 'public' }))
+    // The returned roadmap replaces the loaded one and remains a future-state control.
+    expect(await screen.findByRole('button', { name: /public when published/i })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
   })
 
   it('does not offer Archive on a draft, but does offer Delete', async () => {
@@ -846,7 +849,7 @@ describe('RoadmapView web-only lifecycle', () => {
     await user.click(screen.getByRole('button', { name: /confirm archive/i }))
     await waitFor(() => expect(archiveRequests).toBe(1))
 
-    expect(screen.getByRole('button', { name: /make public/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /private access/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: /fork/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: /edit details/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: /^delete$/i })).toBeDisabled()
@@ -883,7 +886,7 @@ describe('RoadmapView web-only lifecycle', () => {
   it('shows archived content read-only to a non-follower', async () => {
     server.use(
       http.get('*/roadmaps/:id', () =>
-        HttpResponse.json(buildDraft({ status: 'archived', visibility: 'public', owner: 'user-1' })),
+        HttpResponse.json(buildDraft({ status: 'archived', published_visibility: 'public', owner: 'user-1' })),
       ),
       http.get(PROGRESS_URL, () => new HttpResponse(null, { status: 409 })),
       http.get('*/roadmaps/:id/next', () => new HttpResponse(null, { status: 409 })),
@@ -984,22 +987,31 @@ describe('RoadmapView web-only lifecycle', () => {
     expect(screen.getByRole('button', { name: /^fork$/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^delete$/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^archive$/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /make public|make private/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /public when published|public access|private access/i })).not.toBeInTheDocument()
   })
 
-  it('surfaces a retry message when a visibility toggle fails (500)', async () => {
+  it('surfaces a retry message when a publication-access toggle fails (500)', async () => {
     const user = userEvent.setup()
+    let put: unknown
     server.use(
       http.get('*/roadmaps/:id', () => HttpResponse.json(buildDraft())),
-      http.put(VISIBILITY_URL, () => new HttpResponse(null, { status: 500 })),
+      http.put(PUBLISHED_VISIBILITY_URL, async ({ request }) => {
+        put = await request.json()
+        return new HttpResponse(null, { status: 500 })
+      }),
     )
     renderView()
     await screen.findByText('Grokking DSA')
 
-    await user.click(screen.getByRole('button', { name: /make public/i }))
-    expect(await screen.findByText(/couldn.t update visibility/i)).toBeInTheDocument()
-    // Unchanged: still offers "Make public" (the toggle did not take effect).
-    expect(screen.getByRole('button', { name: /make public/i })).toBeInTheDocument()
+    const control = screen.getByRole('button', { name: /public when published/i })
+    expect(control).toHaveAttribute('aria-pressed', 'false')
+    await user.click(control)
+    expect(await screen.findByText(/couldn.t update publication access/i)).toBeInTheDocument()
+    expect(put).toEqual({ published_visibility: 'public' })
+    expect(screen.getByRole('button', { name: /public when published/i })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
   })
 
   it('surfaces a retry message when archive fails (500)', async () => {

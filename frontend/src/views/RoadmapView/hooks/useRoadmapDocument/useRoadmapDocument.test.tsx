@@ -13,7 +13,7 @@ const roadmap: Roadmap = {
   id: ROADMAP_ID,
   owner: 'owner-1',
   title: 'Public roadmap',
-  visibility: 'public',
+  published_visibility: 'public',
   status: 'published',
   revision: 1,
   created_at: '2026-07-15T00:00:00Z',

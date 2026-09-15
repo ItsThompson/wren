@@ -2170,6 +2170,14 @@
           "title": "ChecklistItem",
           "type": "object"
         },
+        "PublishedVisibility": {
+          "enum": [
+            "public",
+            "private"
+          ],
+          "title": "PublishedVisibility",
+          "type": "string"
+        },
         "Resource": {
           "properties": {
             "id": {
@@ -2342,14 +2350,6 @@
           ],
           "title": "Subsection",
           "type": "object"
-        },
-        "Visibility": {
-          "enum": [
-            "public",
-            "private"
-          ],
-          "title": "Visibility",
-          "type": "string"
         }
       },
       "properties": {
@@ -2377,6 +2377,10 @@
         "owner": {
           "title": "Owner",
           "type": "string"
+        },
+        "published_visibility": {
+          "$ref": "#/$defs/PublishedVisibility",
+          "default": "public"
         },
         "revision": {
           "default": 1,
@@ -2427,10 +2431,6 @@
           "format": "date-time",
           "title": "Updated At",
           "type": "string"
-        },
-        "visibility": {
-          "$ref": "#/$defs/Visibility",
-          "default": "private"
         }
       },
       "required": [
@@ -2876,6 +2876,9 @@
               "title": "Owner",
               "type": "string"
             },
+            "published_visibility": {
+              "$ref": "#/$defs/PublishedVisibility"
+            },
             "subject_tags": {
               "default": [],
               "items": {
@@ -2896,19 +2899,24 @@
               "format": "date-time",
               "title": "Updated At",
               "type": "string"
-            },
-            "visibility": {
-              "$ref": "#/$defs/Visibility"
             }
           },
           "required": [
             "created_at",
             "owner",
-            "updated_at",
-            "visibility"
+            "published_visibility",
+            "updated_at"
           ],
           "title": "OverviewDetails",
           "type": "object"
+        },
+        "PublishedVisibility": {
+          "enum": [
+            "public",
+            "private"
+          ],
+          "title": "PublishedVisibility",
+          "type": "string"
         },
         "RoadmapStatus": {
           "enum": [
@@ -2951,14 +2959,6 @@
           ],
           "title": "SectionOverview",
           "type": "object"
-        },
-        "Visibility": {
-          "enum": [
-            "public",
-            "private"
-          ],
-          "title": "Visibility",
-          "type": "string"
         }
       },
       "properties": {
@@ -3035,11 +3035,22 @@
     "name": "roadmap_get_profile",
     "outputSchema": {
       "$defs": {
+        "PublishedVisibility": {
+          "enum": [
+            "public",
+            "private"
+          ],
+          "title": "PublishedVisibility",
+          "type": "string"
+        },
         "RoadmapCard": {
           "properties": {
             "id": {
               "title": "Id",
               "type": "string"
+            },
+            "published_visibility": {
+              "$ref": "#/$defs/PublishedVisibility"
             },
             "status": {
               "$ref": "#/$defs/RoadmapStatus"
@@ -3055,16 +3066,13 @@
             "title": {
               "title": "Title",
               "type": "string"
-            },
-            "visibility": {
-              "$ref": "#/$defs/Visibility"
             }
           },
           "required": [
             "id",
+            "published_visibility",
             "status",
-            "title",
-            "visibility"
+            "title"
           ],
           "title": "RoadmapCard",
           "type": "object"
@@ -3076,14 +3084,6 @@
             "archived"
           ],
           "title": "RoadmapStatus",
-          "type": "string"
-        },
-        "Visibility": {
-          "enum": [
-            "public",
-            "private"
-          ],
-          "title": "Visibility",
           "type": "string"
         }
       },
@@ -3408,11 +3408,22 @@
     "name": "roadmap_list",
     "outputSchema": {
       "$defs": {
+        "PublishedVisibility": {
+          "enum": [
+            "public",
+            "private"
+          ],
+          "title": "PublishedVisibility",
+          "type": "string"
+        },
         "RoadmapCard": {
           "properties": {
             "id": {
               "title": "Id",
               "type": "string"
+            },
+            "published_visibility": {
+              "$ref": "#/$defs/PublishedVisibility"
             },
             "status": {
               "$ref": "#/$defs/RoadmapStatus"
@@ -3428,16 +3439,13 @@
             "title": {
               "title": "Title",
               "type": "string"
-            },
-            "visibility": {
-              "$ref": "#/$defs/Visibility"
             }
           },
           "required": [
             "id",
+            "published_visibility",
             "status",
-            "title",
-            "visibility"
+            "title"
           ],
           "title": "RoadmapCard",
           "type": "object"
@@ -3449,14 +3457,6 @@
             "archived"
           ],
           "title": "RoadmapStatus",
-          "type": "string"
-        },
-        "Visibility": {
-          "enum": [
-            "public",
-            "private"
-          ],
-          "title": "Visibility",
           "type": "string"
         }
       },

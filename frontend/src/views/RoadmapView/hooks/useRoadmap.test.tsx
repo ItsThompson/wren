@@ -28,7 +28,7 @@ function buildRoadmap(overrides: Partial<Roadmap> = {}): Roadmap {
     id: ROADMAP_ID,
     owner: 'user-1',
     title: 'Grokking DSA',
-    visibility: 'private',
+    published_visibility: 'private',
     status: 'draft',
     revision: 1,
     created_at: '2026-07-15T00:00:00Z',

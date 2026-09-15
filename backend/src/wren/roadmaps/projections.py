@@ -59,7 +59,7 @@ def build_overview(roadmap: Roadmap, checked: frozenset[str], *, fmt: ResponseFo
             owner=roadmap.owner,
             description=roadmap.description,
             subject_tags=list(roadmap.subject_tags),
-            visibility=roadmap.visibility,
+            published_visibility=roadmap.published_visibility,
             created_at=roadmap.created_at,
             updated_at=roadmap.updated_at,
             suggested_path=list(roadmap.suggested_path),

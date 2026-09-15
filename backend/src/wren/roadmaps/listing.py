@@ -134,13 +134,13 @@ def _to_card(record: RoadmapRecord) -> RoadmapCard:
     """Project a stored roadmap row into its list-card shape.
 
     Reads ``subject_tags`` from the authoritative document (the scalar index has
-    no tags column); ``status`` / ``visibility`` come off the validated document
-    as the domain enums so the response carries the same values the badges use."""
+    no tags column); ``status`` / ``published_visibility`` come off the validated
+    document as the domain enums so the response carries the same values the badges use."""
     roadmap = Roadmap.model_validate(record.document)
     return RoadmapCard(
         id=roadmap.id,
         title=roadmap.title,
         status=roadmap.status,
-        visibility=roadmap.visibility,
+        published_visibility=roadmap.published_visibility,
         subject_tags=list(roadmap.subject_tags),
     )

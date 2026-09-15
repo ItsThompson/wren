@@ -125,7 +125,7 @@ Each view is one route target. A view is a thin orchestrator: it reads route par
 | `ProfileView` | `useProfile` | `GET /users/{handle}` (public read) |
 | `ConnectedClientsView` | `useConnectedClients` | `GET /me/clients`, `DELETE /me/clients/{id}` |
 | `ConsentView` | `useConsent` | `GET /authorize/context`, `POST /authorize/decision` |
-| `RoadmapView` | `useRoadmap`, `useProgress`, `useLifecycle` | roadmap read, publish, fork, metadata, progress, deadline, visibility, archive, delete |
+| `RoadmapView` | `useRoadmap`, `useProgress`, `useLifecycle` | roadmap read, publish, fork, metadata, progress, deadline, publication visibility, archive, delete |
 | `TreeView` | `useTreeData` | roadmap read, progress read |
 | `NotFoundView` | none | none |
 
@@ -137,7 +137,7 @@ Three hard boundaries govern the roadmap UI:
 - Anonymous versus authenticated: public published and archived documents are readable without a session; progress and mutations require one.
 - Owner versus reader: an authenticated reader can fork; only the owner can edit metadata and run lifecycle.
 
-Lifecycle (visibility, archive, delete) is web-only. Delete is guarded server-side by a zero-followers check; a 409 `DELETE_HAS_FOLLOWERS` steers the owner to archive instead. See `authoring.md` for the publish and immutability contract.
+Lifecycle (publication visibility, archive, delete) is web-only. Delete is guarded server-side by a zero-followers check; a 409 `DELETE_HAS_FOLLOWERS` steers the owner to archive instead. See `authoring.md` for the publish and immutability contract.
 
 ## Study loop on the web
 

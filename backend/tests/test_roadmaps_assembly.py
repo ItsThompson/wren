@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from wren.roadmaps.assembly import AssembledDraft, assemble_draft, assemble_fork
 from wren.roadmaps.schemas import (
     ChecklistItemInput,
+    PublishedVisibility,
     ResourceInput,
     ResourceType,
     Roadmap,
@@ -20,7 +21,6 @@ from wren.roadmaps.schemas import (
     RoadmapStatus,
     SectionInput,
     SubsectionInput,
-    Visibility,
 )
 
 _NOW = datetime(2026, 7, 15, tzinfo=UTC)
@@ -46,14 +46,14 @@ def _assemble(doc: RoadmapInput) -> AssembledDraft:
     return assemble_draft(doc, "grokking-dsa-7f3k", owner="user-1", now=_NOW)
 
 
-def test_assemble_sets_draft_revision_and_owner() -> None:
+def test_assemble_sets_public_default_draft_revision_and_owner() -> None:
     result = _assemble(RoadmapInput(title="Grokking DSA"))
     roadmap = result.roadmap
     assert roadmap.id == "grokking-dsa-7f3k"
     assert roadmap.owner == "user-1"
     assert roadmap.status is RoadmapStatus.DRAFT
     assert roadmap.revision == 1
-    assert roadmap.visibility is Visibility.PRIVATE
+    assert roadmap.published_visibility is PublishedVisibility.PUBLIC
     assert roadmap.created_at == _NOW == roadmap.updated_at
 
 
@@ -249,11 +249,11 @@ def test_subject_tags_and_visibility_are_carried_from_input() -> None:
     doc = RoadmapInput(
         title="DSA",
         subject_tags=["cs", "interview"],
-        visibility=Visibility.PUBLIC,
+        published_visibility=PublishedVisibility.PUBLIC,
     )
     roadmap = _assemble(doc).roadmap
     assert roadmap.subject_tags == ["cs", "interview"]
-    assert roadmap.visibility is Visibility.PUBLIC
+    assert roadmap.published_visibility is PublishedVisibility.PUBLIC
 
 
 # --- assemble_fork ----------------------------------------------------------
@@ -267,7 +267,7 @@ def _source_roadmap() -> Roadmap:
         title="Grokking DSA",
         description="A prerequisite-aware path.",
         subject_tags=["cs", "interview"],
-        visibility=Visibility.PUBLIC,
+        published_visibility=PublishedVisibility.PUBLIC,
         suggested_path=["sub_arrays", "sub_hashing"],
         sections=[
             SectionInput(
@@ -287,11 +287,11 @@ def _source_roadmap() -> Roadmap:
 def test_fork_mints_the_new_roadmap_id_and_resets_lifecycle() -> None:
     fork = assemble_fork(_source_roadmap(), "grokking-dsa-9x2b", owner="forker", now=_LATER)
     # A brand-new roadmap ID (never derived from the source), owned by the forker,
-    # reset to a private draft at revision 1 with fresh timestamps.
+    # reset to a public-on-publish draft at revision 1 with fresh timestamps.
     assert fork.id == "grokking-dsa-9x2b"
     assert fork.owner == "forker"
     assert fork.status is RoadmapStatus.DRAFT
-    assert fork.visibility is Visibility.PRIVATE
+    assert fork.published_visibility is PublishedVisibility.PUBLIC
     assert fork.revision == 1
     assert fork.created_at == _LATER == fork.updated_at
 
@@ -320,5 +320,5 @@ def test_fork_does_not_mutate_the_source() -> None:
     assert source.id == "grokking-dsa-7f3k"
     assert source.owner == "author"
     assert source.status is RoadmapStatus.PUBLISHED
-    assert source.visibility is Visibility.PUBLIC
+    assert source.published_visibility is PublishedVisibility.PUBLIC
     assert source.revision == 5

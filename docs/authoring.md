@@ -8,7 +8,7 @@ A roadmap is authored as a **draft**, then **published** in a one-way transition
 
 Content authoring (create, patch, replace, validate) has **no web UI**. It is agent-only, driven by an AI agent through the MCP tools. The web SPA surfaces no content-editing form.
 
-The backend authoring endpoints exist on both apps and enforce the same rules; the SPA simply does not call the content-write ones. The sanctioned web edits are the presentation-only metadata edit and the lifecycle actions (publish, fork, visibility, archive, delete). See `api.md` for which endpoints mount where.
+The backend authoring endpoints exist on both apps and enforce the same rules; the SPA simply does not call the content-write ones. The sanctioned web edits are the presentation-only metadata edit and the lifecycle actions (publish, fork, publication visibility, archive, delete). See `api.md` for which endpoints mount where.
 
 For the study-time read surface and the follow model (following is created implicitly by the first progress write, not by an explicit follow button), see `progress.md`.
 
@@ -28,7 +28,7 @@ Both are draft-only content writes, both are guarded by `If-Match: <revision>` o
 - The roadmap's own ID (the route param) is **unchanged**.
 - Any node that carries a `proposed_id` **keeps it** (validated, slugified, and de-duped like `create`).
 - Every node **without** a `proposed_id` is **re-minted** from its title.
-- `owner` and `created_at` are preserved, `visibility` is taken from the stored draft (never the imported document), and `revision` is bumped.
+- `owner` and `created_at` are preserved, `published_visibility` is taken from the stored draft (never the imported document), and `revision` is bumped.
 
 The response is the full rebuilt roadmap plus a `remap` of any `proposed_id -> minted_id` that changed (de-dup **or** normalization), so the caller can reconcile its references.
 
@@ -41,12 +41,12 @@ Publishing is where followers start tracking progress against a roadmap's struct
 - `create` produces a fresh draft, `patch` and `replace` both load through the service's content-write guard, and all of them reject a `published`/`archived` roadmap with a `409 IMMUTABLE` problem+json.
 - The error points to **fork-to-change**: forking produces a new draft under a brand-new roadmap ID (child slug IDs are copied verbatim, since their uniqueness scope is a single roadmap) with no progress carry-over, which can then be edited and published on its own.
 
-Fork (`POST /roadmaps/{id}:fork` / the fork MCP tool) works from any roadmap the caller can **read**: their own (any status) or a public one. A private roadmap owned by someone else is a 404, leaking no existence. The fork is owned by the forking user and starts private at `revision` 1.
+Fork (`POST /roadmaps/{id}:fork` / the fork MCP tool) works from any roadmap the caller can **read**: their own (any status) or a public one. A private roadmap owned by someone else is a 404, leaking no existence. The fork is owned by the forking user and starts public when published at `revision` 1; its draft content remains owner-only until publication.
 
-The only sanctioned write on published content is a **presentation-only** metadata edit (`title`, `description`, `subject_tags`) via `PATCH /roadmaps/{id}/metadata` (or the edit-metadata MCP tool). That path does not go through the content-write guard, which is exactly why it stays allowed after publish while structural writes do not. It is deliberately **not** `If-Match`-guarded and never bumps the structural `revision` (last-write-wins presentation edits at the ~5-user scale); a smuggled structural/lifecycle field (e.g. `sections`, `visibility`) is rejected with a `409 IMMUTABLE` rather than silently applied.
+The only sanctioned write on published content is a **presentation-only** metadata edit (`title`, `description`, `subject_tags`) via `PATCH /roadmaps/{id}/metadata` (or the edit-metadata MCP tool). That path does not go through the content-write guard, which is exactly why it stays allowed after publish while structural writes do not. It is deliberately **not** `If-Match`-guarded and never bumps the structural `revision` (last-write-wins presentation edits at the ~5-user scale); a smuggled structural/lifecycle field (e.g. `sections`, `published_visibility`) is rejected with a `409 IMMUTABLE` rather than silently applied.
 
 | Field group | Post-publish |
 |-------------|--------------|
 | Structure and content (sections, subsections, items, prereq edges, `suggested_path`, resources, effort, track tags) | Immutable: fork to change |
 | Presentation (`title`, `description`, `subject_tags`) | Editable by the owner |
-| Lifecycle (`visibility`, archive/delete) | Web-only |
+| Lifecycle (`published_visibility`, archive/delete) | Web-only |

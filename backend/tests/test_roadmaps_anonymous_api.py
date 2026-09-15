@@ -154,7 +154,9 @@ def _create_published_public(client: TestClient) -> str:
     assert isinstance(roadmap_id, str)
     assert client.post(f"/roadmaps/{roadmap_id}:publish").status_code == 200
     assert (
-        client.put(f"/roadmaps/{roadmap_id}/visibility", json={"visibility": "public"}).status_code
+        client.put(
+            f"/roadmaps/{roadmap_id}/published-visibility", json={"published_visibility": "public"}
+        ).status_code
         == 200
     )
     return roadmap_id
@@ -226,7 +228,9 @@ def test_cookie_free_private_and_public_draft_reads_are_404(
     private_draft_id = client.post("/roadmaps", json=_COMPLETE_ROADMAP).json()["id"]
     public_id = _create_published_public(client)
     assert (
-        client.put(f"/roadmaps/{public_id}/visibility", json={"visibility": "private"}).status_code
+        client.put(
+            f"/roadmaps/{public_id}/published-visibility", json={"published_visibility": "private"}
+        ).status_code
         == 200
     )
 
@@ -272,7 +276,9 @@ def test_public_to_private_revocation_takes_effect_on_next_anonymous_read(
     )
     assert login_response.status_code == 200
     assert (
-        client.put(f"/roadmaps/{roadmap_id}/visibility", json={"visibility": "private"}).status_code
+        client.put(
+            f"/roadmaps/{roadmap_id}/published-visibility", json={"published_visibility": "private"}
+        ).status_code
         == 200
     )
     client.cookies.clear()
@@ -292,7 +298,12 @@ def test_all_protected_external_routes_reject_missing_identity(
         ("post", "/roadmaps/unknown-0000:publish", None, None),
         ("post", "/roadmaps/unknown-0000:fork", None, None),
         ("patch", "/roadmaps/unknown-0000/metadata", {"title": "x"}, None),
-        ("put", "/roadmaps/unknown-0000/visibility", {"visibility": "private"}, None),
+        (
+            "put",
+            "/roadmaps/unknown-0000/published-visibility",
+            {"published_visibility": "private"},
+            None,
+        ),
         ("post", "/roadmaps/unknown-0000:archive", None, None),
         ("delete", "/roadmaps/unknown-0000", None, None),
         ("post", "/roadmaps/unknown-0000/follow", None, None),

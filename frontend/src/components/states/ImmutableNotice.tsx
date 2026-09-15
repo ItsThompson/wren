@@ -4,7 +4,7 @@ import { WarningBanner } from './WarningBanner'
 interface ImmutableNoticeProps {
   /** The server's recoverable detail, if any; a warm default otherwise. */
   detail?: string
-  /** Fork the roadmap into an editable private draft; omit to hide the action. */
+  /** Fork the roadmap into an editable owner-only draft; omit to hide the action. */
   onFork?: () => void
   /** Whether a fork is in flight (disables + relabels the action). */
   forking?: boolean
@@ -13,8 +13,8 @@ interface ImmutableNoticeProps {
 /**
  * The 409 `IMMUTABLE` prompt: a structural write
  * against a published/archived roadmap is refused because published roadmaps are
- * immutable (followers' progress stays stable). The recovery is to fork it into a
- * private draft you can edit and publish.
+ * immutable (followers' progress stays stable). The recovery is to fork it into an
+ * owner-only draft you can edit and publish.
  */
 export function ImmutableNotice({ detail, onFork, forking = false }: ImmutableNoticeProps) {
   return (
@@ -29,7 +29,7 @@ export function ImmutableNotice({ detail, onFork, forking = false }: ImmutableNo
       }
     >
       {detail ??
-        'Published roadmaps are immutable so followers keep stable progress. Fork it into a private draft to edit and publish your own copy.'}
+        'Published roadmaps are immutable so followers keep stable progress. Fork it into an owner-only draft to edit and publish your own copy.'}
     </WarningBanner>
   )
 }

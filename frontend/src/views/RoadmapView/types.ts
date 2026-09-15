@@ -11,7 +11,7 @@ export type Subsection = components['schemas']['Subsection']
 export type Resource = components['schemas']['Resource']
 export type ChecklistItem = components['schemas']['ChecklistItem']
 export type Violation = components['schemas']['Violation']
-export type Visibility = components['schemas']['Visibility']
+export type PublishedVisibility = components['schemas']['PublishedVisibility']
 export type RoadmapStatus = components['schemas']['RoadmapStatus']
 
 export type FilterMatchMode = 'any' | 'all'
@@ -118,11 +118,11 @@ export type MetadataEditState =
 export type ForkState = { phase: 'idle' } | { phase: 'forking' } | { phase: 'failed'; status: number | null }
 
 /**
- * The web-only visibility toggle sub-state (`PUT /roadmaps/{id}/visibility`).
+ * The web-only publication-access toggle sub-state (`PUT /roadmaps/{id}/published-visibility`).
  * Last-write-wins: on success the returned roadmap replaces the
  * loaded one so the badge updates in place; `failed` carries the status.
  */
-export type VisibilityState =
+export type PublishedVisibilityState =
   | { phase: 'idle' }
   | { phase: 'saving' }
   | { phase: 'failed'; status: number | null }
@@ -150,14 +150,14 @@ export type DeleteState =
   | { phase: 'failed'; status: number | null }
 
 /**
- * The owner-only web-only lifecycle bundle (visibility / archive / delete).
+ * The owner-only web-only lifecycle bundle (publication-access / archive / delete).
  * No agent surface: these are human-web actions only. Threaded into
  * the {@link RoadmapActions} bundle and rendered by `LifecycleActions` when the
  * signed-in user owns the roadmap.
  */
 export interface RoadmapLifecycle {
-  visibilityState: VisibilityState
-  setVisibility: (visibility: Visibility) => void
+  publishedVisibilityState: PublishedVisibilityState
+  setPublishedVisibility: (published_visibility: PublishedVisibility) => void
   archiveState: ArchiveState
   archive: () => void
   deleteState: DeleteState

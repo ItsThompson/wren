@@ -97,7 +97,7 @@ The MCP Group-A schemas are generated the same way, from the internal app.
 just codegen-mcp       # export the internal OpenAPI, restrict to Group A, run datamodel-codegen
 ```
 
-`just codegen-mcp` writes `mcp/internal-openapi.json` from the live internal app, restricts a copy to the Group-A component set (dropping the authoring input's `visibility` and renaming `RoadmapInput` to `RoadmapDraftInput`), then regenerates `mcp/src/wren_mcp/_schemas_generated.py`. The generator is a dev-only dependency; run it after any change to a Group-A schema on the internal surface. CI drift-gates it: the `mcp-codegen-drift` job fails on a stale committed artifact or module.
+`just codegen-mcp` writes `mcp/internal-openapi.json` from the live internal app, restricts a copy to the Group-A component set (dropping the authoring input's `published_visibility` and renaming `RoadmapInput` to `RoadmapDraftInput`), then regenerates `mcp/src/wren_mcp/_schemas_generated.py`. The generator is a dev-only dependency; run it after any change to a Group-A schema on the internal surface. CI drift-gates it: the `mcp-codegen-drift` job fails on a stale committed artifact or module.
 
 ## Skill sync
 

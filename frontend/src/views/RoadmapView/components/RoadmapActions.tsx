@@ -20,7 +20,7 @@ interface RoadmapActionsProps {
  * "Edit details" affordance is owner-only and opens the {@link MetadataEditor}
  * inline; it stays available even on a published roadmap because editing
  * title/description/subject_tags is the sanctioned post-publish edit. The
- * owner-only web-only lifecycle bar ({@link LifecycleActions}: visibility toggle
+ * owner-only web-only lifecycle bar ({@link LifecycleActions}: publication-access toggle
  * + confirm-gated archive/delete) renders below, for the roadmap's owner.
  */
 export function RoadmapActions({ roadmap, isOwner, actions }: RoadmapActionsProps) {

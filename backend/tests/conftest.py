@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable, Iterator
 
 import pytest
@@ -13,12 +14,18 @@ MakeSettings = Callable[..., AppSettings]
 
 @pytest.fixture(scope="session")
 def postgres_url() -> Iterator[str]:
-    """A live ``postgres:17-alpine`` connection URL (asyncpg driver).
+    """Provide a live PostgreSQL URL for integration tests.
 
-    Session-scoped so integration tests across files share one container. Skips
-    automatically when testcontainers or Docker is unavailable, so a Docker-less
-    checkout still runs the unit suite.
+    ``WREN_TEST_POSTGRES_URL`` supports externally managed PostgreSQL containers
+    when Testcontainers cannot connect to the host Docker socket. Without it,
+    the fixture uses the standard session-scoped Testcontainers path and skips
+    when Docker is unavailable.
     """
+    configured_url = os.getenv("WREN_TEST_POSTGRES_URL")
+    if configured_url:
+        yield configured_url
+        return
+
     try:
         from testcontainers.postgres import PostgresContainer
     except ImportError:  # pragma: no cover - env without testcontainers

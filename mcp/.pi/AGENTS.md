@@ -46,7 +46,7 @@ All recipes run from the repo root and change into `mcp/`.
 - `require_scope` is the only sanctioned source of `user_id` inside a tool. Never accept a user id as a tool argument.
 - `progress_update` lives in `tools_read.py` but requires `progress:write`, not `roadmaps:read`. Do not infer a tool's scope from its file.
 - Update the frozen schema snapshot (`mcp/tests/snapshots/tools_schema.json`) when you add or change a tool. The snapshot test fails otherwise.
-- There is no visibility, archive, or delete tool. Those are web-only.
+- There is no publication-visibility, archive, or delete tool. Those are web-only.
 
 ## Transport and serving
 

@@ -39,7 +39,7 @@ from wren.progress.service import ProgressService
 from wren.roadmaps.listing import ListingService, ProfileOwner
 from wren.roadmaps.listing_api import create_listing_router
 from wren.roadmaps.models import RoadmapRecord
-from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
+from wren.roadmaps.schemas import PublishedVisibility, Roadmap, RoadmapStatus
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -80,7 +80,7 @@ class _Harness:
         owner: str,
         *,
         status: RoadmapStatus,
-        visibility: Visibility,
+        published_visibility: PublishedVisibility,
         title: str = "A Roadmap",
         subject_tags: list[str] | None = None,
     ) -> None:
@@ -89,7 +89,7 @@ class _Harness:
             owner=owner,
             title=title,
             subject_tags=subject_tags or [],
-            visibility=visibility,
+            published_visibility=published_visibility,
             status=status,
             revision=1,
             created_at=_NOW,
@@ -100,7 +100,7 @@ class _Harness:
             owner=roadmap.owner,
             title=roadmap.title,
             status=roadmap.status.value,
-            visibility=roadmap.visibility.value,
+            published_visibility=roadmap.published_visibility.value,
             revision=roadmap.revision,
             document=roadmap.model_dump(mode="json"),
             created_at=roadmap.created_at,
@@ -168,11 +168,36 @@ def test_dashboard_lists_authored_all_statuses_and_followed(make_settings: MakeS
     ada = harness.register("ada", "ada@example.com")
     bob = harness.register("bob", "bob@example.com")
     # ada owns a draft, a public+published, an archived, and a private+published.
-    harness.seed("r-ada-draft", ada, status=RoadmapStatus.DRAFT, visibility=Visibility.PRIVATE)
-    harness.seed("r-ada-pub", ada, status=RoadmapStatus.PUBLISHED, visibility=Visibility.PUBLIC)
-    harness.seed("r-ada-arch", ada, status=RoadmapStatus.ARCHIVED, visibility=Visibility.PUBLIC)
-    harness.seed("r-ada-priv", ada, status=RoadmapStatus.PUBLISHED, visibility=Visibility.PRIVATE)
-    harness.seed("r-bob-pub", bob, status=RoadmapStatus.PUBLISHED, visibility=Visibility.PUBLIC)
+    harness.seed(
+        "r-ada-draft",
+        ada,
+        status=RoadmapStatus.DRAFT,
+        published_visibility=PublishedVisibility.PRIVATE,
+    )
+    harness.seed(
+        "r-ada-pub",
+        ada,
+        status=RoadmapStatus.PUBLISHED,
+        published_visibility=PublishedVisibility.PUBLIC,
+    )
+    harness.seed(
+        "r-ada-arch",
+        ada,
+        status=RoadmapStatus.ARCHIVED,
+        published_visibility=PublishedVisibility.PUBLIC,
+    )
+    harness.seed(
+        "r-ada-priv",
+        ada,
+        status=RoadmapStatus.PUBLISHED,
+        published_visibility=PublishedVisibility.PRIVATE,
+    )
+    harness.seed(
+        "r-bob-pub",
+        bob,
+        status=RoadmapStatus.PUBLISHED,
+        published_visibility=PublishedVisibility.PUBLIC,
+    )
 
     # ada logs in (bob's registration left his session active) and follows bob's
     # roadmap, so the dashboard resolves to ada.
@@ -192,7 +217,12 @@ def test_dashboard_lists_authored_all_statuses_and_followed(make_settings: MakeS
 def test_dashboard_is_scoped_to_the_caller(make_settings: MakeSettings) -> None:
     harness = _build_harness(make_settings)
     ada = harness.register("ada", "ada@example.com")
-    harness.seed("r-ada", ada, status=RoadmapStatus.PUBLISHED, visibility=Visibility.PUBLIC)
+    harness.seed(
+        "r-ada",
+        ada,
+        status=RoadmapStatus.PUBLISHED,
+        published_visibility=PublishedVisibility.PUBLIC,
+    )
     harness.logout()
 
     # bob registers (session now bob) and reads his own empty dashboard: ada's
@@ -210,7 +240,7 @@ def test_dashboard_card_carries_status_and_visibility(make_settings: MakeSetting
         "r-ada",
         ada,
         status=RoadmapStatus.PUBLISHED,
-        visibility=Visibility.PUBLIC,
+        published_visibility=PublishedVisibility.PUBLIC,
         title="Grokking DSA",
         subject_tags=["cs"],
     )
@@ -219,7 +249,7 @@ def test_dashboard_card_carries_status_and_visibility(make_settings: MakeSetting
         "id": "r-ada",
         "title": "Grokking DSA",
         "status": "published",
-        "visibility": "public",
+        "published_visibility": "public",
         "subject_tags": ["cs"],
     }
 
@@ -230,10 +260,27 @@ def test_dashboard_card_carries_status_and_visibility(make_settings: MakeSetting
 def test_profile_returns_published_public_only(make_settings: MakeSettings) -> None:
     harness = _build_harness(make_settings)
     ada = harness.register("ada", "ada@example.com")
-    harness.seed("r-draft", ada, status=RoadmapStatus.DRAFT, visibility=Visibility.PUBLIC)
-    harness.seed("r-private", ada, status=RoadmapStatus.PUBLISHED, visibility=Visibility.PRIVATE)
-    harness.seed("r-archived", ada, status=RoadmapStatus.ARCHIVED, visibility=Visibility.PUBLIC)
-    harness.seed("r-public", ada, status=RoadmapStatus.PUBLISHED, visibility=Visibility.PUBLIC)
+    harness.seed(
+        "r-draft", ada, status=RoadmapStatus.DRAFT, published_visibility=PublishedVisibility.PUBLIC
+    )
+    harness.seed(
+        "r-private",
+        ada,
+        status=RoadmapStatus.PUBLISHED,
+        published_visibility=PublishedVisibility.PRIVATE,
+    )
+    harness.seed(
+        "r-archived",
+        ada,
+        status=RoadmapStatus.ARCHIVED,
+        published_visibility=PublishedVisibility.PUBLIC,
+    )
+    harness.seed(
+        "r-public",
+        ada,
+        status=RoadmapStatus.PUBLISHED,
+        published_visibility=PublishedVisibility.PUBLIC,
+    )
     harness.logout()
 
     body = harness.client.get("/users/ada").json()
@@ -245,7 +292,12 @@ def test_profile_returns_published_public_only(make_settings: MakeSettings) -> N
 def test_profile_is_public_and_needs_no_session(make_settings: MakeSettings) -> None:
     harness = _build_harness(make_settings)
     ada = harness.register("ada", "ada@example.com")
-    harness.seed("r-public", ada, status=RoadmapStatus.PUBLISHED, visibility=Visibility.PUBLIC)
+    harness.seed(
+        "r-public",
+        ada,
+        status=RoadmapStatus.PUBLISHED,
+        published_visibility=PublishedVisibility.PUBLIC,
+    )
     harness.logout()  # no session cookie remains
 
     response = harness.client.get("/users/ada")
@@ -256,8 +308,18 @@ def test_profile_is_public_and_needs_no_session(make_settings: MakeSettings) -> 
 def test_profile_is_viewer_agnostic_for_another_user(make_settings: MakeSettings) -> None:
     harness = _build_harness(make_settings)
     ada = harness.register("ada", "ada@example.com")
-    harness.seed("r-ada-draft", ada, status=RoadmapStatus.DRAFT, visibility=Visibility.PRIVATE)
-    harness.seed("r-ada-pub", ada, status=RoadmapStatus.PUBLISHED, visibility=Visibility.PUBLIC)
+    harness.seed(
+        "r-ada-draft",
+        ada,
+        status=RoadmapStatus.DRAFT,
+        published_visibility=PublishedVisibility.PRIVATE,
+    )
+    harness.seed(
+        "r-ada-pub",
+        ada,
+        status=RoadmapStatus.PUBLISHED,
+        published_visibility=PublishedVisibility.PUBLIC,
+    )
     harness.logout()
     # bob signs in and views ada's profile: still only her published-public one.
     harness.register("bob", "bob@example.com")

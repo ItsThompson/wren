@@ -5,9 +5,9 @@ Reads the committed raw internal-OpenAPI artifact (the unfiltered export of
 carrying exactly the Group-A component schemas the MCP server mirrors, with the
 two deterministic transforms the frozen agent contract requires:
 
-* the authoring input drops its ``visibility`` property (a web-only lifecycle
-  control with no agent tool); the read-side ``Roadmap`` model still carries
-  ``Visibility`` for the full roadmap projection;
+* the authoring input drops its ``published_visibility`` property (a web-only
+  lifecycle control with no agent tool); the read-side ``Roadmap`` model still
+  carries ``PublishedVisibility`` for the full roadmap projection;
 * the authoring input component is renamed ``RoadmapInput`` -> ``RoadmapDraftInput``
   (the name the frozen contract and ``tools_write`` import).
 
@@ -49,7 +49,7 @@ GROUP_A_COMPONENTS: frozenset[str] = frozenset(
         # Shared enums.
         "ResourceType",
         "RoadmapStatus",
-        "Visibility",
+        "PublishedVisibility",
         "ChangedNodeKind",
         "ChangeType",
         "ResponseFormat",
@@ -113,8 +113,8 @@ GROUP_A_COMPONENTS: frozenset[str] = frozenset(
 )
 
 # The property the authoring input omits. The read-side roadmap projection still
-# references the visibility enum, so it remains in the generated contract.
-_OMITTED_INPUT_PROPERTY = "visibility"
+# references the publication-visibility enum, so it remains in the generated contract.
+_OMITTED_INPUT_PROPERTY = "published_visibility"
 
 # Scalar JSON types whose constrained-nullable form the generator would hoist
 # into a shared model. Arrays are excluded on purpose (see below).
@@ -192,9 +192,15 @@ def _select_group_a(schemas: dict[str, Any]) -> dict[str, Any]:
     return {name: schemas[name] for name in GROUP_A_COMPONENTS}
 
 
-def _drop_visibility(authoring_input: dict[str, Any]) -> None:
-    """Remove the web-only ``visibility`` property and required entry in place."""
-    authoring_input.get("properties", {}).pop(_OMITTED_INPUT_PROPERTY, None)
+def _drop_published_visibility(authoring_input: dict[str, Any]) -> None:
+    """Remove the web-only publication setting from the authoring input."""
+    properties = authoring_input.get("properties", {})
+    if "visibility" in properties:
+        raise SystemExit(
+            "RoadmapInput contains the removed visibility authoring property; "
+            "reconcile the backend schema before generating MCP models."
+        )
+    properties.pop(_OMITTED_INPUT_PROPERTY, None)
     if "required" in authoring_input:
         authoring_input["required"] = [
             name for name in authoring_input["required"] if name != _OMITTED_INPUT_PROPERTY
@@ -222,7 +228,7 @@ def build_generation_input(doc: dict[str, Any]) -> dict[str, Any]:
     _lift_patch_op_union(raw_schemas)
     schemas = _select_group_a(raw_schemas)
 
-    _drop_visibility(schemas[_AUTHORING_INPUT_SOURCE])
+    _drop_published_visibility(schemas[_AUTHORING_INPUT_SOURCE])
     schemas[_AUTHORING_INPUT_TARGET] = schemas.pop(_AUTHORING_INPUT_SOURCE)
 
     for schema in schemas.values():

@@ -152,7 +152,7 @@ codegen:
 
 # Regenerate the MCP Group-A schema module from the internal app's OpenAPI.
 # Exports the internal app's OpenAPI to a committed raw artifact, restricts a copy
-# to the Group-A component set (dropping visibility, renaming RoadmapInput ->
+# to the Group-A component set (dropping published_visibility, renaming RoadmapInput ->
 # RoadmapDraftInput), runs datamodel-codegen, then canonicalizes with ruff. CI runs
 # this and `git diff --exit-code` to fail on a stale committed artifact or module.
 # The generator is a DEV-only dependency; the MCP image only copies the committed

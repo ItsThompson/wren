@@ -82,7 +82,7 @@ The `concise` and `detailed` switch travels as `?format=`. Concise is the defaul
 
 ### Write tools
 
-Canonical source: `tools_write.py`. Seven tools require `roadmaps:write` and are `openWorldHint` false: `create_roadmap_draft`, `patch_roadmap_draft`, `replace_roadmap_draft`, `validate_roadmap_draft`, `publish_roadmap`, `fork_roadmap`, and `edit_roadmap_metadata`. There is no visibility, archive, or delete tool: those are web-only. See `authoring.md` for the write-path rules and the immutability boundary, and `api.md` for the endpoints.
+Canonical source: `tools_write.py`. Seven tools require `roadmaps:write` and are `openWorldHint` false: `create_roadmap_draft`, `patch_roadmap_draft`, `replace_roadmap_draft`, `validate_roadmap_draft`, `publish_roadmap`, `fork_roadmap`, and `edit_roadmap_metadata`. There is no publication-visibility, archive, or delete tool: those are web-only. See `authoring.md` for the write-path rules and the immutability boundary, and `api.md` for the endpoints.
 
 Three MCP-specific behaviors: `replace_roadmap_draft` reads the current revision first, so it is the one tool that makes two internal calls; `publish_roadmap`'s docstring tells the agent to confirm with the user first; and `edit_roadmap_metadata` is presentation-only and stays allowed after publish.
 

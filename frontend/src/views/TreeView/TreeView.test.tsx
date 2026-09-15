@@ -66,7 +66,7 @@ function buildRoadmap(overrides: Partial<Roadmap> = {}): Roadmap {
     id: ROADMAP_ID,
     owner: 'user-1',
     title: 'Grokking DSA',
-    visibility: 'public',
+    published_visibility: 'public',
     status: 'published',
     revision: 3,
     section_order: ['sec_1'],

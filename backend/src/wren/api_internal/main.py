@@ -44,7 +44,7 @@ db = create_database(settings.database_url)
 # Roadmap authoring/reading over the trusted identity: the same factory the
 # external app binds, passing App.INTERNAL so the registry resolves
 # require_internal_user and mounts only the routes an MCP tool consumes (the
-# web-only visibility / archive / delete routes are external-only, never built here).
+# web-only publication-visibility / archive / delete routes are external-only, never built here).
 internal_roadmaps_router = create_roadmaps_router(
     build_roadmap_service_provider(),
     build_roadmap_read_service_provider(),

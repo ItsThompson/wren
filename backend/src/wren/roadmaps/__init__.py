@@ -13,19 +13,19 @@ package surface rather than deep-importing ``roadmaps.schemas``. The shared
 """
 
 from wren.roadmaps.schemas import (
+    PublishedVisibility,
     ResourceType,
     Roadmap,
     RoadmapStatus,
     Section,
     Subsection,
-    Visibility,
 )
 
 __all__ = [
+    "PublishedVisibility",
     "ResourceType",
     "Roadmap",
     "RoadmapStatus",
     "Section",
     "Subsection",
-    "Visibility",
 ]

@@ -9,7 +9,7 @@ complementing the per-app contract suites (``test_roadmaps_api*`` /
 
 - the one factory serves BOTH apps (a parameterized suite): the registry-resolved
   identity denies an anonymous caller and resolves an authenticated one;
-- the web-only routes (visibility/archive/delete and follow/deadline) are declared
+- the web-only routes (publication-access/archive/delete and follow/deadline) are declared
   for the external app only, so ``App.INTERNAL`` never mounts them while
   ``App.EXTERNAL`` does;
 - the mounted ``/roadmaps`` surface is EXACTLY each app's registry declaration, so
@@ -89,11 +89,11 @@ _MINIMAL_ROADMAP = {
     ],
 }
 
-# The three web-only lifecycle routes: visibility toggle, archive, delete. They
+# The three web-only lifecycle routes: publication-access toggle, archive, delete. They
 # mount on the external app only (no internal-app route, no MCP tool).
 _WEB_LIFECYCLE_ROUTES = frozenset(
     {
-        RouteKey(method="PUT", path="/roadmaps/{roadmap_id}/visibility"),
+        RouteKey(method="PUT", path="/roadmaps/{roadmap_id}/published-visibility"),
         RouteKey(method="POST", path="/roadmaps/{roadmap_id}:archive"),
         RouteKey(method="DELETE", path="/roadmaps/{roadmap_id}"),
     }
@@ -117,7 +117,7 @@ _EXTERNAL_ROADMAP_SURFACE = frozenset(
         RouteKey(method="POST", path="/roadmaps/{roadmap_id}:publish"),
         RouteKey(method="POST", path="/roadmaps/{roadmap_id}:fork"),
         RouteKey(method="PATCH", path="/roadmaps/{roadmap_id}/metadata"),
-        RouteKey(method="PUT", path="/roadmaps/{roadmap_id}/visibility"),
+        RouteKey(method="PUT", path="/roadmaps/{roadmap_id}/published-visibility"),
         RouteKey(method="POST", path="/roadmaps/{roadmap_id}:archive"),
         RouteKey(method="POST", path="/roadmaps/{roadmap_id}/follow"),
         RouteKey(method="GET", path="/roadmaps/{roadmap_id}/progress"),
@@ -137,7 +137,7 @@ _WEB_ONLY_PROGRESS_ROUTES = frozenset(
 )
 
 # The internal app is the external surface minus the web-only routes: the web
-# lifecycle (visibility/archive/delete) and the web-only progress routes
+# lifecycle (publication-access/archive/delete) and the web-only progress routes
 # (follow/deadline). It mounts only what an MCP tool consumes.
 _INTERNAL_ROADMAP_SURFACE = (
     _EXTERNAL_ROADMAP_SURFACE - _WEB_LIFECYCLE_ROUTES - _WEB_ONLY_PROGRESS_ROUTES

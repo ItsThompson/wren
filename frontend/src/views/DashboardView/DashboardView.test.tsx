@@ -26,7 +26,7 @@ function buildCard(overrides: Partial<RoadmapCardData> = {}): RoadmapCardData {
     id: 'grokking-dsa-7f3k',
     title: 'Grokking DSA',
     status: 'published',
-    visibility: 'public',
+    published_visibility: 'public',
     subject_tags: ['cs'],
     ...overrides,
   }
@@ -48,17 +48,17 @@ function renderView() {
 }
 
 describe('DashboardView', () => {
-  it('renders the Yours and Following sections with status + visibility badges', async () => {
+  it('renders the Yours and Following sections with status + publication-access badges', async () => {
     server.use(
       authedRefresh(),
       http.get('*/me/dashboard', () =>
         HttpResponse.json({
           authored: [
-            buildCard({ id: 'r-draft', title: 'Systems Design', status: 'draft', visibility: 'private', subject_tags: ['systems'] }),
-            buildCard({ id: 'r-pub', title: 'Grokking DSA', status: 'published', visibility: 'public' }),
+            buildCard({ id: 'r-draft', title: 'Systems Design', status: 'draft', published_visibility: 'private', subject_tags: ['systems'] }),
+            buildCard({ id: 'r-pub', title: 'Grokking DSA', status: 'published', published_visibility: 'public' }),
           ],
           followed: [
-            buildCard({ id: 'r-follow', title: 'Rust in Practice', status: 'published', visibility: 'public' }),
+            buildCard({ id: 'r-follow', title: 'Rust in Practice', status: 'published', published_visibility: 'public' }),
           ],
         }),
       ),
@@ -76,7 +76,7 @@ describe('DashboardView', () => {
     // Status badges: the label carries meaning, not color alone.
     expect(screen.getByText('Draft')).toBeInTheDocument()
     expect(screen.getAllByText('Published').length).toBe(2)
-    expect(screen.getByText('Private')).toBeInTheDocument()
+    expect(screen.getByText('Private when published')).toBeInTheDocument()
     expect(screen.getAllByText('Public').length).toBe(2)
 
     // Cards link to the roadmap view.

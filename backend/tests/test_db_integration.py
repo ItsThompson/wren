@@ -59,8 +59,8 @@ def test_alembic_upgrade_head_creates_version_table(
         finally:
             await engine.dispose()
 
-    # Head advances as new migrations are added; onboarding is the latest.
-    assert asyncio.run(_read_version()) == "0006_onboarding"
+    # Head advances as new migrations are added; publication visibility is the latest.
+    assert asyncio.run(_read_version()) == "0007_published_visibility"
 
 
 async def test_db_readiness_check_ok_against_real_db(postgres_url: str) -> None:

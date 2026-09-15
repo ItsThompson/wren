@@ -12,7 +12,7 @@ function buildCard(overrides: Partial<RoadmapCardData> = {}): RoadmapCardData {
     id: 'grokking-dsa-7f3k',
     title: 'Grokking DSA',
     status: 'published',
-    visibility: 'public',
+    published_visibility: 'public',
     subject_tags: ['cs', 'interview-prep'],
     ...overrides,
   }
@@ -37,16 +37,16 @@ describe('RoadmapCard', () => {
     expect(screen.getByText('interview-prep')).toBeInTheDocument()
   })
 
-  it('renders the Published status and Public visibility badges by label', () => {
-    renderCard({ status: 'published', visibility: 'public' })
+  it('renders the Published status and Public publication-access badges by label', () => {
+    renderCard({ status: 'published', published_visibility: 'public' })
     expect(screen.getByText('Published')).toBeInTheDocument()
     expect(screen.getByText('Public')).toBeInTheDocument()
   })
 
-  it('renders the Draft status and Private visibility badges by label', () => {
-    renderCard({ status: 'draft', visibility: 'private' })
+  it('renders the Draft status and future publication badge by label', () => {
+    renderCard({ status: 'draft', published_visibility: 'private' })
     expect(screen.getByText('Draft')).toBeInTheDocument()
-    expect(screen.getByText('Private')).toBeInTheDocument()
+    expect(screen.getByText('Private when published')).toBeInTheDocument()
   })
 
   it('renders the Archived status badge', () => {

@@ -7,12 +7,12 @@ import type {
   DeleteState,
   Roadmap,
   RoadmapLifecycle,
-  Visibility,
-  VisibilityState,
+  PublishedVisibility,
+  PublishedVisibilityState,
 } from '../types'
 
 interface LifecycleCallbacks {
-  /** Reconcile the shared roadmap cache after a visibility toggle or archive. */
+  /** Reconcile the shared roadmap cache after a publication-access toggle or archive. */
   onChanged: (roadmap: Roadmap) => void
   /** Called after a successful delete: the roadmap is gone, so navigate away. */
   onDeleted: () => void
@@ -20,10 +20,10 @@ interface LifecycleCallbacks {
 
 /**
  * The owner-only web-only lifecycle actions for a roadmap:
- * visibility toggle, archive, and delete. Web-only by design: there is no agent
+ * publication-access toggle, archive, and delete. Web-only by design: there is no agent
  * (MCP) surface for any of them.
  *
- * Visibility and archive reconcile the loaded roadmap in place via `onChanged`
+ * PublishedVisibility and archive reconcile the loaded roadmap in place via `onChanged`
  * (which writes the returned roadmap into the shared `keys.roadmap(id)` cache in
  * `useRoadmap`, so the badge / discovery state updates without a refetch and any
  * co-mounted reader stays coherent). Delete is guarded by a
@@ -38,7 +38,7 @@ export function useLifecycle(
   roadmapId: string,
   { onChanged, onDeleted }: LifecycleCallbacks,
 ): RoadmapLifecycle {
-  const [visibilityState, setVisibilityState] = useState<VisibilityState>({ phase: 'idle' })
+  const [publishedVisibilityState, setVisibilityState] = useState<PublishedVisibilityState>({ phase: 'idle' })
   const [archiveState, setArchiveState] = useState<ArchiveState>({ phase: 'idle' })
   const [deleteState, setDeleteState] = useState<DeleteState>({ phase: 'idle' })
   const generationRef = useRef(0)
@@ -68,14 +68,14 @@ export function useLifecycle(
     }
   }, [roadmapId])
 
-  const setVisibility = useCallback(
-    (visibility: Visibility) => {
+  const setPublishedVisibility = useCallback(
+    (publishedVisibility: PublishedVisibility) => {
       setVisibilityState({ phase: 'saving' })
       void (async () => {
         try {
-          const { data, response } = await client.PUT('/roadmaps/{roadmap_id}/visibility', {
+          const { data, response } = await client.PUT('/roadmaps/{roadmap_id}/published-visibility', {
             params: { path: { roadmap_id: roadmapId } },
-            body: { visibility },
+            body: { published_visibility: publishedVisibility },
           })
           if (!isCurrent()) return
           if (data) {
@@ -136,5 +136,5 @@ export function useLifecycle(
     })()
   }, [client, roadmapId, onDeleted, isCurrent])
 
-  return { visibilityState, setVisibility, archiveState, archive, deleteState, deleteRoadmap }
+  return { publishedVisibilityState, setPublishedVisibility, archiveState, archive, deleteState, deleteRoadmap }
 }

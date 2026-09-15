@@ -262,7 +262,7 @@ export interface paths {
         patch: operations["edit_roadmap_metadata_roadmaps__roadmap_id__metadata_patch"];
         trace?: never;
     };
-    "/roadmaps/{roadmap_id}/visibility": {
+    "/roadmaps/{roadmap_id}/published-visibility": {
         parameters: {
             query?: never;
             header?: never;
@@ -270,8 +270,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Set Roadmap Visibility */
-        put: operations["set_roadmap_visibility_roadmaps__roadmap_id__visibility_put"];
+        /** Set Roadmap Published Visibility */
+        put: operations["set_roadmap_published_visibility_roadmaps__roadmap_id__published_visibility_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -911,7 +911,7 @@ export interface components {
          *     left out (``None``) is unchanged (last-write-wins, deliberately not
          *     ``If-Match``-guarded and never bumps the structural ``revision``). ``extra`` is
          *     ``allow``ed so a smuggled structural, lifecycle, or identity field (e.g.
-         *     ``sections`` / ``visibility`` / ``status`` / ``revision``) is *captured* rather
+         *     ``sections`` / ``published_visibility`` / ``status`` / ``revision``) is *captured* rather
          *     than silently dropped, then rejected as immutable by
          *     :meth:`reject_structural_fields`: the metadata endpoint can never touch
          *     anything but presentation.
@@ -1046,7 +1046,7 @@ export interface components {
             description?: string | null;
             /** Subject Tags */
             subject_tags?: string[];
-            visibility: components["schemas"]["Visibility"];
+            published_visibility: components["schemas"]["PublishedVisibility"];
             /**
              * Created At
              * Format: date-time
@@ -1194,6 +1194,18 @@ export interface components {
         ProgressUpdateResult: {
             progress: components["schemas"]["ProgressSnapshot"];
             next: components["schemas"]["NextResult"];
+        };
+        /**
+         * PublishedVisibility
+         * @enum {string}
+         */
+        PublishedVisibility: "public" | "private";
+        /**
+         * PublishedVisibilityRequest
+         * @description The web-only publication-access toggle request.
+         */
+        PublishedVisibilityRequest: {
+            published_visibility: components["schemas"]["PublishedVisibility"];
         };
         /**
          * RegisterRequest
@@ -1347,8 +1359,8 @@ export interface components {
             description?: string | null;
             /** Subject Tags */
             subject_tags?: string[];
-            /** @default private */
-            visibility: components["schemas"]["Visibility"];
+            /** @default public */
+            published_visibility: components["schemas"]["PublishedVisibility"];
             /** @default draft */
             status: components["schemas"]["RoadmapStatus"];
             /**
@@ -1379,8 +1391,8 @@ export interface components {
          * RoadmapCard
          * @description A roadmap summarized for a list/grid card.
          *
-         *     ``status`` drives the Draft/Published/Archived badge and ``visibility`` the
-         *     lock/globe badge. Content (sections, items, progress)
+         *     ``status`` drives the Draft/Published/Archived badge and ``published_visibility``
+         *     the lock/globe badge. Content (sections, items, progress)
          *     is never inlined: a card links to the full roadmap view for that.
          */
         RoadmapCard: {
@@ -1389,7 +1401,7 @@ export interface components {
             /** Title */
             title: string;
             status: components["schemas"]["RoadmapStatus"];
-            visibility: components["schemas"]["Visibility"];
+            published_visibility: components["schemas"]["PublishedVisibility"];
             /** Subject Tags */
             subject_tags?: string[];
         };
@@ -1411,8 +1423,8 @@ export interface components {
             description?: string | null;
             /** Subject Tags */
             subject_tags?: string[];
-            /** @default private */
-            visibility: components["schemas"]["Visibility"];
+            /** @default public */
+            published_visibility: components["schemas"]["PublishedVisibility"];
             /** @default draft */
             status: components["schemas"]["RoadmapStatus"];
             /**
@@ -1456,8 +1468,8 @@ export interface components {
             description?: string | null;
             /** Subject Tags */
             subject_tags?: string[];
-            /** @default private */
-            visibility: components["schemas"]["Visibility"];
+            /** @default public */
+            published_visibility: components["schemas"]["PublishedVisibility"];
             /** Sections */
             sections?: components["schemas"]["SectionInput"][];
             /** Suggested Path */
@@ -1483,8 +1495,8 @@ export interface components {
             description?: string | null;
             /** Subject Tags */
             subject_tags?: string[];
-            /** @default private */
-            visibility: components["schemas"]["Visibility"];
+            /** @default public */
+            published_visibility: components["schemas"]["PublishedVisibility"];
             /** @default draft */
             status: components["schemas"]["RoadmapStatus"];
             /**
@@ -1805,24 +1817,6 @@ export interface components {
             ids: string[];
             /** Message */
             message: string;
-        };
-        /**
-         * Visibility
-         * @enum {string}
-         */
-        Visibility: "public" | "private";
-        /**
-         * VisibilityRequest
-         * @description The ``PUT /roadmaps/{id}/visibility`` body: toggle public/private (web-only).
-         *
-         *     Visibility is a lifecycle/presentation field, editable by the owner on a
-         *     roadmap of any status (draft or published): a public roadmap is reachable by
-         *     link and appears on the owner's profile, a private one is owner-only. The
-         *     toggle is last-write-wins (never ``If-Match``-guarded) and touches no
-         *     follower-visible structure, so it never bumps the structural ``revision``.
-         */
-        VisibilityRequest: {
-            visibility: components["schemas"]["Visibility"];
         };
     };
     responses: never;
@@ -2388,7 +2382,7 @@ export interface operations {
             };
         };
     };
-    set_roadmap_visibility_roadmaps__roadmap_id__visibility_put: {
+    set_roadmap_published_visibility_roadmaps__roadmap_id__published_visibility_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -2399,7 +2393,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["VisibilityRequest"];
+                "application/json": components["schemas"]["PublishedVisibilityRequest"];
             };
         };
         responses: {

@@ -2,7 +2,7 @@
 
 These are the compact card projections the two list views consume, **not** the
 full :class:`~wren.roadmaps.schemas.Roadmap`: a :class:`RoadmapCard` carries only
-what a card needs (title, status/visibility badges, subject tags), the private
+what a card needs (title, status/published-visibility badges, subject tags), the private
 :class:`Dashboard` groups the caller's authored and followed roadmaps, and the
 public :class:`Profile` carries a handle's published-public roadmaps.
 
@@ -17,20 +17,20 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from wren.roadmaps.schemas import RoadmapStatus, Visibility
+from wren.roadmaps.schemas import PublishedVisibility, RoadmapStatus
 
 
 class RoadmapCard(BaseModel):
     """A roadmap summarized for a list/grid card.
 
-    ``status`` drives the Draft/Published/Archived badge and ``visibility`` the
-    lock/globe badge. Content (sections, items, progress)
+    ``status`` drives the Draft/Published/Archived badge and ``published_visibility``
+    the lock/globe badge. Content (sections, items, progress)
     is never inlined: a card links to the full roadmap view for that."""
 
     id: str
     title: str
     status: RoadmapStatus
-    visibility: Visibility
+    published_visibility: PublishedVisibility
     subject_tags: list[str] = Field(default_factory=list)
 
 

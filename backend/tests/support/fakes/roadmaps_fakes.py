@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy.exc import IntegrityError
 
-from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
+from wren.roadmaps.schemas import PublishedVisibility, Roadmap, RoadmapStatus
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Iterator, Sequence
@@ -51,7 +51,7 @@ class InMemoryRoadmapRepository:
         record.owner = roadmap.owner
         record.title = roadmap.title
         record.status = roadmap.status.value
-        record.visibility = roadmap.visibility.value
+        record.published_visibility = roadmap.published_visibility.value
         record.revision = roadmap.revision
         record.document = roadmap.model_dump(mode="json")
         record.updated_at = roadmap.updated_at
@@ -85,7 +85,7 @@ class InMemoryRoadmapRepository:
             for record in self._by_id.values()
             if record.owner == owner_id
             and record.status == RoadmapStatus.PUBLISHED.value
-            and record.visibility == Visibility.PUBLIC.value
+            and record.published_visibility == PublishedVisibility.PUBLIC.value
         )
 
     async def list_by_ids(self, roadmap_ids: Sequence[str]) -> list[RoadmapRecord]:

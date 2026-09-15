@@ -31,7 +31,7 @@ def _roadmap_body() -> dict[str, Any]:
         "title": "Contract roadmap",
         "description": "A populated canonical document.",
         "subject_tags": ["python", "databases"],
-        "visibility": "public",
+        "published_visibility": "public",
         "status": "published",
         "revision": 7,
         "sections": {

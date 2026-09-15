@@ -28,7 +28,7 @@ class RoadmapStatus(StrEnum):
     ARCHIVED = "archived"
 
 
-class Visibility(StrEnum):
+class PublishedVisibility(StrEnum):
     PUBLIC = "public"
     PRIVATE = "private"
 
@@ -102,7 +102,7 @@ class Roadmap(BaseModel):
     title: str
     description: str | None = None
     subject_tags: list[str] = Field(default_factory=list)
-    visibility: Visibility = Visibility.PRIVATE
+    published_visibility: PublishedVisibility = PublishedVisibility.PUBLIC
     status: RoadmapStatus = RoadmapStatus.DRAFT
     revision: int = 1
     sections: dict[str, Section] = Field(default_factory=dict)
@@ -161,22 +161,17 @@ class RoadmapInput(BaseModel):
     title: str = Field(min_length=1)
     description: str | None = None
     subject_tags: list[str] = Field(default_factory=list)
-    visibility: Visibility = Visibility.PRIVATE
+    published_visibility: PublishedVisibility = PublishedVisibility.PUBLIC
     sections: list[SectionInput] = Field(default_factory=list)
     suggested_path: list[str] = Field(default_factory=list)
 
 
-class VisibilityRequest(BaseModel):
-    """The ``PUT /roadmaps/{id}/visibility`` body: toggle public/private (web-only).
+class PublishedVisibilityRequest(BaseModel):
+    """The web-only publication-access toggle request."""
 
-    Visibility is a lifecycle/presentation field, editable by the owner on a
-    roadmap of any status (draft or published): a public roadmap is reachable by
-    link and appears on the owner's profile, a private one is owner-only. The
-    toggle is last-write-wins (never ``If-Match``-guarded) and touches no
-    follower-visible structure, so it never bumps the structural ``revision``.
-    """
+    model_config = ConfigDict(extra="forbid")
 
-    visibility: Visibility
+    published_visibility: PublishedVisibility
 
 
 class MetadataEditRequest(BaseModel):
@@ -187,7 +182,7 @@ class MetadataEditRequest(BaseModel):
     left out (``None``) is unchanged (last-write-wins, deliberately not
     ``If-Match``-guarded and never bumps the structural ``revision``). ``extra`` is
     ``allow``ed so a smuggled structural, lifecycle, or identity field (e.g.
-    ``sections`` / ``visibility`` / ``status`` / ``revision``) is *captured* rather
+    ``sections`` / ``published_visibility`` / ``status`` / ``revision``) is *captured* rather
     than silently dropped, then rejected as immutable by
     :meth:`reject_structural_fields`: the metadata endpoint can never touch
     anything but presentation."""
@@ -203,7 +198,7 @@ class MetadataEditRequest(BaseModel):
         sent, naming the offending fields and pointing to the sanctioned paths.
 
         This is what makes the endpoint presentation-only at the wire boundary: a
-        client cannot smuggle a content, visibility, status, or revision change
+        client cannot smuggle a content, publication-access, status, or revision change
         through the metadata edit. Presentation edits stay allowed post-publish;
         structural changes require a draft (fork a published roadmap first)."""
         smuggled = sorted(self.model_extra or {})

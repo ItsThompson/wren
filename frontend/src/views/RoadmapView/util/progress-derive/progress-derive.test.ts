@@ -31,7 +31,7 @@ function roadmap(sections: Section[]): Roadmap {
     owner: 'owner',
     title: 'R',
     subject_tags: [],
-    visibility: 'public',
+    published_visibility: 'public',
     status: 'published',
     revision: 1,
     section_order: sections.map((sec) => sec.id),

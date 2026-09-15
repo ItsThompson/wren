@@ -21,9 +21,9 @@ field-for-field backend mirror:
 * **Group C** ``SearchResults``: the MCP-only structured wrapper around the hit
   list.
 
-``visibility`` is web-only for authoring, so the generated draft input carries
-no such field; the full read projection retains its visibility value. Enforced by
-the tool schema snapshot and the cross-package ``contract-drift`` mirror test
+``published_visibility`` is web-only for authoring, so the generated draft input
+carries no such field; the full read projection retains its publication setting.
+Enforced by the tool schema snapshot and the cross-package ``contract-drift`` mirror test
 (``contract/tests/test_schema_mirror.py``).
 """
 
@@ -56,6 +56,7 @@ from wren_mcp._schemas_generated import (
     Profile,
     ProgressSnapshot,
     ProgressUpdateResult,
+    PublishedVisibility,
     RemoveEdgeOp,
     RemoveItemOp,
     RemoveSectionOp,
@@ -89,7 +90,6 @@ from wren_mcp._schemas_generated import (
     UpdateSectionOp,
     UpdateSubsectionOp,
     Violation,
-    Visibility,
 )
 
 # ---------- Patch operation grammar (canonical dispatch) ----------------------
@@ -298,6 +298,7 @@ __all__ = [
     "ProgressSnapshot",
     "ProgressUpdateResult",
     "PublishResult",
+    "PublishedVisibility",
     "RemoveEdgeOp",
     "RemoveItemOp",
     "RemoveSectionOp",
@@ -334,5 +335,4 @@ __all__ = [
     "UpdateSubsectionOp",
     "ValidationResult",
     "Violation",
-    "Visibility",
 ]

@@ -12,7 +12,7 @@ model-recoverable :class:`ToolError`\\s (:mod:`wren_mcp.tool_errors`).
 
 Annotations follow MCP guidance:
 ``readOnlyHint``/``idempotentHint``/``destructiveHint`` per tool. There is no
-visibility, archive, or delete tool: those are web-only.
+publication-visibility, archive, or delete tool: those are web-only.
 """
 
 from __future__ import annotations

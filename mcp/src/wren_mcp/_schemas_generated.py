@@ -92,6 +92,11 @@ class PrereqRef(BaseModel):
     title: Annotated[str, Field(title="Title")]
 
 
+class PublishedVisibility(StrEnum):
+    PUBLIC = "public"
+    PRIVATE = "private"
+
+
 class RemoveEdgeOp(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -242,11 +247,6 @@ class Violation(BaseModel):
     rule: Annotated[str, Field(title="Rule")]
 
 
-class Visibility(StrEnum):
-    PUBLIC = "public"
-    PRIVATE = "private"
-
-
 class ChangedNode(BaseModel):
     change: ChangeType
     id: Annotated[str, Field(title="Id")]
@@ -257,10 +257,10 @@ class OverviewDetails(BaseModel):
     created_at: Annotated[AwareDatetime, Field(title="Created At")]
     description: Annotated[str | None, Field(title="Description")] = None
     owner: Annotated[str, Field(title="Owner")]
+    published_visibility: PublishedVisibility
     subject_tags: Annotated[list[str], Field(title="Subject Tags")] = []
     suggested_path: Annotated[list[str], Field(title="Suggested Path")] = []
     updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
-    visibility: Visibility
 
 
 class ProgressSnapshot(BaseModel):
@@ -305,10 +305,10 @@ class ResourceRef(BaseModel):
 
 class RoadmapCard(BaseModel):
     id: Annotated[str, Field(title="Id")]
+    published_visibility: PublishedVisibility
     status: RoadmapStatus
     subject_tags: Annotated[list[str], Field(title="Subject Tags")] = []
     title: Annotated[str, Field(title="Title")]
-    visibility: Visibility
 
 
 class SearchHit(BaseModel):
@@ -456,6 +456,7 @@ class Roadmap(BaseModel):
     description: Annotated[str | None, Field(title="Description")] = None
     id: Annotated[str, Field(title="Id")]
     owner: Annotated[str, Field(title="Owner")]
+    published_visibility: PublishedVisibility = PublishedVisibility.PUBLIC
     revision: Annotated[int, Field(title="Revision")] = 1
     section_order: Annotated[list[str], Field(title="Section Order")] = []
     sections: Annotated[dict[str, Section], Field(title="Sections", validate_default=True)] = {}
@@ -464,7 +465,6 @@ class Roadmap(BaseModel):
     suggested_path: Annotated[list[str], Field(title="Suggested Path")] = []
     title: Annotated[str, Field(title="Title")]
     updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
-    visibility: Visibility = Visibility.PRIVATE
 
 
 class RoadmapDraftInput(BaseModel):

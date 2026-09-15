@@ -41,7 +41,7 @@ from wren.core.route_registry import App
 from wren.core.settings import AppSettings
 from wren.progress.router import create_progress_router
 from wren.progress.service import ProgressService
-from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
+from wren.roadmaps.schemas import PublishedVisibility, Roadmap, RoadmapStatus
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -108,7 +108,9 @@ def test_follow_a_published_roadmap_is_201(make_settings: MakeSettings) -> None:
 
 
 def test_follow_a_draft_is_a_409(make_settings: MakeSettings) -> None:
-    draft = build_roadmap(status=RoadmapStatus.DRAFT, visibility=Visibility.PUBLIC)
+    draft = build_roadmap(
+        status=RoadmapStatus.DRAFT, published_visibility=PublishedVisibility.PUBLIC
+    )
     client, _ = _build_client(make_settings, draft)
     _login(client)
     response = client.post(f"/roadmaps/{draft.id}/follow")
@@ -125,7 +127,7 @@ def test_follow_requires_authentication(make_settings: MakeSettings) -> None:
 
 
 def test_follow_a_private_roadmap_owned_by_another_is_a_404(make_settings: MakeSettings) -> None:
-    private = build_roadmap(owner="someone", visibility=Visibility.PRIVATE)
+    private = build_roadmap(owner="someone", published_visibility=PublishedVisibility.PRIVATE)
     client, _ = _build_client(make_settings, private)
     _login(client)
     response = client.post(f"/roadmaps/{private.id}/follow")
@@ -308,7 +310,9 @@ def test_set_deadline_requires_authentication(make_settings: MakeSettings) -> No
 
 
 def test_set_deadline_on_a_draft_is_a_409(make_settings: MakeSettings) -> None:
-    draft = build_roadmap(status=RoadmapStatus.DRAFT, visibility=Visibility.PUBLIC)
+    draft = build_roadmap(
+        status=RoadmapStatus.DRAFT, published_visibility=PublishedVisibility.PUBLIC
+    )
     client, _ = _build_client(make_settings, draft)
     _login(client)
     response = client.put(f"/roadmaps/{draft.id}/deadline", json={"deadline": "2026-12-01"})

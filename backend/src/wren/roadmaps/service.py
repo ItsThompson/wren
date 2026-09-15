@@ -11,7 +11,7 @@ full-document ``replace_draft`` import escape hatch) and lifecycle (the minimal
 ``validate`` / ``publish`` one-way transition that makes content immutable,
 ``fork`` seeding a new draft from any readable roadmap, ``edit_metadata`` the
 sanctioned presentation-only edit that stays allowed post-publish, and the
-web-only ``set_visibility`` / ``archive`` / ``delete`` actions: delete guarded by
+web-only ``set_published_visibility`` / ``archive`` / ``delete`` actions: delete guarded by
 a zero-followers check, archive the safe retirement path). The study-time reads
 (``get`` and the read projections) live in the sibling
 :class:`~wren.roadmaps.read_service.RoadmapReadService`.
@@ -33,12 +33,12 @@ from wren.roadmaps.repository import RoadmapRepository, transaction
 from wren.roadmaps.schemas import (
     PatchOp,
     PatchResult,
+    PublishedVisibility,
     Roadmap,
     RoadmapCreated,
     RoadmapInput,
     RoadmapReplaced,
     RoadmapStatus,
-    Visibility,
 )
 from wren.roadmaps.validation import validate_structure
 from wren_common.logging import get_logger
@@ -80,7 +80,7 @@ class RoadmapService:
         self._clock = clock
 
     async def create_draft(self, user_id: str, doc: RoadmapInput) -> RoadmapCreated:
-        """Mint slug IDs, resolve references, and persist a private draft.
+        """Mint slug IDs and persist an owner-only draft set public on publish.
 
         Returns the full roadmap at ``revision`` 1 plus the ``proposed_id ->
         minted_id`` remap for any de-duped proposal.
@@ -158,14 +158,14 @@ class RoadmapService:
         ID semantics: the roadmap's own ID (the route param)
         is unchanged, nodes carrying a ``proposed_id`` keep it, and every other node
         is re-minted, all via the shared :func:`assemble_draft` mint-then-resolve
-        pass. ``created_at``, ``owner``, and ``visibility`` are preserved; ``revision``
+        pass. ``created_at``, ``owner``, and ``published_visibility`` are preserved; ``revision``
         bumps by one and the ``proposed_id -> minted_id`` remap is returned so the
         author can reconcile any de-duped reference.
 
-        Visibility is deliberately taken from the **stored** draft, not the imported
+        PublishedVisibility is deliberately taken from the **stored** draft, not the imported
         document: a full-document import replaces content, so it must not silently
-        flip a draft public/private. Visibility is a web-only lifecycle toggle,
-        changed only through :meth:`set_visibility`.
+        flip a draft public/private. PublishedVisibility is a web-only lifecycle toggle,
+        changed only through :meth:`set_published_visibility`.
         """
         async with transaction(self._repo):
             draft = await self._load_writable_draft(user_id, roadmap_id, for_update=True)
@@ -177,11 +177,16 @@ class RoadmapService:
                     instance=f"/roadmaps/{roadmap_id}",
                 )
             assembled = assemble_draft(doc, roadmap_id, owner=user_id, now=self._clock())
+            published_visibility = (
+                doc.published_visibility
+                if "published_visibility" in doc.model_fields_set
+                else draft.published_visibility
+            )
             replaced = assembled.roadmap.model_copy(
                 update={
                     "revision": draft.revision + 1,
                     "created_at": draft.created_at,
-                    "visibility": draft.visibility,
+                    "published_visibility": published_visibility,
                 }
             )
             await self._repo.save(replaced)
@@ -232,8 +237,8 @@ class RoadmapService:
         private roadmap owned by someone else is a 404 with no existence leak
         (:func:`~wren.roadmaps.read_service.load_readable`). The fork is a faithful
         content copy under a freshly-minted, globally-unique roadmap ID (never
-        derived from the source), owned by the forking user, reset to a private
-        ``draft`` at ``revision`` 1.
+        derived from the source), owned by the forking user, reset to a
+        public-on-publish ``draft`` at ``revision`` 1.
         No progress is carried over: fork creates no progress record, so the forker
         starts the copy with a clean slate. The source is never
         mutated (the copy is a fresh insert).
@@ -267,7 +272,7 @@ class RoadmapService:
         guard: a published roadmap is edited here while structural writes on it stay
         409. It is deliberately not ``If-Match``-guarded and does not bump the
         structural ``revision`` (last-write-wins). Only fields
-        explicitly provided (not ``None``) are changed; ``visibility``, ``status``,
+        explicitly provided (not ``None``) are changed; ``published_visibility``, ``status``,
         and all content are untouched (a smuggled structural field is rejected at
         the wire boundary by :meth:`MetadataEditRequest.reject_structural_fields`).
         """
@@ -285,13 +290,13 @@ class RoadmapService:
         _log.info("roadmap_metadata_edited", roadmap_id=roadmap_id, user_id=user_id)
         return edited
 
-    async def set_visibility(
-        self, user_id: str, roadmap_id: str, visibility: Visibility
+    async def set_published_visibility(
+        self, user_id: str, roadmap_id: str, published_visibility: PublishedVisibility
     ) -> Roadmap:
         """Toggle the caller's own roadmap public/private (web-only).
 
         Loads through the plain owner guard (:meth:`_load_owned`), so it applies to
-        a roadmap of any status (a draft or a published one): visibility is a
+        a roadmap of any status (a draft or a published one): publication access is a
         lifecycle field, not follower-visible structure. A public roadmap is
         reachable by link and appears on the owner's profile; a private one is
         owner-only. Last-write-wins (deliberately not ``If-Match``-guarded) and it
@@ -301,14 +306,17 @@ class RoadmapService:
         async with transaction(self._repo):
             roadmap = await self._load_owned(user_id, roadmap_id, for_update=True)
             updated = roadmap.model_copy(
-                update={"visibility": visibility, "updated_at": self._clock()}
+                update={
+                    "published_visibility": published_visibility,
+                    "updated_at": self._clock(),
+                }
             )
             await self._repo.save(updated)
         _log.info(
-            "roadmap_visibility_set",
+            "roadmap_published_visibility_set",
             roadmap_id=roadmap_id,
             user_id=user_id,
-            visibility=visibility.value,
+            published_visibility=published_visibility.value,
         )
         return updated
 
@@ -451,7 +459,7 @@ def _to_record(roadmap: Roadmap) -> RoadmapRecord:
         owner=roadmap.owner,
         title=roadmap.title,
         status=roadmap.status.value,
-        visibility=roadmap.visibility.value,
+        published_visibility=roadmap.published_visibility.value,
         revision=roadmap.revision,
         document=roadmap.model_dump(mode="json"),
         created_at=roadmap.created_at,

@@ -126,11 +126,13 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
         method="GET", path="/roadmaps/{roadmap_id}/sections/{section_id}"
     ): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="GET", path="/roadmaps/{roadmap_id}/search"): AccessLevel.EXTERNAL_COOKIE,
-    # Web-only lifecycle: visibility toggle, archive, and delete. Mounted on
+    # Web-only lifecycle: publication-access toggle, archive, and delete. Mounted on
     # the external (human) app ONLY: no internal-app route and no MCP tool.
     # All resolve the human session via require_user and are
     # owner-scoped in the service; delete is guarded by a zero-followers check.
-    RouteKey(method="PUT", path="/roadmaps/{roadmap_id}/visibility"): AccessLevel.EXTERNAL_COOKIE,
+    RouteKey(
+        method="PUT", path="/roadmaps/{roadmap_id}/published-visibility"
+    ): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="POST", path="/roadmaps/{roadmap_id}:archive"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="DELETE", path="/roadmaps/{roadmap_id}"): AccessLevel.EXTERNAL_COOKIE,
     # Follow, progress, and server-computed next: the study-time surface over
@@ -182,7 +184,7 @@ EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
 # mounts only the routes an MCP tool consumes (see wren.roadmaps.router /
 # wren.progress.router, mounted with identity=require_internal_user); the MCP tools
 # are thin clients of exactly these endpoints. The web-only lifecycle routes
-# (visibility / archive / delete) and the web-only follow / deadline routes are
+# (publication-access / archive / delete) and the web-only follow / deadline routes are
 # external-app only and have no entry here.
 INTERNAL_ROUTE_ACCESS: RouteRegistry = {
     # Listing reads are mirrored for the MCP roadmap list and profile tools.

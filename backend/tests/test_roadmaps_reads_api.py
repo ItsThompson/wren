@@ -46,7 +46,7 @@ from wren.progress.router import create_progress_router
 from wren.progress.service import ProgressService
 from wren.roadmaps.read_service import RoadmapReadService
 from wren.roadmaps.router import create_roadmaps_router
-from wren.roadmaps.schemas import Roadmap, RoadmapStatus, Visibility
+from wren.roadmaps.schemas import PublishedVisibility, Roadmap, RoadmapStatus
 from wren.roadmaps.service import RoadmapService
 
 if TYPE_CHECKING:
@@ -285,7 +285,7 @@ def test_non_owner_can_read_a_public_published_roadmap(make_settings: MakeSettin
 
 
 def test_non_owner_gets_404_on_a_private_roadmap(make_settings: MakeSettings) -> None:
-    private = build_read_roadmap(owner="author", visibility=Visibility.PRIVATE)
+    private = build_read_roadmap(owner="author", published_visibility=PublishedVisibility.PRIVATE)
     client, _ = _build_client(make_settings, private)
     _login(client, username="reader", email="reader@example.com")
     assert client.get(f"/roadmaps/{ROADMAP_ID}").status_code == 404
@@ -294,15 +294,30 @@ def test_non_owner_gets_404_on_a_private_roadmap(make_settings: MakeSettings) ->
 
 def test_non_owner_gets_404_on_a_public_draft(make_settings: MakeSettings) -> None:
     # A public *draft* is not discoverable: a non-owner cannot read it (no leak).
-    draft = build_read_roadmap(status=RoadmapStatus.DRAFT, visibility=Visibility.PUBLIC)
+    draft = build_read_roadmap(
+        status=RoadmapStatus.DRAFT, published_visibility=PublishedVisibility.PUBLIC
+    )
     client, _ = _build_client(make_settings, draft)
     _login(client, username="reader", email="reader@example.com")
+    assert client.get(f"/roadmaps/{ROADMAP_ID}/overview").status_code == 404
+    assert client.get(f"/roadmaps/{ROADMAP_ID}").status_code == 404
+
+
+def test_non_owner_gets_404_on_a_private_archived_roadmap(make_settings: MakeSettings) -> None:
+    archived = build_read_roadmap(
+        status=RoadmapStatus.ARCHIVED, published_visibility=PublishedVisibility.PRIVATE
+    )
+    client, _ = _build_client(make_settings, archived)
+    _login(client, username="reader", email="reader@example.com")
+    assert client.get(f"/roadmaps/{ROADMAP_ID}").status_code == 404
     assert client.get(f"/roadmaps/{ROADMAP_ID}/overview").status_code == 404
 
 
 def test_non_owner_can_read_a_public_archived_roadmap_by_link(make_settings: MakeSettings) -> None:
     # Archived is hidden from discovery but still readable by direct link.
-    archived = build_read_roadmap(status=RoadmapStatus.ARCHIVED, visibility=Visibility.PUBLIC)
+    archived = build_read_roadmap(
+        status=RoadmapStatus.ARCHIVED, published_visibility=PublishedVisibility.PUBLIC
+    )
     client, _ = _build_client(make_settings, archived)
     _login(client, username="reader", email="reader@example.com")
     assert client.get(f"/roadmaps/{ROADMAP_ID}/overview").status_code == 200
