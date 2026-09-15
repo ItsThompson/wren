@@ -26,7 +26,7 @@ All persistent state lives in one PostgreSQL database, reached by the backend ov
 Table `roadmaps`, one row per roadmap (`roadmaps/`).
 
 - The `document` JSONB column is authoritative. It holds the full nested roadmap (sections, subsections, checklist items, resources, the prerequisite DAG, and `suggested_path`).
-- The scalar columns (`owner`, `title`, `status`, `visibility`, `revision`) are a write-derived denormalized index for owner-scoping and listing queries. They are never a second source of truth.
+- The scalar columns (`owner`, `title`, `status`, `published_visibility`, `revision`) are a write-derived denormalized index for owner-scoping and listing queries. They are never a second source of truth.
 - The repository is the only writer. It re-derives every scalar column from the domain object on each write, so the columns cannot drift from the document.
 - The persisted shape is the EASE model: ID-keyed maps plus explicit `*_order` arrays. Operations are order-invariant and no contract addresses a node by array index.
 - The primary key `id` is the globally-unique `{title-slug}-{short-random}` slug. `owner` is a `users.id`, stored as a string with no hard foreign key.

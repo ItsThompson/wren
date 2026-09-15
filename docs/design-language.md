@@ -123,7 +123,7 @@ This section is the *intent*, not the markup. Only three primitives are vendored
 - **Tags / filter chips.** Track tags are hued pills (§3.3); subject tags are neutral; the active filter chip takes the accent tint + accent text.
 - **Inputs.** Quiet fill, 1px border, a visible accent focus ring (§8), labels in the caption size.
 - **Empty states.** The one place serif + warmth shine: one serif line, a quiet sub-line, one primary action, encouraging copy.
-- **Badges.** Status (draft/published/archived) and visibility (private/public) read by shape and label, not color alone.
+- **Badges.** Status (draft/published/archived) and publication visibility (private/public) read by shape and label, not color alone.
 
 ---
 

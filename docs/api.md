@@ -47,9 +47,9 @@ Health and metrics routes mount with `include_in_schema=False`, so the coverage 
 
 Each route's mounting app and access level are declared in `route_registry.py`;
 the roadmaps factory reads that table, so a route mounts on an app only when the
-registry lists it for that app. The web-only lifecycle routes (visibility,
-archive, delete) are declared for the external app only, so they have no internal
-route and no MCP tool.
+registry lists it for that app. The web-only lifecycle routes (publication
+visibility, archive, delete) are declared for the external app only, so they have
+no internal route and no MCP tool.
 
 | Method and path | Purpose | Notes |
 |-----------------|---------|-------|
@@ -60,12 +60,12 @@ route and no MCP tool.
 | `GET /roadmaps/{id}/sections/{sid}` | Paginated drill-down | `cursor` (opaque), `include=subsections\|items\|both` |
 | `GET /roadmaps/{id}/search` | Search subsections and items | `q` and `tags`; empty query with no tags returns `[]` |
 | `PATCH /roadmaps/{id}` | Iterative edit | `If-Match` header; atomic op list. See the deep spec below |
-| `PUT /roadmaps/{id}` | Full-document import escape hatch | `If-Match`; re-mints, preserves the roadmap id, owner, created_at, visibility |
+| `PUT /roadmaps/{id}` | Full-document import escape hatch | `If-Match`; re-mints, preserves the roadmap id, owner, created_at, published_visibility |
 | `POST /roadmaps/{id}:validate` | All violations, no mutate | Always 200 with a (possibly empty) `violations` list |
 | `POST /roadmaps/{id}:publish` | draft to published | 422 hard-block on any violation |
 | `POST /roadmaps/{id}:fork` | New draft from a readable source | 201; no progress carry-over |
 | `PATCH /roadmaps/{id}/metadata` | Presentation-only edit | Allowed post-publish; not `If-Match`-guarded |
-| `PUT /roadmaps/{id}/visibility` | Toggle public or private | Web-only |
+| `PUT /roadmaps/{id}/published-visibility` | Toggle public or private publication access | Web-only |
 | `POST /roadmaps/{id}:archive` | Retire a published roadmap | Web-only |
 | `DELETE /roadmaps/{id}` | Delete | Web-only; 409 `DELETE_HAS_FOLLOWERS` when any follower exists |
 | `GET /me/dashboard` | Private dashboard (authored + followed) | External only, `require_user` |

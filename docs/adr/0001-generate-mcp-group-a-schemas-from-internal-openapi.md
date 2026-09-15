@@ -54,14 +54,14 @@ committed generated files; it never runs codegen and never imports `wren`.
 
 The generator emits a Pydantic class for every component in the internal OpenAPI,
 which is a superset of Group A and includes the full `Roadmap` (which carries
-`visibility: Visibility`). We therefore restrict the generation input to the
-Group-A component set (a test-guarded allowlist) before generation, so the
-non-Group-A domain types are never emitted. We then apply two deterministic
-transforms: drop the `visibility` property from the authoring input, and rename
-the generated `RoadmapInput` to `RoadmapDraftInput` (the name the frozen contract
-and `tools_write` use). Because Group A no longer references `Visibility`, that
-enum becomes unreferenced and absent. The agent field contract stays byte
-identical.
+`published_visibility: PublishedVisibility`). We therefore restrict the generation
+input to the Group-A component set (a test-guarded allowlist) before generation,
+so the non-Group-A domain types are never emitted. We then apply two deterministic
+transforms: drop the `published_visibility` property from the authoring input, and
+rename the generated `RoadmapInput` to `RoadmapDraftInput` (the name the frozen
+contract and `tools_write` use). Read-side Group-A projections retain
+`PublishedVisibility`, so that enum remains generated. The agent field contract
+stays byte identical.
 
 ### Positive Consequences
 
