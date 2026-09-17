@@ -23,6 +23,16 @@ CD registers the context, exports the config/secret env (committed `.env.prod` +
 
 When `DEPLOY_RESULT_FILE` is set, the script writes a runner-local JSON result for each failed run. Only `startup` and `health_gate` are rollback-eligible. Preflight, pull, migration, post-health, malformed output, and unknown failures require operator action; CD never guesses.
 
+| Phase | Rollback | Meaning |
+|---|---:|---|
+| `preflight` | No | Required config, secrets, and release are missing or invalid. |
+| `pull` | No | Images did not download; active containers remain unchanged. |
+| `migration` | No | Database work needs inspection before any image change. |
+| `startup` | Yes | Stack recreation began after migrations completed. |
+| `health_gate` | Yes | Candidate containers started but did not become healthy. |
+| `post_health` | No | Healthy containers remain; repair sync or SHA bookkeeping. |
+| missing, malformed, or unknown | No | Fail closed and investigate. |
+
 Host bootstrap (Docker install, `daemon.json`, prune cron, the deploy user and docker group, the Docker Context) is a one-time bring-up concern (`bring-up.md`), not part of a deploy. Not zero-downtime: there is a brief per-deploy gap while containers recreate, accepted at this scale (~5 users).
 
 ## Triggering a deploy
