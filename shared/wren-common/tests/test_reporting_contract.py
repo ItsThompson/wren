@@ -106,6 +106,7 @@ def test_report_error_skips_invalid_required_group_key() -> None:
         )
 
     report.assert_not_called()
+    logger.error.assert_called_once()
     logger.warning.assert_called_once_with("reporting_group_invalid", fields=["group_key"])
 
 

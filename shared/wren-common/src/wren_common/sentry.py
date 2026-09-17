@@ -196,9 +196,7 @@ def report_exception(
     else:
         return None
     safe_tags["error_kind"] = normalized_error_kind
-    normalized_level = _normalize_level(
-        level if level is not None else owned_tags.get("level")
-    )
+    normalized_level = _normalize_level(level if level is not None else owned_tags.get("level"))
     if level is not None and normalized_level is None:
         return None
     safe_context = sanitize_context(context)
