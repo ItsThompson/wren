@@ -30,6 +30,7 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from wren_common.health import create_health_router
 from wren_common.logging import configure_logging, get_logger
 from wren_common.metrics import instrument
+from wren_common.sentry import initialize_sentry
 from wren_mcp.auth import BearerAuthMiddleware
 from wren_mcp.client import InternalApiClient, create_internal_http_client
 from wren_mcp.config import MCP_PATH, PRM_PATH
@@ -110,6 +111,12 @@ def create_rs_app(
 ) -> FastAPI:
     """Assemble the Resource-Server app from injected dependencies."""
     configure_logging(environment=settings.environment, log_level=settings.log_level)
+    initialize_sentry(
+        dsn=settings.sentry_dsn,
+        environment=settings.environment,
+        release=settings.release,
+        service=settings.service,
+    )
     log = get_logger(settings.service)
 
     verifier = AgentTokenVerifier(key_provider, issuer=settings.issuer, resource=settings.resource)

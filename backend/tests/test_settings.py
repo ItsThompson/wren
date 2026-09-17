@@ -18,13 +18,21 @@ from wren.core.settings import (
 
 
 def test_build_app_settings_injects_identity_over_shared_env() -> None:
-    env = EnvSettings(environment="production", log_level="warning", host="0.0.0.0")
+    env = EnvSettings(
+        environment="production",
+        log_level="warning",
+        sentry_dsn="https://public@example.ingest.sentry.io/1",
+        release="release-1",
+        host="0.0.0.0",
+    )
     settings = build_app_settings(service=EXTERNAL_SERVICE, port=EXTERNAL_PORT, env=env)
 
     assert settings.service == "wren-external"
     assert settings.port == 8000
     assert settings.environment == "production"
     assert settings.log_level == "warning"
+    assert settings.sentry_dsn == "https://public@example.ingest.sentry.io/1"
+    assert settings.release == "release-1"
     assert settings.is_dev is False
 
 

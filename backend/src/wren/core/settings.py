@@ -41,6 +41,8 @@ class EnvSettings(BaseSettings):
 
     environment: str = "development"
     log_level: str = "info"
+    sentry_dsn: str = ""
+    release: str = ""
     host: str = "0.0.0.0"  # noqa: S104 - container binds all interfaces; ingress is tunnel-only
     # Async SQLAlchemy URL (asyncpg driver). Dev default targets the Postgres in
     # docker-compose.dev.yml published to localhost; prod injects the in-network
@@ -118,6 +120,8 @@ class AppSettings(BaseModel):
     port: int
     environment: str
     log_level: str
+    sentry_dsn: str = ""
+    release: str = ""
     host: str
     database_url: str
     internal_api_token: SecretStr
@@ -167,6 +171,8 @@ def build_app_settings(*, service: str, port: int, env: EnvSettings | None = Non
         port=port,
         environment=env.environment,
         log_level=env.log_level,
+        sentry_dsn=env.sentry_dsn,
+        release=env.release,
         host=env.host,
         database_url=env.database_url,
         internal_api_token=env.internal_api_token,

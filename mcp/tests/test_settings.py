@@ -12,6 +12,8 @@ from wren_mcp.settings import ROOT_ENV_FILE, SERVICE, EnvSettings, build_rs_sett
 def test_build_rs_settings_maps_pinned_config() -> None:
     env = EnvSettings(
         environment="production",
+        sentry_dsn="https://public@example.ingest.sentry.io/1",
+        release="release-1",
         public_base_url="https://api.usewren.com",
         mcp_public_url="https://mcp.usewren.com",
         backend_internal_url="http://backend:8001",
@@ -21,6 +23,8 @@ def test_build_rs_settings_maps_pinned_config() -> None:
     settings = build_rs_settings(env)
 
     assert settings.service == SERVICE
+    assert settings.sentry_dsn == "https://public@example.ingest.sentry.io/1"
+    assert settings.release == "release-1"
     # issuer/resource are derived from the pinned public URLs (Site-URL gotcha).
     assert settings.issuer == "https://api.usewren.com"
     assert settings.resource == "https://mcp.usewren.com"

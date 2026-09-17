@@ -41,6 +41,8 @@ class EnvSettings(BaseSettings):
 
     environment: str = "development"
     log_level: str = "info"
+    sentry_dsn: str = ""
+    release: str = ""
     host: str = "0.0.0.0"  # noqa: S104 - container binds all interfaces; ingress is tunnel-only
     port: int = DEFAULT_PORT
     # AS origin (api.usewren.com): the expected token ``iss`` and the base the RS
@@ -70,6 +72,8 @@ class RsSettings(BaseModel):
     service: str
     environment: str
     log_level: str
+    sentry_dsn: str = ""
+    release: str = ""
     host: str
     port: int
     issuer: str  # expected token ``iss`` + AS discovery base (pinned)
@@ -103,6 +107,8 @@ def build_rs_settings(env: EnvSettings | None = None) -> RsSettings:
         service=SERVICE,
         environment=env.environment,
         log_level=env.log_level,
+        sentry_dsn=env.sentry_dsn,
+        release=env.release,
         host=env.host,
         port=env.port,
         issuer=env.public_base_url,
