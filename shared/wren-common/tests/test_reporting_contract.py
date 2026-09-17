@@ -146,6 +146,12 @@ def test_optional_tags_are_allowlisted_and_bounded() -> None:
     assert result == {}
 
 
+def test_optional_tags_omit_empty_values_and_shared_expected_marker() -> None:
+    result = sanitize_tags({"component": "api", "code": "", "expected": "true", "method": "GET"})
+
+    assert result == {"component": "api", "method": "GET"}
+
+
 def test_context_is_typed_and_records_truncation_metadata() -> None:
     original = "秘密" * 10_000
     unsafe_context = cast(

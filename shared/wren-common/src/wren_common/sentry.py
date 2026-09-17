@@ -109,8 +109,10 @@ def initialize_sentry(
         release=_release_name(release, service),
         send_default_pii=False,
         before_send=_scrub_event,
+        default_integrations=False,
         integrations=[],
-        traces_sample_rate=0.0,
+        propagate_traces=False,
+        traces_sample_rate=None,
     )
     _initialized = True
     log.info("sentry_initialized", environment=environment, release=release or None)

@@ -53,8 +53,10 @@ def test_initialize_sentry_is_idempotent() -> None:
         release="wren-api@release-1",
         send_default_pii=False,
         before_send=sentry._scrub_event,
+        default_integrations=False,
         integrations=[],
-        traces_sample_rate=0.0,
+        propagate_traces=False,
+        traces_sample_rate=None,
     )
 
 

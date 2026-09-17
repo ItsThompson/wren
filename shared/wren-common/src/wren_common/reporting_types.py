@@ -63,7 +63,6 @@ REGISTERED_TAG_KEYS = frozenset(
     {
         "code",
         "component",
-        "expected",
         "method",
         "reason",
         "required_scope",
@@ -94,6 +93,7 @@ def sanitize_tags(value: BoundedTags | None) -> dict[str, str]:
             or key not in REGISTERED_TAG_KEYS
             or len(key) > MAX_TAG_KEY_LENGTH
             or type(item) is not str
+            or not item
             or len(item.encode("utf-8")) > MAX_TAG_VALUE_LENGTH
         ):
             continue
