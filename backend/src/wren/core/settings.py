@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import AliasChoices, BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # `just dev-api`/`dev-api-internal` cd into backend/ before launching uvicorn, so
@@ -41,8 +41,10 @@ class EnvSettings(BaseSettings):
 
     environment: str = "development"
     log_level: str = "info"
-    sentry_dsn: str = ""
-    release: str = ""
+    sentry_dsn: str = Field(
+        default="", validation_alias=AliasChoices("SENTRY_DSN_BACKEND", "sentry_dsn")
+    )
+    release: str = Field(default="", validation_alias=AliasChoices("SENTRY_RELEASE", "release"))
     host: str = "0.0.0.0"  # noqa: S104 - container binds all interfaces; ingress is tunnel-only
     # Async SQLAlchemy URL (asyncpg driver). Dev default targets the Postgres in
     # docker-compose.dev.yml published to localhost; prod injects the in-network

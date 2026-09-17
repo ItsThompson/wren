@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import AliasChoices, BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from wren_mcp.config import MCP_INSPECTOR_ORIGIN
@@ -41,8 +41,10 @@ class EnvSettings(BaseSettings):
 
     environment: str = "development"
     log_level: str = "info"
-    sentry_dsn: str = ""
-    release: str = ""
+    sentry_dsn: str = Field(
+        default="", validation_alias=AliasChoices("SENTRY_DSN_MCP", "sentry_dsn")
+    )
+    release: str = Field(default="", validation_alias=AliasChoices("SENTRY_RELEASE", "release"))
     host: str = "0.0.0.0"  # noqa: S104 - container binds all interfaces; ingress is tunnel-only
     port: int = DEFAULT_PORT
     # AS origin (api.usewren.com): the expected token ``iss`` and the base the RS

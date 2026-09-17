@@ -51,4 +51,4 @@ Keep Sentry for actionable unexpected failures only:
 
 Keep Prometheus metrics and Discord alerts for availability, rates, and host signals. Do not add tracing or replay at the current scale.
 
-Canonical sources: `shared/wren-common/src/wren_common/`, `backend/src/wren/core/`, `backend/src/wren/oauth/`, `mcp/src/wren_mcp/`, and `frontend/src/lib/sentry/`.
+Canonical sources: `shared/wren-common/src/wren_common/`, `backend/src/wren/core/`, `backend/src/wren/oauth/`, `mcp/src/wren_mcp/`, and `frontend/src/observability/sentry/`.
