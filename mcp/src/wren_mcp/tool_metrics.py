@@ -71,7 +71,7 @@ def count_invocations[F: Callable[..., Awaitable[Any]]](fn: F) -> F:
                     exc,
                     operation_name=f"tool.{fn.__name__}",
                     kind_name=(
-                        "upstream" if isinstance(exc, BackendUnavailableToolError) else "internal"
+                        exc.kind if isinstance(exc, BackendUnavailableToolError) else "internal"
                     ),
                     log_event_name="unhandled_exception",
                     level_name=(

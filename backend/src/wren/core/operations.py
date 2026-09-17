@@ -7,8 +7,11 @@ when FastAPI reports an exception after path parameters have been expanded.
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
+import httpx
+import sqlalchemy.exc
 import structlog
 
 from wren_common.reporting import (
@@ -104,6 +107,19 @@ def _domain_for_operation(operation: str) -> Domain | None:
     return Domain(value)
 
 
+def _error_kind(exception: BaseException) -> Kind:
+    """Classify operational failures from the most specific boundary outward."""
+    if isinstance(exception, (asyncio.TimeoutError, httpx.TimeoutException)):
+        return Kind.TIMEOUT
+    if isinstance(exception, sqlalchemy.exc.TimeoutError):
+        return Kind.TIMEOUT
+    if isinstance(exception, sqlalchemy.exc.SQLAlchemyError):
+        return Kind.DATABASE
+    if isinstance(exception, httpx.HTTPError):
+        return Kind.UPSTREAM
+    return Kind.INTERNAL
+
+
 def _report(
     exception: BaseException,
     *,
@@ -154,22 +170,28 @@ def report_backend_failure(
     safe_template = _template_for_request(request)
     if safe_template == "http.500":
         safe_template = operation_name
+    error_kind = _error_kind(exception)
     context: dict[str, object] = {
         "method": request.method,
         "path": safe_template,
         "template": safe_template,
         "status": 500,
     }
+    if error_kind is not Kind.INTERNAL:
+        context["error_kind"] = error_kind.value
     user_id = structlog.contextvars.get_contextvars().get("user_id")
     _report(
         exception,
         operation_name=operation_name,
         domain_name=_domain_for_operation(operation_name),
-        kind_name="internal",
+        kind_name=error_kind.value,
         log_event_name="unhandled_exception",
         level_name="error",
         user_id=user_id if isinstance(user_id, str) else None,
-        bounded_tags={"operation": operation_name},
+        bounded_tags={
+            "operation": operation_name,
+            **({"error_kind": error_kind.value} if error_kind is not Kind.INTERNAL else {}),
+        },
         context_data=context,
         group_key=operation_name,
         logger=logger,
@@ -182,11 +204,12 @@ def report_oauth_failure(request: Request, exception: BaseException) -> None:
     status = getattr(exception, "status", 500)
     if not isinstance(status, int) or status < 500:
         return
+    error_kind = _error_kind(exception)
     _report(
         exception,
         operation_name=operation_name,
         domain_name="oauth",
-        kind_name="internal",
+        kind_name=error_kind.value,
         log_event_name="oauth_error",
         level_name="error" if isinstance(status, int) and status >= 500 else "info",
         user_id=(
@@ -194,11 +217,15 @@ def report_oauth_failure(request: Request, exception: BaseException) -> None:
             if isinstance(user_id := structlog.contextvars.get_contextvars().get("user_id"), str)
             else None
         ),
-        bounded_tags={"operation": operation_name},
+        bounded_tags={
+            "operation": operation_name,
+            **({"error_kind": error_kind.value} if error_kind is not Kind.INTERNAL else {}),
+        },
         context_data={
             "method": request.method,
             "template": _template_for_request(request),
             "status": status,
+            **({"error_kind": error_kind.value} if error_kind is not Kind.INTERNAL else {}),
         },
         group_key=operation_name,
     )
@@ -206,17 +233,24 @@ def report_oauth_failure(request: Request, exception: BaseException) -> None:
 
 def report_cleanup_failure(exception: BaseException) -> None:
     """Report a failed OAuth cleanup sweep with a stable maintenance identity."""
+    error_kind = _error_kind(exception)
     _report(
         exception,
         operation_name="oauth.cleanup",
         domain_name="oauth",
-        kind_name="internal",
-        log_event_name="oauth_client_cleanup_failed",
+        kind_name=error_kind.value,
+        log_event_name=LogEvent.UNHANDLED_EXCEPTION.value,
         level_name="error",
         user_id=None,
-        bounded_tags={"operation": "oauth.cleanup"},
-        context_data={"status": 500},
-        group_key="oauth.cleanup",
+        bounded_tags={
+            "operation": "oauth.cleanup",
+            **({"error_kind": error_kind.value} if error_kind is not Kind.INTERNAL else {}),
+        },
+        context_data={
+            "status": 500,
+            **({"error_kind": error_kind.value} if error_kind is not Kind.INTERNAL else {}),
+        },
+        group_key=f"oauth.cleanup.{error_kind.value}",
     )
 
 

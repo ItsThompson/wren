@@ -6,10 +6,57 @@ import asyncio
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
+import httpx
+import sqlalchemy.exc
+
 from wren.oauth import cleanup
 
 if TYPE_CHECKING:
     import pytest
+
+
+async def test_cleanup_uses_independent_budgets_for_failure_classes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_calls: list[BaseException] = []
+    reached = asyncio.Event()
+    failures = [
+        sqlalchemy.exc.OperationalError("select", {}, RuntimeError("db")),
+        httpx.ConnectError("upstream"),
+        sqlalchemy.exc.OperationalError("select", {}, RuntimeError("db")),
+        httpx.ConnectError("upstream"),
+    ]
+    attempt = 0
+
+    class Limiter:
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+
+        def allow(self, key: str) -> bool:
+            self.calls.append(key)
+            return len([call for call in self.calls if call == key]) == 1
+
+    limiters = {key: Limiter() for key in ("internal", "database", "upstream", "timeout")}
+    monkeypatch.setattr(cleanup, "_CLEANUP_REPORT_LIMITER", limiters["internal"])
+    monkeypatch.setattr(cleanup, "_CLEANUP_REPORT_LIMITERS", limiters)
+    monkeypatch.setattr(cleanup, "report_cleanup_failure", report_calls.append)
+
+    async def failing_sweep() -> int:
+        nonlocal attempt
+        if attempt == len(failures):
+            reached.set()
+            return 0
+        failure = failures[attempt]
+        attempt += 1
+        raise failure
+
+    task = asyncio.create_task(cleanup.run_cleanup_loop(failing_sweep, interval=timedelta(0)))
+    await asyncio.wait_for(reached.wait(), timeout=1)
+    await cleanup.stop_stale_client_cleanup(task)
+
+    assert len(report_calls) == 2
+    assert limiters["database"].calls == ["database", "database"]
+    assert limiters["upstream"].calls == ["upstream", "upstream"]
 
 
 async def test_cleanup_reports_once_when_sweeps_fail_repeatedly(

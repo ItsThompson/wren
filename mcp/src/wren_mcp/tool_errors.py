@@ -44,10 +44,20 @@ class ToolAuthorizationError(ExpectedToolError):
 class BackendUnavailableToolError(ToolError):
     """A transport failure that remains agent-recoverable but is reportable."""
 
+    def __init__(self, message: str, *, kind: str) -> None:
+        super().__init__(message)
+        self.status = 503
+        self.kind = kind
+
 
 class BackendToolError(ExpectedToolError):
     """A model-recoverable tool error that also carries the backend's HTTP status
     and problem code, so the tool-invocation counter can log them structurally."""
+
+    # Backend responses are model-recoverable tool results, even for a 5xx. The
+    # tool boundary owns transport reporting; this marker keeps response mapping
+    # from becoming a second Sentry owner.
+    suppress_reporting = True
 
     def __init__(self, message: str, *, status_code: int, code: str) -> None:
         super().__init__(message)

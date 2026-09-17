@@ -19,7 +19,7 @@ from contextlib import suppress
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
-from wren.core.operations import report_cleanup_failure
+from wren.core.operations import _error_kind, report_cleanup_failure
 from wren.oauth.wiring import build_token_service
 from wren_common.limiter import ReportLimiter
 from wren_common.logging import get_logger
@@ -31,7 +31,15 @@ if TYPE_CHECKING:
     from wren.oauth.tokens import AccessTokenCodec
 
 _log = get_logger("wren-oauth-cleanup")
+# Keep independent hourly budgets for each operational failure class. The
+# internal limiter name remains as a compatibility seam for existing callers.
 _CLEANUP_REPORT_LIMITER = ReportLimiter(limit=1, window_seconds=3_600.0)
+_CLEANUP_REPORT_LIMITERS = {
+    "internal": _CLEANUP_REPORT_LIMITER,
+    "database": ReportLimiter(limit=1, window_seconds=3_600.0),
+    "upstream": ReportLimiter(limit=1, window_seconds=3_600.0),
+    "timeout": ReportLimiter(limit=1, window_seconds=3_600.0),
+}
 
 # A one-shot reap: returns the number of stale clients deleted.
 Sweep = Callable[[], Awaitable[int]]
@@ -70,9 +78,22 @@ async def run_cleanup_loop(sweep: Sweep, *, interval: timedelta) -> None:
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001 - one bad sweep must not kill the reaper
-            if _CLEANUP_REPORT_LIMITER.allow("oauth.cleanup"):
+            error_kind = _error_kind(exc).value
+            # Emit an occurrence log for every failed sweep. Only the operational
+            # event is bounded, with a separate hourly budget per failure class.
+            _log.error(
+                "oauth_client_cleanup_failed",
+                error_kind=error_kind,
+                exc_info=exc,
+            )
+            limiter = (
+                _CLEANUP_REPORT_LIMITER
+                if error_kind == "internal"
+                else _CLEANUP_REPORT_LIMITERS.get(error_kind, _CLEANUP_REPORT_LIMITER)
+            )
+            limiter_key = "oauth.cleanup" if error_kind == "internal" else error_kind
+            if limiter.allow(limiter_key):
                 report_cleanup_failure(exc)
-            _log.error("oauth_client_cleanup_failed", exc_info=exc)
         else:
             _log.info("oauth_client_cleanup_swept", deleted=deleted)
 

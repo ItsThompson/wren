@@ -22,7 +22,6 @@ import httpx
 import structlog
 
 from wren_mcp.config import INTERNAL_TOKEN_HEADER, USER_ID_HEADER
-from wren_mcp.reporting import report_mcp_error
 from wren_mcp.tool_errors import BackendUnavailableToolError
 
 if TYPE_CHECKING:
@@ -83,20 +82,11 @@ class InternalApiClient:
         try:
             return await self._http.request(method, path, json=json, params=params, headers=headers)
         except (httpx.TimeoutException, httpx.RequestError) as exc:
-            report_mcp_error(
-                exc,
-                operation_name="mcp.internal_request",
-                kind_name="timeout" if isinstance(exc, httpx.TimeoutException) else "upstream",
-                log_event_name="backend_unavailable",
-                level_name="error",
-                user_id=user_id,
-                bounded_tags={"method": method.upper()},
-                context_data={"method": method.upper(), "status": 503},
-                group_key="mcp.internal_request",
-            )
+            kind = "timeout" if isinstance(exc, httpx.TimeoutException) else "upstream"
             raise BackendUnavailableToolError(
                 "backend_unavailable: the roadmap service is unreachable or timed out; "
-                "retry shortly."
+                "retry shortly.",
+                kind=kind,
             ) from exc
 
     async def create_draft(self, user_id: str, document: Any) -> httpx.Response:

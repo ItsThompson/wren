@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
 
+import httpx
+import pytest
+import sqlalchemy.exc
 import structlog
 from starlette.requests import Request
 
-from wren.core.operations import operation_for_request, report_backend_failure
+from wren.core.operations import _error_kind, operation_for_request, report_backend_failure
 from wren_common.reporting import Domain, Kind, LogEvent, ReportLevel
-
-if TYPE_CHECKING:
-    import pytest
 
 
 def _request(path: str, *, route_path: str | None = None) -> Request:
@@ -36,6 +35,38 @@ def test_unmatched_route_uses_safe_500_operation() -> None:
     request = _request("/roadmaps/r-123")
 
     assert operation_for_request(request) == "http.500"
+
+
+@pytest.mark.parametrize(
+    ("exception", "kind"),
+    [
+        (TimeoutError("timed out"), Kind.TIMEOUT),
+        (httpx.ReadTimeout("timed out"), Kind.TIMEOUT),
+        (sqlalchemy.exc.OperationalError("select", {}, RuntimeError("db")), Kind.DATABASE),
+        (httpx.ConnectError("upstream"), Kind.UPSTREAM),
+    ],
+)
+def test_error_kind_prefers_timeout_then_database_then_httpx(
+    exception: BaseException, kind: Kind
+) -> None:
+    assert _error_kind(exception) is kind
+
+
+def test_backend_report_emits_non_internal_error_kind(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = _request("/roadmaps/r-123", route_path="/roadmaps/{roadmap_id}")
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        "wren.core.operations.report_error",
+        lambda exception, **kwargs: calls.append({"exception": exception, **kwargs}),
+    )
+
+    report_backend_failure(request, httpx.ReadTimeout("timed out"))
+
+    call = calls[0]
+    assert call["kind"] is Kind.TIMEOUT
+    assert call["context_data"]["error_kind"] == "timeout"  # type: ignore[index]
 
 
 def test_backend_report_passes_bounded_context_and_typed_taxonomy(

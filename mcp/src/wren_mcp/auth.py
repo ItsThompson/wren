@@ -32,7 +32,6 @@ from starlette.responses import JSONResponse
 
 from wren_common.logging import get_logger
 from wren_mcp.prm import www_authenticate_challenge
-from wren_mcp.reporting import report_mcp_error
 from wren_mcp.settings import SERVICE
 from wren_mcp.state import set_request_agent
 
@@ -44,12 +43,6 @@ if TYPE_CHECKING:
 _log = get_logger(SERVICE)
 
 _BEARER_PREFIX = "Bearer "
-
-
-class _AuthorizationRejectedError(Exception):
-    """Expected 401 outcome used for reporter classification."""
-
-    status = 401
 
 
 def _extract_bearer(header_value: str | None) -> str | None:
@@ -87,17 +80,6 @@ class BearerAuthMiddleware:
             # Never log the raw token; no verified principal exists yet, so only a
             # reason is available (client_id/sub cannot be trusted pre-validation).
             reason = "missing_bearer" if token is None else "invalid_token"
-            error = _AuthorizationRejectedError("agent bearer token rejected")
-            report_mcp_error(
-                error,
-                operation_name="mcp.authorization",
-                kind_name="permission",
-                log_event_name="agent_token_rejected",
-                level_name="warning",
-                bounded_tags={"reason": reason},
-                context_data={"status": 401},
-                group_key="mcp.authorization",
-            )
             _log.warning("agent_token_rejected", reason=reason)
             await self._challenge()(scope, receive, send)
             return

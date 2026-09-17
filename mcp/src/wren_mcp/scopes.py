@@ -24,7 +24,6 @@ from mcp.server.session import ServerSession
 from starlette.requests import Request
 
 from wren_common.logging import get_logger
-from wren_mcp.reporting import report_mcp_error
 from wren_mcp.settings import SERVICE
 from wren_mcp.state import get_request_agent
 from wren_mcp.tool_errors import ToolAuthorizationError
@@ -52,16 +51,6 @@ def _resolve_agent(ctx: AgentContext) -> VerifiedAgentToken:
         error = ToolAuthorizationError(
             "unauthenticated: no verified agent identity on the request.", status=401
         )
-        report_mcp_error(
-            error,
-            operation_name="mcp.authorization",
-            kind_name="permission",
-            log_event_name="unauthenticated",
-            level_name="warning",
-            context_data={"status": 401},
-            bounded_tags={"reason": "no_verified_identity"},
-            group_key="mcp.authorization",
-        )
         _log.warning("unauthenticated", reason="no_verified_identity")
         raise error
     structlog.contextvars.bind_contextvars(user_id=principal.user_id)
@@ -84,17 +73,6 @@ def require_scope(ctx: AgentContext, *, scope: str) -> str:
             f"insufficient_scope: this tool requires the '{scope}' OAuth scope, but the "
             f"token grants [{have}]. Re-authorize the agent with '{scope}' and retry.",
             status=403,
-        )
-        report_mcp_error(
-            error,
-            operation_name="mcp.authorization",
-            kind_name="permission",
-            log_event_name="insufficient_scope",
-            level_name="warning",
-            user_id=principal.user_id,
-            bounded_tags={"required_scope": scope},
-            context_data={"status": 403},
-            group_key="mcp.authorization",
         )
         _log.warning(
             "insufficient_scope",

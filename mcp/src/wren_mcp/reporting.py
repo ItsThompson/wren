@@ -12,16 +12,24 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from wren_common.limiter import ReportLimiter
 from wren_common.reporting import (
     Domain,
     Kind,
     LogEvent,
     ReportLevel,
+    is_reportable,
     report_error,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
+
+_MCP_REPORT_LIMITERS = {
+    kind.value: ReportLimiter(limit=1, window_seconds=3_600.0)
+    for kind in (Kind.UPSTREAM, Kind.TIMEOUT, Kind.INTERNAL)
+}
 
 
 def _kind(value: str) -> Kind:
@@ -50,19 +58,28 @@ def report_mcp_error(
     context_data: Mapping[str, object] | None = None,
     group_key: str | None = None,
 ) -> None:
-    """Send a typed MCP report without changing the original error path."""
+    """Send one bounded MCP report without changing the original error path."""
+    # Backend responses and authorization failures are model-recoverable tool
+    # outcomes. They still reach the local tool-failure log, but never create an
+    # operational event. BackendToolError marks even 5xx responses explicitly.
+    if getattr(exception, "suppress_reporting", False) or not is_reportable(exception):
+        return
+    kind = _kind(kind_name)
+    limiter = _MCP_REPORT_LIMITERS.get(kind.value)
+    if limiter is not None and not limiter.allow(kind.value):
+        return
     try:
         report_error(
             exception,
             operation=operation_name,
             domain=Domain.MCP,
-            kind=_kind(kind_name),
+            kind=kind,
             user_id=user_id,
             log_event=_log_event(log_event_name),
             level=ReportLevel(level_name),
-            bounded_tags=dict(bounded_tags or {}),
-            context_data=dict(context_data or {}),
-            group_key=group_key or operation_name,
+            bounded_tags={**dict(bounded_tags or {}), "error_kind": kind.value},
+            context_data={**dict(context_data or {}), "error_kind": kind.value},
+            group_key=f"mcp.{kind.value}",
             group_exact=True,
         )
     except Exception:  # noqa: BLE001 - reporting must never mask the original error
