@@ -46,8 +46,10 @@ _OPERATION_RE = re.compile(r"^[a-z][a-z0-9_.:-]{0,127}$")
 _MAX_VALUE_LENGTH = 256
 
 
-def _value(value: StrEnum | str) -> str:
-    return value.value if isinstance(value, StrEnum) else value
+def _value(value: object) -> str:
+    if isinstance(value, StrEnum):
+        return value.value
+    return value if isinstance(value, str) else ""
 
 
 def _valid_enum(value: StrEnum | str, enum: type[StrEnum]) -> str | None:
