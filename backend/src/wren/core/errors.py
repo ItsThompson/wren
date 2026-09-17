@@ -20,6 +20,7 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 from starlette.responses import Response
 
+from wren.core.operations import report_backend_failure
 from wren_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -31,11 +32,13 @@ if TYPE_CHECKING:
 
 PROBLEM_JSON_MEDIA_TYPE = "application/problem+json"
 
+# Kept as a compatibility seam for callers that replace the historical module
+# logger. Unexpected-error logging is owned by ``report_backend_failure``.
+_log = get_logger("wren-core")
+
 # Stable identifier base for the ``type`` member. RFC 9457 ``type`` URIs need not
 # be dereferenceable; they are stable identifiers keyed off the error code.
 ERROR_TYPE_BASE = "https://usewren.com/errors/"
-
-_log = get_logger("wren-core")
 
 
 class ErrorCode(StrEnum):
@@ -238,13 +241,13 @@ async def handle_request_validation_error(request: Request, exc: Exception) -> R
 async def handle_unexpected(request: Request, exc: Exception) -> Response:
     """Render any unhandled exception as a generic 500 problem+json.
 
-    This is the single structured-fault log site: it emits exactly one ``error``
-    event carrying ``exc_info`` (revives ``format_exc_info`` in the log chain) and
-    the request path. The response body is generic so no stack trace or original
+    This is the single structured-fault reporting site. The reporter emits one
+    ``error`` event carrying ``exc_info`` and bounded request context. The response
+    body is generic so no stack trace or original
     exception message leaks to the client. ``request_id`` is added later by the
     correlation contextvars binding, which the log chain merges automatically.
     """
-    _log.error("unhandled_exception", exc_info=exc, path=request.url.path)
+    report_backend_failure(request, exc, logger=_log)
     return _render(
         ProblemDetail(
             type=_type_uri(ErrorCode.INTERNAL),

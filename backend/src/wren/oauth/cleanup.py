@@ -19,7 +19,9 @@ from contextlib import suppress
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
+from wren.core.operations import report_cleanup_failure
 from wren.oauth.wiring import build_token_service
+from wren_common.limiter import ReportLimiter
 from wren_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -29,6 +31,7 @@ if TYPE_CHECKING:
     from wren.oauth.tokens import AccessTokenCodec
 
 _log = get_logger("wren-oauth-cleanup")
+_CLEANUP_REPORT_LIMITER = ReportLimiter(limit=1, window_seconds=60.0)
 
 # A one-shot reap: returns the number of stale clients deleted.
 Sweep = Callable[[], Awaitable[int]]
@@ -67,6 +70,8 @@ async def run_cleanup_loop(sweep: Sweep, *, interval: timedelta) -> None:
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001 - one bad sweep must not kill the reaper
+            if _CLEANUP_REPORT_LIMITER.allow("oauth.cleanup"):
+                report_cleanup_failure(exc)
             _log.error("oauth_client_cleanup_failed", exc_info=exc)
         else:
             _log.info("oauth_client_cleanup_swept", deleted=deleted)
