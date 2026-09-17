@@ -202,7 +202,18 @@ gh secret set SENTRY_DSN_MCP             --body "<MCP DSN>"
 
 `GITHUB_TOKEN` is **not** set manually: it is the built-in Actions token. Ensure Actions is allowed to write packages (repo/org **Settings → Actions → Workflow permissions**), since `cd.yml` already requests `packages: write` and logs into GHCR with it. `SENTRY_AUTH_TOKEN` needs organization release and source-map permissions (`org:ci`). The backend and MCP DSNs remain private GitHub secrets; `VITE_SENTRY_DSN` is public configuration in committed `.env.prod`.
 
-Before the first deploy, confirm the token and project access with the pinned CLI (`frontend/node_modules/.bin/sentry-cli info`) and inspect each configured project. Do not print token values or DSNs in CI logs.
+Before the first deploy, confirm secret presence without printing values, then check token and project access with the pinned CLI:
+
+```sh
+for name in SENTRY_AUTH_TOKEN SENTRY_DSN_BACKEND SENTRY_DSN_MCP; do
+  test -n "${!name:-}" || { echo "missing ${name}" >&2; exit 1; }
+done
+frontend/node_modules/.bin/sentry-cli info >/dev/null
+frontend/node_modules/.bin/sentry-cli projects list --org t-industries \
+  | grep -E 'wren-backend|wren-mcp|wren-frontend'
+```
+
+Confirm all three project names appear and the token has `org:ci` release/source-map access. Do not print token values or DSNs in CI logs.
 
 ---
 
