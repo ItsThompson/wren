@@ -25,7 +25,6 @@ export function reportApiFailure(report: ApiFailureReport): ApiFailureKind {
     scope.setTag('api.method', report.method)
     scope.setTag('api.failure_kind', kind)
     scope.setExtra('api.status', report.status)
-    scope.setExtra('api.url', report.url)
     Sentry.captureException(toError(report.error))
   })
   return kind

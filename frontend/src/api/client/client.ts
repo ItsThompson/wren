@@ -35,6 +35,7 @@ function createApiMiddleware(retryOnUnauthorized?: RetryOnUnauthorized): Middlew
               method: request.method,
               url: request.url,
             })
+            throw error
           }
         }
       }
