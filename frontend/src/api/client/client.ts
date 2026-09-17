@@ -1,24 +1,74 @@
-import createClient, { type Client } from 'openapi-fetch'
+import createClient, { type Client, type Middleware } from 'openapi-fetch'
 
+import { operationRegistry } from '../operationRegistry.generated'
 import type { paths } from '../schema'
+import { reportApiFailure } from '@/observability/sentry'
 
-/**
- * Typed API client.
- *
- * `openapi-fetch` turns the generated OpenAPI `paths` into one typed call per
- * endpoint over a single generic fetch (`client.GET("/roadmaps/{id}", ...)`),
- * so request/response shapes come straight from `just codegen` output and are
- * never hand-written. Each call is independently mockable by URL (see
- * `src/mocks`). Views receive a client built here with the deployment's API
- * base URL; the base is injected rather than read here so this stays testable.
- */
-export const createApiClient = (baseUrl: string): Client<paths> => createClient<paths>({ baseUrl, credentials: 'omit' })
+const AUTH_PREFIX = '/auth/'
+
+type RetryOnUnauthorized = () => Promise<boolean>
+
+export interface ApiClientOptions {
+  credentials?: RequestCredentials
+  retryOnUnauthorized?: RetryOnUnauthorized
+}
+
+function operationIdFor(method: string, schemaPath: string): string {
+  const key = `${method.toUpperCase()} ${schemaPath}` as keyof typeof operationRegistry
+  return operationRegistry[key] ?? key
+}
+
+function createApiMiddleware(retryOnUnauthorized?: RetryOnUnauthorized): Middleware {
+  return {
+    async onResponse({ request, response, schemaPath, options }) {
+      const operationId = operationIdFor(request.method, schemaPath)
+      if (response.status === 401 && retryOnUnauthorized && !new URL(request.url).pathname.startsWith(AUTH_PREFIX)) {
+        const refreshed = await retryOnUnauthorized()
+        if (refreshed) {
+          try {
+            return await options.fetch(request.clone())
+          } catch (error) {
+            reportApiFailure({
+              error,
+              status: null,
+              operationId,
+              method: request.method,
+              url: request.url,
+            })
+          }
+        }
+      }
+
+      if (response.status >= 500) {
+        reportApiFailure({
+          status: response.status,
+          operationId,
+          method: request.method,
+          url: request.url,
+        })
+      }
+      return undefined
+    },
+    onError({ error, request, schemaPath }) {
+      reportApiFailure({
+        error,
+        status: null,
+        operationId: operationIdFor(request.method, schemaPath),
+        method: request.method,
+        url: request.url,
+      })
+    },
+  }
+}
+
+export function createApiClient(baseUrl: string, clientOptions: ApiClientOptions = {}): Client<paths> {
+  const client = createClient<paths>({
+    baseUrl,
+    credentials: clientOptions.credentials ?? 'omit',
+  })
+  client.use(createApiMiddleware(clientOptions.retryOnUnauthorized))
+  return client
+}
 
 export type ApiClient = Client<paths>
-
-/**
- * The session-aware client (credentials + 401→refresh→retry middleware), built
- * by `createSessionClient`. Structurally identical to `ApiClient`; the distinct
- * alias lets the query hooks read as binding separate clients.
- */
 export type SessionClient = Client<paths>

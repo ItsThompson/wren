@@ -14,6 +14,10 @@ interface ImportMetaEnv {
    * endpoint derived from it. Undefined falls back to the pinned public URL.
    */
   readonly VITE_MCP_BASE_URL?: string
+  /** Public Sentry DSN. An empty value disables browser error reporting. */
+  readonly VITE_SENTRY_DSN?: string
+  /** Release identifier attached to Sentry events. */
+  readonly VITE_SENTRY_RELEASE?: string
 }
 
 interface ImportMeta {

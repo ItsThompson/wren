@@ -40,6 +40,30 @@ describe('createSessionClient transparent refresh', () => {
     expect(dashboardCalls).toBe(2)
   })
 
+  it('coalesces concurrent 401 responses into one refresh request', async () => {
+    let refreshCalls = 0
+    let dashboardCalls = 0
+    server.use(
+      http.get('*/me/dashboard', async () => {
+        dashboardCalls += 1
+        if (dashboardCalls <= 2) return new HttpResponse(null, { status: 401 })
+        return HttpResponse.json(mockDashboard)
+      }),
+      http.post('*/auth/refresh', async () => {
+        refreshCalls += 1
+        await new Promise((resolve) => setTimeout(resolve, 5))
+        return HttpResponse.json({ id: 'u', username: 'ada', email: 'a@b.com', created_at: 'x' })
+      }),
+    )
+
+    const client = createSessionClient(BASE)
+    const results = await Promise.all([client.GET('/me/dashboard'), client.GET('/me/dashboard')])
+
+    expect(results.every(({ response }) => response.ok)).toBe(true)
+    expect(refreshCalls).toBe(1)
+    expect(dashboardCalls).toBe(4)
+  })
+
   it('does not retry when the refresh itself fails', async () => {
     let dashboardCalls = 0
     server.use(

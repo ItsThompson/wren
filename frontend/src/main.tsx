@@ -5,6 +5,9 @@ import '../../shared/theme/fonts.css'
 import '../../shared/theme/tokens.css'
 import './globals.css'
 import { App } from './App'
+import { initSentry } from './observability/sentry'
+
+initSentry()
 
 /**
  * Start the MSW worker before rendering when the mock harness is enabled
