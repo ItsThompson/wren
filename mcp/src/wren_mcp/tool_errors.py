@@ -20,10 +20,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-import structlog
 from mcp.server.fastmcp.exceptions import ToolError
-
-from wren_mcp.reporting import report_mcp_error
 
 if TYPE_CHECKING:
     import httpx
@@ -72,24 +69,11 @@ def raise_for_problem(response: httpx.Response) -> httpx.Response:
     if response.status_code < 400:
         return response
     code = _problem_code(response)
-    user_id = structlog.contextvars.get_contextvars().get("user_id")
-    error = BackendToolError(
+    raise BackendToolError(
         _format_problem(response),
         status_code=response.status_code,
         code=code,
     )
-    report_mcp_error(
-        error,
-        operation_name="mcp.backend_error",
-        kind_name="upstream",
-        log_event_name="backend_error",
-        level_name="error" if response.status_code >= 500 else "info",
-        user_id=user_id if isinstance(user_id, str) else None,
-        bounded_tags={"status": str(response.status_code), "code": code},
-        context_data={"status": response.status_code},
-        group_key=code,
-    )
-    raise error
 
 
 def _problem_code(response: httpx.Response) -> str:

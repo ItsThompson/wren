@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 from wren_mcp.tool_metrics import count_invocations
 
 _REGISTERED_TOOL_NAMES: set[str] = set()
+_REGISTERED_TOOLS: dict[Callable[..., Any], str] = {}
 
 
 def is_registered_tool(tool_name: object) -> bool:
@@ -28,6 +29,16 @@ def is_registered_tool(tool_name: object) -> bool:
 def registered_tool_names() -> frozenset[str]:
     """Return the names registered through :func:`counted_tool_registrar`."""
     return frozenset(_REGISTERED_TOOL_NAMES)
+
+
+def registered_tool_name(tool: object) -> str | None:
+    """Return the validated exposed name for a registered function."""
+    if not callable(tool):
+        return None
+    try:
+        return _REGISTERED_TOOLS.get(tool)
+    except TypeError:
+        return None
 
 
 if TYPE_CHECKING:
@@ -42,8 +53,10 @@ def counted_tool_registrar[ToolFn: Callable[..., Awaitable[Any]]](
 
     def tool(annotations: ToolAnnotations) -> Callable[[ToolFn], ToolFn]:
         def register(fn: ToolFn) -> ToolFn:
+            tool_name = fn.__name__
+            _REGISTERED_TOOLS[fn] = tool_name
+            _REGISTERED_TOOL_NAMES.add(tool_name)
             mcp.tool(annotations=annotations)(count_invocations(fn))
-            _REGISTERED_TOOL_NAMES.add(fn.__name__)
             return fn
 
         return register

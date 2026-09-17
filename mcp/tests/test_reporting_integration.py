@@ -22,30 +22,34 @@ class _DiagnosticLogger:
         self._diagnostics.append({event: kwargs})
 
 
-def test_backend_problem_reports_the_same_typed_error_before_raising(
+def test_backend_problem_is_recoverable_without_operational_reporting(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[tuple[BaseException, dict[str, object]]] = []
+    diagnostics: list[dict[str, object]] = []
 
-    def capture(exception: BaseException, **kwargs: object) -> None:
-        calls.append((exception, kwargs))
-
-    monkeypatch.setattr("wren_mcp.tool_errors.report_mcp_error", capture)
+    monkeypatch.setattr(
+        "wren_mcp.tool_errors.report_mcp_error",
+        lambda exception, **kwargs: calls.append((exception, kwargs)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        reporting,
+        "_log",
+        type(
+            "DiagnosticLogger",
+            (),
+            {"warning": lambda _, event, **kwargs: diagnostics.append({event: kwargs})},
+        )(),
+    )
     response = httpx.Response(500, json={"code": "INTERNAL", "detail": "service failed"})
 
     with pytest.raises(BackendToolError) as excinfo:
         raise_for_problem(response)
 
-    assert len(calls) == 1
-    exception, report = calls[0]
-    assert exception is excinfo.value
-    assert isinstance(exception, ToolError)
-    assert report["operation_name"] == "mcp.backend_error"
-    assert report["kind_name"] == "upstream"
-    assert report["log_event_name"] == "backend_error"
-    assert report["level_name"] == "error"
-    assert report["context_data"] == {"status": 500}
-    assert report["bounded_tags"] == {"status": "500", "code": "INTERNAL"}
+    assert isinstance(excinfo.value, ToolError)
+    assert calls == []
+    assert diagnostics == []
 
 
 async def test_transport_failure_is_reported_once_by_the_tool_wrapper(
@@ -57,6 +61,13 @@ async def test_transport_failure_is_reported_once_by_the_tool_wrapper(
         lambda exception, **kwargs: calls.append({"exception": exception, **kwargs}),
     )
 
+    from mcp.server.fastmcp import FastMCP
+    from mcp.types import ToolAnnotations
+
+    mcp = FastMCP("metrics-test")
+    tool = counted_tool_registrar(mcp)
+
+    @tool(ToolAnnotations(title="Metrics test"))
     async def failing_tool() -> None:
         raise BackendUnavailableToolError("retry", kind="timeout")
 
@@ -66,6 +77,40 @@ async def test_transport_failure_is_reported_once_by_the_tool_wrapper(
 
     assert len(calls) == 1
     assert calls[0]["kind_name"] == "timeout"
+
+
+async def test_expected_backend_error_is_not_reported_by_the_tool_wrapper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        "wren_mcp.tool_metrics.report_mcp_error",
+        lambda exception, **kwargs: calls.append({"exception": exception, **kwargs}),
+    )
+
+    from mcp.server.fastmcp import FastMCP
+    from mcp.types import ToolAnnotations
+
+    mcp = FastMCP("metrics-expected-test")
+    tool = counted_tool_registrar(mcp)
+
+    @tool(ToolAnnotations(title="Expected error test"))
+    async def expected_tool() -> None:
+        raise BackendToolError("retry the request", status_code=409, code="STALE_REVISION")
+
+    wrapped = count_invocations(expected_tool)
+    with pytest.raises(BackendToolError):
+        await wrapped()
+
+    assert calls == []
+
+
+def test_unregistered_wrapper_rejects_before_observability_side_effects() -> None:
+    async def unregistered_tool() -> None:
+        return None
+
+    with pytest.raises(ValueError, match="registered as an MCP tool"):
+        count_invocations(unregistered_tool)
 
 
 def test_backend_response_is_not_reported_as_an_operational_event(
