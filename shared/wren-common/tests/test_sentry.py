@@ -50,7 +50,7 @@ def test_initialize_sentry_is_idempotent() -> None:
     init.assert_called_once_with(
         dsn="https://public@example.ingest.sentry.io/1",
         environment="production",
-        release="wren-backend@release-1",
+        release="wren-api@release-1",
         send_default_pii=False,
         before_send=sentry._scrub_event,
         integrations=[],
@@ -80,7 +80,7 @@ def test_initialize_sentry_rejects_release_for_another_service() -> None:
         sentry.initialize_sentry(
             dsn="https://public@example.ingest.sentry.io/1",
             environment="production",
-            release="wren-backend@abc123",
+            release="wren-api@abc123",
             service="wren-mcp",
         )
 
@@ -112,6 +112,7 @@ def test_report_exception_applies_tags_context_and_limiter() -> None:
                 limiter=limiter,
                 tags={"service": "wren-api"},
                 context={"operation": "save"},
+                user_id="user-1",
             )
             == "event-1"
         )
@@ -121,7 +122,20 @@ def test_report_exception_applies_tags_context_and_limiter() -> None:
     scope.set_tag.assert_any_call("service", "wren-api")
     scope.set_tag.assert_any_call("error_kind", "internal")
     scope.set_context.assert_called_once_with("report", {"operation": "save"})
+    scope.set_user.assert_called_once_with({"id": "user-1"})
     capture.assert_called_once_with(exception)
+
+
+def test_report_exception_rejects_unknown_taxonomy_values() -> None:
+    with patch("wren_common.sentry.sentry_sdk.capture_exception") as capture:
+        assert (
+            sentry.report_exception(RuntimeError("boom"), limiter=None, error_kind="custom") is None
+        )
+        assert (
+            sentry.report_exception(RuntimeError("boom"), limiter=None, category="custom") is None
+        )
+
+    capture.assert_not_called()
 
 
 def test_report_exception_uses_explicit_bounded_error_kind() -> None:

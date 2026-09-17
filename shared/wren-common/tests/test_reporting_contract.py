@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from typing import cast
 from unittest.mock import Mock, patch
 
 import pytest
@@ -13,7 +15,14 @@ from wren_common.reporting import (
     make_reporting_contract,
     report_error,
 )
-from wren_common.reporting_types import sanitize_context, sanitize_tags
+from wren_common.reporting_types import (
+    CONTEXT_ORIGINAL_BYTES_KEY,
+    CONTEXT_TRUNCATED_KEY,
+    MAX_CONTEXT_BYTES,
+    SafeContext,
+    sanitize_context,
+    sanitize_tags,
+)
 
 
 def test_report_error_logs_contract_and_forwards_scope() -> None:
@@ -99,6 +108,19 @@ def test_report_error_skips_invalid_operation_and_emits_field_names_only() -> No
     report.assert_not_called()
 
 
+def test_contract_factory_rejects_unregistered_operation() -> None:
+    with pytest.raises(ReportingContractError) as error:
+        make_reporting_contract(
+            operation="roadmaps.arbitrary",
+            domain=Domain.ROADMAPS,
+            kind=Kind.INTERNAL,
+            log_event=LogEvent.UNHANDLED_EXCEPTION,
+            level=ReportLevel.ERROR,
+        )
+
+    assert error.value.fields == ("operation",)
+
+
 def test_contract_factory_enforces_operation_domain_pair() -> None:
     with pytest.raises(ReportingContractError) as error:
         make_reporting_contract(
@@ -121,11 +143,57 @@ def test_optional_tags_are_allowlisted_and_bounded() -> None:
         }
     )
 
-    assert result == {"component": "x" * 200}
+    assert result == {}
 
 
-def test_context_is_allowlisted_and_size_bounded() -> None:
-    result = sanitize_context({"path": "x" * 20_000, "query": "secret"})
+def test_context_is_typed_and_records_truncation_metadata() -> None:
+    original = "秘密" * 10_000
+    unsafe_context = cast(
+        "SafeContext",
+        {
+            "path": original,
+            "status": 500,
+            "query": "secret",
+            "operation": {"contains": "pii"},
+        },
+    )
+    result = sanitize_context(unsafe_context)
 
     assert "query" not in result
-    assert len(str(result["path"])) < 8 * 1024
+    assert "operation" not in result
+    assert result["status"] == 500
+    assert result[CONTEXT_TRUNCATED_KEY] is True
+    assert result[CONTEXT_ORIGINAL_BYTES_KEY] == len(original.encode("utf-8"))
+    assert (
+        len(json.dumps(result, ensure_ascii=True, separators=(",", ":")).encode())
+        <= MAX_CONTEXT_BYTES
+    )
+    assert isinstance(result["path"], str)
+    assert result["path"] != original
+
+
+def test_context_keeps_budget_with_multiple_truncated_values() -> None:
+    path = "p" * 20_000
+    template = "t" * 20_000
+
+    result = sanitize_context({"path": path, "template": template})
+
+    assert result[CONTEXT_TRUNCATED_KEY] is True
+    assert result[CONTEXT_ORIGINAL_BYTES_KEY] == len(path) + len(template)
+    assert (
+        len(json.dumps(result, ensure_ascii=True, separators=(",", ":")).encode())
+        <= MAX_CONTEXT_BYTES
+    )
+
+
+def test_contract_rejects_enum_from_the_wrong_taxonomy() -> None:
+    with pytest.raises(ReportingContractError) as error:
+        make_reporting_contract(
+            operation="roadmaps.create",
+            domain=Kind.INTERNAL,
+            kind=Kind.INTERNAL,
+            log_event=LogEvent.UNHANDLED_EXCEPTION,
+            level=ReportLevel.ERROR,
+        )
+
+    assert error.value.fields == ("domain",)

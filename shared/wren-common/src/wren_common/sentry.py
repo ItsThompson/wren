@@ -8,12 +8,17 @@ import sentry_sdk
 
 from wren_common.limiter import EventLimiter
 from wren_common.logging import get_logger
-from wren_common.reporting import ReportCategory, category_value, classify_exception
-from wren_common.reporting_types import Kind, sanitize_context, sanitize_tags
+from wren_common.reporting import classify_exception
+from wren_common.reporting_types import (
+    BoundedTags,
+    Kind,
+    ReportCategory,
+    SafeContext,
+    sanitize_context,
+    sanitize_tags,
+)
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
     from sentry_sdk.types import Event
 
 _initialized = False
@@ -51,9 +56,9 @@ def _scrub_event(event: Event, _hint: dict[str, Any]) -> Event:
 
 
 _RELEASE_PREFIXES = {
-    "wren": "wren-backend",
-    "wren-external": "wren-backend",
-    "wren-internal": "wren-backend",
+    "wren": "wren-api",
+    "wren-external": "wren-api",
+    "wren-internal": "wren-api",
     "wren-mcp": "wren-mcp",
 }
 
@@ -117,8 +122,8 @@ def report_exception(
     *,
     category: ReportCategory | str | None = None,
     limiter: EventLimiter | None = _REPORT_LIMITER,
-    tags: Mapping[str, str] | None = None,
-    context: Mapping[str, Any] | None = None,
+    tags: BoundedTags | None = None,
+    context: SafeContext | None = None,
     fingerprint: list[str] | None = None,
     user_id: str | None = None,
     error_kind: Kind | str | None = None,
@@ -129,21 +134,36 @@ def report_exception(
     it has a more precise classification than the shared HTTP-status rule.
     ``limiter`` keys on exception type, avoiding secret-bearing exception text.
     """
-    resolved_category = (
-        classify_exception(exception) if category is None else category_value(category)
-    )
-    if category_value(resolved_category) == ReportCategory.EXPECTED.value:
+    if category is None:
+        resolved_category = classify_exception(exception)
+    elif isinstance(category, ReportCategory):
+        resolved_category = category
+    elif type(category) is str:
+        try:
+            resolved_category = ReportCategory(category)
+        except ValueError:
+            return None
+    else:
+        return None
+    if resolved_category is ReportCategory.EXPECTED:
         return None
 
     if limiter is not None and not limiter.allow(type(exception).__qualname__):
         return None
 
     safe_tags = sanitize_tags(tags)
-    safe_tags["report_category"] = category_value(resolved_category)
-    try:
-        normalized_error_kind = Kind(error_kind or Kind.INTERNAL).value
-    except ValueError:
+    safe_tags["report_category"] = resolved_category.value
+    if error_kind is None:
         normalized_error_kind = Kind.INTERNAL.value
+    elif isinstance(error_kind, Kind):
+        normalized_error_kind = error_kind.value
+    elif type(error_kind) is str:
+        try:
+            normalized_error_kind = Kind(error_kind).value
+        except ValueError:
+            return None
+    else:
+        return None
     safe_tags["error_kind"] = normalized_error_kind
     safe_context = sanitize_context(context)
     with sentry_sdk.new_scope() as scope:

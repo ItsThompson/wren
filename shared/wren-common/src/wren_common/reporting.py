@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from wren_common.logging import get_logger
 from wren_common.reporting_types import (
@@ -15,16 +14,16 @@ from wren_common.reporting_types import (
     Kind,
     LogEvent,
     Operation,
+    ReportCategory,
     ReportLevel,
     SafeContext,
     sanitize_context,
     sanitize_tags,
 )
 
-
-class ReportCategory(StrEnum):
-    EXPECTED = "expected"
-    UNEXPECTED = "unexpected"
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from enum import StrEnum
 
 
 ReportClass = ReportCategory
@@ -47,18 +46,92 @@ def is_reportable(exception: BaseException) -> bool:
     return classify_exception(exception) is ReportCategory.UNEXPECTED
 
 
+def _enum_value(value: object, enum: type[StrEnum]) -> str | None:
+    if isinstance(value, enum):
+        return value.value
+    if type(value) is not str:
+        return None
+    try:
+        return enum(value).value
+    except ValueError:
+        return None
+
+
 def category_value(category: ReportCategory | str) -> str:
-    return category.value if isinstance(category, ReportCategory) else str(category)
+    normalized = _enum_value(category, ReportCategory)
+    return normalized if normalized is not None else ""
 
 
 _OPERATION_RE = re.compile(r"^[a-z][a-z0-9_.:-]{0,127}$")
-_OPERATION_DOMAINS = {
-    "accounts",
-    "db",
-    "oauth",
-    "progress",
-    "roadmaps",
-    "skill",
+_TOOL_OPERATION_RE = re.compile(r"^tool\.[a-z][a-z0-9_]{0,127}$")
+
+
+def _registered_operation_factory(*operations: str) -> Callable[[str], bool]:
+    registered = frozenset(operations)
+
+    def is_registered(operation: str) -> bool:
+        return operation in registered
+
+    return is_registered
+
+
+_OPERATION_FACTORIES: dict[str, Callable[[str], bool]] = {
+    Domain.ACCOUNTS.value: _registered_operation_factory(
+        "accounts.register",
+        "accounts.login",
+        "accounts.refresh",
+        "accounts.logout",
+        "accounts.complete_onboarding",
+        "accounts.profile",
+    ),
+    Domain.DB.value: _registered_operation_factory(),
+    Domain.OAUTH.value: _registered_operation_factory(
+        "oauth.metadata",
+        "oauth.jwks",
+        "oauth.register_client",
+        "oauth.authorize",
+        "oauth.authorize_context",
+        "oauth.authorize_decision",
+        "oauth.token",
+        "oauth.revoke",
+        "oauth.list_clients",
+        "oauth.revoke_client",
+        "oauth.cleanup",
+    ),
+    Domain.PROGRESS.value: _registered_operation_factory(
+        "progress.follow",
+        "progress.get",
+        "progress.update",
+        "progress.next",
+        "progress.deadline",
+    ),
+    Domain.ROADMAPS.value: _registered_operation_factory(
+        "roadmaps.create",
+        "roadmaps.get",
+        "roadmaps.patch",
+        "roadmaps.replace",
+        "roadmaps.validate",
+        "roadmaps.publish",
+        "roadmaps.fork",
+        "roadmaps.edit_metadata",
+        "roadmaps.overview",
+        "roadmaps.node",
+        "roadmaps.section",
+        "roadmaps.search",
+        "roadmaps.published_visibility",
+        "roadmaps.archive",
+        "roadmaps.delete",
+        "roadmaps.dashboard",
+    ),
+    Domain.SKILL.value: _registered_operation_factory("skill.get"),
+    Domain.MCP.value: lambda operation: (
+        operation
+        in {
+            "mcp.backend_error",
+            "mcp.internal_request",
+        }
+        or bool(_TOOL_OPERATION_RE.fullmatch(operation))
+    ),
 }
 
 
@@ -77,19 +150,8 @@ class ReportingContractError(ValueError):
         self.fields = fields
 
 
-def _value(value: object) -> str:
-    if isinstance(value, StrEnum):
-        return value.value
-    return value if isinstance(value, str) else ""
-
-
-def _valid_enum(value: StrEnum | str, enum: type[StrEnum]) -> str | None:
-    candidate = _value(value)
-    return candidate if candidate in {member.value for member in enum} else None
-
-
 def _operation(value: Operation | str) -> str:
-    return _value(value)
+    return value if type(value) is str else ""
 
 
 def make_reporting_contract(
@@ -103,10 +165,10 @@ def make_reporting_contract(
     """Create a validated reporting contract from runtime values."""
     invalid: list[str] = []
     normalized_operation = _operation(operation)
-    normalized_domain = None if domain is None else _valid_enum(domain, Domain)
-    normalized_kind = _valid_enum(kind, Kind)
-    normalized_event = _valid_enum(log_event, LogEvent)
-    normalized_level = _valid_enum(level, ReportLevel)
+    normalized_domain = None if domain is None else _enum_value(domain, Domain)
+    normalized_kind = _enum_value(kind, Kind)
+    normalized_event = _enum_value(log_event, LogEvent)
+    normalized_level = _enum_value(level, ReportLevel)
 
     if not _OPERATION_RE.fullmatch(normalized_operation):
         invalid.append("operation")
@@ -125,16 +187,14 @@ def make_reporting_contract(
     elif normalized_domain is None:
         invalid.append("domain")
     else:
-        prefix = normalized_operation.split(".", 1)[0]
-        valid_prefix = prefix == normalized_domain or (
-            normalized_domain == Domain.MCP.value and prefix in {"mcp", "tool"}
-        )
-        if prefix not in _OPERATION_DOMAINS and not (
-            normalized_domain == Domain.MCP.value and prefix in {"mcp", "tool"}
-        ):
-            valid_prefix = False
-        if not valid_prefix:
+        operation_factory = _OPERATION_FACTORIES[normalized_domain]
+        if not operation_factory(normalized_operation):
             invalid.append("operation")
+        prefix = normalized_operation.split(".", 1)[0]
+        if not (
+            prefix == normalized_domain
+            or (normalized_domain == Domain.MCP.value and prefix in {"mcp", "tool"})
+        ):
             invalid.append("domain")
 
     if invalid:
