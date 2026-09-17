@@ -49,6 +49,9 @@ def test_initialize_sentry_is_idempotent() -> None:
         environment="production",
         release="release-1",
         send_default_pii=False,
+        before_send=sentry._scrub_event,
+        integrations=[],
+        traces_sample_rate=0.0,
     )
 
 

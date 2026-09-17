@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import sentry_sdk
 
@@ -13,9 +13,39 @@ from wren_common.reporting import ReportCategory, category_value, classify_excep
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from sentry_sdk.types import Event
+
 _initialized = False
 _disabled_logged = False
 _REPORT_LIMITER = EventLimiter(limit=20, window_seconds=60)
+_REDACTED_EXCEPTION = "[Redacted exception]"
+
+
+def _scrub_event(event: Event, _hint: dict[str, Any]) -> Event:
+    """Remove request-derived payloads while preserving exception types and frames."""
+    event_data = cast("dict[str, Any]", event)
+    for field in ("request", "breadcrumbs", "extra", "message", "logentry"):
+        event_data.pop(field, None)
+    contexts = event_data.get("contexts")
+    if isinstance(contexts, dict):
+        event_data["contexts"] = {"report": contexts["report"]} if "report" in contexts else {}
+    exception = event_data.get("exception")
+    if isinstance(exception, dict):
+        values = exception.get("values")
+        if isinstance(values, list):
+            for value in values:
+                if not isinstance(value, dict):
+                    continue
+                value["value"] = _REDACTED_EXCEPTION
+                value.pop("mechanism", None)
+                stacktrace = value.get("stacktrace")
+                if isinstance(stacktrace, dict):
+                    frames = stacktrace.get("frames")
+                    if isinstance(frames, list):
+                        for frame in frames:
+                            if isinstance(frame, dict):
+                                frame.pop("vars", None)
+    return event
 
 
 def _release_name(release: str, service: str) -> str | None:
@@ -60,6 +90,9 @@ def initialize_sentry(
         environment=environment,
         release=_release_name(release, service),
         send_default_pii=False,
+        before_send=_scrub_event,
+        integrations=[],
+        traces_sample_rate=0.0,
     )
     _initialized = True
     log.info("sentry_initialized", environment=environment, release=release or None)
