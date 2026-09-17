@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from unittest.mock import Mock, patch
 
+import pytest
+
 from wren_common import sentry
 from wren_common.limiter import EventLimiter
 from wren_common.reporting import ReportCategory
@@ -48,7 +50,7 @@ def test_initialize_sentry_is_idempotent() -> None:
     init.assert_called_once_with(
         dsn="https://public@example.ingest.sentry.io/1",
         environment="production",
-        release="release-1",
+        release="wren-backend@release-1",
         send_default_pii=False,
         before_send=sentry._scrub_event,
         integrations=[],
@@ -70,6 +72,21 @@ def test_initialize_sentry_prefixes_bare_deploy_sha_by_service() -> None:
     assert init.call_args.kwargs["release"] == "wren-mcp@abc123"
 
 
+def test_initialize_sentry_rejects_release_for_another_service() -> None:
+    with (
+        patch("wren_common.sentry.sentry_sdk.init") as init,
+        pytest.raises(ValueError, match="release must use the wren-mcp@<version> format"),
+    ):
+        sentry.initialize_sentry(
+            dsn="https://public@example.ingest.sentry.io/1",
+            environment="production",
+            release="wren-backend@abc123",
+            service="wren-mcp",
+        )
+
+    init.assert_not_called()
+
+
 def test_report_exception_skips_expected_category() -> None:
     with patch("wren_common.sentry.sentry_sdk.capture_exception") as capture:
         result = sentry.report_exception(ValueError("bad input"), category=ReportCategory.EXPECTED)
@@ -85,7 +102,7 @@ def test_report_exception_applies_tags_context_and_limiter() -> None:
     limiter = EventLimiter(limit=1, window_seconds=60, clock=lambda: 0.0)
 
     with (
-        patch("wren_common.sentry.sentry_sdk.push_scope", return_value=scope_manager),
+        patch("wren_common.sentry.sentry_sdk.new_scope", return_value=scope_manager),
         patch("wren_common.sentry.sentry_sdk.capture_exception", return_value="event-1") as capture,
     ):
         exception = RuntimeError("database unavailable")
@@ -102,5 +119,6 @@ def test_report_exception_applies_tags_context_and_limiter() -> None:
 
     scope.set_tag.assert_any_call("report_category", "unexpected")
     scope.set_tag.assert_any_call("service", "wren-api")
+    scope.set_tag.assert_any_call("error_kind", "RuntimeError")
     scope.set_context.assert_called_once_with("report", {"operation": "save"})
     capture.assert_called_once_with(exception)

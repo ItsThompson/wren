@@ -8,7 +8,13 @@ import sentry_sdk
 
 from wren_common.limiter import EventLimiter
 from wren_common.logging import get_logger
-from wren_common.reporting import ReportCategory, category_value, classify_exception
+from wren_common.reporting import (
+    ReportCategory,
+    category_value,
+    classify_exception,
+    exception_kind,
+)
+from wren_common.reporting_types import sanitize_context, sanitize_tags
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -49,17 +55,27 @@ def _scrub_event(event: Event, _hint: dict[str, Any]) -> Event:
     return event
 
 
+_RELEASE_PREFIXES = {
+    "wren": "wren-backend",
+    "wren-external": "wren-backend",
+    "wren-internal": "wren-backend",
+    "wren-mcp": "wren-mcp",
+}
+
+
 def _release_name(release: str, service: str) -> str | None:
     value = release.strip()
     if not value:
         return None
+    prefix = _RELEASE_PREFIXES.get(service)
+    if prefix is None:
+        raise ValueError(f"unsupported Sentry service: {service}")
+
     if "@" in value:
-        return value
-    if service in {"wren-external", "wren-internal"}:
-        return f"wren-backend@{value}"
-    if service == "wren-mcp":
-        return f"wren-mcp@{value}"
-    return value
+        supplied_prefix, _, value = value.partition("@")
+        if supplied_prefix != prefix or not value or "@" in value:
+            raise ValueError(f"release must use the {prefix}@<version> format")
+    return f"{prefix}@{value}"
 
 
 def initialize_sentry(
@@ -126,13 +142,15 @@ def report_exception(
     if limiter is not None and not limiter.allow(type(exception).__qualname__):
         return None
 
-    with sentry_sdk.push_scope() as scope:
-        scope.set_tag("report_category", category_value(resolved_category))
-        if tags:
-            for key, value in tags.items():
-                scope.set_tag(key, value)
-        if context:
-            scope.set_context("report", dict(context))
+    safe_tags = sanitize_tags(tags)
+    safe_tags["report_category"] = category_value(resolved_category)
+    safe_tags["error_kind"] = exception_kind(exception)
+    safe_context = sanitize_context(context)
+    with sentry_sdk.new_scope() as scope:
+        for key, value in safe_tags.items():
+            scope.set_tag(key, value)
+        if safe_context:
+            scope.set_context("report", safe_context)
         if user_id:
             scope.set_user({"id": user_id})
         if fingerprint:
