@@ -46,7 +46,8 @@ RUN --mount=type=secret,id=sentry_auth_token,required=false \
     npm run build; \
     printf 'Sentry source-map upload run: %s\\n' "${SENTRY_UPLOAD_RUN_ID}"; \
     if [ -s /run/secrets/sentry_auth_token ] && [ -n "${SENTRY_ORG}" ] && \
-       [ -n "${SENTRY_PROJECT_FRONTEND}" ] && [ -n "${VITE_SENTRY_RELEASE}" ]; then \
+       [ -n "${SENTRY_PROJECT_FRONTEND}" ] && [ -n "${VITE_SENTRY_RELEASE}" ] && \
+       [ -n "${SENTRY_UPLOAD_RUN_ID}" ]; then \
       export SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token)"; \
       ./node_modules/.bin/sentry-cli sourcemaps inject dist; \
       ./node_modules/.bin/sentry-cli sourcemaps upload dist \
