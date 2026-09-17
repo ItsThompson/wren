@@ -275,18 +275,17 @@ def report_error(
         log.warning("reporting_contract_invalid", fields=list(error.fields))
         return
 
-    tags = sanitize_tags(bounded_tags)
-    tags.update(
-        {
-            "operation": contract.operation,
-            "kind": contract.kind,
-            "log_event": contract.log_event,
-            "level": contract.level,
-            "error_kind": contract.kind,
-        }
-    )
+    caller_tags = sanitize_tags(bounded_tags)
+    reporter_tags = {
+        "operation": contract.operation,
+        "kind": contract.kind,
+        "log_event": contract.log_event,
+        "level": contract.level,
+        "error_kind": contract.kind,
+    }
     if contract.domain is not None:
-        tags["domain"] = contract.domain
+        reporter_tags["domain"] = contract.domain
+    tags = {**caller_tags, **reporter_tags}
 
     context = sanitize_context(context_data)
     log_method = getattr(log, contract.level)
@@ -316,12 +315,12 @@ def report_error(
     report_exception(
         exception,
         limiter=None,
-        tags=tags,
+        tags=caller_tags,
         context=context,
         fingerprint=fingerprint,
         user_id=user_id,
         error_kind=contract.kind,
-        reporter_tags=tags,
+        reporter_tags=reporter_tags,
         level=contract.level,
     )
 

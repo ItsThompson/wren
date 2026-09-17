@@ -49,9 +49,8 @@ def test_report_error_logs_contract_and_forwards_scope() -> None:
     logger.error.assert_called_once()
     assert logger.error.call_args.args == ("unhandled_exception",)
     report.assert_called_once()
-    assert report.call_args.kwargs["tags"]["operation"] == "roadmaps.create"
+    assert report.call_args.kwargs["tags"] == {"component": "writer"}
     assert report.call_args.kwargs["context"] == {}
-    assert report.call_args.kwargs["tags"]["error_kind"] == "database"
     assert report.call_args.kwargs["error_kind"] == "database"
     assert report.call_args.kwargs["fingerprint"] == [
         "roadmaps.create",
