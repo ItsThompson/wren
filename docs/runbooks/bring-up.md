@@ -193,11 +193,16 @@ gh secret set INTERNAL_API_TOKEN           --body "<generated>"
 gh secret set DISCORD_WEBHOOK_URL          --body "<real discord webhook>"
 gh secret set WREN_OAUTH_PRIVATE_KEY       < oauth_private.pem             # RAW PEM content
 gh secret set WREN_CLOUDFLARED_CREDENTIALS < ~/.cloudflared/<UUID>.json    # RAW credentials.json (NOT base64)
+gh secret set SENTRY_AUTH_TOKEN          --body "<org:ci token>"
+gh secret set SENTRY_DSN_BACKEND         --body "<backend DSN>"
+gh secret set SENTRY_DSN_MCP             --body "<MCP DSN>"
 ```
 
 > `WREN_CLOUDFLARED_CREDENTIALS` holds the RAW, unencoded `credentials.json` (environment-sourced secrets transmit raw content). `cert.pem` is a bring-up-only tunnel-management artifact and is not needed at runtime.
 
-`GITHUB_TOKEN` is **not** set manually: it is the built-in Actions token. Ensure Actions is allowed to write packages (repo/org **Settings → Actions → Workflow permissions**), since `cd.yml` already requests `packages: write` and logs into GHCR with it.
+`GITHUB_TOKEN` is **not** set manually: it is the built-in Actions token. Ensure Actions is allowed to write packages (repo/org **Settings → Actions → Workflow permissions**), since `cd.yml` already requests `packages: write` and logs into GHCR with it. `SENTRY_AUTH_TOKEN` needs organization release and source-map permissions (`org:ci`). The backend and MCP DSNs remain private GitHub secrets; `VITE_SENTRY_DSN` is public configuration in committed `.env.prod`.
+
+Before the first deploy, confirm the token and project access with the pinned CLI (`frontend/node_modules/.bin/sentry-cli info`) and inspect each configured project. Do not print token values or DSNs in CI logs.
 
 ---
 

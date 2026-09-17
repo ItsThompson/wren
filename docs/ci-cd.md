@@ -54,8 +54,10 @@ CD deploys the whole stack to the single VPS over an SSH Docker Context. The Com
 | Phase | Action |
 |-------|--------|
 | `discover` | Parse the deployable Compose file and emit a build matrix of the first-party images. |
-| `build-and-push` | Build each first-party image and push two tags to GHCR: `:latest` and `:sha-<sha>`. |
+| `prepare-sentry-releases` | Verify the pinned CLI and idempotently prepare `wren-backend@<sha>`, `wren-mcp@<sha>`, and `wren-web@<sha>` with their exact projects. |
+| `build-and-push` | Build each first-party image, upload frontend source maps in the builder when credentials are present, and push `:latest` plus `:sha-<sha>` to GHCR. |
 | `deploy` | Register the Docker Context, export config and secrets CLI-side, then run `scripts/deploy.sh`. |
+| `finalize-sentry-releases` | Finalize all three releases after a healthy deploy. This bookkeeping job cannot trigger application rollback. |
 | Rollback (on failure) | CI-owned. Read the previous `.deployed-sha`, check it out, re-export env, and re-run the deploy pinned to the previous images and config. |
 
 `scripts/deploy.sh` runs a fixed sequence: assert every required config and secret env var is set, pull images, run migrations pre-traffic, start the stack under the `tunnels` profile, health-gate every service for about 60 seconds, sync host-side ops scripts to `/opt/wren/scripts/`, then record the deployed SHA on success. See `docs/runbooks/deploy.md` and `docs/runbooks/rollback.md` for the operator view.
@@ -63,6 +65,22 @@ CD deploys the whole stack to the single VPS over an SSH Docker Context. The Com
 Two SSH write paths remain (beyond the Docker Context's SSH transport): `.deployed-sha` (rollback key) and `scripts/` (ops scripts).
 
 The backend and MCP images build from the repo-root context (like `frontend`/`docs`), each selecting a member `dockerfile:` in `docker-compose.yml`; `discover` parses the context and dockerfile from `docker compose config`. See `docs/packaging.md` for the per-member build.
+
+## Deploy failure phases
+
+The deploy step writes a runner-local JSON result with a closed phase and rollback flag. The workflow validates the result and enables one rollback attempt only for `startup` and `health_gate`.
+
+| Phase | Automatic rollback | Operator action |
+|---|---:|---|
+| `preflight` | No | Supply required values and rerun. |
+| `pull` | No | Fix registry or network access and rerun. |
+| `migration` | No | Inspect database and migration state before changing images. |
+| `startup` | Yes | CD restores the previous SHA, config, and image tags. |
+| `health_gate` | Yes | CD restores the previous SHA, config, and image tags. |
+| `post_health` | No | Repair bookkeeping or ops-script sync while healthy containers remain in place. |
+| missing, malformed, or unknown | No | Treat the result as failed closed and investigate. |
+
+Sentry release finalization runs only after the deploy job succeeds. A finalization failure does not make a healthy application rollback-eligible. A previous revision without the new phase contract is accepted during the one rollback attempt and cannot start a nested rollback.
 
 ## Required secrets
 
