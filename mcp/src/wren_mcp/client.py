@@ -20,10 +20,10 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 import structlog
-from mcp.server.fastmcp.exceptions import ToolError
 
 from wren_mcp.config import INTERNAL_TOKEN_HEADER, USER_ID_HEADER
 from wren_mcp.reporting import report_mcp_error
+from wren_mcp.tool_errors import BackendUnavailableToolError
 
 if TYPE_CHECKING:
     from pydantic import SecretStr
@@ -94,7 +94,7 @@ class InternalApiClient:
                 context_data={"method": method.upper(), "status": 503},
                 group_key="mcp.internal_request",
             )
-            raise ToolError(
+            raise BackendUnavailableToolError(
                 "backend_unavailable: the roadmap service is unreachable or timed out; "
                 "retry shortly."
             ) from exc

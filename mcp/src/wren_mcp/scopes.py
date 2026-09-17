@@ -20,7 +20,6 @@ from typing import TYPE_CHECKING
 
 import structlog
 from mcp.server.fastmcp import Context
-from mcp.server.fastmcp.exceptions import ToolError
 from mcp.server.session import ServerSession
 from starlette.requests import Request
 
@@ -28,6 +27,7 @@ from wren_common.logging import get_logger
 from wren_mcp.reporting import report_mcp_error
 from wren_mcp.settings import SERVICE
 from wren_mcp.state import get_request_agent
+from wren_mcp.tool_errors import ToolAuthorizationError
 
 if TYPE_CHECKING:
     from wren_mcp.tokens import VerifiedAgentToken
@@ -37,14 +37,6 @@ _log = get_logger(SERVICE)
 # The Context the framework injects; the third param is the Starlette request
 # carrying the identity the bearer boundary resolved onto ``request.state``.
 AgentContext = Context[ServerSession, object, Request]
-
-
-class _AuthorizationToolError(ToolError):
-    """Expected authorization result used for shared reporter classification."""
-
-    def __init__(self, message: str, *, status: int) -> None:
-        super().__init__(message)
-        self.status = status
 
 
 def _resolve_agent(ctx: AgentContext) -> VerifiedAgentToken:
@@ -57,7 +49,7 @@ def _resolve_agent(ctx: AgentContext) -> VerifiedAgentToken:
     request = ctx.request_context.request
     principal = get_request_agent(request)
     if principal is None:
-        error = _AuthorizationToolError(
+        error = ToolAuthorizationError(
             "unauthenticated: no verified agent identity on the request.", status=401
         )
         report_mcp_error(
@@ -88,7 +80,7 @@ def require_scope(ctx: AgentContext, *, scope: str) -> str:
     granted = set(principal.scope.split())
     if scope not in granted:
         have = principal.scope or "(none)"
-        error = _AuthorizationToolError(
+        error = ToolAuthorizationError(
             f"insufficient_scope: this tool requires the '{scope}' OAuth scope, but the "
             f"token grants [{have}]. Re-authorize the agent with '{scope}' and retry.",
             status=403,

@@ -29,7 +29,23 @@ if TYPE_CHECKING:
     import httpx
 
 
-class BackendToolError(ToolError):
+class ExpectedToolError(ToolError):
+    """A recoverable tool outcome that does not represent an operational fault."""
+
+
+class ToolAuthorizationError(ExpectedToolError):
+    """A missing identity or scope that the agent can resolve by reauthorizing."""
+
+    def __init__(self, message: str, *, status: int) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+class BackendUnavailableToolError(ToolError):
+    """A transport failure that remains agent-recoverable but is reportable."""
+
+
+class BackendToolError(ExpectedToolError):
     """A model-recoverable tool error that also carries the backend's HTTP status
     and problem code, so the tool-invocation counter can log them structurally."""
 
