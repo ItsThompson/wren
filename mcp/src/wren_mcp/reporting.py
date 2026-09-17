@@ -17,14 +17,21 @@ from wren_common.reporting import (
     Domain,
     Kind,
     LogEvent,
+    ReportingContract,
+    ReportingContractError,
     ReportLevel,
     is_reportable,
+    make_reporting_contract,
     report_error,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from wren_common.reporting_types import SafeContextValue
+
+
+_log = structlog.get_logger("wren-mcp-reporting")
 
 _MCP_REPORT_LIMITERS = {
     kind.value: ReportLimiter(limit=1, window_seconds=3_600.0)
@@ -32,18 +39,36 @@ _MCP_REPORT_LIMITERS = {
 }
 
 
-def _kind(value: str) -> Kind:
+def _validated_contract(
+    *,
+    operation_name: str,
+    kind_name: str,
+    log_event_name: str,
+    level_name: str,
+) -> ReportingContract | None:
+    """Validate report metadata before any limiter or capture side effect."""
     try:
-        return Kind(value)
-    except ValueError:
-        return Kind.INTERNAL
+        contract = make_reporting_contract(
+            operation=operation_name,
+            domain=Domain.MCP,
+            kind=kind_name,
+            log_event=log_event_name,
+            level=level_name,
+        )
+    except ReportingContractError as error:
+        _log.warning("reporting_contract_invalid", fields=list(error.fields))
+        return None
 
+    # Import lazily because the registrar wraps tool metrics, which imports this
+    # reporting adapter.
+    from wren_mcp.tool_registry import is_registered_tool
 
-def _log_event(value: str) -> LogEvent:
-    try:
-        return LogEvent(value)
-    except ValueError:
-        return LogEvent.UNHANDLED_EXCEPTION
+    if contract.operation.startswith("tool.") and not is_registered_tool(
+        contract.operation.removeprefix("tool.")
+    ):
+        _log.warning("reporting_contract_invalid", fields=["operation"])
+        return None
+    return contract
 
 
 def report_mcp_error(
@@ -55,37 +80,42 @@ def report_mcp_error(
     level_name: str,
     user_id: str | None = None,
     bounded_tags: Mapping[str, str] | None = None,
-    context_data: Mapping[str, object] | None = None,
+    context_data: Mapping[str, SafeContextValue] | None = None,
     group_key: str | None = None,
 ) -> None:
     """Send one bounded MCP report without changing the original error path."""
+    contract = _validated_contract(
+        operation_name=operation_name,
+        kind_name=kind_name,
+        log_event_name=log_event_name,
+        level_name=level_name,
+    )
+    if contract is None:
+        return
     # Backend responses and authorization failures are model-recoverable tool
     # outcomes. They still reach the local tool-failure log, but never create an
     # operational event. BackendToolError marks even 5xx responses explicitly.
     if getattr(exception, "suppress_reporting", False) or not is_reportable(exception):
         return
-    kind = _kind(kind_name)
-    limiter = _MCP_REPORT_LIMITERS.get(kind.value)
-    if limiter is not None and not limiter.allow(kind.value):
+    limiter = _MCP_REPORT_LIMITERS.get(contract.kind)
+    if limiter is not None and not limiter.allow(contract.kind):
         return
     try:
         report_error(
             exception,
-            operation=operation_name,
+            operation=contract.operation,
             domain=Domain.MCP,
-            kind=kind,
+            kind=Kind(contract.kind),
             user_id=user_id,
-            log_event=_log_event(log_event_name),
-            level=ReportLevel(level_name),
-            bounded_tags={**dict(bounded_tags or {}), "error_kind": kind.value},
-            context_data={**dict(context_data or {}), "error_kind": kind.value},
-            group_key=f"mcp.{kind.value}",
+            log_event=LogEvent(contract.log_event),
+            level=ReportLevel(contract.level),
+            bounded_tags={**dict(bounded_tags or {}), "error_kind": contract.kind},
+            context_data={**dict(context_data or {}), "error_kind": contract.kind},
+            group_key=f"mcp.{contract.kind}",
             group_exact=True,
         )
     except Exception:  # noqa: BLE001 - reporting must never mask the original error
-        structlog.get_logger("wren-mcp").warning(
-            "error_report_failed", operation=operation_name, exc_info=True
-        )
+        _log.warning("error_report_failed", operation=contract.operation, exc_info=True)
 
 
 __all__ = ["report_mcp_error"]

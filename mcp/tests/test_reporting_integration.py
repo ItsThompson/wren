@@ -11,6 +11,15 @@ from wren_common.reporting import Domain, Kind, LogEvent, ReportLevel
 from wren_mcp import reporting
 from wren_mcp.tool_errors import BackendToolError, BackendUnavailableToolError, raise_for_problem
 from wren_mcp.tool_metrics import count_invocations
+from wren_mcp.tool_registry import counted_tool_registrar, registered_tool_names
+
+
+class _DiagnosticLogger:
+    def __init__(self, diagnostics: list[dict[str, object]]) -> None:
+        self._diagnostics = diagnostics
+
+    def warning(self, event: str, **kwargs: object) -> None:
+        self._diagnostics.append({event: kwargs})
 
 
 def test_backend_problem_reports_the_same_typed_error_before_raising(
@@ -102,7 +111,7 @@ def test_shared_adapter_limits_each_failure_class_independently(
     for kind in ("upstream", "upstream", "internal", "internal"):
         reporting.report_mcp_error(
             RuntimeError(kind),
-            operation_name="tool.example",
+            operation_name="mcp.internal_request",
             kind_name=kind,
             log_event_name="unhandled_exception",
             level_name="error",
@@ -113,7 +122,97 @@ def test_shared_adapter_limits_each_failure_class_independently(
     assert calls[0]["context_data"] == {"error_kind": "upstream"}
 
 
-def test_shared_adapter_uses_valid_taxonomy_fallbacks(
+def test_unregistered_tool_operation_is_not_reported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, object]] = []
+    diagnostics: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        reporting,
+        "report_error",
+        lambda exception, **kwargs: calls.append({"exception": exception, **kwargs}),
+    )
+    monkeypatch.setattr(
+        reporting,
+        "_log",
+        type(
+            "DiagnosticLogger",
+            (),
+            {"warning": lambda _, event, **kwargs: diagnostics.append({event: kwargs})},
+        )(),
+        raising=False,
+    )
+
+    reporting.report_mcp_error(
+        RuntimeError("transport failed"),
+        operation_name="tool.not_registered",
+        kind_name="upstream",
+        log_event_name="unhandled_exception",
+        level_name="error",
+    )
+
+    assert calls == []
+    assert diagnostics == [{"reporting_contract_invalid": {"fields": ["operation"]}}]
+
+
+@pytest.mark.parametrize(
+    ("field", "metadata"),
+    [
+        ("kind", {"kind_name": "not_a_kind"}),
+        ("log_event", {"log_event_name": "not_a_log_event"}),
+        ("level", {"level_name": "not_a_level"}),
+    ],
+)
+def test_invalid_required_metadata_is_not_reported_and_logs_only_field_name(
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    metadata: dict[str, str],
+) -> None:
+    calls: list[dict[str, object]] = []
+    diagnostics: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        reporting,
+        "report_error",
+        lambda exception, **kwargs: calls.append({"exception": exception, **kwargs}),
+    )
+    monkeypatch.setattr(
+        reporting,
+        "_log",
+        type(
+            "DiagnosticLogger",
+            (),
+            {"warning": lambda _, event, **kwargs: diagnostics.append({event: kwargs})},
+        )(),
+        raising=False,
+    )
+
+    reporting.report_mcp_error(
+        RuntimeError("transport failed"),
+        operation_name="mcp.internal_request",
+        kind_name=metadata.get("kind_name", "upstream"),
+        log_event_name=metadata.get("log_event_name", "unhandled_exception"),
+        level_name=metadata.get("level_name", "error"),
+    )
+
+    assert calls == []
+    assert diagnostics == [{"reporting_contract_invalid": {"fields": [field]}}]
+
+
+def test_registrar_adds_tool_name_to_report_registry() -> None:
+    from mcp.server.fastmcp import FastMCP
+    from mcp.types import ToolAnnotations
+
+    mcp = FastMCP("registry-test")
+    tool = counted_tool_registrar(mcp)
+
+    @tool(ToolAnnotations(title="Registry test"))
+    async def registry_probe() -> None:
+        return None
+
+    assert "registry_probe" in registered_tool_names()
+
+
+def test_shared_adapter_uses_typed_taxonomy_values(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from wren_mcp import reporting
@@ -130,7 +229,7 @@ def test_shared_adapter_uses_valid_taxonomy_fallbacks(
         exception,
         operation_name="mcp.internal_request",
         kind_name="timeout",
-        log_event_name="backend_unavailable",
+        log_event_name="unhandled_exception",
         level_name="error",
         user_id="user-ada",
         bounded_tags={"method": "GET"},
