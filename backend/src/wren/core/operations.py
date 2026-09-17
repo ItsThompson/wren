@@ -180,6 +180,8 @@ def report_oauth_failure(request: Request, exception: BaseException) -> None:
     """Report protocol errors while preserving the OAuth response contract."""
     operation_name = operation_for_request(request)
     status = getattr(exception, "status", 500)
+    if not isinstance(status, int) or status < 500:
+        return
     _report(
         exception,
         operation_name=operation_name,
