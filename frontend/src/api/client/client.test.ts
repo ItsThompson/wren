@@ -41,7 +41,23 @@ describe('createApiClient', () => {
     expect(credentials).toBe('omit')
   })
 
-  it('reports a retried 5xx response exactly once after refresh succeeds', async () => {
+  it('reports validation responses and preserves the response', async () => {
+    server.use(http.get('*/me/dashboard', () => new HttpResponse(null, { status: 422 })))
+    const client = createApiClient('https://api.test')
+
+    const { response } = await client.GET('/me/dashboard')
+
+    expect(response.status).toBe(422)
+    expect(reportApiFailure).toHaveBeenCalledWith({
+      status: 422,
+      operationId: 'get_dashboard_me_dashboard_get',
+      method: 'GET',
+      schemaPath: '/me/dashboard',
+      url: 'https://api.test/me/dashboard',
+    })
+  })
+
+  it('reports every response attempt, including the retried 5xx response', async () => {
     let requestCount = 0
     server.use(
       http.get('*/me/dashboard', () => {
@@ -58,8 +74,15 @@ describe('createApiClient', () => {
 
     expect(response.status).toBe(503)
     expect(retryOnUnauthorized).toHaveBeenCalledOnce()
-    expect(reportApiFailure).toHaveBeenCalledOnce()
-    expect(reportApiFailure).toHaveBeenCalledWith({
+    expect(reportApiFailure).toHaveBeenCalledTimes(2)
+    expect(reportApiFailure).toHaveBeenNthCalledWith(1, {
+      status: 401,
+      operationId: 'get_dashboard_me_dashboard_get',
+      method: 'GET',
+      schemaPath: '/me/dashboard',
+      url: 'https://api.test/me/dashboard',
+    })
+    expect(reportApiFailure).toHaveBeenNthCalledWith(2, {
       status: 503,
       operationId: 'get_dashboard_me_dashboard_get',
       method: 'GET',
@@ -80,8 +103,15 @@ describe('createApiClient', () => {
     const client = createApiClient('https://api.test', { retryOnUnauthorized: async () => true })
 
     await expect(client.GET('/me/dashboard')).rejects.toBe(requestError)
-    expect(reportApiFailure).toHaveBeenCalledOnce()
-    expect(reportApiFailure).toHaveBeenCalledWith({
+    expect(reportApiFailure).toHaveBeenCalledTimes(2)
+    expect(reportApiFailure).toHaveBeenNthCalledWith(1, {
+      status: 401,
+      operationId: 'get_dashboard_me_dashboard_get',
+      method: 'GET',
+      schemaPath: '/me/dashboard',
+      url: 'https://api.test/me/dashboard',
+    })
+    expect(reportApiFailure).toHaveBeenNthCalledWith(2, {
       error: requestError,
       status: null,
       operationId: 'get_dashboard_me_dashboard_get',

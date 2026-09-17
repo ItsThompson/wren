@@ -22,14 +22,12 @@ export function operationIdFor(method: string, schemaPath: string): OperationId 
   return operationRegistry[key as OperationKey]
 }
 
-function reportResponseFailure(
+function reportResponseAttempt(
   response: Response,
   operationId: OperationId,
   schemaPath: string,
   request: Request,
 ): void {
-  if (response.status < 500) return
-
   reportApiFailure({
     status: response.status,
     operationId,
@@ -57,12 +55,13 @@ function createApiMiddleware(retryOnUnauthorized?: RetryOnUnauthorized): Middlew
 
       const retryRequest = replayableRequests.get(request)
       replayableRequests.delete(request)
+      reportResponseAttempt(response, operationId, schemaPath, request)
       if (response.status === 401 && retryOnUnauthorized && !new URL(request.url).pathname.startsWith(AUTH_PREFIX)) {
         const refreshed = await retryOnUnauthorized()
         if (refreshed) {
           try {
             const retriedResponse = await options.fetch(retryRequest ?? request.clone())
-            reportResponseFailure(retriedResponse, operationId, schemaPath, request)
+            reportResponseAttempt(retriedResponse, operationId, schemaPath, request)
             return retriedResponse
           } catch (error) {
             reportApiFailure({
@@ -78,8 +77,7 @@ function createApiMiddleware(retryOnUnauthorized?: RetryOnUnauthorized): Middlew
         }
       }
 
-      reportResponseFailure(response, operationId, schemaPath, request)
-      return undefined
+      return response
     },
     onError({ error, request, schemaPath }) {
       let operationId: OperationId

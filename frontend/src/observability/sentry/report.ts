@@ -13,7 +13,7 @@ import { classifyApiFailure, type ApiFailureKind } from './classify'
 export const RENDER_OPERATION = 'render.app' as const
 const KNOWN_OPERATIONS = new Set<string>([...Object.values(operationRegistry), RENDER_OPERATION])
 const KNOWN_DOMAINS = new Set<string>(Object.values(operationDomainRegistry))
-const KNOWN_KINDS = new Set<string>(['expected', 'upstream', 'network', 'internal'])
+const KNOWN_KINDS = new Set<string>(['validation', 'upstream', 'network', 'internal'])
 
 export type ReportingOperation = OperationId | typeof RENDER_OPERATION
 export type BrowserDomain = OperationDomain
@@ -113,7 +113,7 @@ export function reportApiFailure(report: ApiFailureReport): ApiFailureKind {
     scope.setTag('api.method', report.method)
     scope.setTag('api.failure_kind', kind)
     if (domain) scope.setTag('api.domain', domain)
-    if (kind === 'expected') scope.setTag('expected', 'true')
+    if (kind === 'validation') scope.setTag('expected', 'true')
     if (kind === 'network') scope.setLevel('warning')
     scope.setExtra('api.status', report.status)
     Sentry.captureException(toError(report.error))

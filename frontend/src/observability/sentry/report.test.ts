@@ -17,9 +17,17 @@ vi.mock('@sentry/react', () => ({
   ) => callback({ setTag, setExtra, setLevel }),
 }))
 
-import { reportApiFailure } from './report'
+import { isKnownBrowserFailureKind, reportApiFailure } from './report'
 
 describe('reportApiFailure', () => {
+  it('accepts only the closed browser failure taxonomy', () => {
+    expect(isKnownBrowserFailureKind('validation')).toBe(true)
+    expect(isKnownBrowserFailureKind('upstream')).toBe(true)
+    expect(isKnownBrowserFailureKind('internal')).toBe(true)
+    expect(isKnownBrowserFailureKind('network')).toBe(true)
+    expect(isKnownBrowserFailureKind('expected')).toBe(false)
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -29,7 +37,7 @@ describe('reportApiFailure', () => {
     vi.restoreAllMocks()
   })
 
-  it('marks expected client failures for the beforeSend drop', () => {
+  it('marks validation failures for the beforeSend drop', () => {
     const kind = reportApiFailure({
       status: 409,
       operationId: 'patch_roadmap_roadmaps__roadmap_id__patch',
@@ -38,8 +46,9 @@ describe('reportApiFailure', () => {
       url: 'https://api.test/roadmaps/one',
     })
 
-    expect(kind).toBe('expected')
+    expect(kind).toBe('validation')
     expect(setTag).toHaveBeenCalledWith('expected', 'true')
+    expect(setTag).toHaveBeenCalledWith('api.failure_kind', 'validation')
     expect(captureException).toHaveBeenCalledOnce()
   })
 
