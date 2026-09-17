@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from collections.abc import Mapping
 from enum import StrEnum
 from typing import cast
@@ -73,7 +74,12 @@ REGISTERED_TAG_KEYS = frozenset(
 )
 # Keep the old name available to callers while making the registry explicit.
 OPTIONAL_TAG_KEYS = REGISTERED_TAG_KEYS
-SAFE_CONTEXT_KEYS = frozenset({"method", "operation", "path", "status", "template"})
+SAFE_CONTEXT_KEYS = frozenset({"method", "path", "status", "template"})
+# Route context must contain a template, not a request-expanded identifier.
+_ROUTE_TEMPLATE_RE = re.compile(
+    r"^/(?:[a-z]+(?:[._:-][a-z]+)*|\{[a-z][a-z0-9_]*\}(?::[a-z]+)?)"
+    r"(?:/(?:[a-z]+(?:[._:-][a-z]+)*|\{[a-z][a-z0-9_]*\}(?::[a-z]+)?))*$"
+)
 CONTEXT_TRUNCATED_KEY = "truncated"
 CONTEXT_ORIGINAL_BYTES_KEY = "original_bytes"
 MAX_TAG_KEY_LENGTH = 32
@@ -154,6 +160,10 @@ def sanitize_context(value: SafeContext | None) -> dict[str, SafeContextValue]:
             continue
         item = _safe_context_value(raw_item)
         if item is None and raw_item is not None:
+            continue
+        if key in {"path", "template"} and (
+            type(item) is not str or _ROUTE_TEMPLATE_RE.fullmatch(item) is None
+        ):
             continue
         safe_items.append((key, item))
 

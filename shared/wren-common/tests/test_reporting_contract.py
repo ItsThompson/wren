@@ -53,7 +53,60 @@ def test_report_error_logs_contract_and_forwards_scope() -> None:
     assert report.call_args.kwargs["context"] == {}
     assert report.call_args.kwargs["tags"]["error_kind"] == "database"
     assert report.call_args.kwargs["error_kind"] == "database"
-    assert report.call_args.kwargs["fingerprint"] == ["roadmaps.create"]
+    assert report.call_args.kwargs["fingerprint"] == [
+        "roadmaps.create",
+        "database",
+        "{{ default }}",
+    ]
+    assert report.call_args.kwargs["reporter_tags"]["operation"] == "roadmaps.create"
+    assert report.call_args.kwargs["level"] == "error"
+
+
+def test_report_error_uses_exact_cleanup_group_key() -> None:
+    logger = Mock()
+    with (
+        patch("wren_common.reporting.get_logger", return_value=logger),
+        patch("wren_common.sentry.report_exception") as report,
+    ):
+        report_error(
+            RuntimeError("cleanup failed"),
+            operation="oauth.cleanup",
+            domain=Domain.OAUTH,
+            kind=Kind.DATABASE,
+            user_id=None,
+            log_event=LogEvent.UNHANDLED_EXCEPTION,
+            level=ReportLevel.ERROR,
+            bounded_tags={},
+            context_data={},
+            group_key="oauth.cleanup.database",
+            group_exact=True,
+        )
+
+    assert report.call_args.kwargs["fingerprint"] == ["oauth.cleanup.database"]
+
+
+def test_report_error_skips_invalid_required_group_key() -> None:
+    logger = Mock()
+    with (
+        patch("wren_common.reporting.get_logger", return_value=logger),
+        patch("wren_common.sentry.report_exception") as report,
+    ):
+        report_error(
+            RuntimeError("boom"),
+            operation="roadmaps.create",
+            domain=Domain.ROADMAPS,
+            kind=Kind.INTERNAL,
+            user_id=None,
+            log_event=LogEvent.UNHANDLED_EXCEPTION,
+            level=ReportLevel.ERROR,
+            bounded_tags={},
+            context_data={},
+            group_key="/roadmaps/{roadmap_id}",
+            group_exact=True,
+        )
+
+    report.assert_not_called()
+    logger.warning.assert_called_once_with("reporting_group_invalid", fields=["group_key"])
 
 
 def test_report_error_drops_invalid_closed_contract_values() -> None:
@@ -152,8 +205,20 @@ def test_optional_tags_omit_empty_values_and_shared_expected_marker() -> None:
     assert result == {"component": "api", "method": "GET"}
 
 
+def test_context_rejects_request_expanded_route_identity() -> None:
+    result = sanitize_context(
+        {
+            "path": "/roadmaps/r-123",
+            "template": "/roadmaps/{roadmap_id}:validate",
+            "operation": "roadmaps.get",
+        }
+    )
+
+    assert result == {"template": "/roadmaps/{roadmap_id}:validate"}
+
+
 def test_context_is_typed_and_records_truncation_metadata() -> None:
-    original = "秘密" * 10_000
+    original = "/" + "a" * 10_000
     unsafe_context = cast(
         "SafeContext",
         {
@@ -179,8 +244,8 @@ def test_context_is_typed_and_records_truncation_metadata() -> None:
 
 
 def test_context_keeps_budget_with_multiple_truncated_values() -> None:
-    path = "p" * 20_000
-    template = "t" * 20_000
+    path = "/" + "p" * 20_000
+    template = "/" + "t" * 20_000
 
     result = sanitize_context({"path": path, "template": template})
 

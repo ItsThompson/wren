@@ -123,7 +123,7 @@ def test_report_exception_applies_tags_context_and_limiter() -> None:
     scope.set_tag.assert_any_call("report_category", "unexpected")
     scope.set_tag.assert_any_call("service", "wren-api")
     scope.set_tag.assert_any_call("error_kind", "internal")
-    scope.set_context.assert_called_once_with("report", {"operation": "save"})
+    scope.set_context.assert_not_called()
     scope.set_user.assert_called_once_with({"id": "user-1"})
     capture.assert_called_once_with(exception)
 
@@ -138,6 +138,44 @@ def test_report_exception_rejects_unknown_taxonomy_values() -> None:
         )
 
     capture.assert_not_called()
+
+
+def test_report_exception_preserves_reporter_tags_and_scope_level() -> None:
+    scope = Mock()
+    scope_manager = Mock()
+    scope_manager.__enter__ = Mock(return_value=scope)
+    scope_manager.__exit__ = Mock(return_value=None)
+
+    with (
+        patch("wren_common.sentry.sentry_sdk.new_scope", return_value=scope_manager),
+        patch("wren_common.sentry.sentry_sdk.capture_exception", return_value="event-1"),
+    ):
+        result = sentry.report_exception(
+            RuntimeError("database unavailable"),
+            limiter=None,
+            tags={"component": "writer", "operation": "caller-value"},
+            reporter_tags={
+                "operation": "roadmaps.create",
+                "domain": "roadmaps",
+                "kind": "database",
+                "log_event": "unhandled_exception",
+                "level": "warning",
+            },
+            level="warning",
+            error_kind="database",
+        )
+
+    assert result == "event-1"
+    for key, value in {
+        "operation": "roadmaps.create",
+        "domain": "roadmaps",
+        "kind": "database",
+        "log_event": "unhandled_exception",
+        "level": "warning",
+    }.items():
+        scope.set_tag.assert_any_call(key, value)
+    scope.set_tag.assert_any_call("component", "writer")
+    scope.set_level.assert_called_once_with("warning")
 
 
 def test_report_exception_uses_explicit_bounded_error_kind() -> None:

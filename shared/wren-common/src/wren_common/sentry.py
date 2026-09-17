@@ -13,6 +13,7 @@ from wren_common.reporting_types import (
     BoundedTags,
     Kind,
     ReportCategory,
+    ReportLevel,
     SafeContext,
     sanitize_context,
     sanitize_tags,
@@ -26,6 +27,30 @@ _disabled_logged = False
 _disabled_services: set[str] = set()
 _REPORT_LIMITER = EventLimiter(limit=20, window_seconds=60)
 _REDACTED_EXCEPTION = "[Redacted exception]"
+_REPORTER_TAG_KEYS = frozenset({"operation", "domain", "kind", "log_event", "level"})
+
+
+def _sanitize_reporter_tags(value: dict[str, str] | None) -> dict[str, str]:
+    if not value:
+        return {}
+    return {
+        key: item
+        for key, item in value.items()
+        if key in _REPORTER_TAG_KEYS and type(item) is str and item
+    }
+
+
+def _normalize_level(value: ReportLevel | str | None) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, ReportLevel):
+        return value.value
+    if type(value) is not str:
+        return None
+    try:
+        return ReportLevel(value).value
+    except ValueError:
+        return None
 
 
 def _scrub_event(event: Event, _hint: dict[str, Any]) -> Event:
@@ -129,6 +154,8 @@ def report_exception(
     fingerprint: list[str] | None = None,
     user_id: str | None = None,
     error_kind: Kind | str | None = None,
+    reporter_tags: dict[str, str] | None = None,
+    level: ReportLevel | str | None = None,
 ) -> str | None:
     """Capture one unexpected exception and return its Sentry event id.
 
@@ -154,6 +181,8 @@ def report_exception(
         return None
 
     safe_tags = sanitize_tags(tags)
+    owned_tags = _sanitize_reporter_tags(reporter_tags)
+    safe_tags.update(owned_tags)
     safe_tags["report_category"] = resolved_category.value
     if error_kind is None:
         normalized_error_kind = Kind.INTERNAL.value
@@ -167,10 +196,17 @@ def report_exception(
     else:
         return None
     safe_tags["error_kind"] = normalized_error_kind
+    normalized_level = _normalize_level(
+        level if level is not None else owned_tags.get("level")
+    )
+    if level is not None and normalized_level is None:
+        return None
     safe_context = sanitize_context(context)
     with sentry_sdk.new_scope() as scope:
         for key, value in safe_tags.items():
             scope.set_tag(key, value)
+        if normalized_level is not None:
+            scope.set_level(cast("Any", normalized_level))
         if safe_context:
             scope.set_context("report", safe_context)
         if user_id:

@@ -212,6 +212,39 @@ def make_reporting_contract(
 create_reporting_contract = make_reporting_contract
 
 
+def _report_fingerprint(
+    contract: ReportingContract,
+    *,
+    group_key: GroupKey | str | None,
+    group_exact: bool,
+) -> list[str] | None:
+    """Build a bounded fingerprint without accepting request identity values."""
+    if group_key is None:
+        normalized_group = contract.operation
+    else:
+        normalized_group = _operation(group_key)
+        if not _OPERATION_RE.fullmatch(normalized_group):
+            return None
+
+    exact_group = (
+        contract.operation == "oauth.cleanup"
+        and normalized_group == f"oauth.cleanup.{contract.kind}"
+    ) or (
+        contract.domain == Domain.MCP.value
+        and normalized_group == f"mcp.{contract.kind}"
+    )
+    if group_exact is True and exact_group:
+        return [normalized_group]
+    if group_exact is True and normalized_group != contract.operation:
+        return None
+
+    # Backend adapters historically pass the operation as their group key. Treat
+    # that value as the default grouping and include the error kind.
+    if normalized_group == contract.operation:
+        return [contract.operation, contract.kind, "{{ default }}"]
+    return [normalized_group, "{{ default }}"]
+
+
 def report_error(
     exception: BaseException,
     *,
@@ -243,9 +276,15 @@ def report_error(
         log.warning("reporting_contract_invalid", fields=list(error.fields))
         return
 
-    normalized_group = _operation(group_key or contract.operation)
-    if not _OPERATION_RE.fullmatch(normalized_group):
-        normalized_group = contract.operation
+    fingerprint = _report_fingerprint(
+        contract,
+        group_key=group_key,
+        group_exact=group_exact,
+    )
+    if fingerprint is None:
+        log.warning("reporting_group_invalid", fields=["group_key"])
+        return
+
     tags = sanitize_tags(bounded_tags)
     tags.update(
         {
@@ -280,9 +319,11 @@ def report_error(
         limiter=None,
         tags=tags,
         context=context,
-        fingerprint=([normalized_group] if group_exact else [normalized_group, "{{ default }}"]),
+        fingerprint=fingerprint,
         user_id=user_id,
         error_kind=contract.kind,
+        reporter_tags=tags,
+        level=contract.level,
     )
 
 
