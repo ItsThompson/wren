@@ -52,6 +52,9 @@ export_required_secret_env() {
   export WREN_ALERTMANAGER_CONFIG="global: {}" WREN_CLOUDFLARED_INGRESS="tunnel: x"
   export WREN_PROMETHEUS_CONFIG="global: {}" WREN_PROMETHEUS_ALERTS="groups: []"
   export POSTGRES_PASSWORD="pw" SESSION_JWT_SECRET="s" INTERNAL_API_TOKEN="t"
+  export SENTRY_DSN_BACKEND="https://backend@example.ingest.sentry.io/1"
+  export SENTRY_DSN_MCP="https://mcp@example.ingest.sentry.io/2"
+  export SENTRY_RELEASE="cafef00d"
 }
 
 # --- pure helpers -----------------------------------------------------------
@@ -243,6 +246,9 @@ test_compose_deploy_overlay_feeds_app_env_from_env_prod_and_secrets() {
   # App secrets are passed through from the runner env (GitHub secrets).
   contains "${overlay}" 'SESSION_JWT_SECRET: ${SESSION_JWT_SECRET' || return 1
   contains "${overlay}" 'INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN' || return 1
+  contains "${overlay}" 'SENTRY_DSN_BACKEND: ${SENTRY_DSN_BACKEND' || return 1
+  contains "${overlay}" 'SENTRY_DSN_MCP: ${SENTRY_DSN_MCP' || return 1
+  contains "${overlay}" 'SENTRY_RELEASE: ${SENTRY_RELEASE' || return 1
   # The base file's env_file: .env is the local-dev source; .env.prod is layered
   # on top here for the deploy (base file itself is untouched).
   local base
@@ -365,6 +371,34 @@ test_api_ingress_blocks_observability_surface_before_backend() {
   grep -Fq 'oauth-protected-resource)$' "${cfg}" || { echo "mcp allow-list changed"; return 1; }
 }
 
+# --- deploy result contract --------------------------------------------------
+
+test_deploy_result_is_closed_and_only_startup_health_can_roll_back() {
+  source "${DEPLOY}"
+  local file phase expected actual
+  file="${TMPDIR:-/tmp}/wren-deploy-result.$$.${RANDOM}.json"
+  for phase in preflight pull migration post_health unknown; do
+    DEPLOY_RESULT_FILE="${file}"
+    DEPLOY_PHASE="${phase}"
+    write_deploy_result 1
+    actual="$(jq -r '.rollback_eligible' "${file}")"
+    equals "${actual}" "false" || { rm -f "${file}"; return 1; }
+  done
+  for phase in startup health_gate; do
+    DEPLOY_RESULT_FILE="${file}"
+    DEPLOY_PHASE="${phase}"
+    write_deploy_result 1
+    actual="$(jq -r '.rollback_eligible' "${file}")"
+    equals "${actual}" "true" || { rm -f "${file}"; return 1; }
+  done
+  DEPLOY_PHASE=health_gate
+  write_deploy_result 0
+  equals "$(jq -r '.status' "${file}")" "success" || { rm -f "${file}"; return 1; }
+  equals "$(jq -r '.phase' "${file}")" "complete" || { rm -f "${file}"; return 1; }
+  equals "$(jq -r '.rollback_eligible' "${file}")" "false" || { rm -f "${file}"; return 1; }
+  rm -f "${file}"
+}
+
 # --- run all ----------------------------------------------------------------
 
 main_tests() {
@@ -386,6 +420,7 @@ main_tests() {
   run_test test_read_deployed_sha_returns_prev_and_refuses_on_empty
   run_test test_failed_gate_no_internal_redeploy
   run_test test_failed_gate_nonzero_exit_and_no_deployed_sha_write
+  run_test test_deploy_result_is_closed_and_only_startup_health_can_roll_back
   run_test test_api_ingress_blocks_observability_surface_before_backend
 
   echo "-----------------------------------------------------------------------"

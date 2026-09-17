@@ -33,7 +33,30 @@ ARG VITE_API_BASE_URL=""
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 ARG VITE_MCP_BASE_URL=""
 ENV VITE_MCP_BASE_URL=$VITE_MCP_BASE_URL
-RUN cd frontend && npm run build
+ARG VITE_SENTRY_DSN=""
+ARG VITE_SENTRY_RELEASE=""
+ARG SENTRY_ORG=""
+ARG SENTRY_PROJECT_FRONTEND=""
+ARG SENTRY_UPLOAD_RUN_ID=""
+ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN \
+    VITE_SENTRY_RELEASE=$VITE_SENTRY_RELEASE
+RUN --mount=type=secret,id=sentry_auth_token,required=false \
+    set -eu; \
+    cd frontend; \
+    npm run build; \
+    printf 'Sentry source-map upload run: %s\\n' "${SENTRY_UPLOAD_RUN_ID}"; \
+    if [ -s /run/secrets/sentry_auth_token ] && [ -n "${SENTRY_ORG}" ] && \
+       [ -n "${SENTRY_PROJECT_FRONTEND}" ] && [ -n "${VITE_SENTRY_RELEASE}" ]; then \
+      export SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token)"; \
+      ./node_modules/.bin/sentry-cli sourcemaps inject dist; \
+      ./node_modules/.bin/sentry-cli sourcemaps upload dist \
+        --org "${SENTRY_ORG}" \
+        --project "${SENTRY_PROJECT_FRONTEND}" \
+        --release "${VITE_SENTRY_RELEASE}"; \
+    else \
+      echo 'Sentry source-map upload disabled: credentials or release arguments absent'; \
+    fi; \
+    find dist -type f -name '*.map' -delete
 
 # ---------------------------------------------------------------------------
 FROM nginx:1.27-alpine AS runtime

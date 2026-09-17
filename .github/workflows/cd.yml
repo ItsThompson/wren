@@ -67,12 +67,59 @@ jobs:
           echo "${matrix}" | jq -r '.[].service'
 
   # ---------------------------------------------------------------------------
+  # prepare-sentry-releases: converge the exact release/project associations
+  # before any image build can upload browser source maps. This job is safe to
+  # rerun after a failed deploy or after a release was finalized.
+  # ---------------------------------------------------------------------------
+  prepare-sentry-releases:
+    needs: [discover]
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SENTRY_ORG: t-industries
+      SENTRY_PROJECT_BACKEND: wren-backend
+      SENTRY_PROJECT_MCP: wren-mcp
+      SENTRY_PROJECT_FRONTEND: wren-frontend
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install pinned Sentry CLI
+        working-directory: frontend
+        run: npm ci
+
+      - name: Verify pinned Sentry CLI and prepare releases
+        env:
+          SENTRY_CLI_BIN: ${{ github.workspace }}/frontend/node_modules/.bin/sentry-cli
+        run: |
+          set -euo pipefail
+          : "${SENTRY_AUTH_TOKEN:?SENTRY_AUTH_TOKEN is required}"
+          expected="$(node -p "require('./frontend/package-lock.json').packages['node_modules/@sentry/cli'].version")"
+          actual="$(${SENTRY_CLI_BIN} --version | awk '{print $NF}')"
+          [[ "${actual}" == "${expected}" ]] || {
+            echo "Sentry CLI version mismatch: expected ${expected}, got ${actual}"
+            exit 1
+          }
+          ./scripts/sentry-release.sh prepare "${DEPLOY_SHA}"
+
+  # ---------------------------------------------------------------------------
   # build-and-push: build each first-party image with Buildx and push two tags to
   # GHCR: :latest (what deploy.sh pulls) and :sha-<DEPLOY_SHA> (immutable, what a
   # rollback re-pulls). GHA layer cache keeps rebuilds cheap.
   # ---------------------------------------------------------------------------
   build-and-push:
-    needs: [discover]
+    needs: [discover, prepare-sentry-releases]
     if: >-
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
@@ -105,6 +152,11 @@ jobs:
             echo 'value<<EOF'
             echo "VITE_API_BASE_URL=${PUBLIC_BASE_URL:?PUBLIC_BASE_URL is required}"
             echo "VITE_MCP_BASE_URL=${MCP_PUBLIC_URL:?MCP_PUBLIC_URL is required}"
+            echo "VITE_SENTRY_DSN=${VITE_SENTRY_DSN:-}"
+            echo "VITE_SENTRY_RELEASE=wren-web@${DEPLOY_SHA}"
+            echo 'SENTRY_ORG=t-industries'
+            echo 'SENTRY_PROJECT_FRONTEND=wren-frontend'
+            echo "SENTRY_UPLOAD_RUN_ID=${{ github.run_id }}-${{ github.run_attempt }}"
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
 
@@ -128,6 +180,8 @@ jobs:
             ghcr.io/${{ steps.owner.outputs.owner }}/wren/${{ matrix.service }}:latest
             ghcr.io/${{ steps.owner.outputs.owner }}/wren/${{ matrix.service }}:sha-${{ env.DEPLOY_SHA }}
           build-args: ${{ steps.frontend-build-args.outputs.value }}
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -172,10 +226,15 @@ jobs:
       # deploy.sh's first compose call (the migration `run` materializes
       # configs/secrets exactly like `up`). Secrets are kept OUT of $GITHUB_ENV.
       - name: Deploy over the Docker Context
+        id: deploy-application
         env:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           SESSION_JWT_SECRET: ${{ secrets.SESSION_JWT_SECRET }}
           INTERNAL_API_TOKEN: ${{ secrets.INTERNAL_API_TOKEN }}
+          SENTRY_DSN_BACKEND: ${{ secrets.SENTRY_DSN_BACKEND }}
+          SENTRY_DSN_MCP: ${{ secrets.SENTRY_DSN_MCP }}
+          SENTRY_RELEASE: ${{ env.DEPLOY_SHA }}
+          DEPLOY_RESULT_FILE: ${{ runner.temp }}/wren-deploy-result.json
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           WREN_OAUTH_PRIVATE_KEY: ${{ secrets.WREN_OAUTH_PRIVATE_KEY }}
           WREN_CLOUDFLARED_CREDENTIALS: ${{ secrets.WREN_CLOUDFLARED_CREDENTIALS }}
@@ -193,7 +252,45 @@ jobs:
           WREN_CLOUDFLARED_INGRESS="$(envsubst '$CF_TUNNEL_ID $CF_APP_HOSTNAME $CF_API_HOSTNAME $CF_MCP_HOSTNAME $CF_DOCS_HOSTNAME' < deployments/cloudflare/config.yml)"
           WREN_ALERTMANAGER_CONFIG="$(envsubst '$DISCORD_WEBHOOK_URL' < deployments/alertmanager/alertmanager.yml)"
           set +a
+          set +e
           ./scripts/deploy.sh "${DEPLOY_SERVER_IP}"
+          deploy_rc=$?
+          set -e
+          validation_rc="${deploy_rc}"
+          [[ "${validation_rc}" -ne 0 ]] || validation_rc=1
+
+          result_file="${DEPLOY_RESULT_FILE}"
+          if [[ ! -s "${result_file}" ]]; then
+            echo 'deploy did not emit a result; rollback is disabled'
+            echo 'failed_phase=unknown' >> "$GITHUB_OUTPUT"
+            echo 'rollback_eligible=false' >> "$GITHUB_OUTPUT"
+            exit "${validation_rc}"
+          fi
+          if ! jq -e '
+            (.status == "success" or .status == "failed")
+            and (.phase | IN("preflight", "pull", "migration", "startup", "health_gate", "post_health", "complete"))
+            and (.rollback_eligible | type == "boolean")
+          ' "${result_file}" >/dev/null 2>&1; then
+            echo 'deploy emitted malformed result; rollback is disabled'
+            echo 'failed_phase=unknown' >> "$GITHUB_OUTPUT"
+            echo 'rollback_eligible=false' >> "$GITHUB_OUTPUT"
+            exit "${validation_rc}"
+          fi
+          phase="$(jq -r '.phase' "${result_file}")"
+          emitted="$(jq -r '.rollback_eligible' "${result_file}")"
+          expected='false'
+          if [[ "${deploy_rc}" -ne 0 && ("${phase}" == startup || "${phase}" == health_gate) ]]; then
+            expected='true'
+          fi
+          if [[ "${emitted}" != "${expected}" ]]; then
+            echo 'deploy emitted inconsistent rollback eligibility; rollback is disabled'
+            echo 'failed_phase=unknown' >> "$GITHUB_OUTPUT"
+            echo 'rollback_eligible=false' >> "$GITHUB_OUTPUT"
+            exit "${validation_rc}"
+          fi
+          echo "failed_phase=${phase}" >> "$GITHUB_OUTPUT"
+          echo "rollback_eligible=${emitted}" >> "$GITHUB_OUTPUT"
+          exit "${deploy_rc}"
 
       # CI-owned rollback (design note 5.2). On any failure above, read the
       # previous .deployed-sha, check it out, re-export env FROM THAT checkout,
@@ -201,11 +298,15 @@ jobs:
       # previous SHA exists (first deploy) read-deployed-sha refuses and the job
       # fails; a failed rollback re-run also fails the job (human intervention).
       - name: Roll back to the previous SHA on failure
-        if: failure()
+        if: >-
+          failure() && steps.deploy-application.outcome == 'failure' &&
+          steps.deploy-application.outputs.rollback_eligible == 'true'
         env:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           SESSION_JWT_SECRET: ${{ secrets.SESSION_JWT_SECRET }}
           INTERNAL_API_TOKEN: ${{ secrets.INTERNAL_API_TOKEN }}
+          SENTRY_DSN_BACKEND: ${{ secrets.SENTRY_DSN_BACKEND }}
+          SENTRY_DSN_MCP: ${{ secrets.SENTRY_DSN_MCP }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           WREN_OAUTH_PRIVATE_KEY: ${{ secrets.WREN_OAUTH_PRIVATE_KEY }}
           WREN_CLOUDFLARED_CREDENTIALS: ${{ secrets.WREN_CLOUDFLARED_CREDENTIALS }}
@@ -225,4 +326,49 @@ jobs:
           WREN_CLOUDFLARED_INGRESS="$(envsubst '$CF_TUNNEL_ID $CF_APP_HOSTNAME $CF_API_HOSTNAME $CF_MCP_HOSTNAME $CF_DOCS_HOSTNAME' < deployments/cloudflare/config.yml)"
           WREN_ALERTMANAGER_CONFIG="$(envsubst '$DISCORD_WEBHOOK_URL' < deployments/alertmanager/alertmanager.yml)"
           set +a
-          DEPLOY_SHA="${prev}" WREN_IMAGE_TAG="sha-${prev}" ./scripts/deploy.sh "${DEPLOY_SERVER_IP}"
+          DEPLOY_SHA="${prev}" SENTRY_RELEASE="${prev}" WREN_IMAGE_TAG="sha-${prev}" \
+            ./scripts/deploy.sh "${DEPLOY_SERVER_IP}"
+
+  # ---------------------------------------------------------------------------
+  # finalize-sentry-releases: finalization is observability bookkeeping only.
+  # It runs after a healthy application deploy and cannot trigger rollback.
+  # ---------------------------------------------------------------------------
+  finalize-sentry-releases:
+    needs: [deploy]
+    if: ${{ needs.deploy.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SENTRY_ORG: t-industries
+      SENTRY_PROJECT_BACKEND: wren-backend
+      SENTRY_PROJECT_MCP: wren-mcp
+      SENTRY_PROJECT_FRONTEND: wren-frontend
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install pinned Sentry CLI
+        working-directory: frontend
+        run: npm ci
+
+      - name: Verify pinned Sentry CLI and finalize releases
+        env:
+          SENTRY_CLI_BIN: ${{ github.workspace }}/frontend/node_modules/.bin/sentry-cli
+        run: |
+          set -euo pipefail
+          : "${SENTRY_AUTH_TOKEN:?SENTRY_AUTH_TOKEN is required}"
+          expected="$(node -p "require('./frontend/package-lock.json').packages['node_modules/@sentry/cli'].version")"
+          actual="$(${SENTRY_CLI_BIN} --version | awk '{print $NF}')"
+          [[ "${actual}" == "${expected}" ]] || {
+            echo "Sentry CLI version mismatch: expected ${expected}, got ${actual}"
+            exit 1
+          }
+          ./scripts/sentry-release.sh finalize "${DEPLOY_SHA}"

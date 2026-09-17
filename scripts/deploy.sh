@@ -28,6 +28,7 @@
 #   WREN_OAUTH_PRIVATE_KEY WREN_CLOUDFLARED_CREDENTIALS WREN_ALERTMANAGER_CONFIG
 #   WREN_CLOUDFLARED_INGRESS WREN_PROMETHEUS_CONFIG WREN_PROMETHEUS_ALERTS
 #   POSTGRES_PASSWORD SESSION_JWT_SECRET INTERNAL_API_TOKEN
+#   SENTRY_DSN_BACKEND SENTRY_DSN_MCP SENTRY_RELEASE
 #
 # Rollback is owned by CI (cd.yml): on a failed health gate this script exits
 # non-zero WITHOUT any internal re-deploy. cd.yml reads the previous SHA
@@ -55,6 +56,8 @@ COMPOSE_TUNNEL="${COMPOSE} --profile tunnels"
 
 SSH_OPTS=(-o ConnectTimeout=10 -o BatchMode=yes)
 DRY_RUN="${DRY_RUN:-0}"
+DEPLOY_RESULT_FILE="${DEPLOY_RESULT_FILE:-}"
+DEPLOY_PHASE="preflight"
 
 # Set by configure(); declared here for clarity.
 SERVER_IP=""
@@ -75,6 +78,9 @@ REQUIRED_SECRET_ENV=(
   POSTGRES_PASSWORD
   SESSION_JWT_SECRET
   INTERNAL_API_TOKEN
+  SENTRY_DSN_BACKEND
+  SENTRY_DSN_MCP
+  SENTRY_RELEASE
 )
 
 # --- Logging & execution helpers --------------------------------------------
@@ -84,6 +90,54 @@ REQUIRED_SECRET_ENV=(
 log() { printf '%s\n' "$*" >&2; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 is_dry_run() { [[ "${DRY_RUN}" == "1" ]]; }
+
+set_deploy_phase() {
+  DEPLOY_PHASE="$1"
+}
+
+write_deploy_result() {
+  local exit_code="$1" status="failed" eligible="false" tmp
+  [[ -n "${DEPLOY_RESULT_FILE}" ]] || return 0
+
+  if [[ "${exit_code}" -eq 0 ]]; then
+    status="success"
+    DEPLOY_PHASE="complete"
+  elif [[ "${DEPLOY_PHASE}" == "startup" || "${DEPLOY_PHASE}" == "health_gate" ]]; then
+    eligible="true"
+  fi
+
+  if ! mkdir -p "$(dirname "${DEPLOY_RESULT_FILE}")"; then
+    log "WARNING: cannot create deploy result directory; preserving exit status"
+    return 0
+  fi
+  umask 077
+  tmp="$(mktemp "${DEPLOY_RESULT_FILE}.tmp.XXXXXX")" || {
+    log "WARNING: cannot create deploy result file; preserving exit status"
+    return 0
+  }
+  if ! jq -n \
+    --arg status "${status}" \
+    --arg phase "${DEPLOY_PHASE}" \
+    --argjson rollback_eligible "${eligible}" \
+    '{status: $status, phase: $phase, rollback_eligible: $rollback_eligible}' \
+    > "${tmp}" 2>/dev/null; then
+    rm -f "${tmp}"
+    log "WARNING: cannot serialize deploy result; preserving exit status"
+    return 0
+  fi
+  if ! mv -f "${tmp}" "${DEPLOY_RESULT_FILE}"; then
+    rm -f "${tmp}"
+    log "WARNING: cannot publish deploy result; preserving exit status"
+  fi
+}
+
+on_deploy_exit() {
+  local exit_code="$?"
+  trap - EXIT
+  set +e
+  write_deploy_result "${exit_code}"
+  exit "${exit_code}"
+}
 
 # The ssh boundaries that remain: read/write /opt/wren/.deployed-sha (the
 # settled rollback key) and sync ops scripts to /opt/wren/scripts/. Everything
@@ -319,20 +373,30 @@ configure() {
 
 main() {
   set -euo pipefail
+  trap on_deploy_exit EXIT
+  set_deploy_phase preflight
   configure "$@"
   CURRENT_SHA="${DEPLOY_SHA:-$(git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null || echo "")}"
   log "=== Wren deploy -> context ${CONTEXT_NAME} (${SSH_TARGET}); dry-run=${DRY_RUN} ==="
 
   assert_secret_env_present
+
+  set_deploy_phase pull
   pull_images
+
+  set_deploy_phase migration
   run_migrations
+
+  set_deploy_phase startup
   start_stack
 
+  set_deploy_phase health_gate
   if ! health_gate; then
     log "!!! health gate FAILED: deploy.sh exits non-zero (CI owns rollback)"
     die "deploy failed the health gate on context ${CONTEXT_NAME}"
   fi
 
+  set_deploy_phase post_health
   sync_ops_scripts
   record_deploy
   log "=== Deploy complete: ${CURRENT_SHA:-unknown} on context ${CONTEXT_NAME} ==="
