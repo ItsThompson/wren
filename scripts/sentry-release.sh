@@ -13,7 +13,8 @@
 
 set -euo pipefail
 
-SENTRY_API_ROOT="${SENTRY_API_ROOT:-https://sentry.io/api/0}"
+SENTRY_API_ROOT="${SENTRY_API_ROOT:-${SENTRY_API_URL:-https://sentry.io/api/0}}"
+SENTRY_API_ROOT="${SENTRY_API_ROOT%/}"
 SENTRY_ORG="${SENTRY_ORG:-}"
 SENTRY_AUTH_TOKEN="${SENTRY_AUTH_TOKEN:-}"
 SENTRY_CLI_BIN="${SENTRY_CLI_BIN:-sentry-cli}"
