@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from wren.oauth.tokens import AccessTokenCodec
 
 _log = get_logger("wren-oauth-cleanup")
-_CLEANUP_REPORT_LIMITER = ReportLimiter(limit=1, window_seconds=60.0)
+_CLEANUP_REPORT_LIMITER = ReportLimiter(limit=1, window_seconds=3_600.0)
 
 # A one-shot reap: returns the number of stale clients deleted.
 Sweep = Callable[[], Awaitable[int]]
