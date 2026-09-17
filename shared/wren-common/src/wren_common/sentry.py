@@ -6,16 +6,16 @@ from typing import TYPE_CHECKING, Any
 
 import sentry_sdk
 
+from wren_common.limiter import EventLimiter
 from wren_common.logging import get_logger
 from wren_common.reporting import ReportCategory, category_value, classify_exception
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from wren_common.limiter import EventLimiter
-
 _initialized = False
 _disabled_logged = False
+_REPORT_LIMITER = EventLimiter(limit=20, window_seconds=60)
 
 
 def initialize_sentry(
@@ -57,7 +57,7 @@ def report_exception(
     exception: BaseException,
     *,
     category: ReportCategory | str | None = None,
-    limiter: EventLimiter | None = None,
+    limiter: EventLimiter | None = _REPORT_LIMITER,
     tags: Mapping[str, str] | None = None,
     context: Mapping[str, Any] | None = None,
     fingerprint: list[str] | None = None,
