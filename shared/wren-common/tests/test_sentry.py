@@ -52,6 +52,20 @@ def test_initialize_sentry_is_idempotent() -> None:
     )
 
 
+def test_initialize_sentry_prefixes_bare_deploy_sha_by_service() -> None:
+    with patch("wren_common.sentry.sentry_sdk.init") as init:
+        assert (
+            sentry.initialize_sentry(
+                dsn="https://public@example.ingest.sentry.io/1",
+                environment="production",
+                release="abc123",
+                service="wren-mcp",
+            )
+            is True
+        )
+    assert init.call_args.kwargs["release"] == "wren-mcp@abc123"
+
+
 def test_report_exception_skips_expected_category() -> None:
     with patch("wren_common.sentry.sentry_sdk.capture_exception") as capture:
         result = sentry.report_exception(ValueError("bad input"), category=ReportCategory.EXPECTED)

@@ -18,6 +18,19 @@ _disabled_logged = False
 _REPORT_LIMITER = EventLimiter(limit=20, window_seconds=60)
 
 
+def _release_name(release: str, service: str) -> str | None:
+    value = release.strip()
+    if not value:
+        return None
+    if "@" in value:
+        return value
+    if service in {"wren-external", "wren-internal"}:
+        return f"wren-backend@{value}"
+    if service == "wren-mcp":
+        return f"wren-mcp@{value}"
+    return value
+
+
 def initialize_sentry(
     *,
     dsn: str,
@@ -45,7 +58,7 @@ def initialize_sentry(
     sentry_sdk.init(
         dsn=dsn,
         environment=environment,
-        release=release or None,
+        release=_release_name(release, service),
         send_default_pii=False,
     )
     _initialized = True
