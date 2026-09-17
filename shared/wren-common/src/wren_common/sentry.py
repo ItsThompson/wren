@@ -8,13 +8,8 @@ import sentry_sdk
 
 from wren_common.limiter import EventLimiter
 from wren_common.logging import get_logger
-from wren_common.reporting import (
-    ReportCategory,
-    category_value,
-    classify_exception,
-    exception_kind,
-)
-from wren_common.reporting_types import sanitize_context, sanitize_tags
+from wren_common.reporting import ReportCategory, category_value, classify_exception
+from wren_common.reporting_types import Kind, sanitize_context, sanitize_tags
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -126,6 +121,7 @@ def report_exception(
     context: Mapping[str, Any] | None = None,
     fingerprint: list[str] | None = None,
     user_id: str | None = None,
+    error_kind: Kind | str | None = None,
 ) -> str | None:
     """Capture one unexpected exception and return its Sentry event id.
 
@@ -144,7 +140,11 @@ def report_exception(
 
     safe_tags = sanitize_tags(tags)
     safe_tags["report_category"] = category_value(resolved_category)
-    safe_tags["error_kind"] = exception_kind(exception)
+    try:
+        normalized_error_kind = Kind(error_kind or Kind.INTERNAL).value
+    except ValueError:
+        normalized_error_kind = Kind.INTERNAL.value
+    safe_tags["error_kind"] = normalized_error_kind
     safe_context = sanitize_context(context)
     with sentry_sdk.new_scope() as scope:
         for key, value in safe_tags.items():

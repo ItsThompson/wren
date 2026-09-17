@@ -31,7 +31,7 @@ ReportClass = ReportCategory
 
 
 def exception_kind(exception: BaseException) -> str:
-    """Return a bounded exception type name suitable for a Sentry tag."""
+    """Return a bounded exception type name for local diagnostics."""
     name = type(exception).__name__
     return name[:200] if name else "BaseException"
 
@@ -193,7 +193,7 @@ def report_error(
             "kind": contract.kind,
             "log_event": contract.log_event,
             "level": contract.level,
-            "error_kind": exception_kind(exception),
+            "error_kind": contract.kind,
         }
     )
     if contract.domain is not None:
@@ -222,6 +222,7 @@ def report_error(
         context=context,
         fingerprint=([normalized_group] if group_exact else [normalized_group, "{{ default }}"]),
         user_id=user_id,
+        error_kind=contract.kind,
     )
 
 

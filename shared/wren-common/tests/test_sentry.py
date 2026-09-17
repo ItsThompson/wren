@@ -119,6 +119,28 @@ def test_report_exception_applies_tags_context_and_limiter() -> None:
 
     scope.set_tag.assert_any_call("report_category", "unexpected")
     scope.set_tag.assert_any_call("service", "wren-api")
-    scope.set_tag.assert_any_call("error_kind", "RuntimeError")
+    scope.set_tag.assert_any_call("error_kind", "internal")
     scope.set_context.assert_called_once_with("report", {"operation": "save"})
     capture.assert_called_once_with(exception)
+
+
+def test_report_exception_uses_explicit_bounded_error_kind() -> None:
+    scope = Mock()
+    scope_manager = Mock()
+    scope_manager.__enter__ = Mock(return_value=scope)
+    scope_manager.__exit__ = Mock(return_value=None)
+
+    with (
+        patch("wren_common.sentry.sentry_sdk.new_scope", return_value=scope_manager),
+        patch("wren_common.sentry.sentry_sdk.capture_exception", return_value="event-1"),
+    ):
+        result = sentry.report_exception(
+            RuntimeError("database unavailable"),
+            limiter=None,
+            tags={"error_kind": "timeout"},
+            error_kind="database",
+        )
+
+    assert result == "event-1"
+    scope.set_tag.assert_any_call("error_kind", "database")
+    assert not any(call.args == ("error_kind", "timeout") for call in scope.set_tag.call_args_list)
