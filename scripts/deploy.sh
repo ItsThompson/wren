@@ -22,6 +22,7 @@
 #                        executing.
 #   WREN_DOCKER_CONTEXT  Docker context name (default `wren`); CI registers it.
 #   WREN_REMOTE_DIR      remote dir holding .deployed-sha and scripts/ (default /opt/wren).
+#   DEPLOY_RESULT_FILE   runner-local JSON result path; unset disables result output.
 #
 # Required config/secret env vars (asserted before ANY compose call, because the
 # migration `run` materializes configs/secrets exactly like `up`):
