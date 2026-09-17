@@ -5,11 +5,11 @@ description = "Shared Wren infrastructure (structured logging, HTTP metrics, hea
 requires-python = ">=3.12"
 # Upper-major caps are a safety net (the committed root uv.lock is the source of
 # truth; `uv sync --frozen` enforces it), matching the backend/mcp convention.
-# structlog (calver) is left uncapped so patches are never blocked. Only the four
-# libraries the three modules import at module scope are listed: health.py imports
-# fastapi.APIRouter + fastapi.responses.JSONResponse; metrics.py imports
-# starlette.responses.Response (arriving transitively via fastapi, matching the
-# backend/mcp convention of not listing starlette explicitly).
+# structlog (calver) is left uncapped so patches are never blocked. Only the
+# libraries imported at module scope are listed: health.py imports fastapi,
+# metrics.py imports starlette.responses.Response (arriving transitively via
+# fastapi), and sentry.py imports sentry-sdk. Starlette remains unlisted to match
+# the backend/mcp convention.
 dependencies = [
     "fastapi>=0.115.0,<1",
     "structlog>=24.4.0",
