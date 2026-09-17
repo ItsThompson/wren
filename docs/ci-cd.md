@@ -96,8 +96,11 @@ CD reads these from GitHub Actions repo secrets. It exports them into the deploy
 | `DISCORD_WEBHOOK_URL` | The webhook for alerts and signup notifications |
 | `WREN_OAUTH_PRIVATE_KEY` | The OAuth AS signing PEM (raw) |
 | `WREN_CLOUDFLARED_CREDENTIALS` | The tunnel credentials JSON (raw) |
+| `SENTRY_AUTH_TOKEN` | Organization CI token for release and source-map operations |
+| `SENTRY_DSN_BACKEND` | Private backend DSN |
+| `SENTRY_DSN_MCP` | Private MCP DSN |
 
-`GITHUB_TOKEN` is the built-in Actions token; CD uses it to push images to GHCR. See `docs/runbooks/bring-up.md` for the one-time steps that produce these values.
+`GITHUB_TOKEN` is the built-in Actions token; CD uses it to push images to GHCR. The public frontend DSN comes from `.env.prod` and is not a secret. See `docs/runbooks/bring-up.md` for the one-time steps that produce these values.
 
 ## Healthcheck workflow
 
