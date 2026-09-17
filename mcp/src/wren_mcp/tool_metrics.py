@@ -18,9 +18,11 @@ import functools
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+import structlog
 from prometheus_client import CollectorRegistry, Counter
 
 from wren_common.logging import get_logger
+from wren_mcp.reporting import report_mcp_error
 from wren_mcp.settings import SERVICE
 from wren_mcp.tool_errors import BackendToolError
 
@@ -59,6 +61,19 @@ def count_invocations[F: Callable[..., Awaitable[Any]]](fn: F) -> F:
             # Backend HTTP status/code are available only for backend-hop failures;
             # other exceptions log the tool + error_type with no backend fields.
             backend = exc if isinstance(exc, BackendToolError) else None
+            if backend is None:
+                user_id = structlog.contextvars.get_contextvars().get("user_id")
+                report_mcp_error(
+                    exc,
+                    operation_name=f"mcp.tool.{fn.__name__}",
+                    kind_name="tool",
+                    log_event_name="tool_failed",
+                    level_name="error",
+                    user_id=user_id if isinstance(user_id, str) else None,
+                    bounded_tags={"tool": fn.__name__},
+                    context_data={"status": getattr(exc, "status", None)},
+                    group_key=fn.__name__,
+                )
             _log.warning(
                 "tool_failed",
                 tool=fn.__name__,
