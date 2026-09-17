@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 import sqlalchemy.exc
+import structlog
 
 from wren.oauth import cleanup
 
@@ -91,3 +92,49 @@ async def test_cleanup_reports_once_when_sweeps_fail_repeatedly(
     assert limiter_calls == ["oauth.cleanup"] * attempts
     assert len(report_calls) == 1
     assert isinstance(report_calls[0], RuntimeError)
+
+
+async def test_cleanup_report_failure_does_not_stop_later_sweeps(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_failure = RuntimeError("reporting unavailable")
+    occurrence_failure = RuntimeError("database unavailable")
+    reached = asyncio.Event()
+    attempts = 0
+    limiter_calls: list[str] = []
+
+    class Limiter:
+        def allow(self, key: str) -> bool:
+            limiter_calls.append(key)
+            return True
+
+    async def sweep() -> int:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise occurrence_failure
+        reached.set()
+        return 0
+
+    def failing_report(_exception: BaseException) -> None:
+        raise report_failure
+
+    cap = structlog.testing.CapturingLogger()
+    monkeypatch.setattr(cleanup, "_CLEANUP_REPORT_LIMITER", Limiter())
+    monkeypatch.setattr(cleanup, "report_cleanup_failure", failing_report)
+    monkeypatch.setattr(cleanup, "_log", cap)
+
+    task = asyncio.create_task(cleanup.run_cleanup_loop(sweep, interval=timedelta(0)))
+    await asyncio.wait_for(reached.wait(), timeout=1)
+    await cleanup.stop_stale_client_cleanup(task)
+
+    assert attempts >= 2
+    assert limiter_calls == ["oauth.cleanup"]
+    error_calls = [call for call in cap.calls if call.method_name == "error"]
+    assert len(error_calls) == 1
+    assert error_calls[0].args == ("oauth_client_cleanup_failed",)
+    warning_calls = [call for call in cap.calls if call.method_name == "warning"]
+    assert len(warning_calls) == 1
+    assert warning_calls[0].args == ("oauth_client_cleanup_report_failed",)
+    assert warning_calls[0].kwargs["error_kind"] == "internal"
+    assert warning_calls[0].kwargs["exc_info"] is report_failure

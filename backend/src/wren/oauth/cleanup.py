@@ -93,7 +93,14 @@ async def run_cleanup_loop(sweep: Sweep, *, interval: timedelta) -> None:
             )
             limiter_key = "oauth.cleanup" if error_kind == "internal" else error_kind
             if limiter.allow(limiter_key):
-                report_cleanup_failure(exc)
+                try:
+                    report_cleanup_failure(exc)
+                except Exception as report_exc:  # noqa: BLE001 - reporting must not stop the reaper
+                    _log.warning(
+                        "oauth_client_cleanup_report_failed",
+                        error_kind=error_kind,
+                        exc_info=report_exc,
+                    )
         else:
             _log.info("oauth_client_cleanup_swept", deleted=deleted)
 
