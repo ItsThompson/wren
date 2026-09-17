@@ -3,21 +3,28 @@ import { describe, expect, it } from 'vitest'
 import { scrubSentryEvent } from './scrub'
 
 describe('scrubSentryEvent', () => {
-  it('removes credentials from request data and query strings', () => {
+  it('removes request-derived fields and exception payloads', () => {
     const event = scrubSentryEvent({
-      request: {
-        url: 'https://api.test/me?token=secret&safe=yes',
-        headers: { Authorization: 'Bearer secret', 'x-request-id': 'request-1' },
-        query_string: { token: 'secret', safe: 'yes' },
-        data: { password: 'secret', title: 'Roadmap' },
+      request: { url: 'https://api.test/me?token=secret' },
+      breadcrumbs: [{ message: 'secret request' }],
+      extra: { access_token: 'secret' },
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'secret exception',
+            mechanism: { type: 'generic', handled: false },
+            stacktrace: { frames: [{ filename: 'app.ts', vars: { secret: 'value' } }] },
+          },
+        ],
       },
-      extra: { access_token: 'secret', safe: 'yes' },
     })
 
-    expect(event.request?.url).toContain('token=%5BRedacted%5D')
-    expect(event.request?.headers).toEqual({ Authorization: '[Redacted]', 'x-request-id': 'request-1' })
-    expect(event.request?.query_string).toEqual({ token: '[Redacted]', safe: 'yes' })
-    expect(event.request?.data).toEqual({ password: '[Redacted]', title: 'Roadmap' })
-    expect(event.extra).toEqual({ access_token: '[Redacted]', safe: 'yes' })
+    expect(event.request).toBeUndefined()
+    expect(event.breadcrumbs).toBeUndefined()
+    expect(event.extra).toBeUndefined()
+    expect(event.exception?.values?.[0].value).toBe('[Redacted exception]')
+    expect(event.exception?.values?.[0].mechanism).toBeUndefined()
+    expect(event.exception?.values?.[0].stacktrace?.frames?.[0].vars).toBeUndefined()
   })
 })
