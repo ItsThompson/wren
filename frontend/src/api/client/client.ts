@@ -1,21 +1,35 @@
 import createClient, { type Client, type Middleware } from 'openapi-fetch'
 
-import { operationRegistry } from '../operationRegistry.generated'
+import { operationRegistry, type OperationId, type OperationKey } from '../operationRegistry.generated'
 import type { paths } from '../schema'
 import { reportApiFailure } from '@/observability/sentry'
 
 const AUTH_PREFIX = '/auth/'
 
-type RetryOnUnauthorized = () => Promise<boolean>
+export type RetryOnUnauthorized = () => Promise<boolean>
 
 export interface ApiClientOptions {
   credentials?: RequestCredentials
   retryOnUnauthorized?: RetryOnUnauthorized
 }
 
-function operationIdFor(method: string, schemaPath: string): string {
-  const key = `${method.toUpperCase()} ${schemaPath}` as keyof typeof operationRegistry
-  return operationRegistry[key] ?? key
+export function operationIdFor(method: string, schemaPath: string): OperationId {
+  const key = `${method.toUpperCase()} ${schemaPath}`
+  if (!Object.prototype.hasOwnProperty.call(operationRegistry, key)) {
+    throw new Error(`Unknown API operation: ${key}`)
+  }
+  return operationRegistry[key as OperationKey]
+}
+
+function reportResponseFailure(response: Response, operationId: OperationId, request: Request): void {
+  if (response.status < 500) return
+
+  reportApiFailure({
+    status: response.status,
+    operationId,
+    method: request.method,
+    url: request.url,
+  })
 }
 
 function createApiMiddleware(retryOnUnauthorized?: RetryOnUnauthorized): Middleware {
@@ -26,7 +40,9 @@ function createApiMiddleware(retryOnUnauthorized?: RetryOnUnauthorized): Middlew
         const refreshed = await retryOnUnauthorized()
         if (refreshed) {
           try {
-            return await options.fetch(request.clone())
+            const retriedResponse = await options.fetch(request.clone())
+            reportResponseFailure(retriedResponse, operationId, request)
+            return retriedResponse
           } catch (error) {
             reportApiFailure({
               error,
@@ -40,14 +56,7 @@ function createApiMiddleware(retryOnUnauthorized?: RetryOnUnauthorized): Middlew
         }
       }
 
-      if (response.status >= 500) {
-        reportApiFailure({
-          status: response.status,
-          operationId,
-          method: request.method,
-          url: request.url,
-        })
-      }
+      reportResponseFailure(response, operationId, request)
       return undefined
     },
     onError({ error, request, schemaPath }) {

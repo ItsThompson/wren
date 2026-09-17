@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const { init } = vi.hoisted(() => ({ init: vi.fn() }))
 vi.mock('@sentry/react', () => ({ init }))
 
-import { initSentry } from './init'
+import { beforeSendSentryEvent, initSentry } from './init'
 
 describe('initSentry', () => {
   beforeEach(() => {
@@ -31,8 +31,23 @@ describe('initSentry', () => {
         dsn: 'https://public@example.ingest.sentry.io/1',
         release: 'release-1',
         sendDefaultPii: false,
-        beforeSend: expect.any(Function),
+        defaultIntegrations: [],
+        integrations: [],
+        enableLogs: false,
+        maxBreadcrumbs: 0,
+        tracesSampleRate: 0,
+        replaysSessionSampleRate: 0,
+        replaysOnErrorSampleRate: 0,
+        beforeSend: beforeSendSentryEvent,
       }),
     )
+  })
+
+  it('drops expected events before they reach the transport', () => {
+    const expectedEvent = { tags: { expected: 'true' } }
+    const unexpectedEvent = { tags: { expected: 'false' } }
+
+    expect(beforeSendSentryEvent(expectedEvent)).toBeNull()
+    expect(beforeSendSentryEvent(unexpectedEvent)).toBe(unexpectedEvent)
   })
 })
