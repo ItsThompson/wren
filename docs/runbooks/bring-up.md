@@ -236,6 +236,8 @@ WREN_ALERTMANAGER_CONFIG="$(DISCORD_WEBHOOK_URL='<webhook>' envsubst '$DISCORD_W
 WREN_OAUTH_PRIVATE_KEY="$(cat oauth_private.pem)"
 WREN_CLOUDFLARED_CREDENTIALS="$(cat ~/.cloudflared/<UUID>.json)"
 POSTGRES_PASSWORD='<hex>'; SESSION_JWT_SECRET='<gen>'; INTERNAL_API_TOKEN='<gen>'
+SENTRY_DSN_BACKEND='<backend DSN>'; SENTRY_DSN_MCP='<MCP DSN>'
+SENTRY_RELEASE="$(git rev-parse HEAD)"
 set +a
 
 DRY_RUN=1 DEPLOY_SHA=$(git rev-parse HEAD) ./scripts/deploy.sh <vps-ip> deploy   # preview
