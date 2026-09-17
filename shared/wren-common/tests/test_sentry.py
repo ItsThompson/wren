@@ -10,6 +10,7 @@ from wren_common.reporting import ReportCategory
 def setup_function() -> None:
     sentry._initialized = False
     sentry._disabled_logged = False
+    sentry._disabled_services.clear()
 
 
 def test_initialize_sentry_skips_blank_dsn() -> None:

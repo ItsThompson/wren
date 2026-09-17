@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 _initialized = False
 _disabled_logged = False
+_disabled_services: set[str] = set()
 _REPORT_LIMITER = EventLimiter(limit=20, window_seconds=60)
 _REDACTED_EXCEPTION = "[Redacted exception]"
 
@@ -80,8 +81,9 @@ def initialize_sentry(
     if _initialized:
         return False
     if not dsn.strip():
-        if not _disabled_logged:
+        if service not in _disabled_services:
             log.info("sentry_disabled", reason="dsn_not_configured")
+            _disabled_services.add(service)
             _disabled_logged = True
         return False
 
