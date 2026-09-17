@@ -5,6 +5,7 @@ catch-all 500 handler and its single structured fault log."""
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import pytest
 import structlog
@@ -25,8 +26,16 @@ from wren.core.errors import (
     build_exception_handlers,
 )
 from wren.core.settings import AppSettings
-from wren.oauth.errors import build_oauth_exception_handlers
+from wren.oauth.errors import (
+    OAuthError,
+    OAuthErrorCode,
+    build_oauth_exception_handlers,
+)
 from wren_common.logging import _build_processors
+
+if TYPE_CHECKING:
+    from starlette.requests import Request
+
 
 MakeSettings = Callable[..., AppSettings]
 MakeHandlers = Callable[[], dict[ExceptionKey, ExceptionHandler]]
@@ -108,6 +117,16 @@ def _boom_router() -> APIRouter:
     return router
 
 
+def _oauth_error_router(*, status: int, error: OAuthErrorCode) -> APIRouter:
+    router = APIRouter()
+
+    @router.get("/oauth-error")
+    async def oauth_error() -> None:
+        raise OAuthError(error, "protocol failure", status=status)
+
+    return router
+
+
 @pytest.mark.parametrize(
     ("path", "status", "code"),
     [
@@ -171,6 +190,59 @@ def test_request_validation_error_uses_the_same_field_map_shape() -> None:
 
 
 # --- catch-all 500 handler ---------------------------------------------
+
+
+def test_oauth_server_error_uses_shared_backend_failure_reporting(
+    make_settings: MakeSettings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[tuple[Request, BaseException]] = []
+
+    def report_backend_failure(request: Request, exception: BaseException) -> None:
+        calls.append((request, exception))
+
+    monkeypatch.setattr("wren.oauth.errors.report_backend_failure", report_backend_failure)
+    app = create_app(
+        make_settings(),
+        routers=[_oauth_error_router(status=500, error=OAuthErrorCode.SERVER_ERROR)],
+        exception_handlers={**build_exception_handlers(), **build_oauth_exception_handlers()},
+    )
+
+    response = TestClient(app, raise_server_exceptions=False).get("/oauth-error")
+
+    assert response.status_code == 500
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
+    assert response.json() == {
+        "error": "server_error",
+        "error_description": "protocol failure",
+    }
+    assert len(calls) == 1
+    assert calls[0][0].url.path == "/oauth-error"
+    assert isinstance(calls[0][1], OAuthError)
+
+
+def test_oauth_client_error_keeps_rfc_response_without_backend_reporting(
+    make_settings: MakeSettings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[tuple[Request, BaseException]] = []
+    monkeypatch.setattr(
+        "wren.oauth.errors.report_backend_failure",
+        lambda request, exception: calls.append((request, exception)),
+    )
+    app = create_app(
+        make_settings(),
+        routers=[_oauth_error_router(status=400, error=OAuthErrorCode.INVALID_REQUEST)],
+        exception_handlers={**build_exception_handlers(), **build_oauth_exception_handlers()},
+    )
+
+    response = TestClient(app, raise_server_exceptions=False).get("/oauth-error")
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "error": "invalid_request",
+        "error_description": "protocol failure",
+    }
+    assert calls == []
 
 
 @pytest.mark.parametrize("make_handlers", _HANDLER_MAPS)

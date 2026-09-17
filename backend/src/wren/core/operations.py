@@ -129,7 +129,7 @@ def _report(
     log_event_name: str,
     level_name: str,
     user_id: str | None,
-    context_data: dict[str, object],
+    context_data: dict[str, str | bool | int | float | None],
     bounded_tags: dict[str, str],
     group_key: str | None,
     logger: object | None = None,
@@ -171,7 +171,7 @@ def report_backend_failure(
     if safe_template == "http.500":
         safe_template = operation_name
     error_kind = _error_kind(exception)
-    context: dict[str, object] = {
+    context: dict[str, str | bool | int | float | None] = {
         "method": request.method,
         "path": safe_template,
         "template": safe_template,
@@ -195,39 +195,6 @@ def report_backend_failure(
         context_data=context,
         group_key=operation_name,
         logger=logger,
-    )
-
-
-def report_oauth_failure(request: Request, exception: BaseException) -> None:
-    """Report protocol errors while preserving the OAuth response contract."""
-    operation_name = operation_for_request(request)
-    status = getattr(exception, "status", 500)
-    if not isinstance(status, int) or status < 500:
-        return
-    error_kind = _error_kind(exception)
-    _report(
-        exception,
-        operation_name=operation_name,
-        domain_name="oauth",
-        kind_name=error_kind.value,
-        log_event_name="oauth_error",
-        level_name="error" if isinstance(status, int) and status >= 500 else "info",
-        user_id=(
-            user_id
-            if isinstance(user_id := structlog.contextvars.get_contextvars().get("user_id"), str)
-            else None
-        ),
-        bounded_tags={
-            "operation": operation_name,
-            **({"error_kind": error_kind.value} if error_kind is not Kind.INTERNAL else {}),
-        },
-        context_data={
-            "method": request.method,
-            "template": _template_for_request(request),
-            "status": status,
-            **({"error_kind": error_kind.value} if error_kind is not Kind.INTERNAL else {}),
-        },
-        group_key=operation_name,
     )
 
 
@@ -259,5 +226,4 @@ __all__ = [
     "operation_for_request",
     "report_backend_failure",
     "report_cleanup_failure",
-    "report_oauth_failure",
 ]

@@ -54,7 +54,7 @@ CD deploys the whole stack to the single VPS over an SSH Docker Context. The Com
 | Phase | Action |
 |-------|--------|
 | `discover` | Parse the deployable Compose file and emit a build matrix of the first-party images. |
-| `prepare-sentry-releases` | Verify the pinned CLI and idempotently prepare `wren-backend@<sha>`, `wren-mcp@<sha>`, and `wren-web@<sha>` with their exact projects. |
+| `prepare-sentry-releases` | Verify the pinned CLI and idempotently prepare `wren-api@<sha>`, `wren-mcp@<sha>`, and `wren-web@<sha>` with their exact projects. |
 | `build-and-push` | Build each first-party image, upload frontend source maps in the builder when credentials are present, and push `:latest` plus `:sha-<sha>` to GHCR. |
 | `deploy` | Register the Docker Context, export config and secrets CLI-side, then run `scripts/deploy.sh`. |
 | `finalize-sentry-releases` | Finalize all three releases after a healthy deploy. This bookkeeping job cannot trigger application rollback. |

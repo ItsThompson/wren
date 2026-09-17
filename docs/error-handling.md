@@ -32,7 +32,7 @@ The three Sentry projects and release families are:
 
 | Project | Release |
 |---|---|
-| `wren-backend` | `wren-backend@<sha>` |
+| `wren-backend` | `wren-api@<sha>` |
 | `wren-mcp` | `wren-mcp@<sha>` |
 | `wren-frontend` | `wren-web@<sha>` |
 

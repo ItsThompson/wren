@@ -55,7 +55,7 @@ The tunnel is the only ingress (zero inbound ports). CI renders `deployments/clo
 
 ## Sentry release and source-map gates
 
-CD prepares `wren-backend@<sha>`, `wren-mcp@<sha>`, and `wren-web@<sha>` before the image matrix runs. The preparation helper inspects exact organization release state and project association, creates only missing releases, and is safe to rerun. Buildx uploads frontend maps with a per-attempt cache key, then deletes maps before the nginx runtime copy. Finalization runs in a separate job after a healthy deploy. A finalization failure cannot trigger application rollback.
+CD prepares `wren-api@<sha>`, `wren-mcp@<sha>`, and `wren-web@<sha>` before the image matrix runs. The preparation helper inspects exact organization release state and project association, creates only missing releases, and is safe to rerun. Buildx uploads frontend maps with a per-attempt cache key, then deletes maps before the nginx runtime copy. Finalization runs in a separate job after a healthy deploy. A finalization failure cannot trigger application rollback.
 
 Same-SHA reruns reuse existing releases and source maps. A rollback reuses the previous frontend image and release artifacts; it does not create, upload, or finalize releases.
 

@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 from starlette.responses import JSONResponse, Response
 
 from wren.core.errors import ExpectedError
-from wren.core.operations import report_oauth_failure
+from wren.core.operations import report_backend_failure
 
 if TYPE_CHECKING:
     from starlette.requests import Request
@@ -99,7 +99,8 @@ async def handle_oauth_error(request: Request, exc: Exception) -> Response:
     """Render an :class:`OAuthError` as RFC 6749 error JSON."""
     if not isinstance(exc, OAuthError):  # pragma: no cover - registered only for OAuthError
         raise exc
-    report_oauth_failure(request, exc)
+    if exc.status >= 500:
+        report_backend_failure(request, exc)
     return _render(exc)
 
 

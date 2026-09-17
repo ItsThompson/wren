@@ -56,7 +56,7 @@ Sentry uses three projects with organization-unique releases. Backend and MCP re
 
 | Project | Release family | Runtime environment |
 |---|---|---|
-| `wren-backend` | `wren-backend@<sha>` | `production` |
+| `wren-backend` | `wren-api@<sha>` | `production` |
 | `wren-mcp` | `wren-mcp@<sha>` | `production` |
 | `wren-frontend` | `wren-web@<sha>` | `production` |
 

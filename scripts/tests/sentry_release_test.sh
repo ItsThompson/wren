@@ -55,18 +55,18 @@ setup_state() {
 
 test_release_names_are_exact_and_sha_is_not_prefixed_twice() {
   setup_state
-  equals "$(release_name backend abc123)" "wren-backend@abc123" || return 1
+  equals "$(release_name api abc123)" "wren-api@abc123" || return 1
   equals "$(release_name mcp abc123)" "wren-mcp@abc123" || return 1
   equals "$(release_name web abc123)" "wren-web@abc123" || return 1
   for_each_release prepare abc123
-  grep -Fq 'wren-backend@abc123|wren-backend|' "${STATE_FILE}" || return 1
+  grep -Fq 'wren-api@abc123|wren-backend|' "${STATE_FILE}" || return 1
   grep -Fq 'wren-mcp@abc123|wren-mcp|' "${STATE_FILE}" || return 1
   grep -Fq 'wren-web@abc123|wren-frontend|' "${STATE_FILE}" || return 1
 }
 
 test_prepare_is_idempotent_and_only_creates_missing_release() {
   setup_state
-  printf '%s\n' 'wren-backend@abc123|wren-backend|false' 'wren-mcp@abc123|wren-mcp|false' > "${STATE_FILE}"
+  printf '%s\n' 'wren-api@abc123|wren-backend|false' 'wren-mcp@abc123|wren-mcp|false' > "${STATE_FILE}"
   for_each_release prepare abc123
   equals "${CLI_CALLS}" "1" || return 1
   grep -Fq 'wren-web@abc123|wren-frontend|' "${STATE_FILE}" || return 1
@@ -83,25 +83,25 @@ test_create_failure_is_accepted_only_when_postcondition_exists() {
   }
   # A failed CLI with no exact release remains a hard failure.
   local output rc
-  output="$(ensure_prepared wren-backend@abc123 wren-backend 2>&1)"
+  output="$(ensure_prepared wren-api@abc123 wren-backend 2>&1)"
   rc=$?
   [[ ${rc} -ne 0 ]] || return 1
   contains "${output}" "release creation did not produce" || return 1
 
   # A lost create response is safe when the API now shows the exact release.
-  printf '%s\n' 'wren-backend@abc123|wren-backend|false' >> "${STATE_FILE}"
-  ensure_prepared wren-backend@abc123 wren-backend
+  printf '%s\n' 'wren-api@abc123|wren-backend|false' >> "${STATE_FILE}"
+  ensure_prepared wren-api@abc123 wren-backend
 }
 
 test_wrong_project_is_rejected_without_leaking_token() {
   setup_state
-  printf '%s\n' 'wren-backend@abc123|another-project|false' > "${STATE_FILE}"
+  printf '%s\n' 'wren-api@abc123|another-project|false' > "${STATE_FILE}"
   inspect_release() {
     grep -Fq "${1}|" "${STATE_FILE}" && return 1
     return 10
   }
   local output rc
-  output="$(ensure_prepared wren-backend@abc123 wren-backend 2>&1)"
+  output="$(ensure_prepared wren-api@abc123 wren-backend 2>&1)"
   rc=$?
   [[ ${rc} -ne 0 ]] || return 1
   contains "${output}" "cannot inspect release before preparation" || return 1
@@ -110,17 +110,17 @@ test_wrong_project_is_rejected_without_leaking_token() {
 
 test_finalize_is_idempotent_and_preserves_finalized_release() {
   setup_state
-  printf '%s\n' 'wren-backend@abc123|wren-backend|false' > "${STATE_FILE}"
-  ensure_finalized wren-backend@abc123 wren-backend
+  printf '%s\n' 'wren-api@abc123|wren-backend|false' > "${STATE_FILE}"
+  ensure_finalized wren-api@abc123 wren-backend
   equals "${CLI_CALLS}" "1" || return 1
-  ensure_finalized wren-backend@abc123 wren-backend
+  ensure_finalized wren-api@abc123 wren-backend
   equals "${CLI_CALLS}" "1" || return 1
 }
 
 test_finalize_requires_existing_release() {
   setup_state
   local output rc
-  output="$(ensure_finalized wren-backend@abc123 wren-backend 2>&1)"
+  output="$(ensure_finalized wren-api@abc123 wren-backend 2>&1)"
   rc=$?
   [[ ${rc} -ne 0 ]] || return 1
   contains "${output}" "cannot finalize an absent" || return 1

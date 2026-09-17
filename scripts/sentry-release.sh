@@ -158,7 +158,7 @@ for_each_release() {
       ensure_finalized "${release}" "${project}"
     fi
   done <<EOF
-backend|${SENTRY_PROJECT_BACKEND}
+api|${SENTRY_PROJECT_BACKEND}
 mcp|${SENTRY_PROJECT_MCP}
 web|${SENTRY_PROJECT_FRONTEND}
 EOF
