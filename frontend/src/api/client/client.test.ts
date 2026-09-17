@@ -63,6 +63,7 @@ describe('createApiClient', () => {
       status: 503,
       operationId: 'get_dashboard_me_dashboard_get',
       method: 'GET',
+      schemaPath: '/me/dashboard',
       url: 'https://api.test/me/dashboard',
     })
   })
@@ -85,6 +86,7 @@ describe('createApiClient', () => {
       status: null,
       operationId: 'get_dashboard_me_dashboard_get',
       method: 'GET',
+      schemaPath: '/me/dashboard',
       url: 'https://api.test/me/dashboard',
     })
     fetchMock.mockRestore()

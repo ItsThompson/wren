@@ -22,13 +22,19 @@ export function operationIdFor(method: string, schemaPath: string): OperationId 
   return operationRegistry[key as OperationKey]
 }
 
-function reportResponseFailure(response: Response, operationId: OperationId, request: Request): void {
+function reportResponseFailure(
+  response: Response,
+  operationId: OperationId,
+  schemaPath: string,
+  request: Request,
+): void {
   if (response.status < 500) return
 
   reportApiFailure({
     status: response.status,
     operationId,
     method: request.method,
+    schemaPath,
     url: request.url,
   })
 }
@@ -56,7 +62,7 @@ function createApiMiddleware(retryOnUnauthorized?: RetryOnUnauthorized): Middlew
         if (refreshed) {
           try {
             const retriedResponse = await options.fetch(retryRequest ?? request.clone())
-            reportResponseFailure(retriedResponse, operationId, request)
+            reportResponseFailure(retriedResponse, operationId, schemaPath, request)
             return retriedResponse
           } catch (error) {
             reportApiFailure({
@@ -64,6 +70,7 @@ function createApiMiddleware(retryOnUnauthorized?: RetryOnUnauthorized): Middlew
               status: null,
               operationId,
               method: request.method,
+              schemaPath,
               url: request.url,
             })
             throw error
@@ -71,7 +78,7 @@ function createApiMiddleware(retryOnUnauthorized?: RetryOnUnauthorized): Middlew
         }
       }
 
-      reportResponseFailure(response, operationId, request)
+      reportResponseFailure(response, operationId, schemaPath, request)
       return undefined
     },
     onError({ error, request, schemaPath }) {
@@ -86,6 +93,7 @@ function createApiMiddleware(retryOnUnauthorized?: RetryOnUnauthorized): Middlew
         status: null,
         operationId,
         method: request.method,
+        schemaPath,
         url: request.url,
       })
     },

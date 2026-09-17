@@ -39,6 +39,13 @@ describe('initSentry', () => {
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         beforeSend: beforeSendSentryEvent,
+        initialScope: {
+          tags: {
+            service: 'wren-web',
+            surface: 'web',
+            runtime: 'browser',
+          },
+        },
       }),
     )
   })

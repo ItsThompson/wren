@@ -43,3 +43,46 @@ export const operationRegistry = {
 
 export type OperationKey = keyof typeof operationRegistry
 export type OperationId = (typeof operationRegistry)[OperationKey]
+
+export const operationDomainRegistry = {
+  "DELETE /me/clients/{client_id}": "oauth",
+  "DELETE /roadmaps/{roadmap_id}": "roadmaps",
+  "GET /.well-known/oauth-authorization-server": "oauth",
+  "GET /authorize": "oauth",
+  "GET /authorize/context": "oauth",
+  "GET /jwks": "oauth",
+  "GET /me/clients": "oauth",
+  "GET /me/dashboard": "accounts",
+  "GET /roadmaps/{roadmap_id}": "roadmaps",
+  "GET /roadmaps/{roadmap_id}/next": "progress",
+  "GET /roadmaps/{roadmap_id}/nodes/{subsection_id}": "roadmaps",
+  "GET /roadmaps/{roadmap_id}/overview": "roadmaps",
+  "GET /roadmaps/{roadmap_id}/progress": "progress",
+  "GET /roadmaps/{roadmap_id}/search": "roadmaps",
+  "GET /roadmaps/{roadmap_id}/sections/{section_id}": "roadmaps",
+  "GET /skill": "skill",
+  "GET /users/{handle}": "accounts",
+  "PATCH /roadmaps/{roadmap_id}": "roadmaps",
+  "PATCH /roadmaps/{roadmap_id}/metadata": "roadmaps",
+  "POST /auth/login": "accounts",
+  "POST /auth/logout": "accounts",
+  "POST /auth/refresh": "accounts",
+  "POST /auth/register": "accounts",
+  "POST /authorize/decision": "oauth",
+  "POST /me/onboarding:complete": "accounts",
+  "POST /register": "oauth",
+  "POST /revoke": "oauth",
+  "POST /roadmaps": "roadmaps",
+  "POST /roadmaps/{roadmap_id}:archive": "roadmaps",
+  "POST /roadmaps/{roadmap_id}:fork": "roadmaps",
+  "POST /roadmaps/{roadmap_id}:publish": "roadmaps",
+  "POST /roadmaps/{roadmap_id}:validate": "roadmaps",
+  "POST /roadmaps/{roadmap_id}/follow": "progress",
+  "POST /roadmaps/{roadmap_id}/progress": "progress",
+  "POST /token": "oauth",
+  "PUT /roadmaps/{roadmap_id}": "roadmaps",
+  "PUT /roadmaps/{roadmap_id}/deadline": "progress",
+  "PUT /roadmaps/{roadmap_id}/published-visibility": "roadmaps"
+} as const satisfies Record<OperationKey, string>
+
+export type OperationDomain = (typeof operationDomainRegistry)[OperationKey]

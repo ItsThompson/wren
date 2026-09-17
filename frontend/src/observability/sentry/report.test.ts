@@ -34,6 +34,7 @@ describe('reportApiFailure', () => {
       status: 409,
       operationId: 'patch_roadmap_roadmaps__roadmap_id__patch',
       method: 'PATCH',
+      schemaPath: '/roadmaps/{roadmap_id}',
       url: 'https://api.test/roadmaps/one',
     })
 
@@ -49,11 +50,13 @@ describe('reportApiFailure', () => {
       status: 503,
       operationId: 'get_dashboard_me_dashboard_get',
       method: 'GET',
+      schemaPath: '/me/dashboard',
       url: 'https://api.test/me/dashboard',
     })
 
     expect(kind).toBe('upstream')
     expect(setTag).toHaveBeenCalledWith('api.operation', 'get_dashboard_me_dashboard_get')
+    expect(setTag).toHaveBeenCalledWith('api.domain', 'accounts')
     expect(setTag).toHaveBeenCalledWith('api.failure_kind', 'upstream')
     expect(setExtra).toHaveBeenCalledWith('api.status', 503)
     expect(setLevel).not.toHaveBeenCalled()
@@ -67,6 +70,7 @@ describe('reportApiFailure', () => {
       status: null,
       operationId: 'get_dashboard_me_dashboard_get',
       method: 'GET',
+      schemaPath: '/me/dashboard',
       url: 'https://api.test/me/dashboard',
     })
 
@@ -75,11 +79,44 @@ describe('reportApiFailure', () => {
     expect(captureException).toHaveBeenCalledWith(error)
   })
 
+  it('rejects a mismatched valid operation and method without changing the failure outcome', () => {
+    const kind = reportApiFailure({
+      status: 503,
+      operationId: 'get_dashboard_me_dashboard_get',
+      method: 'POST',
+      schemaPath: '/me/dashboard',
+      url: 'https://api.test/me/dashboard',
+    })
+
+    expect(kind).toBe('upstream')
+    expect(captureException).not.toHaveBeenCalled()
+    expect(console.warn).toHaveBeenCalledWith('reporting_contract_invalid', { fields: ['method'] })
+  })
+
+  it('rejects invalid domain and kind values without changing the failure outcome', () => {
+    const kind = reportApiFailure({
+      status: 503,
+      operationId: 'get_dashboard_me_dashboard_get',
+      method: 'GET',
+      schemaPath: '/me/dashboard',
+      url: 'https://api.test/me/dashboard',
+      domain: 'not-a-domain',
+      kind: 'not-a-kind',
+    })
+
+    expect(kind).toBe('upstream')
+    expect(captureException).not.toHaveBeenCalled()
+    expect(console.warn).toHaveBeenCalledWith('reporting_contract_invalid', {
+      fields: ['domain', 'kind'],
+    })
+  })
+
   it('skips invalid operation metadata without changing the failure outcome', () => {
     const kind = reportApiFailure({
       status: 500,
-      operationId: 'unknown_operation' as never,
+      operationId: 'unknown_operation',
       method: 'GET',
+      schemaPath: '/unknown',
       url: 'https://api.test/unknown',
     })
 
