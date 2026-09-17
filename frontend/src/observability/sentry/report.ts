@@ -4,7 +4,7 @@ import { operationRegistry, type OperationId } from '@/api/operationRegistry.gen
 
 import { classifyApiFailure, type ApiFailureKind } from './classify'
 
-const RENDER_OPERATION = 'render.app' as const
+export const RENDER_OPERATION = 'render.app' as const
 const KNOWN_OPERATIONS = new Set<string>([...Object.values(operationRegistry), RENDER_OPERATION])
 
 export type ReportingOperation = OperationId | typeof RENDER_OPERATION
@@ -27,12 +27,31 @@ function toError(value: unknown): Error {
   return new Error('API request failed')
 }
 
-export function reportApiFailure(report: ApiFailureReport): ApiFailureKind {
-  if (!isKnownReportingOperation(report.operationId)) {
-    throw new Error(`Unknown reporting operation: ${report.operationId}`)
+function invalidMetadataFields(report: ApiFailureReport): string[] {
+  const fields: string[] = []
+  if (!isKnownReportingOperation(report.operationId)) fields.push('operationId')
+  if (!/^[A-Z]+$/.test(report.method)) fields.push('method')
+  try {
+    new URL(report.url)
+  } catch {
+    fields.push('url')
   }
+  if (
+    report.status !== null &&
+    (!Number.isInteger(report.status) || report.status < 0 || report.status > 599)
+  ) {
+    fields.push('status')
+  }
+  return fields
+}
 
+export function reportApiFailure(report: ApiFailureReport): ApiFailureKind {
   const kind = classifyApiFailure(report)
+  const invalidFields = invalidMetadataFields(report)
+  if (invalidFields.length > 0) {
+    console.warn('reporting_contract_invalid', { fields: invalidFields })
+    return kind
+  }
   Sentry.withScope((scope) => {
     scope.setTag('api.operation', report.operationId)
     scope.setTag('api.method', report.method)

@@ -1,6 +1,6 @@
 export { classifyApiFailure, isReportableApiFailure } from './classify'
 export type { ApiFailureInput, ApiFailureKind } from './classify'
 export { beforeSendSentryEvent, initSentry } from './init'
-export { isKnownReportingOperation, reportApiFailure, reportException } from './report'
+export { isKnownReportingOperation, reportApiFailure, reportException, RENDER_OPERATION } from './report'
 export type { ApiFailureReport, ReportingOperation } from './report'
 export { scrubSentryEvent } from './scrub'

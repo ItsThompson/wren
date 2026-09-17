@@ -5,6 +5,7 @@ import type { paths } from '../schema'
 import { reportApiFailure } from '@/observability/sentry'
 
 const AUTH_PREFIX = '/auth/'
+const BODY_METHODS = new Set(['POST', 'PUT', 'PATCH'])
 
 export type RetryOnUnauthorized = () => Promise<boolean>
 
@@ -33,14 +34,28 @@ function reportResponseFailure(response: Response, operationId: OperationId, req
 }
 
 function createApiMiddleware(retryOnUnauthorized?: RetryOnUnauthorized): Middleware {
+  const replayableRequests = new WeakMap<Request, Request>()
+
   return {
+    onRequest({ request }) {
+      if (BODY_METHODS.has(request.method)) replayableRequests.set(request, request.clone())
+    },
     async onResponse({ request, response, schemaPath, options }) {
-      const operationId = operationIdFor(request.method, schemaPath)
+      let operationId: OperationId
+      try {
+        operationId = operationIdFor(request.method, schemaPath)
+      } catch {
+        replayableRequests.delete(request)
+        return undefined
+      }
+
+      const retryRequest = replayableRequests.get(request)
+      replayableRequests.delete(request)
       if (response.status === 401 && retryOnUnauthorized && !new URL(request.url).pathname.startsWith(AUTH_PREFIX)) {
         const refreshed = await retryOnUnauthorized()
         if (refreshed) {
           try {
-            const retriedResponse = await options.fetch(request.clone())
+            const retriedResponse = await options.fetch(retryRequest ?? request.clone())
             reportResponseFailure(retriedResponse, operationId, request)
             return retriedResponse
           } catch (error) {
@@ -60,10 +75,16 @@ function createApiMiddleware(retryOnUnauthorized?: RetryOnUnauthorized): Middlew
       return undefined
     },
     onError({ error, request, schemaPath }) {
+      let operationId: OperationId
+      try {
+        operationId = operationIdFor(request.method, schemaPath)
+      } catch {
+        return
+      }
       reportApiFailure({
         error,
         status: null,
-        operationId: operationIdFor(request.method, schemaPath),
+        operationId,
         method: request.method,
         url: request.url,
       })

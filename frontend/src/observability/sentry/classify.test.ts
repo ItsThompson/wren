@@ -9,8 +9,10 @@ describe('classifyApiFailure', () => {
     expect(isReportableApiFailure({ status: 404 })).toBe(false)
   })
 
-  it('reports server responses and network failures', () => {
-    expect(classifyApiFailure({ status: 503 })).toBe('server')
+  it('reports only valid 5xx responses and network failures', () => {
+    expect(classifyApiFailure({ status: 503 })).toBe('upstream')
+    expect(classifyApiFailure({ status: 600 })).toBe('expected')
+    expect(classifyApiFailure({ status: Number.NaN })).toBe('expected')
     expect(classifyApiFailure({ status: null, error: new Error('offline') })).toBe('network')
     expect(isReportableApiFailure({ status: 500 })).toBe(true)
   })

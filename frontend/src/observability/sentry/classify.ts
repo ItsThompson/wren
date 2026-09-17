@@ -1,4 +1,4 @@
-export type ApiFailureKind = 'expected' | 'server' | 'network'
+export type ApiFailureKind = 'expected' | 'upstream' | 'network'
 
 export interface ApiFailureInput {
   status: number | null
@@ -6,8 +6,9 @@ export interface ApiFailureInput {
 }
 
 export function classifyApiFailure({ status, error }: ApiFailureInput): ApiFailureKind {
-  if (status === null || error !== undefined && status === 0) return 'network'
-  if (status >= 500) return 'server'
+  if (status === null || (error !== undefined && status === 0)) return 'network'
+  if (!Number.isInteger(status) || status < 100 || status > 599) return 'expected'
+  if (status >= 500) return 'upstream'
   return 'expected'
 }
 

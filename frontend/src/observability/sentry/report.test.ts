@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { captureException, setTag, setExtra, setLevel } = vi.hoisted(() => ({
   captureException: vi.fn(),
@@ -22,6 +22,11 @@ import { reportApiFailure } from './report'
 describe('reportApiFailure', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   it('marks expected client failures for the beforeSend drop', () => {
@@ -47,9 +52,9 @@ describe('reportApiFailure', () => {
       url: 'https://api.test/me/dashboard',
     })
 
-    expect(kind).toBe('server')
+    expect(kind).toBe('upstream')
     expect(setTag).toHaveBeenCalledWith('api.operation', 'get_dashboard_me_dashboard_get')
-    expect(setTag).toHaveBeenCalledWith('api.failure_kind', 'server')
+    expect(setTag).toHaveBeenCalledWith('api.failure_kind', 'upstream')
     expect(setExtra).toHaveBeenCalledWith('api.status', 503)
     expect(setLevel).not.toHaveBeenCalled()
     expect(captureException).toHaveBeenCalledWith(error)
@@ -70,15 +75,16 @@ describe('reportApiFailure', () => {
     expect(captureException).toHaveBeenCalledWith(error)
   })
 
-  it('rejects operations outside the generated registry', () => {
-    expect(() =>
-      reportApiFailure({
-        status: 500,
-        operationId: 'unknown_operation' as never,
-        method: 'GET',
-        url: 'https://api.test/unknown',
-      }),
-    ).toThrow('Unknown reporting operation: unknown_operation')
+  it('skips invalid operation metadata without changing the failure outcome', () => {
+    const kind = reportApiFailure({
+      status: 500,
+      operationId: 'unknown_operation' as never,
+      method: 'GET',
+      url: 'https://api.test/unknown',
+    })
+
+    expect(kind).toBe('upstream')
     expect(captureException).not.toHaveBeenCalled()
+    expect(console.warn).toHaveBeenCalledWith('reporting_contract_invalid', { fields: ['operationId'] })
   })
 })

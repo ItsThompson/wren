@@ -90,6 +90,87 @@ describe('createApiClient', () => {
     fetchMock.mockRestore()
   })
 
+  it('replays a consumed POST body after refresh, including its identity field', async () => {
+    const body = { title: 'Retry create', proposed_id: 'post-retry-id', published_visibility: 'private' as const }
+    const receivedBodies: unknown[] = []
+    const receivedRequests: Request[] = []
+    let requestCount = 0
+    server.use(
+      http.post('*/roadmaps', async ({ request }) => {
+        receivedRequests.push(request)
+        receivedBodies.push(await request.json())
+        requestCount += 1
+        return requestCount === 1
+          ? new HttpResponse(null, { status: 401 })
+          : HttpResponse.json({}, { status: 201 })
+      }),
+    )
+
+    const client = createApiClient('https://api.test', { retryOnUnauthorized: async () => true })
+    const { response } = await client.POST('/roadmaps', { body })
+
+    expect(response.status).toBe(201)
+    expect(receivedBodies).toEqual([body, body])
+    expect(receivedRequests[0]).not.toBe(receivedRequests[1])
+  })
+
+  it('replays a consumed PUT body after refresh, including its identity field', async () => {
+    const body = { title: 'Retry replace', proposed_id: 'put-retry-id', published_visibility: 'private' as const }
+    const receivedBodies: unknown[] = []
+    const receivedRequests: Request[] = []
+    let requestCount = 0
+    server.use(
+      http.put('*/roadmaps/:roadmapId', async ({ request }) => {
+        receivedRequests.push(request)
+        receivedBodies.push(await request.json())
+        requestCount += 1
+        return requestCount === 1
+          ? new HttpResponse(null, { status: 401 })
+          : HttpResponse.json({}, { status: 200 })
+      }),
+    )
+
+    const client = createApiClient('https://api.test', { retryOnUnauthorized: async () => true })
+    const { response } = await client.PUT('/roadmaps/{roadmap_id}', {
+      params: { path: { roadmap_id: 'put-roadmap' }, header: { 'If-Match': 1 } },
+      body,
+    })
+
+    expect(response.status).toBe(200)
+    expect(receivedBodies).toEqual([body, body])
+    expect(receivedRequests[0]).not.toBe(receivedRequests[1])
+  })
+
+  it('replays a consumed PATCH body after refresh, including its identity field', async () => {
+    const body = {
+      operations: [{ op: 'set_suggested_path' as const, path: ['patch-retry-id'] }],
+    }
+    const receivedBodies: unknown[] = []
+    const receivedRequests: Request[] = []
+    let requestCount = 0
+    server.use(
+      http.patch('*/roadmaps/:roadmapId', async ({ request }) => {
+        receivedRequests.push(request)
+        receivedBodies.push(await request.json())
+        requestCount += 1
+        return requestCount === 1
+          ? new HttpResponse(null, { status: 401 })
+          : HttpResponse.json({}, { status: 200 })
+      }),
+    )
+
+    const client = createApiClient('https://api.test', { retryOnUnauthorized: async () => true })
+    const { response } = await client.PATCH('/roadmaps/{roadmap_id}', {
+      params: { path: { roadmap_id: 'patch-roadmap' }, header: { 'If-Match': 1 } },
+      body,
+    })
+
+    expect(response.status).toBe(200)
+    expect(receivedBodies).toEqual([body, body])
+    expect(receivedRequests[0]).not.toBe(receivedRequests[1])
+  })
+
+
   it('rejects operation keys that are missing from the generated registry', () => {
     expect(() => operationIdFor('GET', '/unknown')).toThrow('Unknown API operation: GET /unknown')
   })
