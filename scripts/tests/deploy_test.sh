@@ -267,6 +267,20 @@ test_cd_frontend_image_bakes_prod_api_and_mcp_origins() {
   contains "${workflow}" 'build-args: ${{ steps.frontend-build-args.outputs.value }}' || return 1
 }
 
+test_cd_rollback_is_phase_gated_and_legacy_safe() {
+  local workflow
+  workflow="$(cat "${REPO_DIR}/.github/workflows/cd.yml")"
+  contains "${workflow}" "id: deploy-application" || return 1
+  contains "${workflow}" "steps.deploy-application.outputs.rollback_eligible == 'true'" || return 1
+  contains "${workflow}" 'SENTRY_RELEASE="${prev}"' || return 1
+  contains "${workflow}" "prepare-sentry-releases" || return 1
+  contains "${workflow}" "finalize-sentry-releases" || return 1
+  # The rollback invocation must not require the newer result-file contract.
+  local rollback_block
+  rollback_block="$(printf '%s\n' "${workflow}" | sed -n '/name: Roll back to the previous SHA on failure/,$p')"
+  not_contains "${rollback_block}" 'DEPLOY_RESULT_FILE:' || return 1
+}
+
 # --- rollback target helper (CI owns rollback) ------------------------------
 
 test_read_deployed_sha_returns_prev_and_refuses_on_empty() {
@@ -417,6 +431,7 @@ main_tests() {
   run_test test_compose_base_declares_environment_sourced_prometheus_configs
   run_test test_compose_deploy_overlay_feeds_app_env_from_env_prod_and_secrets
   run_test test_cd_frontend_image_bakes_prod_api_and_mcp_origins
+  run_test test_cd_rollback_is_phase_gated_and_legacy_safe
   run_test test_read_deployed_sha_returns_prev_and_refuses_on_empty
   run_test test_failed_gate_no_internal_redeploy
   run_test test_failed_gate_nonzero_exit_and_no_deployed_sha_write
