@@ -25,6 +25,10 @@ coverage/
 .env.local
 .env.*.local
 e2e/.env.test
+# E2E trust, OAuth signing, and recorder material are generated locally/CI.
+e2e/ingress/certificates/*
+!e2e/ingress/certificates/.gitkeep
+e2e/keys/
 # .env.prod is intentionally COMMITTED (non-secret production config; the .env
 # rule above does not match it and .env.*.local needs a .local suffix). Secrets
 # stay in GitHub Actions, never here.
