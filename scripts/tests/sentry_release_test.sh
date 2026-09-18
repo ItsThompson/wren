@@ -45,7 +45,7 @@ setup_state() {
     CLI_CALLS=$((CLI_CALLS + 1))
     CLI_LAST_ARGS="$*"
     local release="${@: -1}" project
-    if [[ " $* " == *" releases finalize "* ]]; then
+    if [[ " $* " == *" finalize "* ]]; then
       sed "s#^${release}|#${release}|#" "${STATE_FILE}" | sed 's/|false$/|true/' > "${STATE_FILE}.tmp"
       mv "${STATE_FILE}.tmp" "${STATE_FILE}"
     else
@@ -81,6 +81,7 @@ test_release_names_are_exact_and_sha_is_not_prefixed_twice() {
   grep -Fq 'wren-api@abc123|wren-backend|' "${STATE_FILE}" || return 1
   grep -Fq 'wren-mcp@abc123|wren-mcp|' "${STATE_FILE}" || return 1
   grep -Fq 'wren-web@abc123|wren-frontend|' "${STATE_FILE}" || return 1
+  equals "${CLI_LAST_ARGS}" "releases --org t-industries new --project wren-frontend wren-web@abc123" || return 1
 }
 
 test_prepare_is_idempotent_and_only_creates_missing_release() {
@@ -132,7 +133,7 @@ test_finalize_is_idempotent_and_preserves_finalized_release() {
   printf '%s\n' 'wren-api@abc123|wren-backend|false' > "${STATE_FILE}"
   ensure_finalized wren-api@abc123 wren-backend
   equals "${CLI_CALLS}" "1" || return 1
-  contains "${CLI_LAST_ARGS}" "--project wren-backend releases finalize" || return 1
+  equals "${CLI_LAST_ARGS}" "releases --org t-industries --project wren-backend finalize wren-api@abc123" || return 1
   ensure_finalized wren-api@abc123 wren-backend
   equals "${CLI_CALLS}" "1" || return 1
 }
