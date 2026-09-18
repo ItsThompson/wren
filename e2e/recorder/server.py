@@ -9,7 +9,11 @@ from threading import Lock
 from urllib.parse import urlparse
 
 TOKEN = os.environ.get("RECORDER_CONTROL_TOKEN", "")
+MAX_ENVELOPE_BYTES = 1_048_576
+MAX_STORED_ENVELOPES = 100
+MAX_STORED_BYTES = 10 * 1_048_576
 ENVELOPES: list[bytes] = []
+STORED_BYTES = 0
 LOCK = Lock()
 
 
@@ -51,12 +55,22 @@ class RecorderHandler(BaseHTTPRequestHandler):
         except ValueError:
             self.respond(400, b"invalid content length\n", "text/plain")
             return
-        if length < 1 or length > 1_048_576:
+        if length < 1 or length > MAX_ENVELOPE_BYTES:
             self.respond(413, b"envelope too large\n", "text/plain")
             return
         body = self.rfile.read(length)
+        if len(body) != length:
+            self.respond(400, b"incomplete envelope\n", "text/plain")
+            return
         with LOCK:
+            global STORED_BYTES
+            while ENVELOPES and (
+                len(ENVELOPES) >= MAX_STORED_ENVELOPES
+                or STORED_BYTES + len(body) > MAX_STORED_BYTES
+            ):
+                STORED_BYTES -= len(ENVELOPES.pop(0))
             ENVELOPES.append(body)
+            STORED_BYTES += len(body)
         self.respond(200, b"{}", "application/json")
 
     def log_message(self, format: str, *args: object) -> None:

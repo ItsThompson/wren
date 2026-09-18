@@ -4,10 +4,12 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$root"
 python3 scripts/e2e/test_public_contracts.py >/dev/null
+python3 -m unittest discover -s e2e/recorder -p 'test_*.py' >/dev/null
 
 hosts="$(mktemp)"
 key_dir="$(mktemp -d)"
-trap 'rm -f "$hosts" "$hosts.wren-e2e.bak" /tmp/wren-e2e-compose.json; rm -rf "$key_dir"' EXIT
+trust_dir="$(mktemp -d)"
+trap 'rm -f "$hosts" "$hosts.wren-e2e.bak" /tmp/wren-e2e-compose.json /tmp/wren-e2e-tls-error.txt /tmp/wren-e2e-reset-error.txt /tmp/wren-e2e-config-error.txt; rm -rf "$key_dir" "$trust_dir"' EXIT
 printf '127.0.0.1 unrelated.test\n' > "$hosts"
 case "$(uname -s)" in
   Darwin) original_mode="$(stat -f '%Lp' "$hosts")" ;;
@@ -61,6 +63,26 @@ case "$(uname -s)" in
 esac
 test "$key_mode" = 644
 test "$token_mode" = 600
+
+if E2E_CERT_DIR="$trust_dir/setup" E2E_MKCERT_BIN=wren-missing-mkcert scripts/e2e/setup-certificates.sh > /tmp/wren-e2e-tls-error.txt 2>&1; then
+  printf 'certificate setup unexpectedly succeeded without mkcert\n' >&2
+  exit 1
+fi
+grep -q 'mkcert is required' /tmp/wren-e2e-tls-error.txt
+mkdir -p "$trust_dir/reset/caroot"
+printf 'not-a-certificate\n' > "$trust_dir/reset/caroot/rootCA.pem"
+if E2E_CERT_DIR="$trust_dir/reset" scripts/e2e/reset-certificates.sh > /tmp/wren-e2e-reset-error.txt 2>&1; then
+  printf 'certificate reset unexpectedly accepted malformed CA\n' >&2
+  exit 1
+fi
+grep -q 'not a valid certificate' /tmp/wren-e2e-reset-error.txt
+test -f "$trust_dir/reset/caroot/rootCA.pem"
+
+if FRONTEND_BASE_URL=http://app.wren.test node --experimental-strip-types --input-type=module -e "await import('./e2e/helpers/config.ts')" > /tmp/wren-e2e-config-error.txt 2>&1; then
+  printf 'config unexpectedly accepted an HTTP public URL\n' >&2
+  exit 1
+fi
+grep -q 'FRONTEND_BASE_URL must be the canonical HTTPS origin' /tmp/wren-e2e-config-error.txt
 
 RECORDER_CONTROL_TOKEN=test-token docker compose \
   -f docker-compose.yml -f e2e/docker-compose.e2e.yml config --format json > /tmp/wren-e2e-compose.json

@@ -2,13 +2,14 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CERT_DIR="${ROOT_DIR}/e2e/ingress/certificates"
+CERT_DIR="${E2E_CERT_DIR:-${ROOT_DIR}/e2e/ingress/certificates}"
 CAROOT="${CERT_DIR}/caroot"
 LEAF="${CERT_DIR}/wren-e2e.pem"
 KEY="${CERT_DIR}/wren-e2e-key.pem"
 CA="${CAROOT}/rootCA.pem"
 
-if ! command -v mkcert >/dev/null 2>&1; then
+MKCERT_BIN="${E2E_MKCERT_BIN:-mkcert}"
+if ! command -v "$MKCERT_BIN" >/dev/null 2>&1; then
   printf 'tls: mkcert is required. Install it with Homebrew (macOS) or apt (Ubuntu), then rerun setup.\n' >&2
   exit 1
 fi
@@ -24,8 +25,8 @@ esac
 
 mkdir -p "$CERT_DIR" "$CAROOT"
 chmod 700 "$CAROOT" "$CERT_DIR"
-CAROOT="$CAROOT" mkcert -install
-CAROOT="$CAROOT" mkcert \
+CAROOT="$CAROOT" "$MKCERT_BIN" -install
+CAROOT="$CAROOT" "$MKCERT_BIN" \
   -cert-file "$LEAF" \
   -key-file "$KEY" \
   app.wren.test api.wren.test mcp.wren.test
