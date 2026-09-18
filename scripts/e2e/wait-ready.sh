@@ -14,10 +14,36 @@ if [[ ! -r "$CA" ]]; then
   printf 'node-trust: Wren CA is missing: %s\n' "$CA" >&2
   exit 1
 fi
-if [[ "$APP_URL" != https://* || "$API_URL" != https://* || "$MCP_URL" != https://* ]]; then
-  printf 'hosts: readiness URLs must use HTTPS under the Wren E2E hosts\n' >&2
-  exit 1
-fi
+
+canonical_urls="$(python3 - "$APP_URL" "$API_URL" "$MCP_URL" <<'PY'
+import sys
+from urllib.parse import urlsplit
+
+expected_hosts = ("app.wren.test", "api.wren.test", "mcp.wren.test")
+canonical_urls = []
+for raw_url, expected_host in zip(sys.argv[1:], expected_hosts):
+    try:
+        parsed = urlsplit(raw_url)
+        port = parsed.port
+    except ValueError:
+        raise SystemExit(f"hosts: URL for {expected_host} has an invalid port")
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname != expected_host
+        or port is not None
+        or parsed.path not in ("", "/")
+        or parsed.query
+        or parsed.fragment
+        or parsed.username
+        or parsed.password
+    ):
+        raise SystemExit(f"hosts: URL must be the canonical HTTPS origin https://{expected_host}")
+    canonical_urls.append(f"https://{expected_host}")
+print(*canonical_urls)
+PY
+)"
+read -r APP_URL API_URL MCP_URL <<< "$canonical_urls"
+
 if [[ -z "$RECORDER_TOKEN" ]]; then
   printf 'recorder: RECORDER_CONTROL_TOKEN is required\n' >&2
   exit 1
