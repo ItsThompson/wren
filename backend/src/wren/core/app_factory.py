@@ -48,7 +48,7 @@ def create_app(
     initialize_sentry(
         dsn=settings.sentry_dsn,
         environment=settings.environment,
-        release=settings.release,
+        release=settings.sentry_release,
         service=settings.service,
     )
     log = get_logger(settings.service)

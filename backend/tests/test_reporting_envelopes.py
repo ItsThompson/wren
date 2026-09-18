@@ -85,7 +85,11 @@ def _client(make_settings: MakeSettings, router: APIRouter, *, oauth: bool = Fal
     handlers: dict[Any, Any] = dict(build_exception_handlers())
     if oauth:
         handlers.update(build_oauth_exception_handlers())
-    settings = make_settings(sentry_dsn=TEST_DSN, release=TEST_RELEASE, service="wren-external")
+    settings = make_settings(
+        sentry_dsn=TEST_DSN,
+        sentry_release=TEST_RELEASE,
+        service="wren-external",
+    )
     app = create_app(settings, routers=[router], exception_handlers=handlers)
     # create_app does not install the internal-token seam; the real processes do
     # it at startup wiring. Install it here so require_internal_user can resolve.

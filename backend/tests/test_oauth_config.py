@@ -26,7 +26,7 @@ def test_endpoint_urls_are_built_from_the_pinned_issuer() -> None:
     assert config.endpoint(AUTHORIZE_PATH) == "https://api.usewren.com/authorize"
 
 
-def test_consent_url_is_built_from_the_app_public_url() -> None:
+def test_consent_url_is_built_from_the_web_app_url() -> None:
     config = build_test_config()
     assert config.consent_url == "https://usewren.com/authorize"
 
@@ -66,9 +66,9 @@ def test_build_oauth_config_reads_only_pinned_settings() -> None:
         internal_api_token=SecretStr("t"),
         session_jwt_secret=SecretStr("s"),
         cookie_domain="",
-        public_base_url="https://api.usewren.com",
-        app_public_url="https://usewren.com",
-        mcp_public_url="https://mcp.usewren.com",
+        oauth_issuer_url="https://api.usewren.com",
+        web_app_url="https://usewren.com",
+        mcp_resource_url="https://mcp.usewren.com",
         oauth_private_key_path="",
         oauth_key_id="kid-1",
         oauth_access_ttl_seconds=900,
