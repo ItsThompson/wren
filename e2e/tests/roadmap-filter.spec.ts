@@ -48,7 +48,7 @@ test.describe('roadmap list filters', () => {
 
     await page.getByRole('link', { name: 'Tree' }).click()
     await expect(page.getByRole('link', { name: 'List' })).toBeVisible()
-    expect(page.getByRole('group', { name: 'Roadmap filters' })).not.toBeVisible()
+    await expect(page.getByRole('group', { name: 'Roadmap filters' })).not.toBeVisible()
     await page.getByRole('link', { name: 'List' }).click()
     await expect(panel.getByRole('radio', { name: 'ANY' })).toHaveAttribute('aria-checked', 'true')
     await expect(panel.getByRole('radio', { name: 'ALL' })).toHaveAttribute('aria-checked', 'false')

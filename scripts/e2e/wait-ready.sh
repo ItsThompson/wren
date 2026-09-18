@@ -70,11 +70,11 @@ check_app() {
 }
 check_api_metadata() {
   response=$(curl --fail --silent --show-error --cacert "$CA" "$API_URL/.well-known/oauth-authorization-server")
-  [[ "$response" == *'https://api.wren.test'* && "$response" == *'jwks_uri'* ]]
+  printf '%s' "$response" | python3 "$ROOT_DIR/scripts/e2e/public_contracts.py" authorization "$API_URL"
 }
 check_mcp_prm() {
   response=$(curl --fail --silent --show-error --cacert "$CA" "$MCP_URL/.well-known/oauth-protected-resource")
-  [[ "$response" == *'https://mcp.wren.test'* && "$response" == *'https://api.wren.test'* ]]
+  printf '%s' "$response" | python3 "$ROOT_DIR/scripts/e2e/public_contracts.py" protected-resource "$MCP_URL" "$API_URL"
 }
 check_recorder() {
   curl --fail --silent --show-error --cacert "$CA" \
