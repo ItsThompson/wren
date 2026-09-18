@@ -1,17 +1,54 @@
 import type { Event } from '@sentry/react'
 
-const REDACTED = '[Redacted]'
-const SENSITIVE_KEY = /authorization|cookie|password|secret|token|api[-_]?key|set-cookie/i
+// The only context the reporter constructs. beforeSend keeps exactly these
+// keys with scalar values and deletes every other context, so a stray caller
+// or SDK context cannot persist URL, query, or body data.
+const REPORT_CONTEXT_KEYS = ['method', 'status'] as const
+const ALLOWED_TAG_KEYS = new Set([
+  'service',
+  'surface',
+  'runtime',
+  'api.operation',
+  'api.method',
+  'api.domain',
+  'api.failure_kind',
+  'expected',
+  'code',
+])
+const MAX_TAG_KEY_LENGTH = 32
+const MAX_TAG_VALUE_LENGTH = 200
 
-function scrubValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(scrubValue)
-  if (value === null || typeof value !== 'object') return value
+function isScalar(value: unknown): value is string | number | boolean | null {
+  return (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  )
+}
 
-  const scrubbed: Record<string, unknown> = {}
-  for (const [key, nestedValue] of Object.entries(value)) {
-    scrubbed[key] = SENSITIVE_KEY.test(key) ? REDACTED : scrubValue(nestedValue)
+function sanitizeReportContext(report: Record<string, unknown>): Record<string, unknown> {
+  const sanitized: Record<string, unknown> = {}
+  for (const key of REPORT_CONTEXT_KEYS) {
+    if (isScalar(report[key])) sanitized[key] = report[key]
   }
-  return scrubbed
+  return sanitized
+}
+
+function sanitizeTags(tags: Record<string, unknown>): Record<string, string> {
+  const sanitized: Record<string, string> = {}
+  for (const [key, value] of Object.entries(tags)) {
+    if (
+      ALLOWED_TAG_KEYS.has(key) &&
+      key.length <= MAX_TAG_KEY_LENGTH &&
+      typeof value === 'string' &&
+      value.length > 0 &&
+      value.length <= MAX_TAG_VALUE_LENGTH
+    ) {
+      sanitized[key] = value
+    }
+  }
+  return sanitized
 }
 
 export function scrubSentryEvent<T extends Event>(event: T): T {
@@ -19,11 +56,14 @@ export function scrubSentryEvent<T extends Event>(event: T): T {
     delete event[field]
   }
 
+  if (event.tags) event.tags = sanitizeTags(event.tags)
+
   if (event.contexts) {
-    const reportContext = event.contexts.report
-    event.contexts = reportContext
-      ? { report: scrubValue(reportContext) as Record<string, unknown> }
-      : {}
+    const report = event.contexts.report
+    event.contexts =
+      report && typeof report === 'object'
+        ? { report: sanitizeReportContext(report as Record<string, unknown>) }
+        : {}
   }
 
   for (const value of event.exception?.values ?? []) {

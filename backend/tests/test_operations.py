@@ -10,7 +10,14 @@ import sqlalchemy.exc
 import structlog
 from starlette.requests import Request
 
-from wren.core.operations import _error_kind, operation_for_request, report_backend_failure
+from wren.core.operations import (
+    ROUTE_OPERATIONS,
+    _domain_for_operation,
+    _error_kind,
+    operation_for_request,
+    report_backend_failure,
+)
+from wren.core.route_registry import EXTERNAL_ROUTE_ACCESS, INTERNAL_ROUTE_ACCESS
 from wren_common.reporting import Domain, Kind, LogEvent, ReportLevel
 
 
@@ -35,6 +42,33 @@ def test_unmatched_route_uses_safe_500_operation() -> None:
     request = _request("/roadmaps/r-123")
 
     assert operation_for_request(request) == "http.500"
+
+
+def test_route_operation_map_covers_both_route_registries_exactly() -> None:
+    """Every registered product route maps to an operation, with no orphans.
+
+    A new product route without an entry here silently falls back to
+    ``http.500`` and loses its domain tag; a stale entry hides drift. Both
+    directions must fail loudly.
+    """
+    registry_keys = {
+        (key.method, key.path)
+        for registry in (EXTERNAL_ROUTE_ACCESS, INTERNAL_ROUTE_ACCESS)
+        for key in registry
+    }
+    mapped_keys = set(ROUTE_OPERATIONS)
+
+    missing = registry_keys - mapped_keys
+    orphaned = mapped_keys - registry_keys
+    assert (missing, orphaned) == (set(), set()), (
+        f"ROUTE_OPERATIONS drift: missing={sorted(missing)} orphaned={sorted(orphaned)}"
+    )
+
+
+def test_http_500_fallback_has_no_domain() -> None:
+    """The unmapped fallback must omit the domain tag, not invent an eighth."""
+    assert _domain_for_operation("http.500") is None
+    assert _domain_for_operation("roadmaps.get") is Domain.ROADMAPS
 
 
 @pytest.mark.parametrize(

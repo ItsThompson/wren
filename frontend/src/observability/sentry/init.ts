@@ -17,7 +17,7 @@ export function initSentry(): void {
     release: import.meta.env.VITE_SENTRY_RELEASE,
     sendDefaultPii: false,
     defaultIntegrations: [],
-    integrations: [],
+    integrations: [Sentry.linkedErrorsIntegration()],
     enableLogs: false,
     maxBreadcrumbs: 0,
     tracesSampleRate: 0,

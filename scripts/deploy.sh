@@ -208,6 +208,19 @@ gate_unhealthy() {
 
 # --- Preflight: required config/secret env vars -----------------------------
 
+is_bare_deploy_sha() {
+  [[ "$1" =~ ^[0-9a-f]{40}$ ]]
+}
+
+validate_deploy_identity() {
+  is_bare_deploy_sha "${CURRENT_SHA}" \
+    || die "DEPLOY_SHA must be 40 lowercase hexadecimal characters"
+  is_bare_deploy_sha "${SENTRY_RELEASE}" \
+    || die "SENTRY_RELEASE must be a bare 40-character lowercase hexadecimal SHA"
+  [[ "${SENTRY_RELEASE}" == "${CURRENT_SHA}" ]] \
+    || die "SENTRY_RELEASE must equal DEPLOY_SHA"
+}
+
 assert_secret_env_present() {
   log "==> Preflight: assert required config/secret env vars are set"
   local missing=() var
@@ -325,6 +338,10 @@ read_deployed_sha() {
     log "no previous .deployed-sha recorded on ${SSH_TARGET}; cannot roll back"
     return 1
   fi
+  if ! is_bare_deploy_sha "${sha}"; then
+    log "invalid previous .deployed-sha on ${SSH_TARGET}; cannot roll back"
+    return 1
+  fi
   printf '%s\n' "${sha}"
 }
 
@@ -381,6 +398,7 @@ main() {
   log "=== Wren deploy -> context ${CONTEXT_NAME} (${SSH_TARGET}); dry-run=${DRY_RUN} ==="
 
   assert_secret_env_present
+  validate_deploy_identity
 
   set_deploy_phase pull
   pull_images

@@ -10,18 +10,34 @@ import {
 
 import { classifyApiFailure, type ApiFailureKind } from './classify'
 
+// Render failures own one fixed operation. It is never a valid API operation:
+// API reports accept only generated OpenAPI registry operations.
 export const RENDER_OPERATION = 'render.app' as const
-const KNOWN_OPERATIONS = new Set<string>([...Object.values(operationRegistry), RENDER_OPERATION])
+
+const API_OPERATION_IDS = new Set<string>(Object.values(operationRegistry))
 const KNOWN_DOMAINS = new Set<string>(Object.values(operationDomainRegistry))
 const KNOWN_KINDS = new Set<string>(['validation', 'upstream', 'network', 'internal'])
 
-export type ReportingOperation = OperationId | typeof RENDER_OPERATION
+// Optional-tag policy mirrors the shared Python reporter: a closed key set
+// with fixed size limits. Unknown, reserved, empty, non-string, or oversized
+// values are omitted without logging their values.
+const OPTIONAL_TAG_KEYS = new Set(['code'])
+const RESERVED_TAG_KEYS = new Set([
+  'expected',
+  'service',
+  'surface',
+  'runtime',
+  'api.operation',
+  'api.method',
+  'api.domain',
+  'api.failure_kind',
+])
+const MAX_TAG_KEY_LENGTH = 32
+const MAX_TAG_VALUE_LENGTH = 200
+
+export type ReportingOperation = OperationId
 export type BrowserDomain = OperationDomain
 export type BrowserFailureKind = ApiFailureKind | 'internal'
-
-export function isKnownReportingOperation(operationId: string): operationId is ReportingOperation {
-  return KNOWN_OPERATIONS.has(operationId)
-}
 
 export function isKnownBrowserDomain(value: unknown): value is BrowserDomain {
   return typeof value === 'string' && KNOWN_DOMAINS.has(value)
@@ -34,12 +50,13 @@ export function isKnownBrowserFailureKind(value: unknown): value is BrowserFailu
 export interface ApiFailureReport {
   error?: unknown
   status: number | null
-  operationId: ReportingOperation | string
+  operationId: OperationId | string
   method: string
   schemaPath: string
   url: string
   domain?: BrowserDomain | string
   kind?: BrowserFailureKind | string
+  tags?: Record<string, string>
 }
 
 function toError(value: unknown): Error {
@@ -61,20 +78,42 @@ function expectedOperationKey(operationId: string): OperationKey | null {
   return null
 }
 
+function sanitizeOptionalTags(tags: Record<string, string> | undefined): Record<string, string> {
+  const sanitized: Record<string, string> = {}
+  for (const [key, value] of Object.entries(tags ?? {})) {
+    if (
+      typeof key !== 'string' ||
+      !OPTIONAL_TAG_KEYS.has(key) ||
+      RESERVED_TAG_KEYS.has(key) ||
+      key.length > MAX_TAG_KEY_LENGTH ||
+      typeof value !== 'string' ||
+      !value ||
+      value.length > MAX_TAG_VALUE_LENGTH
+    ) {
+      continue
+    }
+    sanitized[key] = value
+  }
+  return sanitized
+}
+
 function invalidMetadataFields(report: ApiFailureReport, kind: ApiFailureKind): string[] {
   const fields: string[] = []
-  const operationIsKnown = typeof report.operationId === 'string' && isKnownReportingOperation(report.operationId)
-  if (!operationIsKnown) fields.push('operationId')
-  if (typeof report.method !== 'string' || !/^[A-Z]+$/.test(report.method)) fields.push('method')
-  if (typeof report.schemaPath !== 'string' || !report.schemaPath.startsWith('/')) fields.push('schemaPath')
+  const operationId = report.operationId
+  if (typeof operationId !== 'string' || !API_OPERATION_IDS.has(operationId)) {
+    fields.push('operationId')
+  }
 
-  const expectedKey = operationIsKnown ? expectedOperationKey(report.operationId) : null
-  if (expectedKey) {
+  const expectedKey =
+    typeof operationId === 'string' && API_OPERATION_IDS.has(operationId)
+      ? expectedOperationKey(operationId)
+      : null
+  if (expectedKey === null) {
+    fields.push('operationId')
+  } else {
     const [expectedMethod, ...expectedPath] = expectedKey.split(' ')
     if (report.method !== expectedMethod) fields.push('method')
     if (report.schemaPath !== expectedPath.join(' ')) fields.push('schemaPath')
-  } else if (!operationKeyFor(report)) {
-    fields.push('operationId')
   }
 
   const operationKey = operationKeyFor(report)
@@ -99,6 +138,16 @@ function invalidMetadataFields(report: ApiFailureReport, kind: ApiFailureKind): 
   return [...new Set(fields)]
 }
 
+function captureSafely(capture: () => void): void {
+  try {
+    capture()
+  } catch {
+    // Reporting must never replace a response or a promise rejection: emit
+    // only this value-free diagnostic and return.
+    console.warn('reporting_failed')
+  }
+}
+
 export function reportApiFailure(report: ApiFailureReport): ApiFailureKind {
   const kind = classifyApiFailure(report)
   const invalidFields = invalidMetadataFields(report, kind)
@@ -107,20 +156,31 @@ export function reportApiFailure(report: ApiFailureReport): ApiFailureKind {
     return kind
   }
   const operationKey = operationKeyFor(report)
-  const domain = operationKey ? operationDomainRegistry[operationKey] : undefined
-  Sentry.withScope((scope) => {
-    scope.setTag('api.operation', report.operationId)
-    scope.setTag('api.method', report.method)
-    scope.setTag('api.failure_kind', kind)
-    if (domain) scope.setTag('api.domain', domain)
-    if (kind === 'validation') scope.setTag('expected', 'true')
-    if (kind === 'network') scope.setLevel('warning')
-    scope.setExtra('api.status', report.status)
-    Sentry.captureException(toError(report.error))
+  if (operationKey === null) return kind
+  const domain = operationDomainRegistry[operationKey]
+  const optionalTags = sanitizeOptionalTags(report.tags)
+
+  captureSafely(() => {
+    Sentry.withScope((scope) => {
+      for (const [key, value] of Object.entries(optionalTags)) {
+        scope.setTag(key, value)
+      }
+      scope.setTag('api.operation', report.operationId)
+      scope.setTag('api.method', report.method)
+      scope.setTag('api.failure_kind', kind)
+      scope.setTag('api.domain', domain)
+      if (kind === 'validation') scope.setTag('expected', 'true')
+      if (kind === 'network') scope.setLevel('warning')
+      scope.setContext('report', { method: report.method, status: report.status })
+      Sentry.captureException(toError(report.error))
+    })
   })
   return kind
 }
 
-export function reportException(error: unknown): void {
-  Sentry.captureException(toError(error))
+// Render capture enriches the SDK ErrorBoundary's own capture with the fixed
+// render taxonomy. It never routes through the API report helper.
+export function applyRenderCaptureTags(scope: Pick<Sentry.Scope, 'setTag'>): void {
+  scope.setTag('api.operation', RENDER_OPERATION)
+  scope.setTag('api.failure_kind', 'internal')
 }

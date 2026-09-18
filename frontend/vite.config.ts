@@ -1,6 +1,4 @@
-import { sentryVitePlugin } from '@sentry/vite-plugin'
 import { defineConfig } from 'vitest/config'
-import { loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath, URL } from 'node:url'
@@ -8,26 +6,9 @@ import { fileURLToPath, URL } from 'node:url'
 import { devServerProxy } from './vite.dev-proxy.ts'
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
-  const hasSentryUploadConfig = Boolean(env.SENTRY_AUTH_TOKEN && env.SENTRY_ORG && env.SENTRY_PROJECT)
-
-  return {
-    plugins: [
-      react(),
-      tailwindcss(),
-      ...(hasSentryUploadConfig
-        ? [
-            sentryVitePlugin({
-              authToken: env.SENTRY_AUTH_TOKEN,
-              org: env.SENTRY_ORG,
-              project: env.SENTRY_PROJECT,
-              telemetry: false,
-            }),
-          ]
-        : []),
-    ],
-    server: {
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  server: {
     proxy: devServerProxy,
     // Allow the dev server to read the repo-root shared/theme/*.css imported by
     // main.tsx (one level above this package). Dev-only: the production build
@@ -35,8 +16,8 @@ export default defineConfig(({ mode }) => {
     fs: {
       allow: [fileURLToPath(new URL('..', import.meta.url))],
     },
-    },
-    build: {
+  },
+  build: {
     // Keep maps available to the builder for Sentry upload, but omit the
     // sourceMappingURL trailer so nginx never advertises them to browsers.
     sourcemap: 'hidden',
@@ -55,7 +36,7 @@ export default defineConfig(({ mode }) => {
       ),
     },
   },
-    test: {
+  test: {
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
@@ -84,6 +65,5 @@ export default defineConfig(({ mode }) => {
         lines: 70,
       },
     },
-    },
-  }
+  },
 })

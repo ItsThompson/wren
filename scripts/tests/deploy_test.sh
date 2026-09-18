@@ -23,6 +23,8 @@ DEPLOY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../deploy.sh"
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PASS=0
 FAIL=0
+VALID_SHA="0123456789abcdef0123456789abcdef01234567"
+OTHER_SHA="1123456789abcdef0123456789abcdef01234567"
 
 # Run a test function in a subshell so its stubs/vars never leak.
 run_test() {
@@ -54,7 +56,8 @@ export_required_secret_env() {
   export POSTGRES_PASSWORD="pw" SESSION_JWT_SECRET="s" INTERNAL_API_TOKEN="t"
   export SENTRY_DSN_BACKEND="https://backend@example.ingest.sentry.io/1"
   export SENTRY_DSN_MCP="https://mcp@example.ingest.sentry.io/2"
-  export SENTRY_RELEASE="cafef00d"
+  export DEPLOY_SHA="${VALID_SHA}"
+  export SENTRY_RELEASE="${VALID_SHA}"
 }
 
 # --- pure helpers -----------------------------------------------------------
@@ -137,11 +140,34 @@ test_assert_secret_env_present() {
 
 # --- dry-run phase plan & ordering ------------------------------------------
 
+test_main_rejects_invalid_or_mismatched_release_before_compose() {
+  source "${DEPLOY}"
+  local row deploy_sha release expected out rc
+  local cases=(
+    "badsha|${VALID_SHA}|DEPLOY_SHA must be 40 lowercase hexadecimal characters"
+    "${VALID_SHA}|wren-api@${VALID_SHA}|SENTRY_RELEASE must be a bare 40-character"
+    "${VALID_SHA}|${OTHER_SHA}|SENTRY_RELEASE must equal DEPLOY_SHA"
+  )
+
+  for row in "${cases[@]}"; do
+    export_required_secret_env
+    IFS='|' read -r deploy_sha release expected <<< "${row}"
+    DEPLOY_SHA="${deploy_sha}"
+    SENTRY_RELEASE="${release}"
+    DRY_RUN=1
+    out="$(main 203.0.113.10 deploy 2>&1)"
+    rc=$?
+    [[ ${rc} -ne 0 ]] || { echo "expected invalid deploy identity to fail"; return 1; }
+    contains "${out}" "${expected}" || return 1
+    not_contains "${out}" "compose -f" || return 1
+  done
+}
+
 test_dry_run_uses_docker_context_and_no_ssh_heredoc() {
   source "${DEPLOY}"
   export_required_secret_env
   DRY_RUN=1
-  DEPLOY_SHA="cafef00d"
+  DEPLOY_SHA="${VALID_SHA}"
   local out
   out="$(main 203.0.113.10 deploy 2>&1)"
   # Transport is the Docker Context, not ssh-bash.
@@ -160,7 +186,7 @@ test_dry_run_includes_ops_scripts_sync() {
   source "${DEPLOY}"
   export_required_secret_env
   DRY_RUN=1
-  DEPLOY_SHA="cafef00d"
+  DEPLOY_SHA="${VALID_SHA}"
   local out
   out="$(main 203.0.113.10 deploy 2>&1)"
   # The sync step appears in the plan with its transport (tar, not scp).
@@ -285,13 +311,13 @@ test_cd_rollback_is_phase_gated_and_legacy_safe() {
 
 test_read_deployed_sha_returns_prev_and_refuses_on_empty() {
   source "${DEPLOY}"
-  # Present: echoes the prev SHA on stdout, exit 0.
-  remote() { printf '%s\n' "abc123"; }
+  # Present: echoes the validated previous SHA on stdout, exit 0.
+  remote() { printf '%s\n' "${VALID_SHA}"; }
   local out rc
   out="$(read_deployed_sha)"
   rc=$?
   [[ ${rc} -eq 0 ]] || { echo "expected success when sha present"; return 1; }
-  equals "${out}" "abc123" || return 1
+  equals "${out}" "${VALID_SHA}" || return 1
   # Empty file (ssh ok, no rollback target): refuses with the no-prev message.
   remote() { printf '%s' ""; }
   out="$(read_deployed_sha 2>&1)"
@@ -299,6 +325,12 @@ test_read_deployed_sha_returns_prev_and_refuses_on_empty() {
   [[ ${rc} -ne 0 ]] || { echo "expected non-zero when .deployed-sha empty"; return 1; }
   contains "${out}" "no previous .deployed-sha" || return 1
   contains "${out}" "cannot roll back" || return 1
+  # Malformed or injected rollback keys are never used as checkout/release input.
+  remote() { printf '%s\n' "wren-api@${VALID_SHA}"; }
+  out="$(read_deployed_sha 2>&1)"
+  rc=$?
+  [[ ${rc} -ne 0 ]] || { echo "expected non-zero for invalid .deployed-sha"; return 1; }
+  contains "${out}" "invalid previous .deployed-sha" || return 1
   # SSH/transport failure (non-zero ssh): refuses with a DISTINCT message, not
   # conflated with an absent file.
   remote() { return 1; }
@@ -314,7 +346,7 @@ test_failed_gate_no_internal_redeploy() {
   source "${DEPLOY}"
   export_required_secret_env
   DRY_RUN=0
-  DEPLOY_SHA="newsha00"
+  DEPLOY_SHA="${VALID_SHA}"
   local ccalls="${TMPDIR:-/tmp}/wren-cc.$$.${RANDOM}"
   local rcalls="${TMPDIR:-/tmp}/wren-rc.$$.${RANDOM}"
   : > "${ccalls}"; : > "${rcalls}"
@@ -344,7 +376,7 @@ test_failed_gate_nonzero_exit_and_no_deployed_sha_write() {
   source "${DEPLOY}"
   export_required_secret_env
   DRY_RUN=0
-  DEPLOY_SHA="newsha00"
+  DEPLOY_SHA="${VALID_SHA}"
   local rcalls="${TMPDIR:-/tmp}/wren-rc2.$$.${RANDOM}"
   : > "${rcalls}"
   compose_run() { :; }
@@ -422,6 +454,7 @@ main_tests() {
   run_test test_gate_unhealthy_array_and_all_healthy
   run_test test_gate_unhealthy_empty_or_unparseable_is_not_healthy
   run_test test_assert_secret_env_present
+  run_test test_main_rejects_invalid_or_mismatched_release_before_compose
   run_test test_dry_run_uses_docker_context_and_no_ssh_heredoc
   run_test test_dry_run_includes_ops_scripts_sync
   run_test test_dry_run_migrations_before_start

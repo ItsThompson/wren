@@ -57,8 +57,19 @@ type SafeContextValue = str | bool | int | float | None
 type SafeContext = Mapping[str, SafeContextValue]
 
 # These fields are controlled by the reporter and cannot be supplied by callers.
+# ``service`` is process-owned: set by ``initialize_sentry`` from the running
+# process's service name, never taken from caller tags.
 RESERVED_TAG_KEYS = frozenset(
-    {"operation", "domain", "kind", "log_event", "level", "report_category", "error_kind"}
+    {
+        "operation",
+        "domain",
+        "kind",
+        "log_event",
+        "level",
+        "report_category",
+        "error_kind",
+        "service",
+    }
 )
 REGISTERED_TAG_KEYS = frozenset(
     {
@@ -67,7 +78,6 @@ REGISTERED_TAG_KEYS = frozenset(
         "method",
         "reason",
         "required_scope",
-        "service",
         "status",
         "tool",
     }

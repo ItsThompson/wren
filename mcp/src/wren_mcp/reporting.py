@@ -47,6 +47,8 @@ def _validated_contract(
     level_name: str,
 ) -> ReportingContract | None:
     """Validate report metadata before any limiter or capture side effect."""
+    from wren_mcp.tool_registry import registered_tool_names
+
     try:
         contract = make_reporting_contract(
             operation=operation_name,
@@ -54,21 +56,35 @@ def _validated_contract(
             kind=kind_name,
             log_event=log_event_name,
             level=level_name,
+            registered_tools=registered_tool_names(),
         )
     except ReportingContractError as error:
         _log.warning("reporting_contract_invalid", fields=list(error.fields))
         return None
-
-    # Import lazily because the registrar wraps tool metrics, which imports this
-    # reporting adapter.
-    from wren_mcp.tool_registry import is_registered_tool
-
-    if contract.operation.startswith("tool.") and not is_registered_tool(
-        contract.operation.removeprefix("tool.")
-    ):
-        _log.warning("reporting_contract_invalid", fields=["operation"])
-        return None
     return contract
+
+
+def _validated_tool_tag(
+    contract: ReportingContract, bounded_tags: Mapping[str, str] | None
+) -> tuple[bool, str | None]:
+    """Validate the tool tag against the operation identity.
+
+    The tool tag is owned by the validated ``tool.<name>`` operation identity,
+    never by the caller. Returns ``(ok, derived_tag)``: ``ok=False`` when a
+    caller-supplied tag disagrees with the operation or rides a non-tool
+    operation, ``derived_tag`` only for ``tool.`` operations.
+    """
+    caller_tool = dict(bounded_tags or {}).get("tool")
+    if not contract.operation.startswith("tool."):
+        if caller_tool is not None:
+            _log.warning("reporting_contract_invalid", fields=["tool"])
+            return False, None
+        return True, None
+    derived = contract.operation.removeprefix("tool.")
+    if caller_tool is not None and caller_tool != derived:
+        _log.warning("reporting_contract_invalid", fields=["tool"])
+        return False, None
+    return True, derived
 
 
 def report_mcp_error(
@@ -92,6 +108,12 @@ def report_mcp_error(
     )
     if contract is None:
         return
+    tool_tag_ok, derived_tool_tag = _validated_tool_tag(contract, bounded_tags)
+    if not tool_tag_ok:
+        return
+    caller_tags = dict(bounded_tags or {})
+    if derived_tool_tag is not None:
+        caller_tags["tool"] = derived_tool_tag
     # Backend responses and authorization failures are model-recoverable tool
     # outcomes. They still reach the local tool-failure log, but never create an
     # operational event. BackendToolError marks even 5xx responses explicitly.
@@ -100,6 +122,10 @@ def report_mcp_error(
     limiter = _MCP_REPORT_LIMITERS.get(contract.kind)
     if limiter is not None and not limiter.allow(contract.kind):
         return
+    # Import lazily because the registrar wraps tool metrics, which imports this
+    # reporting adapter.
+    from wren_mcp.tool_registry import registered_tool_names
+
     try:
         report_error(
             exception,
@@ -109,10 +135,11 @@ def report_mcp_error(
             user_id=user_id,
             log_event=LogEvent(contract.log_event),
             level=ReportLevel(contract.level),
-            bounded_tags={**dict(bounded_tags or {}), "error_kind": contract.kind},
+            bounded_tags={**caller_tags, "error_kind": contract.kind},
             context_data={**dict(context_data or {}), "error_kind": contract.kind},
             group_key=f"mcp.{contract.kind}",
             group_exact=True,
+            registered_tools=registered_tool_names(),
         )
     except Exception:  # noqa: BLE001 - reporting must never mask the original error
         _log.warning("error_report_failed", operation=contract.operation, exc_info=True)

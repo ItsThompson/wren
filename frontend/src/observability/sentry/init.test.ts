@@ -1,13 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { init } = vi.hoisted(() => ({ init: vi.fn() }))
-vi.mock('@sentry/react', () => ({ init }))
+const { init, linkedErrorsIntegration, linkedErrors } = vi.hoisted(() => ({
+  init: vi.fn(),
+  linkedErrorsIntegration: vi.fn(),
+  linkedErrors: { name: 'LinkedErrors' },
+}))
+vi.mock('@sentry/react', () => ({ init, linkedErrorsIntegration }))
 
 import { beforeSendSentryEvent, initSentry } from './init'
 
 describe('initSentry', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    linkedErrorsIntegration.mockReturnValue(linkedErrors)
     vi.unstubAllEnvs()
   })
 
@@ -32,7 +37,7 @@ describe('initSentry', () => {
         release: 'release-1',
         sendDefaultPii: false,
         defaultIntegrations: [],
-        integrations: [],
+        integrations: [linkedErrors],
         enableLogs: false,
         maxBreadcrumbs: 0,
         tracesSampleRate: 0,

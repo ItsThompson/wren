@@ -34,8 +34,8 @@ require_config() {
 
 validate_sha() {
   local sha="$1"
-  [[ -n "${sha}" && "${sha}" != *[!A-Za-z0-9]* ]] \
-    || die "release SHA must contain only letters and numbers"
+  [[ "${sha}" =~ ^[0-9a-f]{40}$ ]] \
+    || die "release SHA must be 40 lowercase hexadecimal characters"
 }
 
 release_name() {
@@ -141,7 +141,7 @@ ensure_finalized() {
   fi
 
   log "finalizing release: ${release}"
-  run_cli --org "${SENTRY_ORG}" releases finalize "${release}" || true
+  run_cli --org "${SENTRY_ORG}" --project "${project}" releases finalize "${release}" || true
   inspect_release "${release}" "${project}" \
     || die "release finalization did not produce the expected release: ${release}"
   [[ "${RELEASE_FINALIZED}" == "true" ]] \

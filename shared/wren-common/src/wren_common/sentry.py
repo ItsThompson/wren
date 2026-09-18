@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any, cast
 
 import sentry_sdk
@@ -18,26 +19,27 @@ from wren_common.reporting_types import (
     sanitize_context,
     sanitize_tags,
 )
+from wren_common.sentry_scrub import (
+    REPORT_CONTEXT_MARKER_TAG as _REPORT_CONTEXT_MARKER_TAG,
+)
+from wren_common.sentry_scrub import REPORT_MARKER_TAG as _REPORT_MARKER_TAG
+from wren_common.sentry_scrub import REPORT_TAG_KEYS_TAG as _REPORT_TAG_KEYS_TAG
+from wren_common.sentry_scrub import REPORT_USER_MARKER_TAG as _REPORT_USER_MARKER_TAG
+from wren_common.sentry_scrub import sanitize_reporter_tags as _sanitize_reporter_tags
+from wren_common.sentry_scrub import scrub_event
 
 if TYPE_CHECKING:
-    from sentry_sdk.types import Event
+    from sentry_sdk.transport import Transport
 
+_scrub_event = scrub_event
 _initialized = False
 _disabled_logged = False
 _disabled_services: set[str] = set()
+# Process-wide service identity, set once by the enabled initialize_sentry call.
+# Every isolated report scope receives it as the ``service`` tag so external,
+# internal, and MCP events stay distinguishable inside one Sentry project.
+_SERVICE: str | None = None
 _REPORT_LIMITER = EventLimiter(limit=20, window_seconds=60)
-_REDACTED_EXCEPTION = "[Redacted exception]"
-_REPORTER_TAG_KEYS = frozenset({"operation", "domain", "kind", "log_event", "level"})
-
-
-def _sanitize_reporter_tags(value: dict[str, str] | None) -> dict[str, str]:
-    if not value:
-        return {}
-    return {
-        key: item
-        for key, item in value.items()
-        if key in _REPORTER_TAG_KEYS and type(item) is str and item
-    }
 
 
 def _normalize_level(value: ReportLevel | str | None) -> str | None:
@@ -53,33 +55,7 @@ def _normalize_level(value: ReportLevel | str | None) -> str | None:
         return None
 
 
-def _scrub_event(event: Event, _hint: dict[str, Any]) -> Event:
-    """Remove request-derived payloads while preserving exception types and frames."""
-    event_data = cast("dict[str, Any]", event)
-    for field in ("request", "breadcrumbs", "extra", "message", "logentry"):
-        event_data.pop(field, None)
-    contexts = event_data.get("contexts")
-    if isinstance(contexts, dict):
-        event_data["contexts"] = {"report": contexts["report"]} if "report" in contexts else {}
-    exception = event_data.get("exception")
-    if isinstance(exception, dict):
-        values = exception.get("values")
-        if isinstance(values, list):
-            for value in values:
-                if not isinstance(value, dict):
-                    continue
-                value["value"] = _REDACTED_EXCEPTION
-                value.pop("mechanism", None)
-                stacktrace = value.get("stacktrace")
-                if isinstance(stacktrace, dict):
-                    frames = stacktrace.get("frames")
-                    if isinstance(frames, list):
-                        for frame in frames:
-                            if isinstance(frame, dict):
-                                frame.pop("vars", None)
-    return event
-
-
+_DEPLOY_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 _RELEASE_PREFIXES = {
     "wren": "wren-api",
     "wren-external": "wren-api",
@@ -96,10 +72,8 @@ def _release_name(release: str, service: str) -> str | None:
     if prefix is None:
         raise ValueError(f"unsupported Sentry service: {service}")
 
-    if "@" in value:
-        supplied_prefix, _, value = value.partition("@")
-        if supplied_prefix != prefix or not value or "@" in value:
-            raise ValueError(f"release must use the {prefix}@<version> format")
+    if _DEPLOY_SHA_RE.fullmatch(value) is None:
+        raise ValueError("release must be a bare 40-character lowercase hexadecimal SHA")
     return f"{prefix}@{value}"
 
 
@@ -110,14 +84,17 @@ def initialize_sentry(
     release: str,
     service: str = "wren",
     logger: Any | None = None,
+    transport: Transport | None = None,
 ) -> bool:
     """Initialize Sentry once when a DSN is configured.
 
     A blank DSN disables reporting and does not lock out a later configured app
     in the same test or process. Sentry SDK initialization stays after logging
     setup in each app factory so startup diagnostics use the configured logger.
+    ``transport`` lets tests install a recording transport; production callers
+    leave it unset so the SDK's own HTTP transport is used.
     """
-    global _disabled_logged, _initialized
+    global _disabled_logged, _initialized, _SERVICE
     log = logger or get_logger(service)
     if _initialized:
         return False
@@ -128,18 +105,23 @@ def initialize_sentry(
             _disabled_logged = True
         return False
 
-    sentry_sdk.init(
-        dsn=dsn,
-        environment=environment,
-        release=_release_name(release, service),
-        send_default_pii=False,
-        before_send=_scrub_event,
-        default_integrations=False,
-        integrations=[],
-        propagate_traces=False,
-        traces_sample_rate=None,
-    )
+    options: dict[str, Any] = {
+        "dsn": dsn,
+        "environment": environment,
+        "release": _release_name(release, service),
+        "send_default_pii": False,
+        "before_send": _scrub_event,
+        "default_integrations": False,
+        "integrations": [],
+        "propagate_traces": False,
+        "traces_sample_rate": None,
+        "max_breadcrumbs": 0,
+    }
+    if transport is not None:
+        options["transport"] = transport
+    sentry_sdk.init(**options)
     _initialized = True
+    _SERVICE = service
     log.info("sentry_initialized", environment=environment, release=release or None)
     return True
 
@@ -201,8 +183,18 @@ def report_exception(
         return None
     safe_context = sanitize_context(context)
     with sentry_sdk.new_scope() as scope:
+        scope.clear()
+        scope.set_tag(_REPORT_MARKER_TAG, "1")
+        owned_tag_keys = set(safe_tags)
+        if _SERVICE is not None:
+            owned_tag_keys.add("service")
+        scope.set_tag(_REPORT_TAG_KEYS_TAG, ",".join(sorted(owned_tag_keys)))
+        scope.set_tag(_REPORT_CONTEXT_MARKER_TAG, "1" if safe_context else "0")
+        scope.set_tag(_REPORT_USER_MARKER_TAG, "1" if user_id else "0")
         for key, value in safe_tags.items():
             scope.set_tag(key, value)
+        if _SERVICE is not None:
+            scope.set_tag("service", _SERVICE)
         if normalized_level is not None:
             scope.set_level(cast("Any", normalized_level))
         if safe_context:

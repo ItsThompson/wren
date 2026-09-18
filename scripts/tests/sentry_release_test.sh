@@ -33,6 +33,7 @@ setup_state() {
   STATE_FILE="${TMPDIR:-/tmp}/wren-sentry-state.$$.${RANDOM}"
   : > "${STATE_FILE}"
   CLI_CALLS=0
+  CLI_LAST_ARGS=""
   inspect_release() {
     local release="$1" project="$2" row
     row="$(grep -F "${release}|${project}|" "${STATE_FILE}" | head -1 || true)"
@@ -42,8 +43,9 @@ setup_state() {
   }
   run_cli() {
     CLI_CALLS=$((CLI_CALLS + 1))
+    CLI_LAST_ARGS="$*"
     local release="${@: -1}" project
-    if [[ "${1:-}" == "--org" && "${4:-}" == "finalize" ]]; then
+    if [[ " $* " == *" releases finalize "* ]]; then
       sed "s#^${release}|#${release}|#" "${STATE_FILE}" | sed 's/|false$/|true/' > "${STATE_FILE}.tmp"
       mv "${STATE_FILE}.tmp" "${STATE_FILE}"
     else
@@ -51,6 +53,23 @@ setup_state() {
       printf '%s|%s|false\n' "${release}" "${project}" >> "${STATE_FILE}"
     fi
   }
+}
+
+test_validate_sha_accepts_only_a_bare_full_deploy_sha() {
+  setup_state
+  validate_sha 0123456789abcdef0123456789abcdef01234567 || return 1
+
+  local invalid output rc
+  for invalid in \
+    abc123 \
+    ABCDEF0123456789abcdef0123456789abcdef01 \
+    wren-api@0123456789abcdef0123456789abcdef01234567 \
+    z123456789abcdef0123456789abcdef01234567; do
+    output="$(validate_sha "${invalid}" 2>&1)"
+    rc=$?
+    [[ ${rc} -ne 0 ]] || return 1
+    contains "${output}" "40 lowercase hexadecimal characters" || return 1
+  done
 }
 
 test_release_names_are_exact_and_sha_is_not_prefixed_twice() {
@@ -113,6 +132,7 @@ test_finalize_is_idempotent_and_preserves_finalized_release() {
   printf '%s\n' 'wren-api@abc123|wren-backend|false' > "${STATE_FILE}"
   ensure_finalized wren-api@abc123 wren-backend
   equals "${CLI_CALLS}" "1" || return 1
+  contains "${CLI_LAST_ARGS}" "--project wren-backend releases finalize" || return 1
   ensure_finalized wren-api@abc123 wren-backend
   equals "${CLI_CALLS}" "1" || return 1
 }
@@ -127,6 +147,7 @@ test_finalize_requires_existing_release() {
 }
 
 main_tests() {
+  run_test test_validate_sha_accepts_only_a_bare_full_deploy_sha
   run_test test_release_names_are_exact_and_sha_is_not_prefixed_twice
   run_test test_prepare_is_idempotent_and_only_creates_missing_release
   run_test test_create_failure_is_accepted_only_when_postcondition_exists
