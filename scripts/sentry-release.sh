@@ -124,7 +124,7 @@ ensure_prepared() {
   fi
 
   log "preparing release: ${release}"
-  run_cli --org "${SENTRY_ORG}" releases new --project "${project}" "${release}" || true
+  run_cli releases --org "${SENTRY_ORG}" new --project "${project}" "${release}" || true
   # A lost response or create race is accepted only when the exact postcondition
   # now holds. An unrelated release or project never satisfies this check.
   inspect_release "${release}" "${project}" \
@@ -141,7 +141,7 @@ ensure_finalized() {
   fi
 
   log "finalizing release: ${release}"
-  run_cli --org "${SENTRY_ORG}" --project "${project}" releases finalize "${release}" || true
+  run_cli releases --org "${SENTRY_ORG}" --project "${project}" finalize "${release}" || true
   inspect_release "${release}" "${project}" \
     || die "release finalization did not produce the expected release: ${release}"
   [[ "${RELEASE_FINALIZED}" == "true" ]] \
