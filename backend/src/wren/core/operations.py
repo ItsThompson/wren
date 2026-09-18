@@ -1,9 +1,4 @@
-"""Backend operation identity and error-reporting adapter.
-
-The route registry owns access policy. This module owns the separate reporting
-identity for a mounted route, keeping operation names stable and low-cardinality
-when FastAPI reports an exception after path parameters have been expanded.
-"""
+"""Backend error-reporting adapter."""
 
 from __future__ import annotations
 
@@ -27,56 +22,15 @@ if TYPE_CHECKING:
     from starlette.requests import Request
 
 
-# Stable names are deliberately independent of the expanded URL. They are also
-# useful to callers that need to report a failure before FastAPI has matched a
-# route (for example malformed requests).
-ROUTE_OPERATIONS: dict[tuple[str, str], str] = {
-    ("POST", "/auth/register"): "accounts.register",
-    ("POST", "/auth/login"): "accounts.login",
-    ("POST", "/auth/refresh"): "accounts.refresh",
-    ("POST", "/auth/logout"): "accounts.logout",
-    ("POST", "/roadmaps"): "roadmaps.create",
-    ("GET", "/roadmaps/{roadmap_id}"): "roadmaps.get",
-    ("PATCH", "/roadmaps/{roadmap_id}"): "roadmaps.patch",
-    ("PUT", "/roadmaps/{roadmap_id}"): "roadmaps.replace",
-    ("POST", "/roadmaps/{roadmap_id}:validate"): "roadmaps.validate",
-    ("POST", "/roadmaps/{roadmap_id}:publish"): "roadmaps.publish",
-    ("POST", "/roadmaps/{roadmap_id}:fork"): "roadmaps.fork",
-    ("PATCH", "/roadmaps/{roadmap_id}/metadata"): "roadmaps.edit_metadata",
-    ("GET", "/roadmaps/{roadmap_id}/overview"): "roadmaps.overview",
-    ("GET", "/roadmaps/{roadmap_id}/nodes/{subsection_id}"): "roadmaps.node",
-    ("GET", "/roadmaps/{roadmap_id}/sections/{section_id}"): "roadmaps.section",
-    ("GET", "/roadmaps/{roadmap_id}/search"): "roadmaps.search",
-    ("PUT", "/roadmaps/{roadmap_id}/published-visibility"): "roadmaps.published_visibility",
-    ("POST", "/roadmaps/{roadmap_id}:archive"): "roadmaps.archive",
-    ("DELETE", "/roadmaps/{roadmap_id}"): "roadmaps.delete",
-    ("POST", "/roadmaps/{roadmap_id}/follow"): "progress.follow",
-    ("GET", "/roadmaps/{roadmap_id}/progress"): "progress.get",
-    ("POST", "/roadmaps/{roadmap_id}/progress"): "progress.update",
-    ("GET", "/roadmaps/{roadmap_id}/next"): "progress.next",
-    ("PUT", "/roadmaps/{roadmap_id}/deadline"): "progress.deadline",
-    ("GET", "/.well-known/oauth-authorization-server"): "oauth.metadata",
-    ("GET", "/jwks"): "oauth.jwks",
-    ("POST", "/register"): "oauth.register_client",
-    ("GET", "/authorize"): "oauth.authorize",
-    ("GET", "/authorize/context"): "oauth.authorize_context",
-    ("POST", "/authorize/decision"): "oauth.authorize_decision",
-    ("POST", "/token"): "oauth.token",
-    ("POST", "/revoke"): "oauth.revoke",
-    ("GET", "/me/clients"): "oauth.list_clients",
-    ("DELETE", "/me/clients/{client_id}"): "oauth.revoke_client",
-    ("GET", "/me/dashboard"): "roadmaps.dashboard",
-    ("POST", "/me/onboarding:complete"): "accounts.complete_onboarding",
-    ("GET", "/users/{handle}"): "accounts.profile",
-    ("GET", "/skill"): "skill.get",
-}
-
-_DOMAIN_BY_PREFIX = {
-    "accounts": "accounts",
-    "oauth": "oauth",
-    "progress": "progress",
-    "roadmaps": "roadmaps",
-    "skill": "skill",
+_DOMAIN_BY_ROUTE_TAG = {
+    "accounts": Domain.ACCOUNTS,
+    "auth": Domain.ACCOUNTS,
+    "listing": Domain.ACCOUNTS,
+    "onboarding": Domain.ACCOUNTS,
+    "oauth": Domain.OAUTH,
+    "progress": Domain.PROGRESS,
+    "roadmaps": Domain.ROADMAPS,
+    "skill": Domain.SKILL,
 }
 
 
@@ -87,9 +41,13 @@ def _template_for_request(request: Request) -> str:
 
 
 def operation_for_request(request: Request) -> str:
-    """Return the bounded operation name for a matched request."""
-    key = (request.method.upper(), _template_for_request(request))
-    return ROUTE_OPERATIONS.get(key, "http.500")
+    """Return a domain-scoped OpenAPI operation ID for a matched request."""
+    route = request.scope.get("route")
+    operation_id = getattr(route, "unique_id", None)
+    domain = _domain_for_request(request)
+    if not isinstance(operation_id, str) or not operation_id or domain is None:
+        return "http.500"
+    return f"{domain.value}.{operation_id}"
 
 
 def _log_event(value: str) -> LogEvent:
@@ -99,12 +57,12 @@ def _log_event(value: str) -> LogEvent:
         return LogEvent.UNHANDLED_EXCEPTION
 
 
-def _domain_for_operation(operation: str) -> Domain | None:
-    prefix = operation.split(".", 1)[0]
-    value = _DOMAIN_BY_PREFIX.get(prefix)
-    if value is None:
+def _domain_for_request(request: Request) -> Domain | None:
+    route = request.scope.get("route")
+    tags = getattr(route, "tags", None)
+    if not isinstance(tags, list) or len(tags) != 1:
         return None
-    return Domain(value)
+    return _DOMAIN_BY_ROUTE_TAG.get(tags[0])
 
 
 def _error_kind(exception: BaseException) -> Kind:
@@ -183,7 +141,7 @@ def report_backend_failure(
     _report(
         exception,
         operation_name=operation_name,
-        domain_name=_domain_for_operation(operation_name),
+        domain_name=_domain_for_request(request),
         kind_name=error_kind.value,
         log_event_name="unhandled_exception",
         level_name="error",
@@ -222,7 +180,6 @@ def report_cleanup_failure(exception: BaseException) -> None:
 
 
 __all__ = [
-    "ROUTE_OPERATIONS",
     "operation_for_request",
     "report_backend_failure",
     "report_cleanup_failure",

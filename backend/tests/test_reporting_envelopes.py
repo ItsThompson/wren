@@ -109,22 +109,22 @@ def _upstream_connect_error() -> httpx.ConnectError:
 
 
 def _upstream_boom_router() -> APIRouter:
-    router = APIRouter()
+    router = APIRouter(tags=["roadmaps"])
 
     @router.get("/roadmaps/{roadmap_id}")
-    async def boom(user_id: str = Depends(require_internal_user)) -> None:
+    async def get_roadmap(user_id: str = Depends(require_internal_user)) -> None:
         raise _upstream_connect_error()
 
     return router
 
 
 def _mapped_internal_boom_router() -> APIRouter:
-    router = APIRouter()
+    router = APIRouter(tags=["roadmaps"])
 
     # The secret-bearing message is assembled at runtime: frame source-context
     # lines inlined into the envelope would otherwise contain its literal.
     @router.get("/roadmaps/{roadmap_id}/overview")
-    async def boom(user_id: str = Depends(require_internal_user)) -> None:
+    async def get_overview(user_id: str = Depends(require_internal_user)) -> None:
         raise RuntimeError("secret database detail: postgres://admin:" + "hunter2" + "@host")
 
     return router
@@ -142,12 +142,12 @@ def _unmapped_boom_router() -> APIRouter:
 
 def _concurrent_boom_router() -> APIRouter:
     """Hold both requests at the handler boundary so their scopes overlap."""
-    router = APIRouter()
+    router = APIRouter(tags=["roadmaps"])
     arrived = 0
     release: asyncio.Event | None = None
 
     @router.get("/roadmaps/{roadmap_id}/overview")
-    async def boom(user_id: str = Depends(require_internal_user)) -> None:
+    async def get_overview(user_id: str = Depends(require_internal_user)) -> None:
         nonlocal arrived, release
         if release is None:
             release = asyncio.Event()
@@ -183,10 +183,10 @@ def _routine_4xx_router() -> APIRouter:
 
 
 def _oauth_error_router(*, status: int, error: OAuthErrorCode) -> APIRouter:
-    router = APIRouter()
+    router = APIRouter(tags=["oauth"])
 
     @router.post("/token")
-    async def oauth_error() -> None:
+    async def token() -> None:
         raise OAuthError(error, "protocol failure", status=status)
 
     return router
@@ -216,19 +216,26 @@ def test_mapped_authenticated_500_emits_exactly_one_log_and_envelope(
     fault_logs = [call for call in cap.calls if call.method_name == "error"]
     assert len(fault_logs) == 1
     assert fault_logs[0].args == ("unhandled_exception",)
-    assert fault_logs[0].kwargs["operation"] == "roadmaps.overview"
+    assert (
+        fault_logs[0].kwargs["operation"]
+        == "roadmaps.get_overview_roadmaps__roadmap_id__overview_get"
+    )
     assert fault_logs[0].kwargs["domain"] == "roadmaps"
     assert isinstance(fault_logs[0].kwargs["exc_info"], RuntimeError)
 
     assert len(transport.events) == 1
     event = transport.events[0]
     assert event["release"] == f"wren-api@{TEST_RELEASE}"
-    assert event["tags"]["operation"] == "roadmaps.overview"
+    assert event["tags"]["operation"] == "roadmaps.get_overview_roadmaps__roadmap_id__overview_get"
     assert event["tags"]["domain"] == "roadmaps"
     assert event["tags"]["error_kind"] == "internal"
     assert event["tags"]["service"] == "wren-external"
     assert event["user"] == {"id": "user-ada"}
-    assert event["fingerprint"] == ["roadmaps.overview", "internal", "{{ default }}"]
+    assert event["fingerprint"] == [
+        "roadmaps.get_overview_roadmaps__roadmap_id__overview_get",
+        "internal",
+        "{{ default }}",
+    ]
 
 
 def test_upstream_500_envelope_is_scrubbed_across_the_exception_chain(
@@ -254,7 +261,7 @@ def test_upstream_500_envelope_is_scrubbed_across_the_exception_chain(
     assert "hunter2" not in serialized
 
 
-def test_unmapped_500_reports_http_500_operation_without_domain(
+def test_route_without_reporting_domain_uses_safe_500_operation(
     make_settings: MakeSettings, transport: RecordingTransport
 ) -> None:
     client = _client(make_settings, _unmapped_boom_router())
@@ -315,7 +322,7 @@ def test_oauth_client_error_emits_zero_envelopes_and_server_error_one(
     assert fault_logs[0].args == ("unhandled_exception",)
     assert len(transport.events) == 1
     event = transport.events[0]
-    assert event["tags"]["operation"] == "oauth.token"
+    assert event["tags"]["operation"] == "oauth.token_token_post"
     assert event["tags"]["domain"] == "oauth"
     assert event["tags"]["service"] == "wren-external"
 

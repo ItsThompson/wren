@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 from wren_common.reporting_types import Domain, GroupKey, Kind, LogEvent, Operation, ReportLevel
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
     from enum import StrEnum
 
 
@@ -26,66 +25,6 @@ def _enum_value(value: object, enum: type[StrEnum]) -> str | None:
     except ValueError:
         return None
 
-
-def _registered_operation_factory(*operations: str) -> Callable[[str, frozenset[str] | None], bool]:
-    registered = frozenset(operations)
-
-    def is_registered(operation: str, _registered_tools: frozenset[str] | None) -> bool:
-        return operation in registered
-
-    return is_registered
-
-
-_OPERATION_FACTORIES: dict[str, Callable[[str, frozenset[str] | None], bool]] = {
-    Domain.ACCOUNTS.value: _registered_operation_factory(
-        "accounts.register",
-        "accounts.login",
-        "accounts.refresh",
-        "accounts.logout",
-        "accounts.complete_onboarding",
-        "accounts.profile",
-    ),
-    Domain.DB.value: _registered_operation_factory(),
-    Domain.OAUTH.value: _registered_operation_factory(
-        "oauth.metadata",
-        "oauth.jwks",
-        "oauth.register_client",
-        "oauth.authorize",
-        "oauth.authorize_context",
-        "oauth.authorize_decision",
-        "oauth.token",
-        "oauth.revoke",
-        "oauth.list_clients",
-        "oauth.revoke_client",
-        "oauth.cleanup",
-    ),
-    Domain.PROGRESS.value: _registered_operation_factory(
-        "progress.follow",
-        "progress.get",
-        "progress.update",
-        "progress.next",
-        "progress.deadline",
-    ),
-    Domain.ROADMAPS.value: _registered_operation_factory(
-        "roadmaps.create",
-        "roadmaps.get",
-        "roadmaps.patch",
-        "roadmaps.replace",
-        "roadmaps.validate",
-        "roadmaps.publish",
-        "roadmaps.fork",
-        "roadmaps.edit_metadata",
-        "roadmaps.overview",
-        "roadmaps.node",
-        "roadmaps.section",
-        "roadmaps.search",
-        "roadmaps.published_visibility",
-        "roadmaps.archive",
-        "roadmaps.delete",
-        "roadmaps.dashboard",
-    ),
-    Domain.SKILL.value: _registered_operation_factory("skill.get"),
-}
 
 _FIXED_MCP_OPERATIONS = frozenset({"mcp.backend_error", "mcp.internal_request"})
 
@@ -156,13 +95,10 @@ def make_reporting_contract(
     elif normalized_domain is None:
         invalid.append("domain")
     else:
-        if normalized_domain == Domain.MCP.value:
-            if not _mcp_operation_is_registered(normalized_operation, registered_tools):
-                invalid.append("operation")
-        else:
-            operation_factory = _OPERATION_FACTORIES[normalized_domain]
-            if not operation_factory(normalized_operation, registered_tools):
-                invalid.append("operation")
+        if normalized_domain == Domain.MCP.value and not _mcp_operation_is_registered(
+            normalized_operation, registered_tools
+        ):
+            invalid.append("operation")
         prefix = normalized_operation.split(".", 1)[0]
         if not (
             prefix == normalized_domain

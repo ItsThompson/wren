@@ -190,17 +190,16 @@ def test_report_error_skips_invalid_operation_and_emits_field_names_only() -> No
     report.assert_not_called()
 
 
-def test_contract_factory_rejects_unregistered_operation() -> None:
-    with pytest.raises(ReportingContractError) as error:
-        make_reporting_contract(
-            operation="roadmaps.arbitrary",
-            domain=Domain.ROADMAPS,
-            kind=Kind.INTERNAL,
-            log_event=LogEvent.UNHANDLED_EXCEPTION,
-            level=ReportLevel.ERROR,
-        )
+def test_contract_factory_accepts_bounded_domain_scoped_operation() -> None:
+    contract = make_reporting_contract(
+        operation="roadmaps.get_roadmap_roadmaps__roadmap_id__get",
+        domain=Domain.ROADMAPS,
+        kind=Kind.INTERNAL,
+        log_event=LogEvent.UNHANDLED_EXCEPTION,
+        level=ReportLevel.ERROR,
+    )
 
-    assert error.value.fields == ("operation",)
+    assert contract.operation == "roadmaps.get_roadmap_roadmaps__roadmap_id__get"
 
 
 def test_contract_factory_enforces_operation_domain_pair() -> None:
@@ -213,7 +212,7 @@ def test_contract_factory_enforces_operation_domain_pair() -> None:
             level=ReportLevel.ERROR,
         )
 
-    assert error.value.fields == ("operation", "domain")
+    assert error.value.fields == ("domain",)
 
 
 def test_contract_factory_accepts_tool_operations_only_from_the_registered_set() -> None:
