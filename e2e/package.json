@@ -7,7 +7,7 @@
   "scripts": {
     "test": "playwright test",
     "test:ui": "playwright test --ui",
-    "test:unit": "node --experimental-strip-types --test helpers/*.test.ts",
+    "test:unit": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint --type-aware .",
     "report": "playwright show-report"
@@ -17,6 +17,7 @@
     "@types/node": "^22.10.0",
     "oxlint": "^1.71.0",
     "oxlint-tsgolint": "^7.0.2002",
-    "typescript": "~6.0.2"
+    "typescript": "~6.0.2",
+    "vitest": "^4.1.10"
   }
 }

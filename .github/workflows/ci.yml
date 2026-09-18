@@ -290,11 +290,17 @@ jobs:
       - name: Prepare trusted E2E environment
         run: just setup-e2e
 
+      - name: Run E2E package quality gates
+        run: |
+          just e2e-typecheck
+          just e2e-lint
+          just test-e2e-unit
+
       - name: Start production HTTPS E2E topology
         run: just e2e-up
 
-      - name: Run E2E static checks and Playwright
-        run: just test-e2e
+      - name: Run Playwright system tests
+        run: just test-e2e-system
         env:
           CI: true
 

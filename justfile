@@ -252,6 +252,15 @@ test-e2e:
     npm run test:unit
     npx playwright test
 
+# Run only the Playwright suite against an already-running E2E stack.
+test-e2e-system:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export NODE_EXTRA_CA_CERTS="{{e2e_ca}}"
+    export RECORDER_CONTROL_TOKEN="$(cat {{e2e_token}})"
+    cd e2e
+    npx playwright test
+
 e2e-typecheck:
     cd e2e && npm run typecheck
 
