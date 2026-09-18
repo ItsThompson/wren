@@ -12,6 +12,7 @@ class RecorderServerTest(unittest.TestCase):
     def setUp(self) -> None:
         server.TOKEN = "test-control-token"
         server.ENVELOPES.clear()
+        server.STORED_BYTES = 0
         self.httpd = server.ThreadingHTTPServer(("127.0.0.1", 0), server.RecorderHandler)
         self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
         self.thread.start()
@@ -64,10 +65,27 @@ class RecorderServerTest(unittest.TestCase):
         status, _ = self.request(
             "POST",
             "/_e2e/sentry/api/1/envelope/",
-            declared_length=1_048_576 + 1,
+            declared_length=server.MAX_ENVELOPE_BYTES + 1,
         )
         self.assertEqual(status, 413)
         self.assertEqual(server.ENVELOPES, [])
+
+    def test_evicts_old_envelopes_at_storage_bounds(self) -> None:
+        original_count = server.MAX_STORED_ENVELOPES
+        original_bytes = server.MAX_STORED_BYTES
+        server.MAX_STORED_ENVELOPES = 2
+        server.MAX_STORED_BYTES = 8
+        try:
+            for envelope in (b"one", b"two", b"three"):
+                status, _ = self.request(
+                    "POST", "/_e2e/sentry/api/1/envelope/", body=envelope
+                )
+                self.assertEqual(status, 200)
+            self.assertEqual(server.ENVELOPES, [b"two", b"three"])
+            self.assertEqual(server.STORED_BYTES, len(b"two") + len(b"three"))
+        finally:
+            server.MAX_STORED_ENVELOPES = original_count
+            server.MAX_STORED_BYTES = original_bytes
 
 
 if __name__ == "__main__":
