@@ -207,32 +207,54 @@ render-alertmanager:
     envsubst '$DISCORD_WEBHOOK_URL' \
       < deployments/alertmanager/alertmanager.yml
 
-# --- E2E (Playwright, full stack) -------------------------------------------
+# --- E2E (Playwright, production-mode HTTPS stack) --------------------------
 
-# Every e2e compose invocation layers the e2e overlay (published frontend +
-# backend ports, relaxed cookies) on the base stack. Test-only: a real deploy
-# never uses this overlay (deploy.sh composes base + docker-compose.tunnel.yml).
 e2e_compose := "-f docker-compose.yml -f e2e/docker-compose.e2e.yml"
+e2e_root := justfile_directory()
+e2e_ca := e2e_root + "/e2e/ingress/certificates/caroot/rootCA.pem"
+e2e_token := e2e_root + "/e2e/keys/recorder-control-token"
 
-# Install the Playwright runner + the chromium browser (run once).
+# Install dependencies, prepare isolated hosts and trust, and generate test-only
+# OAuth material. The production stack never uses these generated files.
 setup-e2e:
-    cd e2e && npm ci && npx playwright install --with-deps chromium
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ "$(uname -s)" == "Linux" ]]; then (cd e2e && npm ci && npx playwright install --with-deps chromium); else (cd e2e && npm ci && npx playwright install chromium); fi
+    if [[ -w /etc/hosts ]]; then scripts/e2e/setup-hosts.sh; else sudo scripts/e2e/setup-hosts.sh; fi
+    scripts/e2e/setup-certificates.sh
+    scripts/e2e/setup-oauth-key.sh
 
-# Build + boot the e2e stack (published ports) and run pre-traffic migrations.
-# Both `up` and the migration `run` materialize the environment-sourced
-# Prometheus config, so export the vars for the whole recipe.
+# Migrate the disposable database before starting the focused ingress graph.
+# Only ingress publishes host port 443; all application services stay private.
 e2e-up:
     #!/usr/bin/env bash
     set -euo pipefail
     export WREN_PROMETHEUS_CONFIG="$(cat deployments/prometheus/prometheus.yml)"
     export WREN_PROMETHEUS_ALERTS="$(cat deployments/prometheus/alerts.yml)"
-    docker compose {{e2e_compose}} up -d --build
-    docker compose {{e2e_compose}} run --rm backend alembic upgrade head
+    scripts/e2e/setup-oauth-key.sh
+    export RECORDER_CONTROL_TOKEN="$(cat {{e2e_token}})"
+    export NODE_EXTRA_CA_CERTS="{{e2e_ca}}"
+    docker compose {{e2e_compose}} build frontend backend mcp recorder ingress
+    docker compose {{e2e_compose}} up -d --wait postgres
+    docker compose {{e2e_compose}} run --rm --no-deps backend alembic upgrade head
+    docker compose {{e2e_compose}} up -d ingress
+    FRONTEND_BASE_URL=https://app.wren.test API_BASE_URL=https://api.wren.test MCP_BASE_URL=https://mcp.wren.test scripts/e2e/wait-ready.sh
 
-# Run the Playwright spine + smoke against the running e2e stack.
+# Run the Playwright suite through trusted HTTPS and Node's configured CA.
 test-e2e:
-    cd e2e && npx playwright test
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export NODE_EXTRA_CA_CERTS="{{e2e_ca}}"
+    export RECORDER_CONTROL_TOKEN="$(cat {{e2e_token}})"
+    cd e2e
+    npx playwright test
 
-# Tear down the e2e stack and drop its named volumes.
+# Tear down containers, networks, volumes, and generated OAuth material.
 e2e-down:
-    docker compose {{e2e_compose}} down -v
+    docker compose {{e2e_compose}} down -v --remove-orphans
+    scripts/e2e/cleanup-generated.sh
+
+# Remove only the Wren-managed host entries and isolated CA/leaf material.
+reset-e2e-trust:
+    if [[ -w /etc/hosts ]]; then scripts/e2e/reset-hosts.sh; else sudo scripts/e2e/reset-hosts.sh; fi
+    scripts/e2e/reset-certificates.sh
