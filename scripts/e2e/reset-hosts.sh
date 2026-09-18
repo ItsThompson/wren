@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=host-file-lib.sh
+source "$SCRIPT_DIR/host-file-lib.sh"
+
 HOSTS_FILE=${WREN_E2E_HOSTS_FILE:-/etc/hosts}
 MARKER_START="# BEGIN WREN E2E MANAGED HOSTS"
 MARKER_END="# END WREN E2E MANAGED HOSTS"
@@ -20,20 +24,14 @@ if ! mkdir "$LOCK_DIR" 2>/dev/null; then
 fi
 trap 'rmdir "$LOCK_DIR"' EXIT
 
-if ! grep -q -F "$MARKER_START" "$HOSTS_FILE"; then
+if grep -q -F "$MARKER_START" "$HOSTS_FILE" || grep -q -F "$MARKER_END" "$HOSTS_FILE"; then
+  validate_managed_markers "$HOSTS_FILE" "$MARKER_START" "$MARKER_END"
+else
   printf 'hosts: no Wren-managed block found\n'
   exit 0
 fi
-if [[ "$(grep -c -F "$MARKER_START" "$HOSTS_FILE")" != "$(grep -c -F "$MARKER_END" "$HOSTS_FILE" || true)" ]]; then
-  printf 'hosts: managed block markers are unbalanced; refusing to edit %s\n' "$HOSTS_FILE" >&2
-  exit 1
-fi
 
-case "$(uname -s)" in
-  Darwin) original_mode="$(stat -f '%Lp' "$HOSTS_FILE")" ;;
-  Linux) original_mode="$(stat -c '%a' "$HOSTS_FILE")" ;;
-  *) printf 'hosts: unsupported operating system for portable mode preservation\n' >&2; exit 1 ;;
-esac
+original_mode="$(get_host_file_mode "$HOSTS_FILE")"
 if [[ ! "$original_mode" =~ ^[0-7]{3,4}$ ]]; then
   printf 'hosts: could not read the existing mode for %s\n' "$HOSTS_FILE" >&2
   exit 1

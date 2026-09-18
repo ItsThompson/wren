@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-KEY_DIR="${ROOT_DIR}/e2e/keys"
+KEY_DIR="${E2E_KEY_DIR:-${ROOT_DIR}/e2e/keys}"
 KEY_PATH="${KEY_DIR}/oauth-private.pem"
 TOKEN_PATH="${KEY_DIR}/recorder-control-token"
 mkdir -p "$KEY_DIR"
@@ -25,5 +25,8 @@ if [[ ! -s "$TOKEN_PATH" ]]; then
     printf '%s\n' "$TOKEN" > "$TOKEN_PATH"
   fi
 fi
-chmod 600 "$KEY_PATH" "$TOKEN_PATH"
+# The key is synthetic and mounted into the non-root backend container. The
+# recorder token remains owner-only because it never enters a container mount.
+chmod 644 "$KEY_PATH"
+chmod 600 "$TOKEN_PATH"
 printf 'oauth: E2E signing key and recorder control token are ready\n'
