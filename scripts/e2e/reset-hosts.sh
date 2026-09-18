@@ -29,6 +29,15 @@ if [[ "$(grep -c -F "$MARKER_START" "$HOSTS_FILE")" != "$(grep -c -F "$MARKER_EN
   exit 1
 fi
 
+case "$(uname -s)" in
+  Darwin) original_mode="$(stat -f '%Lp' "$HOSTS_FILE")" ;;
+  Linux) original_mode="$(stat -c '%a' "$HOSTS_FILE")" ;;
+  *) printf 'hosts: unsupported operating system for portable mode preservation\n' >&2; exit 1 ;;
+esac
+if [[ ! "$original_mode" =~ ^[0-7]{3,4}$ ]]; then
+  printf 'hosts: could not read the existing mode for %s\n' "$HOSTS_FILE" >&2
+  exit 1
+fi
 backup="${HOSTS_FILE}.wren-e2e.bak"
 cp "$HOSTS_FILE" "$backup"
 tmp="$(mktemp "${HOSTS_FILE}.wren-e2e.XXXXXX")"
@@ -45,5 +54,6 @@ if grep -q -F "$MARKER_START" "$tmp"; then
   printf 'hosts: reset validation failed; original preserved at %s\n' "$backup" >&2
   exit 1
 fi
+chmod "$original_mode" "$tmp"
 mv "$tmp" "$HOSTS_FILE"
 printf 'hosts: removed Wren-managed entries; unrelated entries preserved\n'

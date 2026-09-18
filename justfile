@@ -240,14 +240,26 @@ e2e-up:
     docker compose {{e2e_compose}} up -d ingress
     FRONTEND_BASE_URL=https://app.wren.test API_BASE_URL=https://api.wren.test MCP_BASE_URL=https://mcp.wren.test scripts/e2e/wait-ready.sh
 
-# Run the Playwright suite through trusted HTTPS and Node's configured CA.
+# Run E2E static checks and the Playwright suite through trusted HTTPS.
 test-e2e:
     #!/usr/bin/env bash
     set -euo pipefail
     export NODE_EXTRA_CA_CERTS="{{e2e_ca}}"
     export RECORDER_CONTROL_TOKEN="$(cat {{e2e_token}})"
     cd e2e
+    npm run typecheck
+    npm run lint
+    npm run test:unit
     npx playwright test
+
+e2e-typecheck:
+    cd e2e && npm run typecheck
+
+e2e-lint:
+    cd e2e && npm run lint
+
+test-e2e-unit:
+    cd e2e && npm run test:unit
 
 # Tear down containers, networks, volumes, and generated OAuth material.
 e2e-down:

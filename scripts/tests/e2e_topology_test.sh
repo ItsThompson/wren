@@ -3,6 +3,7 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$root"
+python3 scripts/e2e/test_public_contracts.py >/dev/null
 
 hosts="$(mktemp)"
 trap 'rm -f "$hosts" "$hosts.wren-e2e.bak" /tmp/wren-e2e-compose.json' EXIT
@@ -21,6 +22,11 @@ WREN_E2E_HOSTS_FILE="$hosts" scripts/e2e/setup-hosts.sh >/dev/null
 test "$(grep -c 'BEGIN WREN E2E MANAGED HOSTS' "$hosts")" -eq 1
 grep -q unrelated.test "$hosts"
 WREN_E2E_HOSTS_FILE="$hosts" scripts/e2e/reset-hosts.sh >/dev/null
+case "$(uname -s)" in
+  Darwin) reset_mode="$(stat -f '%Lp' "$hosts")" ;;
+  Linux) reset_mode="$(stat -c '%a' "$hosts")" ;;
+esac
+test "$reset_mode" = "$original_mode"
 grep -q unrelated.test "$hosts"
 ! grep -q 'WREN E2E MANAGED HOSTS' "$hosts"
 
@@ -30,12 +36,37 @@ python3 - <<'PY'
 import json
 
 services = json.load(open('/tmp/wren-e2e-compose.json'))['services']
-assert {'frontend', 'backend', 'mcp', 'postgres', 'recorder', 'ingress'} <= services.keys()
+expected = {'frontend', 'backend', 'mcp', 'postgres', 'recorder', 'ingress'}
+
+def dependency_closure(service: str, seen: set[str]) -> None:
+    if service in seen:
+        return
+    seen.add(service)
+    for dependency in services[service].get('depends_on', {}):
+        dependency_closure(dependency, seen)
+
+focused = set()
+dependency_closure('ingress', focused)
+assert focused == expected, focused
 for service in ('frontend', 'backend', 'mcp', 'postgres', 'recorder'):
     assert not services[service].get('ports'), service
 assert services['ingress']['ports'][0]['published'] == '443'
 assert services['backend']['environment']['ENVIRONMENT'] == 'production'
 assert services['mcp']['environment']['ENVIRONMENT'] == 'production'
+assert services['ingress']['depends_on']['mcp']['condition'] == 'service_started'
+assert services['backend']['depends_on']['postgres']['condition'] == 'service_healthy'
+assert services['mcp']['depends_on']['backend']['condition'] == 'service_healthy'
+PY
+
+startup_plan="$(just --dry-run e2e-up 2>&1)"
+python3 - "$startup_plan" <<'PY'
+import sys
+
+plan = sys.argv[1]
+postgres = plan.index('up -d --wait postgres')
+migration = plan.index('run --rm --no-deps backend alembic upgrade head')
+ingress = plan.index('up -d ingress')
+assert postgres < migration < ingress
 PY
 
 printf 'e2e topology tests: ok\n'
