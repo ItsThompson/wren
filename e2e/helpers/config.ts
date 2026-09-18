@@ -25,13 +25,48 @@ function loadEnvTest(): void {
 loadEnvTest()
 
 /** The SPA origin Playwright drives in the browser. */
-export const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL ?? 'https://app.wren.test'
+export const FRONTEND_BASE_URL = readCanonicalPublicUrl(
+  'FRONTEND_BASE_URL',
+  'https://app.wren.test',
+  'app.wren.test',
+)
 
 /** The external-app origin the APIRequestContext seeds and reads against. */
-export const API_BASE_URL = process.env.API_BASE_URL ?? 'https://api.wren.test'
+export const API_BASE_URL = readCanonicalPublicUrl(
+  'API_BASE_URL',
+  'https://api.wren.test',
+  'api.wren.test',
+)
 
 /** The MCP Resource Server origin the mounted transport exposes to agents. */
-export const MCP_BASE_URL = process.env.MCP_BASE_URL ?? 'https://mcp.wren.test'
+export const MCP_BASE_URL = readCanonicalPublicUrl(
+  'MCP_BASE_URL',
+  'https://mcp.wren.test',
+  'mcp.wren.test',
+)
+
+function readCanonicalPublicUrl(name: string, fallback: string, expectedHostname: string): string {
+  const rawValue = process.env[name] ?? fallback
+  let parsedUrl: URL
+  try {
+    parsedUrl = new URL(rawValue)
+  } catch {
+    throw new Error(`${name} must be the canonical HTTPS origin https://${expectedHostname}`)
+  }
+  if (
+    parsedUrl.protocol !== 'https:' ||
+    parsedUrl.hostname !== expectedHostname ||
+    parsedUrl.port !== '' ||
+    parsedUrl.pathname !== '/' ||
+    parsedUrl.search !== '' ||
+    parsedUrl.hash !== '' ||
+    parsedUrl.username !== '' ||
+    parsedUrl.password !== ''
+  ) {
+    throw new Error(`${name} must be the canonical HTTPS origin https://${expectedHostname}`)
+  }
+  return parsedUrl.origin
+}
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 

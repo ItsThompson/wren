@@ -251,6 +251,9 @@ test-e2e:
 
 # Tear down containers, networks, volumes, and generated OAuth material.
 e2e-down:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ -r "{{e2e_token}}" ]]; then export RECORDER_CONTROL_TOKEN="$(cat "{{e2e_token}}")"; else export RECORDER_CONTROL_TOKEN=teardown-placeholder; fi
     docker compose {{e2e_compose}} down -v --remove-orphans
     scripts/e2e/cleanup-generated.sh
 

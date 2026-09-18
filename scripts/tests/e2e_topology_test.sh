@@ -7,7 +7,16 @@ cd "$root"
 hosts="$(mktemp)"
 trap 'rm -f "$hosts" "$hosts.wren-e2e.bak" /tmp/wren-e2e-compose.json' EXIT
 printf '127.0.0.1 unrelated.test\n' > "$hosts"
+case "$(uname -s)" in
+  Darwin) original_mode="$(stat -f '%Lp' "$hosts")" ;;
+  Linux) original_mode="$(stat -c '%a' "$hosts")" ;;
+esac
 WREN_E2E_HOSTS_FILE="$hosts" scripts/e2e/setup-hosts.sh >/dev/null
+case "$(uname -s)" in
+  Darwin) updated_mode="$(stat -f '%Lp' "$hosts")" ;;
+  Linux) updated_mode="$(stat -c '%a' "$hosts")" ;;
+esac
+test "$updated_mode" = "$original_mode"
 WREN_E2E_HOSTS_FILE="$hosts" scripts/e2e/setup-hosts.sh >/dev/null
 test "$(grep -c 'BEGIN WREN E2E MANAGED HOSTS' "$hosts")" -eq 1
 grep -q unrelated.test "$hosts"

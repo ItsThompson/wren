@@ -38,6 +38,15 @@ for host in app.wren.test api.wren.test mcp.wren.test; do
   fi
 done
 
+case "$(uname -s)" in
+  Darwin) original_mode="$(stat -f '%Lp' "$HOSTS_FILE")" ;;
+  Linux) original_mode="$(stat -c '%a' "$HOSTS_FILE")" ;;
+  *) printf 'hosts: unsupported operating system for portable mode preservation\n' >&2; exit 1 ;;
+esac
+if [[ ! "$original_mode" =~ ^[0-7]{3,4}$ ]]; then
+  printf 'hosts: could not read the existing mode for %s\n' "$HOSTS_FILE" >&2
+  exit 1
+fi
 backup="${HOSTS_FILE}.wren-e2e.bak"
 cp "$HOSTS_FILE" "$backup"
 tmp="$(mktemp "${HOSTS_FILE}.wren-e2e.XXXXXX")"
@@ -59,6 +68,6 @@ if ! grep -q -F "$MARKER_START" "$tmp" || ! grep -q '127\.0\.0\.1 app\.wren\.tes
   printf 'hosts: generated file failed validation; original preserved at %s\n' "$backup" >&2
   exit 1
 fi
-chmod --reference="$HOSTS_FILE" "$tmp" 2>/dev/null || true
+chmod "$original_mode" "$tmp"
 mv "$tmp" "$HOSTS_FILE"
 printf 'hosts: configured app.wren.test, api.wren.test, and mcp.wren.test\n'
