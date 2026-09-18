@@ -266,8 +266,8 @@ e2e-down:
     #!/usr/bin/env bash
     set -euo pipefail
     if [[ -r "{{e2e_token}}" ]]; then export RECORDER_CONTROL_TOKEN="$(cat "{{e2e_token}}")"; else export RECORDER_CONTROL_TOKEN=teardown-placeholder; fi
+    trap 'status=$?; trap - EXIT; scripts/e2e/cleanup-generated.sh || status=$?; exit "$status"' EXIT
     docker compose {{e2e_compose}} down -v --remove-orphans
-    scripts/e2e/cleanup-generated.sh
 
 # Remove only the Wren-managed host entries and isolated CA/leaf material.
 reset-e2e-trust:
