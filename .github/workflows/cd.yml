@@ -83,7 +83,6 @@ jobs:
       SENTRY_PROJECT_BACKEND: wren-backend
       SENTRY_PROJECT_MCP: wren-mcp
       SENTRY_PROJECT_FRONTEND: wren-frontend
-      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -101,6 +100,7 @@ jobs:
 
       - name: Verify pinned Sentry CLI and prepare releases
         env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_CLI_BIN: ${{ github.workspace }}/frontend/node_modules/.bin/sentry-cli
         run: |
           set -euo pipefail
@@ -171,6 +171,20 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push ${{ matrix.service }}
+        if: ${{ matrix.service != 'frontend' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: true
+          tags: |
+            ghcr.io/${{ steps.owner.outputs.owner }}/wren/${{ matrix.service }}:latest
+            ghcr.io/${{ steps.owner.outputs.owner }}/wren/${{ matrix.service }}:sha-${{ env.DEPLOY_SHA }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push frontend
+        if: ${{ matrix.service == 'frontend' }}
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
@@ -200,6 +214,8 @@ jobs:
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      health_gate_passed: ${{ steps.deploy-application.outputs.health_gate_passed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -264,16 +280,20 @@ jobs:
             echo 'deploy did not emit a result; rollback is disabled'
             echo 'failed_phase=unknown' >> "$GITHUB_OUTPUT"
             echo 'rollback_eligible=false' >> "$GITHUB_OUTPUT"
+            echo 'health_gate_passed=false' >> "$GITHUB_OUTPUT"
             exit "${validation_rc}"
           fi
           if ! jq -e '
             (.status == "success" or .status == "failed")
             and (.phase | IN("preflight", "pull", "migration", "startup", "health_gate", "post_health", "complete"))
             and (.rollback_eligible | type == "boolean")
+            and (.health_gate_passed | type == "boolean")
+            and (((.phase == "post_health" or .phase == "complete")) == .health_gate_passed)
           ' "${result_file}" >/dev/null 2>&1; then
             echo 'deploy emitted malformed result; rollback is disabled'
             echo 'failed_phase=unknown' >> "$GITHUB_OUTPUT"
             echo 'rollback_eligible=false' >> "$GITHUB_OUTPUT"
+            echo 'health_gate_passed=false' >> "$GITHUB_OUTPUT"
             exit "${validation_rc}"
           fi
           phase="$(jq -r '.phase' "${result_file}")"
@@ -286,10 +306,13 @@ jobs:
             echo 'deploy emitted inconsistent rollback eligibility; rollback is disabled'
             echo 'failed_phase=unknown' >> "$GITHUB_OUTPUT"
             echo 'rollback_eligible=false' >> "$GITHUB_OUTPUT"
+            echo 'health_gate_passed=false' >> "$GITHUB_OUTPUT"
             exit "${validation_rc}"
           fi
+          health_gate_passed="$(jq -r '.health_gate_passed' "${result_file}")"
           echo "failed_phase=${phase}" >> "$GITHUB_OUTPUT"
           echo "rollback_eligible=${emitted}" >> "$GITHUB_OUTPUT"
+          echo "health_gate_passed=${health_gate_passed}" >> "$GITHUB_OUTPUT"
           exit "${deploy_rc}"
 
       # CI-owned rollback (design note 5.2). On any failure above, read the
@@ -335,7 +358,7 @@ jobs:
   # ---------------------------------------------------------------------------
   finalize-sentry-releases:
     needs: [deploy]
-    if: ${{ needs.deploy.result == 'success' }}
+    if: ${{ always() && needs.deploy.outputs.health_gate_passed == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -343,7 +366,6 @@ jobs:
       SENTRY_PROJECT_BACKEND: wren-backend
       SENTRY_PROJECT_MCP: wren-mcp
       SENTRY_PROJECT_FRONTEND: wren-frontend
-      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -361,6 +383,7 @@ jobs:
 
       - name: Verify pinned Sentry CLI and finalize releases
         env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_CLI_BIN: ${{ github.workspace }}/frontend/node_modules/.bin/sentry-cli
         run: |
           set -euo pipefail

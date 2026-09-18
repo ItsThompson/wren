@@ -1,6 +1,7 @@
 import type { RouteObject } from 'react-router'
 
 import { AppShell } from '@/components/AppShell'
+import { ErrorBoundaryFallback } from '@/components/ErrorBoundaryFallback'
 import { OnboardingGate } from '@/components/OnboardingGate'
 import { PageTitle } from '@/components/PageTitle'
 import { AuthView } from '@/views/AuthView'
@@ -26,6 +27,7 @@ export const appRoutes: RouteObject[] = [
     // Its own guard bounces onboarded/anonymous users; the wizard renders only
     // for a signed-in, un-onboarded user.
     path: '/onboarding',
+    errorElement: <ErrorBoundaryFallback />,
     element: (
       <PageTitle title="Get started">
         <OnboardingRouteGuard>
@@ -36,6 +38,7 @@ export const appRoutes: RouteObject[] = [
   },
   {
     path: '/',
+    errorElement: <ErrorBoundaryFallback />,
     element: <AppShell />,
     children: [
       // Ungated (public or exempt). `/authorize` is the OAuth-consent surface:

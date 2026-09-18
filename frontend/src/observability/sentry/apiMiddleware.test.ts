@@ -34,6 +34,17 @@ function baseParams(schemaPath: string): MiddlewareCallbackParams {
 }
 
 describe('createApiReportingMiddleware', () => {
+  it.each([200, 404, 409, 422])('skips successful and expected %i responses before reporting', async (status) => {
+    const { middleware } = createApiReportingMiddleware()
+
+    await middleware.onResponse?.({
+      ...baseParams('/me/dashboard'),
+      response: new Response(null, { status }),
+    })
+
+    expect(reportApiFailure).not.toHaveBeenCalled()
+  })
+
   it('reports unknown method/schema-path pairs through a field-name diagnostic', async () => {
     const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const { middleware } = createApiReportingMiddleware()

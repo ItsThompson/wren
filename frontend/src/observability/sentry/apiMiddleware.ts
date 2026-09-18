@@ -2,6 +2,7 @@ import type { Middleware } from 'openapi-fetch'
 
 import { operationRegistry, type OperationId, type OperationKey } from '@/api/operationRegistry.generated'
 
+import { isReportableApiFailure } from './classify'
 import { reportApiFailure } from './report'
 
 /**
@@ -56,6 +57,8 @@ function reportResponseAttempt(
 export function createApiReportingMiddleware(): ApiReportingController {
   const middleware: Middleware = {
     async onResponse({ request, response, schemaPath }) {
+      if (!isReportableApiFailure({ status: response.status })) return undefined
+
       let operationId: OperationId
       try {
         operationId = operationIdFor(request.method, schemaPath)

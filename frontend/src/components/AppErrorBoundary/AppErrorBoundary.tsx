@@ -48,7 +48,7 @@ export function AppErrorBoundary({ children }: AppErrorBoundaryProps) {
 
   return (
     <Sentry.ErrorBoundary
-      fallback={ErrorBoundaryFallback}
+      fallback={<ErrorBoundaryFallback />}
       beforeCapture={(scope, error) => {
         applyRenderCaptureTags(scope)
         causeSnapshots.current.set(error, snapshotCauseChain(error))

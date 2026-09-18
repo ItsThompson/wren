@@ -225,3 +225,23 @@ def test_empty_dsn_never_touches_the_transport() -> None:
 
     assert transport.events == []
     assert sentry_module._SERVICE is None
+
+
+def test_empty_dsn_cannot_capture_through_a_stale_sdk_client() -> None:
+    stale_transport = RecordingTransport()
+    _init(stale_transport)
+    sentry_module._initialized = False
+    sentry_module._SERVICE = None
+
+    assert (
+        sentry_module.initialize_sentry(
+            dsn="",
+            environment="production",
+            release="",
+            service="wren-external",
+        )
+        is False
+    )
+    _report(RuntimeError("boom"))
+
+    assert stale_transport.events == []

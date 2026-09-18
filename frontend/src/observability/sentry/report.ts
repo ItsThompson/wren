@@ -8,11 +8,12 @@ import {
   type OperationKey,
 } from '@/api/operationRegistry.generated'
 
-import { classifyApiFailure, type ApiFailureKind } from './classify'
+import { classifyApiFailure, isReportableApiFailure, type ApiFailureKind } from './classify'
 
-// Render failures own one fixed operation. It is never a valid API operation:
-// API reports accept only generated OpenAPI registry operations.
+// UI failures use fixed operations that cannot collide with generated API
+// operations or accept route parameters.
 export const RENDER_OPERATION = 'render.app' as const
+const ROUTE_OPERATION = 'route.app' as const
 
 const API_OPERATION_IDS = new Set<string>(Object.values(operationRegistry))
 const KNOWN_DOMAINS = new Set<string>(Object.values(operationDomainRegistry))
@@ -150,6 +151,8 @@ function captureSafely(capture: () => void): void {
 
 export function reportApiFailure(report: ApiFailureReport): ApiFailureKind {
   const kind = classifyApiFailure(report)
+  if (!isReportableApiFailure(report)) return kind
+
   const invalidFields = invalidMetadataFields(report, kind)
   if (invalidFields.length > 0) {
     console.warn('reporting_contract_invalid', { fields: invalidFields })
@@ -169,18 +172,34 @@ export function reportApiFailure(report: ApiFailureReport): ApiFailureKind {
       scope.setTag('api.method', report.method)
       scope.setTag('api.failure_kind', kind)
       scope.setTag('api.domain', domain)
-      if (kind === 'validation') scope.setTag('expected', 'true')
       if (kind === 'network') scope.setLevel('warning')
       scope.setContext('report', { method: report.method, status: report.status })
+      scope.setFingerprint([report.operationId, kind, '{{ default }}'])
       Sentry.captureException(toError(report.error))
     })
   })
   return kind
 }
 
+type CaptureScope = Pick<Sentry.Scope, 'setFingerprint' | 'setTag'>
+
+function applyUiCaptureTags(scope: CaptureScope, operation: string): void {
+  scope.setTag('api.operation', operation)
+  scope.setTag('api.failure_kind', 'internal')
+  scope.setFingerprint([operation, 'internal', '{{ default }}'])
+}
+
 // Render capture enriches the SDK ErrorBoundary's own capture with the fixed
 // render taxonomy. It never routes through the API report helper.
-export function applyRenderCaptureTags(scope: Pick<Sentry.Scope, 'setTag'>): void {
-  scope.setTag('api.operation', RENDER_OPERATION)
-  scope.setTag('api.failure_kind', 'internal')
+export function applyRenderCaptureTags(scope: CaptureScope): void {
+  applyUiCaptureTags(scope, RENDER_OPERATION)
+}
+
+export function reportRouteError(error: unknown): void {
+  captureSafely(() => {
+    Sentry.withScope((scope) => {
+      applyUiCaptureTags(scope, ROUTE_OPERATION)
+      Sentry.captureException(error)
+    })
+  })
 }

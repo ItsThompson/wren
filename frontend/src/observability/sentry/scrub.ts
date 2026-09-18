@@ -52,7 +52,7 @@ function sanitizeTags(tags: Record<string, unknown>): Record<string, string> {
 }
 
 export function scrubSentryEvent<T extends Event>(event: T): T {
-  for (const field of ['request', 'breadcrumbs', 'extra', 'message', 'logentry'] as const) {
+  for (const field of ['request', 'breadcrumbs', 'extra', 'message', 'logentry', 'user'] as const) {
     delete event[field]
   }
 

@@ -293,6 +293,16 @@ test_cd_frontend_image_bakes_prod_api_and_mcp_origins() {
   contains "${workflow}" 'build-args: ${{ steps.frontend-build-args.outputs.value }}' || return 1
 }
 
+test_cd_scopes_sentry_token_and_finalizes_after_health() {
+  local workflow
+  workflow="$(cat "${REPO_DIR}/.github/workflows/cd.yml")"
+  equals "$(grep -c 'secrets.SENTRY_AUTH_TOKEN' <<< "${workflow}")" "3" || return 1
+  contains "${workflow}" "health_gate_passed:" || return 1
+  contains "${workflow}" "steps.deploy-application.outputs.health_gate_passed" || return 1
+  contains "${workflow}" "always() && needs.deploy.outputs.health_gate_passed == 'true'" || return 1
+  contains "${workflow}" "matrix.service == 'frontend'" || return 1
+}
+
 test_cd_rollback_is_phase_gated_and_legacy_safe() {
   local workflow
   workflow="$(cat "${REPO_DIR}/.github/workflows/cd.yml")"
@@ -438,9 +448,18 @@ test_deploy_result_is_closed_and_only_startup_health_can_roll_back() {
     equals "${actual}" "true" || { rm -f "${file}"; return 1; }
   done
   DEPLOY_PHASE=health_gate
+  DEPLOY_HEALTH_GATE_PASSED=true
   write_deploy_result 0
   equals "$(jq -r '.status' "${file}")" "success" || { rm -f "${file}"; return 1; }
   equals "$(jq -r '.phase' "${file}")" "complete" || { rm -f "${file}"; return 1; }
+  equals "$(jq -r '.rollback_eligible' "${file}")" "false" || { rm -f "${file}"; return 1; }
+  equals "$(jq -r '.health_gate_passed' "${file}")" "true" || { rm -f "${file}"; return 1; }
+
+  DEPLOY_PHASE=post_health
+  DEPLOY_HEALTH_GATE_PASSED=true
+  write_deploy_result 1
+  equals "$(jq -r '.status' "${file}")" "failed" || { rm -f "${file}"; return 1; }
+  equals "$(jq -r '.health_gate_passed' "${file}")" "true" || { rm -f "${file}"; return 1; }
   equals "$(jq -r '.rollback_eligible' "${file}")" "false" || { rm -f "${file}"; return 1; }
   rm -f "${file}"
 }
@@ -464,6 +483,7 @@ main_tests() {
   run_test test_compose_base_declares_environment_sourced_prometheus_configs
   run_test test_compose_deploy_overlay_feeds_app_env_from_env_prod_and_secrets
   run_test test_cd_frontend_image_bakes_prod_api_and_mcp_origins
+  run_test test_cd_scopes_sentry_token_and_finalizes_after_health
   run_test test_cd_rollback_is_phase_gated_and_legacy_safe
   run_test test_read_deployed_sha_returns_prev_and_refuses_on_empty
   run_test test_failed_gate_no_internal_redeploy

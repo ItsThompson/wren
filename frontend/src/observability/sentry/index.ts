@@ -8,6 +8,7 @@ export {
   isKnownBrowserDomain,
   isKnownBrowserFailureKind,
   reportApiFailure,
+  reportRouteError,
   RENDER_OPERATION,
 } from './report'
 export type { ApiFailureReport, BrowserDomain, BrowserFailureKind, ReportingOperation } from './report'

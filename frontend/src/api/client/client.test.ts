@@ -20,7 +20,12 @@ import { createApiClient } from './client'
 // exactly where a synchronous SDK failure would originate.
 
 const server = setupServer(...handlers)
-const scopeOps = { setTag: vi.fn(), setContext: vi.fn(), setLevel: vi.fn() }
+const scopeOps = {
+  setTag: vi.fn(),
+  setContext: vi.fn(),
+  setFingerprint: vi.fn(),
+  setLevel: vi.fn(),
+}
 const captureException = vi.spyOn(Sentry, 'captureException').mockImplementation(() => 'event-1')
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
@@ -53,29 +58,28 @@ describe('createApiClient', () => {
     expect(credentials).toBe('omit')
   })
 
-  it('reports validation responses and preserves the response', async () => {
+  it('skips reporting for validation responses and preserves the response', async () => {
     server.use(http.get('*/me/dashboard', () => new HttpResponse(null, { status: 422 })))
     const client = createApiClient('https://api.test')
 
     const { response } = await client.GET('/me/dashboard')
 
     expect(response.status).toBe(422)
-    expect(scopeOps.setTag).toHaveBeenCalledWith('expected', 'true')
-    expect(scopeOps.setTag).toHaveBeenCalledWith('api.failure_kind', 'validation')
-    expect(captureException).toHaveBeenCalledOnce()
+    expect(withScope).not.toHaveBeenCalled()
+    expect(captureException).not.toHaveBeenCalled()
   })
 
-  it('never replaces a response when the SDK fails synchronously', async () => {
+  it('never replaces a server response when the SDK fails synchronously', async () => {
     withScope.mockImplementationOnce(() => {
       throw new Error('synchronous SDK failure')
     })
     const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    server.use(http.get('*/me/dashboard', () => new HttpResponse(null, { status: 422 })))
+    server.use(http.get('*/me/dashboard', () => new HttpResponse(null, { status: 503 })))
     const client = createApiClient('https://api.test')
 
     const { response } = await client.GET('/me/dashboard')
 
-    expect(response.status).toBe(422)
+    expect(response.status).toBe(503)
     expect(consoleWarn).toHaveBeenCalledWith('reporting_failed')
     consoleWarn.mockRestore()
   })

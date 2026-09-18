@@ -59,6 +59,7 @@ SSH_OPTS=(-o ConnectTimeout=10 -o BatchMode=yes)
 DRY_RUN="${DRY_RUN:-0}"
 DEPLOY_RESULT_FILE="${DEPLOY_RESULT_FILE:-}"
 DEPLOY_PHASE="preflight"
+DEPLOY_HEALTH_GATE_PASSED=false
 
 # Set by configure(); declared here for clarity.
 SERVER_IP=""
@@ -120,7 +121,8 @@ write_deploy_result() {
     --arg status "${status}" \
     --arg phase "${DEPLOY_PHASE}" \
     --argjson rollback_eligible "${eligible}" \
-    '{status: $status, phase: $phase, rollback_eligible: $rollback_eligible}' \
+    --argjson health_gate_passed "${DEPLOY_HEALTH_GATE_PASSED}" \
+    '{status: $status, phase: $phase, rollback_eligible: $rollback_eligible, health_gate_passed: $health_gate_passed}' \
     > "${tmp}" 2>/dev/null; then
     rm -f "${tmp}"
     log "WARNING: cannot serialize deploy result; preserving exit status"
@@ -393,6 +395,7 @@ main() {
   set -euo pipefail
   trap on_deploy_exit EXIT
   set_deploy_phase preflight
+  DEPLOY_HEALTH_GATE_PASSED=false
   configure "$@"
   CURRENT_SHA="${DEPLOY_SHA:-$(git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null || echo "")}"
   log "=== Wren deploy -> context ${CONTEXT_NAME} (${SSH_TARGET}); dry-run=${DRY_RUN} ==="
@@ -414,6 +417,7 @@ main() {
     log "!!! health gate FAILED: deploy.sh exits non-zero (CI owns rollback)"
     die "deploy failed the health gate on context ${CONTEXT_NAME}"
   fi
+  DEPLOY_HEALTH_GATE_PASSED=true
 
   set_deploy_phase post_health
   sync_ops_scripts

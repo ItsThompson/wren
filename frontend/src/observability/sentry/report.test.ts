@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { captureException, setTag, setContext, setLevel, withScope } = vi.hoisted(() => ({
+const { captureException, setTag, setContext, setFingerprint, setLevel, withScope } = vi.hoisted(() => ({
   captureException: vi.fn(),
   setTag: vi.fn(),
   setContext: vi.fn(),
+  setFingerprint: vi.fn(),
   setLevel: vi.fn(),
   withScope: vi.fn(),
 }))
@@ -13,6 +14,7 @@ vi.mock('@sentry/react', () => ({
     callback: (scope: {
       setTag: typeof setTag
       setContext: typeof setContext
+      setFingerprint: typeof setFingerprint
       setLevel: typeof setLevel
     }) => void,
   ) => withScope(callback),
@@ -21,7 +23,7 @@ vi.mock('@sentry/react', () => ({
 import { applyRenderCaptureTags, isKnownBrowserFailureKind, reportApiFailure } from './report'
 
 function invokeScope(callback: (scope: unknown) => void): void {
-  callback({ setTag, setContext, setLevel })
+  callback({ setTag, setContext, setFingerprint, setLevel })
 }
 withScope.mockImplementation(invokeScope)
 
@@ -43,7 +45,7 @@ describe('reportApiFailure', () => {
     expect(isKnownBrowserFailureKind('expected')).toBe(false)
   })
 
-  it('marks validation failures for the beforeSend drop', () => {
+  it('skips SDK capture for expected validation failures', () => {
     const kind = reportApiFailure({
       status: 409,
       operationId: 'patch_roadmap_roadmaps__roadmap_id__patch',
@@ -53,9 +55,8 @@ describe('reportApiFailure', () => {
     })
 
     expect(kind).toBe('validation')
-    expect(setTag).toHaveBeenCalledWith('expected', 'true')
-    expect(setTag).toHaveBeenCalledWith('api.failure_kind', 'validation')
-    expect(captureException).toHaveBeenCalledOnce()
+    expect(setTag).not.toHaveBeenCalled()
+    expect(captureException).not.toHaveBeenCalled()
   })
 
   it('reports server failures with operation context and closed report context', () => {
@@ -74,6 +75,11 @@ describe('reportApiFailure', () => {
     expect(setTag).toHaveBeenCalledWith('api.domain', 'accounts')
     expect(setTag).toHaveBeenCalledWith('api.failure_kind', 'upstream')
     expect(setContext).toHaveBeenCalledWith('report', { method: 'GET', status: 503 })
+    expect(setFingerprint).toHaveBeenCalledWith([
+      'get_dashboard_me_dashboard_get',
+      'upstream',
+      '{{ default }}',
+    ])
     expect(setLevel).not.toHaveBeenCalled()
     expect(captureException).toHaveBeenCalledWith(error)
   })
@@ -196,9 +202,10 @@ describe('reportApiFailure', () => {
   })
 
   it('enriches render captures with the fixed render taxonomy', () => {
-    const scope = { setTag }
+    const scope = { setFingerprint, setTag }
     applyRenderCaptureTags(scope)
     expect(setTag).toHaveBeenCalledWith('api.operation', 'render.app')
     expect(setTag).toHaveBeenCalledWith('api.failure_kind', 'internal')
+    expect(setFingerprint).toHaveBeenCalledWith(['render.app', 'internal', '{{ default }}'])
   })
 })

@@ -100,6 +100,30 @@ describe('real-SDK envelope contracts', () => {
     expect(events[0].contexts).toEqual({ report: { method: 'GET', status: null } })
   })
 
+  it('groups failures by bounded operation and kind', async () => {
+    reportUpstreamFailure()
+    reportApiFailure({
+      status: 503,
+      operationId: 'get_roadmap_roadmaps__roadmap_id__get',
+      method: 'GET',
+      schemaPath: '/roadmaps/{roadmap_id}',
+      url: 'https://api.test/roadmaps/one',
+    })
+    await Sentry.flush()
+
+    expect(events).toHaveLength(2)
+    expect(events[0].fingerprint).toEqual([
+      'get_dashboard_me_dashboard_get',
+      'upstream',
+      '{{ default }}',
+    ])
+    expect(events[1].fingerprint).toEqual([
+      'get_roadmap_roadmaps__roadmap_id__get',
+      'upstream',
+      '{{ default }}',
+    ])
+  })
+
   it('drops expected validation events before they reach the transport', async () => {
     reportApiFailure({
       status: 422,
@@ -143,11 +167,12 @@ describe('real-SDK envelope contracts', () => {
     expect(error.cause).toBe(cause)
   })
 
-  it('deletes non-report contexts a stray scope might have added', async () => {
+  it('deletes explicit user data and non-report contexts from stray scopes', async () => {
     Sentry.withScope((scope) => {
       scope.setContext('response', { url: 'https://api.test?token=' + SENTINEL_QUERY })
       scope.setContext('trace', { data: { secret: 'value' } })
       scope.setTag('unsafe', SENTINEL_QUERY)
+      scope.setUser({ id: 'browser-user', email: 'person@example.test' })
       reportUpstreamFailure()
     })
     await Sentry.flush()
@@ -155,6 +180,7 @@ describe('real-SDK envelope contracts', () => {
     expect(events).toHaveLength(1)
     expect(events[0].contexts).toEqual({ report: { method: 'GET', status: 503 } })
     expect(events[0].tags?.unsafe).toBeUndefined()
+    expect(events[0].user).toBeUndefined()
     expect(JSON.stringify(events[0])).not.toContain(SENTINEL_QUERY)
   })
 

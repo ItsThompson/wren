@@ -30,6 +30,20 @@ def test_initialize_sentry_skips_blank_dsn() -> None:
     logger.info.assert_called_once_with("sentry_disabled", reason="dsn_not_configured")
 
 
+def test_blank_dsn_blocks_the_sdk_capture_path() -> None:
+    logger = Mock()
+    with (
+        patch("wren_common.sentry.sentry_sdk.new_scope") as new_scope,
+        patch("wren_common.sentry.sentry_sdk.capture_exception") as capture,
+    ):
+        sentry.initialize_sentry(dsn="", environment="development", release="", logger=logger)
+        result = sentry.report_exception(RuntimeError("boom"), limiter=None)
+
+    assert result is None
+    new_scope.assert_not_called()
+    capture.assert_not_called()
+
+
 def test_initialize_sentry_is_idempotent() -> None:
     release = "0123456789abcdef0123456789abcdef01234567"
     with patch("wren_common.sentry.sentry_sdk.init") as init:
@@ -103,6 +117,7 @@ def test_initialize_sentry_rejects_non_bare_sha_input(release: str) -> None:
 
 
 def test_report_exception_skips_expected_category() -> None:
+    sentry._initialized = True
     with patch("wren_common.sentry.sentry_sdk.capture_exception") as capture:
         result = sentry.report_exception(ValueError("bad input"), category=ReportCategory.EXPECTED)
     assert result is None
@@ -110,6 +125,7 @@ def test_report_exception_skips_expected_category() -> None:
 
 
 def test_report_exception_applies_tags_context_and_limiter() -> None:
+    sentry._initialized = True
     scope = Mock()
     scope_manager = Mock()
     scope_manager.__enter__ = Mock(return_value=scope)
@@ -144,6 +160,7 @@ def test_report_exception_applies_tags_context_and_limiter() -> None:
 
 
 def test_report_exception_rejects_unknown_taxonomy_values() -> None:
+    sentry._initialized = True
     with patch("wren_common.sentry.sentry_sdk.capture_exception") as capture:
         assert (
             sentry.report_exception(RuntimeError("boom"), limiter=None, error_kind="custom") is None
@@ -156,6 +173,7 @@ def test_report_exception_rejects_unknown_taxonomy_values() -> None:
 
 
 def test_report_exception_preserves_reporter_tags_and_scope_level() -> None:
+    sentry._initialized = True
     scope = Mock()
     scope_manager = Mock()
     scope_manager.__enter__ = Mock(return_value=scope)
@@ -257,6 +275,7 @@ def test_scrub_event_closes_reporter_owned_metadata() -> None:
 
 
 def test_report_exception_uses_explicit_bounded_error_kind() -> None:
+    sentry._initialized = True
     scope = Mock()
     scope_manager = Mock()
     scope_manager.__enter__ = Mock(return_value=scope)

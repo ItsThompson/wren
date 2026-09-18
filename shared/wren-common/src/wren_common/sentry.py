@@ -145,6 +145,9 @@ def report_exception(
     it has a more precise classification than the shared HTTP-status rule.
     ``limiter`` keys on exception type, avoiding secret-bearing exception text.
     """
+    if not _initialized:
+        return None
+
     if category is None:
         resolved_category = classify_exception(exception)
     elif isinstance(category, ReportCategory):
