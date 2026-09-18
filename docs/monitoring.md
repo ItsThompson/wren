@@ -1,6 +1,6 @@
 # Monitoring
 
-Wren's P0 observability: what is measured, what alerts, and how long data is kept. There is **no Grafana at P0** (Prometheus retains the data regardless); the only alert sink is Discord. Metric names and labels follow a stable convention so rules and dashboards can be dropped in later.
+Wren's P0 observability: what is measured, what alerts, and how long data is kept. Error ownership and Sentry privacy rules live in `docs/error-handling.md`. There is **no Grafana at P0** (Prometheus retains the data regardless); the only alert sink is Discord. Metric names and labels follow a stable convention so rules and dashboards can be dropped in later.
 
 Canonical sources:
 
@@ -49,6 +49,20 @@ Prometheus evaluates three critical rules (`deployments/prometheus/alerts.yml`) 
 `deployments/alertmanager/alertmanager.yml` keeps a `${DISCORD_WEBHOOK_URL}` placeholder in the committed file. Alertmanager does not expand environment variables, so CI renders it (`envsubst` substitutes **only** that token) into the `WREN_ALERTMANAGER_CONFIG` env var, which the `alertmanager` service receives as an environment-sourced Compose secret (`0400`) at `/etc/alertmanager/alertmanager.yml`; the Go templating (`{{ ... }}`) in the title/message is left untouched and renders at alert time. `DISCORD_WEBHOOK_URL` is a GitHub Actions secret (see `runbooks/deploy.md`). No rendered file is written to the box; never commit a real webhook.
 
 **This render is release-gating, not merely "needed for live firing."** Alertmanager v0.27 **exits on config load** if `webhook_url` is not a valid URL (an unrendered/blank placeholder → `unsupported scheme ""`). Because the deploy health gate polls *every* service's healthcheck, a deploy that starts Alertmanager without a rendered webhook will fail the gate and roll back. To avoid crash-looping local dev, the `alertmanager` service is gated behind the `tunnels` compose profile (the only profile the deploy activates), so `just up`/`up-dev` do not start it; Prometheus and node-exporter still run locally. The render runs in CI (`cd.yml`) alongside the tunnel-ingress render; provisioning a real `DISCORD_WEBHOOK_URL` GitHub secret is a prerequisite of the live bring-up.
+
+## Sentry projects and releases
+
+Sentry uses three projects with organization-unique releases. Backend and MCP releases use the bare deployment SHA supplied by CD; the frontend release is prefixed before the Vite build.
+
+| Project | Release family | Runtime environment |
+|---|---|---|
+| `wren-backend` | `wren-api@<sha>` | `production` |
+| `wren-mcp` | `wren-mcp@<sha>` | `production` |
+| `wren-frontend` | `wren-web@<sha>` | `production` |
+
+CD prepares releases before Buildx source-map upload and finalizes them in a separate post-deploy job. Preparation and finalization are idempotent, so same-SHA reruns reuse existing releases, including finalized releases. Source maps upload inside the exact frontend builder layer and are deleted before the nginx image is assembled.
+
+Backend and MCP DSNs are GitHub Actions secrets. The browser DSN is public build configuration in `.env.prod`. Empty DSNs preserve local and E2E operation. See `docs/error-handling.md` for event ownership, hourly class limits, expected-drop behavior, and PII scrubbing.
 
 ## Retention and query guards
 

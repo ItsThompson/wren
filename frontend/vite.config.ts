@@ -17,6 +17,11 @@ export default defineConfig({
       allow: [fileURLToPath(new URL('..', import.meta.url))],
     },
   },
+  build: {
+    // Keep maps available to the builder for Sentry upload, but omit the
+    // sourceMappingURL trailer so nginx never advertises them to browsers.
+    sourcemap: 'hidden',
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

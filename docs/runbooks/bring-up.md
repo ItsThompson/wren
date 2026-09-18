@@ -193,11 +193,27 @@ gh secret set INTERNAL_API_TOKEN           --body "<generated>"
 gh secret set DISCORD_WEBHOOK_URL          --body "<real discord webhook>"
 gh secret set WREN_OAUTH_PRIVATE_KEY       < oauth_private.pem             # RAW PEM content
 gh secret set WREN_CLOUDFLARED_CREDENTIALS < ~/.cloudflared/<UUID>.json    # RAW credentials.json (NOT base64)
+gh secret set SENTRY_AUTH_TOKEN          --body "<org:ci token>"
+gh secret set SENTRY_DSN_BACKEND         --body "<backend DSN>"
+gh secret set SENTRY_DSN_MCP             --body "<MCP DSN>"
 ```
 
 > `WREN_CLOUDFLARED_CREDENTIALS` holds the RAW, unencoded `credentials.json` (environment-sourced secrets transmit raw content). `cert.pem` is a bring-up-only tunnel-management artifact and is not needed at runtime.
 
-`GITHUB_TOKEN` is **not** set manually: it is the built-in Actions token. Ensure Actions is allowed to write packages (repo/org **Settings → Actions → Workflow permissions**), since `cd.yml` already requests `packages: write` and logs into GHCR with it.
+`GITHUB_TOKEN` is **not** set manually: it is the built-in Actions token. Ensure Actions is allowed to write packages (repo/org **Settings → Actions → Workflow permissions**), since `cd.yml` already requests `packages: write` and logs into GHCR with it. `SENTRY_AUTH_TOKEN` needs organization release and source-map permissions (`org:ci`). The backend and MCP DSNs remain private GitHub secrets; `VITE_SENTRY_DSN` is public configuration in committed `.env.prod`.
+
+Before the first deploy, confirm repository secret names without printing values:
+
+```bash
+required_secrets=(SENTRY_AUTH_TOKEN SENTRY_DSN_BACKEND SENTRY_DSN_MCP)
+configured_secrets="$(gh secret list --json name --jq '.[].name')"
+for name in "${required_secrets[@]}"; do
+  grep -Fxq "${name}" <<< "${configured_secrets}" \
+    || { echo "missing GitHub secret: ${name}" >&2; exit 1; }
+done
+```
+
+GitHub does not expose secret values after creation. The CD release preparation step validates token access to all three Sentry projects before it builds images. Do not print token values or DSNs in CI logs.
 
 ---
 
@@ -220,6 +236,8 @@ WREN_ALERTMANAGER_CONFIG="$(DISCORD_WEBHOOK_URL='<webhook>' envsubst '$DISCORD_W
 WREN_OAUTH_PRIVATE_KEY="$(cat oauth_private.pem)"
 WREN_CLOUDFLARED_CREDENTIALS="$(cat ~/.cloudflared/<UUID>.json)"
 POSTGRES_PASSWORD='<hex>'; SESSION_JWT_SECRET='<gen>'; INTERNAL_API_TOKEN='<gen>'
+SENTRY_DSN_BACKEND='<backend DSN>'; SENTRY_DSN_MCP='<MCP DSN>'
+SENTRY_RELEASE="$(git rev-parse HEAD)"
 set +a
 
 DRY_RUN=1 DEPLOY_SHA=$(git rev-parse HEAD) ./scripts/deploy.sh <vps-ip> deploy   # preview

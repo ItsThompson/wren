@@ -20,13 +20,13 @@ from typing import TYPE_CHECKING
 
 import structlog
 from mcp.server.fastmcp import Context
-from mcp.server.fastmcp.exceptions import ToolError
 from mcp.server.session import ServerSession
 from starlette.requests import Request
 
 from wren_common.logging import get_logger
 from wren_mcp.settings import SERVICE
 from wren_mcp.state import get_request_agent
+from wren_mcp.tool_errors import ToolAuthorizationError
 
 if TYPE_CHECKING:
     from wren_mcp.tokens import VerifiedAgentToken
@@ -48,8 +48,11 @@ def _resolve_agent(ctx: AgentContext) -> VerifiedAgentToken:
     request = ctx.request_context.request
     principal = get_request_agent(request)
     if principal is None:
+        error = ToolAuthorizationError(
+            "unauthenticated: no verified agent identity on the request.", status=401
+        )
         _log.warning("unauthenticated", reason="no_verified_identity")
-        raise ToolError("unauthenticated: no verified agent identity on the request.")
+        raise error
     structlog.contextvars.bind_contextvars(user_id=principal.user_id)
     return principal
 
@@ -66,14 +69,16 @@ def require_scope(ctx: AgentContext, *, scope: str) -> str:
     granted = set(principal.scope.split())
     if scope not in granted:
         have = principal.scope or "(none)"
+        error = ToolAuthorizationError(
+            f"insufficient_scope: this tool requires the '{scope}' OAuth scope, but the "
+            f"token grants [{have}]. Re-authorize the agent with '{scope}' and retry.",
+            status=403,
+        )
         _log.warning(
             "insufficient_scope",
             reason="missing_required_scope",
             required=scope,
             client_id=principal.client_id,
         )
-        raise ToolError(
-            f"insufficient_scope: this tool requires the '{scope}' OAuth scope, but the "
-            f"token grants [{have}]. Re-authorize the agent with '{scope}' and retry."
-        )
+        raise error
     return principal.user_id

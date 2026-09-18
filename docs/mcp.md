@@ -152,6 +152,8 @@ Invariants of the hop:
 
 Canonical source: `tool_errors.py`. The error contract itself has one canonical home: `api.md`. This doc does not restate it.
 
+Named authorization and backend-response errors remain expected, agent-recoverable outcomes and do not create Sentry events. Typed backend transport failures report as bounded `upstream` failures, while unknown tool errors report as `internal`; the counted wrapper preserves the original exception and existing invocation counter. See `error-handling.md` for the cross-runtime ownership and privacy rules.
+
 - A backend response of `>=400` carries an RFC 9457 `application/problem+json` body. `raise_for_problem` folds it into one model-recoverable `BackendToolError` that the agent can self-correct against. The error also carries the HTTP status and problem code for structured logging.
 - A transport failure (backend unreachable or timed out) becomes a model-recoverable `ToolError` (`backend_unavailable: ... retry shortly`).
 - A `>=400` response is not a transport failure. It passes through untouched so `raise_for_problem` can map it.

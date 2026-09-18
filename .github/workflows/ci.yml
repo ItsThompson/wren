@@ -114,8 +114,8 @@ jobs:
           cd ../frontend
           npm run codegen
 
-      - name: Fail on stale committed client
-        run: git diff --exit-code -- frontend/openapi.json frontend/src/api/schema.d.ts
+      - name: Fail on stale committed client or operation registry
+        run: git diff --exit-code -- frontend/openapi.json frontend/src/api/schema.d.ts frontend/src/api/operationRegistry.generated.ts
 
   # ---------------------------------------------------------------------------
   # mcp-codegen-drift: regenerate the internal app's OpenAPI and the MCP Group-A

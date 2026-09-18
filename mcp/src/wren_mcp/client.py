@@ -20,9 +20,9 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 import structlog
-from mcp.server.fastmcp.exceptions import ToolError
 
 from wren_mcp.config import INTERNAL_TOKEN_HEADER, USER_ID_HEADER
+from wren_mcp.tool_errors import BackendUnavailableToolError
 
 if TYPE_CHECKING:
     from pydantic import SecretStr
@@ -82,9 +82,11 @@ class InternalApiClient:
         try:
             return await self._http.request(method, path, json=json, params=params, headers=headers)
         except (httpx.TimeoutException, httpx.RequestError) as exc:
-            raise ToolError(
+            kind = "timeout" if isinstance(exc, httpx.TimeoutException) else "upstream"
+            raise BackendUnavailableToolError(
                 "backend_unavailable: the roadmap service is unreachable or timed out; "
-                "retry shortly."
+                "retry shortly.",
+                kind=kind,
             ) from exc
 
     async def create_draft(self, user_id: str, document: Any) -> httpx.Response:

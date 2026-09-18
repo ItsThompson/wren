@@ -23,6 +23,7 @@ from wren.core.observability import WREN_REGISTRY
 from wren_common.health import ReadinessCheck, create_health_router
 from wren_common.logging import configure_logging, get_logger
 from wren_common.metrics import instrument
+from wren_common.sentry import initialize_sentry
 
 if TYPE_CHECKING:
     from starlette.types import Lifespan
@@ -44,6 +45,12 @@ def create_app(
 ) -> FastAPI:
     """Assemble a configured FastAPI app from injected settings and mount points."""
     configure_logging(environment=settings.environment, log_level=settings.log_level)
+    initialize_sentry(
+        dsn=settings.sentry_dsn,
+        environment=settings.environment,
+        release=settings.sentry_release,
+        service=settings.service,
+    )
     log = get_logger(settings.service)
 
     app = FastAPI(title=f"wren ({settings.service})", version="0.1.0", lifespan=lifespan)

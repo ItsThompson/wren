@@ -79,10 +79,8 @@ class BearerAuthMiddleware:
         if principal is None:
             # Never log the raw token; no verified principal exists yet, so only a
             # reason is available (client_id/sub cannot be trusted pre-validation).
-            _log.warning(
-                "agent_token_rejected",
-                reason="missing_bearer" if token is None else "invalid_token",
-            )
+            reason = "missing_bearer" if token is None else "invalid_token"
+            _log.warning("agent_token_rejected", reason=reason)
             await self._challenge()(scope, receive, send)
             return
         # Boundary guarantee: the handler receives a resolved identity, never the

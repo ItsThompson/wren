@@ -23,6 +23,8 @@ DEPLOY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../deploy.sh"
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PASS=0
 FAIL=0
+VALID_SHA="0123456789abcdef0123456789abcdef01234567"
+OTHER_SHA="1123456789abcdef0123456789abcdef01234567"
 
 # Run a test function in a subshell so its stubs/vars never leak.
 run_test() {
@@ -52,6 +54,10 @@ export_required_secret_env() {
   export WREN_ALERTMANAGER_CONFIG="global: {}" WREN_CLOUDFLARED_INGRESS="tunnel: x"
   export WREN_PROMETHEUS_CONFIG="global: {}" WREN_PROMETHEUS_ALERTS="groups: []"
   export POSTGRES_PASSWORD="pw" SESSION_JWT_SECRET="s" INTERNAL_API_TOKEN="t"
+  export SENTRY_DSN_BACKEND="https://backend@example.ingest.sentry.io/1"
+  export SENTRY_DSN_MCP="https://mcp@example.ingest.sentry.io/2"
+  export DEPLOY_SHA="${VALID_SHA}"
+  export SENTRY_RELEASE="${VALID_SHA}"
 }
 
 # --- pure helpers -----------------------------------------------------------
@@ -134,11 +140,34 @@ test_assert_secret_env_present() {
 
 # --- dry-run phase plan & ordering ------------------------------------------
 
+test_main_rejects_invalid_or_mismatched_release_before_compose() {
+  source "${DEPLOY}"
+  local row deploy_sha release expected out rc
+  local cases=(
+    "badsha|${VALID_SHA}|DEPLOY_SHA must be 40 lowercase hexadecimal characters"
+    "${VALID_SHA}|wren-api@${VALID_SHA}|SENTRY_RELEASE must be a bare 40-character"
+    "${VALID_SHA}|${OTHER_SHA}|SENTRY_RELEASE must equal DEPLOY_SHA"
+  )
+
+  for row in "${cases[@]}"; do
+    export_required_secret_env
+    IFS='|' read -r deploy_sha release expected <<< "${row}"
+    DEPLOY_SHA="${deploy_sha}"
+    SENTRY_RELEASE="${release}"
+    DRY_RUN=1
+    out="$(main 203.0.113.10 deploy 2>&1)"
+    rc=$?
+    [[ ${rc} -ne 0 ]] || { echo "expected invalid deploy identity to fail"; return 1; }
+    contains "${out}" "${expected}" || return 1
+    not_contains "${out}" "compose -f" || return 1
+  done
+}
+
 test_dry_run_uses_docker_context_and_no_ssh_heredoc() {
   source "${DEPLOY}"
   export_required_secret_env
   DRY_RUN=1
-  DEPLOY_SHA="cafef00d"
+  DEPLOY_SHA="${VALID_SHA}"
   local out
   out="$(main 203.0.113.10 deploy 2>&1)"
   # Transport is the Docker Context, not ssh-bash.
@@ -157,7 +186,7 @@ test_dry_run_includes_ops_scripts_sync() {
   source "${DEPLOY}"
   export_required_secret_env
   DRY_RUN=1
-  DEPLOY_SHA="cafef00d"
+  DEPLOY_SHA="${VALID_SHA}"
   local out
   out="$(main 203.0.113.10 deploy 2>&1)"
   # The sync step appears in the plan with its transport (tar, not scp).
@@ -243,6 +272,9 @@ test_compose_deploy_overlay_feeds_app_env_from_env_prod_and_secrets() {
   # App secrets are passed through from the runner env (GitHub secrets).
   contains "${overlay}" 'SESSION_JWT_SECRET: ${SESSION_JWT_SECRET' || return 1
   contains "${overlay}" 'INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN' || return 1
+  contains "${overlay}" 'SENTRY_DSN_BACKEND: ${SENTRY_DSN_BACKEND' || return 1
+  contains "${overlay}" 'SENTRY_DSN_MCP: ${SENTRY_DSN_MCP' || return 1
+  contains "${overlay}" 'SENTRY_RELEASE: ${SENTRY_RELEASE' || return 1
   # The base file's env_file: .env is the local-dev source; .env.prod is layered
   # on top here for the deploy (base file itself is untouched).
   local base
@@ -261,17 +293,41 @@ test_cd_frontend_image_bakes_prod_api_and_mcp_origins() {
   contains "${workflow}" 'build-args: ${{ steps.frontend-build-args.outputs.value }}' || return 1
 }
 
+test_cd_scopes_sentry_token_and_finalizes_after_health() {
+  local workflow
+  workflow="$(cat "${REPO_DIR}/.github/workflows/cd.yml")"
+  equals "$(grep -c 'secrets.SENTRY_AUTH_TOKEN' <<< "${workflow}")" "3" || return 1
+  contains "${workflow}" "health_gate_passed:" || return 1
+  contains "${workflow}" "steps.deploy-application.outputs.health_gate_passed" || return 1
+  contains "${workflow}" "always() && needs.deploy.outputs.health_gate_passed == 'true'" || return 1
+  contains "${workflow}" "matrix.service == 'frontend'" || return 1
+}
+
+test_cd_rollback_is_phase_gated_and_legacy_safe() {
+  local workflow
+  workflow="$(cat "${REPO_DIR}/.github/workflows/cd.yml")"
+  contains "${workflow}" "id: deploy-application" || return 1
+  contains "${workflow}" "steps.deploy-application.outputs.rollback_eligible == 'true'" || return 1
+  contains "${workflow}" 'SENTRY_RELEASE="${prev}"' || return 1
+  contains "${workflow}" "prepare-sentry-releases" || return 1
+  contains "${workflow}" "finalize-sentry-releases" || return 1
+  # The rollback invocation must not require the newer result-file contract.
+  local rollback_block
+  rollback_block="$(printf '%s\n' "${workflow}" | sed -n '/name: Roll back to the previous SHA on failure/,$p')"
+  not_contains "${rollback_block}" 'DEPLOY_RESULT_FILE:' || return 1
+}
+
 # --- rollback target helper (CI owns rollback) ------------------------------
 
 test_read_deployed_sha_returns_prev_and_refuses_on_empty() {
   source "${DEPLOY}"
-  # Present: echoes the prev SHA on stdout, exit 0.
-  remote() { printf '%s\n' "abc123"; }
+  # Present: echoes the validated previous SHA on stdout, exit 0.
+  remote() { printf '%s\n' "${VALID_SHA}"; }
   local out rc
   out="$(read_deployed_sha)"
   rc=$?
   [[ ${rc} -eq 0 ]] || { echo "expected success when sha present"; return 1; }
-  equals "${out}" "abc123" || return 1
+  equals "${out}" "${VALID_SHA}" || return 1
   # Empty file (ssh ok, no rollback target): refuses with the no-prev message.
   remote() { printf '%s' ""; }
   out="$(read_deployed_sha 2>&1)"
@@ -279,6 +335,12 @@ test_read_deployed_sha_returns_prev_and_refuses_on_empty() {
   [[ ${rc} -ne 0 ]] || { echo "expected non-zero when .deployed-sha empty"; return 1; }
   contains "${out}" "no previous .deployed-sha" || return 1
   contains "${out}" "cannot roll back" || return 1
+  # Malformed or injected rollback keys are never used as checkout/release input.
+  remote() { printf '%s\n' "wren-api@${VALID_SHA}"; }
+  out="$(read_deployed_sha 2>&1)"
+  rc=$?
+  [[ ${rc} -ne 0 ]] || { echo "expected non-zero for invalid .deployed-sha"; return 1; }
+  contains "${out}" "invalid previous .deployed-sha" || return 1
   # SSH/transport failure (non-zero ssh): refuses with a DISTINCT message, not
   # conflated with an absent file.
   remote() { return 1; }
@@ -294,7 +356,7 @@ test_failed_gate_no_internal_redeploy() {
   source "${DEPLOY}"
   export_required_secret_env
   DRY_RUN=0
-  DEPLOY_SHA="newsha00"
+  DEPLOY_SHA="${VALID_SHA}"
   local ccalls="${TMPDIR:-/tmp}/wren-cc.$$.${RANDOM}"
   local rcalls="${TMPDIR:-/tmp}/wren-rc.$$.${RANDOM}"
   : > "${ccalls}"; : > "${rcalls}"
@@ -324,7 +386,7 @@ test_failed_gate_nonzero_exit_and_no_deployed_sha_write() {
   source "${DEPLOY}"
   export_required_secret_env
   DRY_RUN=0
-  DEPLOY_SHA="newsha00"
+  DEPLOY_SHA="${VALID_SHA}"
   local rcalls="${TMPDIR:-/tmp}/wren-rc2.$$.${RANDOM}"
   : > "${rcalls}"
   compose_run() { :; }
@@ -365,6 +427,43 @@ test_api_ingress_blocks_observability_surface_before_backend() {
   grep -Fq 'oauth-protected-resource)$' "${cfg}" || { echo "mcp allow-list changed"; return 1; }
 }
 
+# --- deploy result contract --------------------------------------------------
+
+test_deploy_result_is_closed_and_only_startup_health_can_roll_back() {
+  source "${DEPLOY}"
+  local file phase expected actual
+  file="${TMPDIR:-/tmp}/wren-deploy-result.$$.${RANDOM}.json"
+  for phase in preflight pull migration post_health unknown; do
+    DEPLOY_RESULT_FILE="${file}"
+    DEPLOY_PHASE="${phase}"
+    write_deploy_result 1
+    actual="$(jq -r '.rollback_eligible' "${file}")"
+    equals "${actual}" "false" || { rm -f "${file}"; return 1; }
+  done
+  for phase in startup health_gate; do
+    DEPLOY_RESULT_FILE="${file}"
+    DEPLOY_PHASE="${phase}"
+    write_deploy_result 1
+    actual="$(jq -r '.rollback_eligible' "${file}")"
+    equals "${actual}" "true" || { rm -f "${file}"; return 1; }
+  done
+  DEPLOY_PHASE=health_gate
+  DEPLOY_HEALTH_GATE_PASSED=true
+  write_deploy_result 0
+  equals "$(jq -r '.status' "${file}")" "success" || { rm -f "${file}"; return 1; }
+  equals "$(jq -r '.phase' "${file}")" "complete" || { rm -f "${file}"; return 1; }
+  equals "$(jq -r '.rollback_eligible' "${file}")" "false" || { rm -f "${file}"; return 1; }
+  equals "$(jq -r '.health_gate_passed' "${file}")" "true" || { rm -f "${file}"; return 1; }
+
+  DEPLOY_PHASE=post_health
+  DEPLOY_HEALTH_GATE_PASSED=true
+  write_deploy_result 1
+  equals "$(jq -r '.status' "${file}")" "failed" || { rm -f "${file}"; return 1; }
+  equals "$(jq -r '.health_gate_passed' "${file}")" "true" || { rm -f "${file}"; return 1; }
+  equals "$(jq -r '.rollback_eligible' "${file}")" "false" || { rm -f "${file}"; return 1; }
+  rm -f "${file}"
+}
+
 # --- run all ----------------------------------------------------------------
 
 main_tests() {
@@ -374,6 +473,7 @@ main_tests() {
   run_test test_gate_unhealthy_array_and_all_healthy
   run_test test_gate_unhealthy_empty_or_unparseable_is_not_healthy
   run_test test_assert_secret_env_present
+  run_test test_main_rejects_invalid_or_mismatched_release_before_compose
   run_test test_dry_run_uses_docker_context_and_no_ssh_heredoc
   run_test test_dry_run_includes_ops_scripts_sync
   run_test test_dry_run_migrations_before_start
@@ -383,9 +483,12 @@ main_tests() {
   run_test test_compose_base_declares_environment_sourced_prometheus_configs
   run_test test_compose_deploy_overlay_feeds_app_env_from_env_prod_and_secrets
   run_test test_cd_frontend_image_bakes_prod_api_and_mcp_origins
+  run_test test_cd_scopes_sentry_token_and_finalizes_after_health
+  run_test test_cd_rollback_is_phase_gated_and_legacy_safe
   run_test test_read_deployed_sha_returns_prev_and_refuses_on_empty
   run_test test_failed_gate_no_internal_redeploy
   run_test test_failed_gate_nonzero_exit_and_no_deployed_sha_write
+  run_test test_deploy_result_is_closed_and_only_startup_health_can_roll_back
   run_test test_api_ingress_blocks_observability_surface_before_backend
 
   echo "-----------------------------------------------------------------------"

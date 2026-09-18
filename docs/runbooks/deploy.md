@@ -14,13 +14,24 @@ Deployment is a two-phase, two-machine process:
 
 CD registers the context, exports the config/secret env (committed `.env.prod` + files rendered in the runner + GitHub secrets), and runs `scripts/deploy.sh <server-ip>`, which:
 
-1. **Preflight:** assert every required config/secret env var is set (fail fast).
+1. **Preflight:** assert every required config/secret env var, including both backend/MCP Sentry DSNs and the bare release SHA, is set (fail fast).
 2. **Pull:** `docker --context wren compose ... pull`.
 3. **Migrations (pre-traffic):** start postgres, wait healthy, then `... run --rm backend alembic upgrade head`. Aborts the deploy on failure. See `migration.md`.
-4. **Start:** `docker --context wren compose --profile tunnels up -d`.
+4. **Startup:** `docker --context wren compose --profile tunnels up -d --force-recreate`.
 5. **Health gate:** poll `docker --context wren compose ps` health across all services (~60s).
-6. **Sync ops scripts:** `tar` `scripts/ops/` over SSH to `/opt/wren/scripts/` on the box (atomic swap: extract to a temp dir, then replace). The box holds no repo checkout, so host-side ops scripts (`list-users.sh`, `delete-user.sh`, etc.) are otherwise absent; this keeps them version-matched to the running deploy. Only runs after the gate passes, and a sync failure is non-fatal (warning only): the box keeps its previous scripts and the deploy proceeds.
-7. **Record on success:** writes the deployed SHA to `/opt/wren/.deployed-sha` (the rollback key) via `ssh`. On a failed gate the script exits non-zero and CD owns the rollback (below); the script never re-deploys itself.
+6. **Post-health:** sync ops scripts and record the SHA. Sync is atomic and non-fatal; bookkeeping failures do not replace healthy containers.
+
+When `DEPLOY_RESULT_FILE` is set, the script writes a runner-local JSON result for each failed run. Only `startup` and `health_gate` are rollback-eligible. Preflight, pull, migration, post-health, malformed output, and unknown failures require operator action; CD never guesses.
+
+| Phase | Rollback | Meaning |
+|---|---:|---|
+| `preflight` | No | Required config, secrets, and release are missing or invalid. |
+| `pull` | No | Images did not download; active containers remain unchanged. |
+| `migration` | No | Database work needs inspection before any image change. |
+| `startup` | Yes | Stack recreation began after migrations completed. |
+| `health_gate` | Yes | Candidate containers started but did not become healthy. |
+| `post_health` | No | Healthy containers remain; repair sync or SHA bookkeeping. |
+| missing, malformed, or unknown | No | Fail closed and investigate. |
 
 Host bootstrap (Docker install, `daemon.json`, prune cron, the deploy user and docker group, the Docker Context) is a one-time bring-up concern (`bring-up.md`), not part of a deploy. Not zero-downtime: there is a brief per-deploy gap while containers recreate, accepted at this scale (~5 users).
 
@@ -40,7 +51,13 @@ The tunnel is the only ingress (zero inbound ports). CI renders `deployments/clo
 
 **How app config reaches the containers:** the deploy layers a deploy-only overlay (`docker-compose.deploy.yml`) that loads `.env.prod` into backend/mcp via `env_file` (read CLI-side and transmitted over the context: no file on the box) and passes `SESSION_JWT_SECRET`/`INTERNAL_API_TOKEN` through from the runner env. The base file's `env_file: .env` stays the local-dev source; the overlay is never used locally, so a stray dev `.env` cannot leak into a deploy.
 
-**GitHub repo secrets** (CI/CD only): `DEPLOY_SSH_KEY`, `DEPLOY_SERVER_IP`, `POSTGRES_PASSWORD`, `SESSION_JWT_SECRET`, `INTERNAL_API_TOKEN`, `DISCORD_WEBHOOK_URL`, `WREN_OAUTH_PRIVATE_KEY` (RAW PEM), `WREN_CLOUDFLARED_CREDENTIALS` (RAW `credentials.json`, not base64), plus the built-in `GITHUB_TOKEN` (GHCR). CD exports these into the deploy step's environment; Compose transmits them to the daemon as environment-sourced `secrets:`. Nothing is written to the box. (`cert.pem` is a bring-up-only tunnel-management artifact.)
+**GitHub repo secrets** (CI/CD only): `DEPLOY_SSH_KEY`, `DEPLOY_SERVER_IP`, `POSTGRES_PASSWORD`, `SESSION_JWT_SECRET`, `INTERNAL_API_TOKEN`, `DISCORD_WEBHOOK_URL`, `WREN_OAUTH_PRIVATE_KEY` (RAW PEM), `WREN_CLOUDFLARED_CREDENTIALS` (RAW `credentials.json`, not base64), `SENTRY_AUTH_TOKEN`, `SENTRY_DSN_BACKEND`, and `SENTRY_DSN_MCP`, plus the built-in `GITHUB_TOKEN` (GHCR). CD exports these into the deploy step's environment; Compose transmits them to the daemon as environment-sourced `secrets:`. Nothing is written to the box. (`cert.pem` is a bring-up-only tunnel-management artifact.)
+
+## Sentry release and source-map gates
+
+CD prepares `wren-api@<sha>`, `wren-mcp@<sha>`, and `wren-web@<sha>` before the image matrix runs. The preparation helper inspects exact organization release state and project association, creates only missing releases, and is safe to rerun. Buildx uploads frontend maps with a per-attempt cache key, then deletes maps before the nginx runtime copy. Finalization runs in a separate job after a healthy deploy. A finalization failure cannot trigger application rollback.
+
+Same-SHA reruns reuse existing releases and source maps. A rollback reuses the previous frontend image and release artifacts; it does not create, upload, or finalize releases.
 
 ## Rollback (CI-owned)
 

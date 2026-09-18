@@ -23,8 +23,7 @@ if TYPE_CHECKING:
     from wren.core.settings import AppSettings
 
 # --- Endpoint paths (mounted on the external app) ---------------------------
-# The AS metadata document advertises the absolute forms of these, built from
-# `public_base_url`; the router mounts these relative paths.
+# The AS metadata document advertises absolute forms built from the pinned issuer.
 WELL_KNOWN_AS_METADATA_PATH = "/.well-known/oauth-authorization-server"
 JWKS_PATH = "/jwks"
 REGISTER_PATH = "/register"
@@ -35,8 +34,7 @@ TOKEN_PATH = "/token"
 REVOKE_PATH = "/revoke"
 CLIENTS_PATH = "/me/clients"
 
-# The SPA route that renders consent: the AS parks the
-# request and 302s the browser to `<app_public_url><CONSENT_ROUTE>?auth_request_id`.
+# The SPA renders consent at this path after the AS parks the request.
 CONSENT_ROUTE = "/authorize"
 
 # --- Scopes -----------------------------------------------
@@ -103,9 +101,9 @@ class OAuthConfig:
 def build_oauth_config(settings: AppSettings) -> OAuthConfig:
     """Compose the OAuth config from pinned deployment settings."""
     return OAuthConfig(
-        issuer=settings.public_base_url,
-        consent_base_url=settings.app_public_url,
-        resource=settings.mcp_public_url,
+        issuer=settings.oauth_issuer_url,
+        consent_base_url=settings.web_app_url,
+        resource=settings.mcp_resource_url,
         key_path=settings.oauth_private_key_path,
         key_id=settings.oauth_key_id,
         access_ttl=timedelta(seconds=settings.oauth_access_ttl_seconds),

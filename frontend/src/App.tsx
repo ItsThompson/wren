@@ -3,7 +3,9 @@ import { SWRConfig } from 'swr'
 
 import { ApiClientProvider, swrRevalidationPosture } from '@/api'
 import { SessionCacheBoundary } from '@/api/SessionCacheBoundary'
+import { AppErrorBoundary } from '@/components/AppErrorBoundary'
 import { AuthProvider } from '@/auth'
+import { reportRouteError } from '@/observability/sentry'
 
 import { appRoutes } from './routes'
 
@@ -18,14 +20,16 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
 export function App() {
   return (
-    <SWRConfig value={swrRevalidationPosture}>
-      <ApiClientProvider baseUrl={API_BASE_URL}>
-        <AuthProvider>
-          <SessionCacheBoundary>
-            <RouterProvider router={router} />
-          </SessionCacheBoundary>
-        </AuthProvider>
-      </ApiClientProvider>
-    </SWRConfig>
+    <AppErrorBoundary>
+      <SWRConfig value={swrRevalidationPosture}>
+        <ApiClientProvider baseUrl={API_BASE_URL}>
+          <AuthProvider>
+            <SessionCacheBoundary>
+              <RouterProvider router={router} onError={reportRouteError} />
+            </SessionCacheBoundary>
+          </AuthProvider>
+        </ApiClientProvider>
+      </SWRConfig>
+    </AppErrorBoundary>
   )
 }

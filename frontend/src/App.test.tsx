@@ -2,6 +2,7 @@ import { isValidElement } from 'react'
 import { render, screen } from '@testing-library/react'
 import type { RouteObject } from 'react-router'
 
+import { ErrorBoundaryFallback } from '@/components/ErrorBoundaryFallback'
 import { OnboardingGate } from '@/components/OnboardingGate'
 import { PageTitle } from '@/components/PageTitle'
 
@@ -11,6 +12,10 @@ import { appRoutes } from './routes'
 /** The React component type mounted for a route, or `undefined` for layout/no element. */
 function elementType(route: RouteObject | undefined) {
   return route && isValidElement(route.element) ? route.element.type : undefined
+}
+
+function errorElementType(route: RouteObject | undefined) {
+  return route && isValidElement(route.errorElement) ? route.errorElement.type : undefined
 }
 
 function routeTitle(route: RouteObject | undefined): string | undefined {
@@ -67,6 +72,14 @@ describe('App route titles', () => {
       ]),
     )
     expect(routeTitle(appRoutes.find((route) => route.path === '/onboarding'))).toBe('Get started')
+  })
+})
+
+describe('App route error fallback', () => {
+  it('defines a safe fallback on every root route', () => {
+    for (const route of appRoutes) {
+      expect(errorElementType(route)).toBe(ErrorBoundaryFallback)
+    }
   })
 })
 

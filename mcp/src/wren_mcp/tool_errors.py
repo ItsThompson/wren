@@ -26,12 +26,39 @@ if TYPE_CHECKING:
     import httpx
 
 
-class BackendToolError(ToolError):
+class ExpectedToolError(ToolError):
+    """A recoverable tool outcome that does not represent an operational fault."""
+
+
+class ToolAuthorizationError(ExpectedToolError):
+    """A missing identity or scope that the agent can resolve by reauthorizing."""
+
+    def __init__(self, message: str, *, status: int) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+class BackendUnavailableToolError(ToolError):
+    """A transport failure that remains agent-recoverable but is reportable."""
+
+    def __init__(self, message: str, *, kind: str) -> None:
+        super().__init__(message)
+        self.status = 503
+        self.kind = kind
+
+
+class BackendToolError(ExpectedToolError):
     """A model-recoverable tool error that also carries the backend's HTTP status
     and problem code, so the tool-invocation counter can log them structurally."""
 
+    # Backend responses are model-recoverable tool results, even for a 5xx. The
+    # tool boundary owns transport reporting; this marker keeps response mapping
+    # from becoming a second Sentry owner.
+    suppress_reporting = True
+
     def __init__(self, message: str, *, status_code: int, code: str) -> None:
         super().__init__(message)
+        self.status = status_code
         self.status_code = status_code
         self.code = code
 
@@ -41,10 +68,11 @@ def raise_for_problem(response: httpx.Response) -> httpx.Response:
     :class:`BackendToolError` carrying the backend's structured problem detail."""
     if response.status_code < 400:
         return response
+    code = _problem_code(response)
     raise BackendToolError(
         _format_problem(response),
         status_code=response.status_code,
-        code=_problem_code(response),
+        code=code,
     )
 
 

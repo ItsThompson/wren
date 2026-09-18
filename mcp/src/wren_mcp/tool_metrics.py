@@ -18,11 +18,18 @@ import functools
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+import structlog
 from prometheus_client import CollectorRegistry, Counter
 
 from wren_common.logging import get_logger
+from wren_common.reporting import is_reportable
+from wren_mcp.reporting import report_mcp_error
 from wren_mcp.settings import SERVICE
-from wren_mcp.tool_errors import BackendToolError
+from wren_mcp.tool_errors import (
+    BackendToolError,
+    BackendUnavailableToolError,
+    ExpectedToolError,
+)
 
 _log = get_logger(SERVICE)
 
@@ -39,35 +46,57 @@ TOOL_INVOCATIONS = Counter(
 
 
 def count_invocations[F: Callable[..., Awaitable[Any]]](fn: F) -> F:
-    """Wrap an MCP tool coroutine to count its invocations and outcome.
+    """Wrap a registered MCP tool coroutine to count its invocations and outcome.
 
-    The tool name is the wrapped function's ``__name__`` (the name FastMCP also
-    registers it under), so the label always matches the exposed tool. Each call
-    logs ``tool_invoked`` on entry and ``tool_failed`` on error (carrying the
-    backend HTTP status/code when the failure came from the backend hop);
-    ``user_id``/``request_id`` ride along via contextvars and no raw token is
-    ever logged.
+    Registration supplies the exposed tool name. Rejecting unregistered functions
+    before creating the wrapper prevents arbitrary function names from reaching
+    logs, metrics, tags, or reporting operations.
     """
+    from wren_mcp.tool_registry import registered_tool_name
+
+    tool_name = registered_tool_name(fn)
+    if tool_name is None:
+        raise ValueError("count_invocations requires a function registered as an MCP tool")
 
     @functools.wraps(fn)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        _log.info("tool_invoked", tool=fn.__name__)
+        _log.info("tool_invoked", tool=tool_name)
         try:
             result = await fn(*args, **kwargs)
         except Exception as exc:
-            TOOL_INVOCATIONS.labels(tool=fn.__name__, outcome="error").inc()
+            TOOL_INVOCATIONS.labels(tool=tool_name, outcome="error").inc()
             # Backend HTTP status/code are available only for backend-hop failures;
             # other exceptions log the tool + error_type with no backend fields.
             backend = exc if isinstance(exc, BackendToolError) else None
+            should_report = isinstance(exc, BackendUnavailableToolError) or (
+                not isinstance(exc, ExpectedToolError) and is_reportable(exc)
+            )
+            if should_report:
+                user_id = structlog.contextvars.get_contextvars().get("user_id")
+                report_mcp_error(
+                    exc,
+                    operation_name=f"tool.{tool_name}",
+                    kind_name=(
+                        exc.kind if isinstance(exc, BackendUnavailableToolError) else "internal"
+                    ),
+                    log_event_name="unhandled_exception",
+                    level_name=(
+                        "warning" if isinstance(exc, BackendUnavailableToolError) else "error"
+                    ),
+                    user_id=user_id if isinstance(user_id, str) else None,
+                    bounded_tags={"tool": tool_name},
+                    context_data={"status": getattr(exc, "status", None)},
+                    group_key=tool_name,
+                )
             _log.warning(
                 "tool_failed",
-                tool=fn.__name__,
+                tool=tool_name,
                 error_type=type(exc).__name__,
                 status=backend.status_code if backend is not None else None,
                 code=backend.code if backend is not None else None,
             )
             raise
-        TOOL_INVOCATIONS.labels(tool=fn.__name__, outcome="ok").inc()
+        TOOL_INVOCATIONS.labels(tool=tool_name, outcome="ok").inc()
         return result
 
     return wrapper  # type: ignore[return-value]

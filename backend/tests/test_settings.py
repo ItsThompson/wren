@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic import SecretStr
 
@@ -16,16 +17,45 @@ from wren.core.settings import (
     build_app_settings,
 )
 
+if TYPE_CHECKING:
+    import pytest
+
 
 def test_build_app_settings_injects_identity_over_shared_env() -> None:
-    env = EnvSettings(environment="production", log_level="warning", host="0.0.0.0")
+    env = EnvSettings(
+        environment="production",
+        log_level="warning",
+        sentry_dsn="https://public@example.ingest.sentry.io/1",
+        sentry_release="release-1",
+        host="0.0.0.0",
+    )
     settings = build_app_settings(service=EXTERNAL_SERVICE, port=EXTERNAL_PORT, env=env)
 
     assert settings.service == "wren-external"
     assert settings.port == 8000
     assert settings.environment == "production"
     assert settings.log_level == "warning"
+    assert settings.sentry_dsn == "https://public@example.ingest.sentry.io/1"
+    assert settings.sentry_release == "release-1"
     assert settings.is_dev is False
+
+
+def test_deployment_env_names_populate_specific_internal_fields(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SENTRY_RELEASE", "release-1")
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://api.usewren.com")
+    monkeypatch.setenv("APP_PUBLIC_URL", "https://usewren.com")
+    monkeypatch.setenv("MCP_PUBLIC_URL", "https://mcp.usewren.com")
+    monkeypatch.setenv("TRUSTED_PROXIES", "172.20.0.0/24")
+
+    env = EnvSettings()
+
+    assert env.sentry_release == "release-1"
+    assert env.oauth_issuer_url == "https://api.usewren.com"
+    assert env.web_app_url == "https://usewren.com"
+    assert env.mcp_resource_url == "https://mcp.usewren.com"
+    assert env.trusted_proxies_csv == "172.20.0.0/24"
 
 
 def test_internal_and_external_differ_only_by_identity() -> None:
@@ -48,7 +78,7 @@ def test_is_dev_true_for_development() -> None:
 def test_trusted_proxies_parses_the_comma_separated_env() -> None:
     # TRUSTED_PROXIES is a comma-separated CIDR/IP list; blanks (e.g. a trailing
     # comma) are dropped so an empty literal can never be trusted.
-    env = EnvSettings(trusted_proxies="172.20.0.0/24, 10.0.0.1 ,")
+    env = EnvSettings(trusted_proxies_csv="172.20.0.0/24, 10.0.0.1 ,")
     settings = build_app_settings(service=EXTERNAL_SERVICE, port=EXTERNAL_PORT, env=env)
     assert settings.trusted_proxies == ["172.20.0.0/24", "10.0.0.1"]
 

@@ -1,24 +1,29 @@
-import createClient, { type Client } from 'openapi-fetch'
+import createClient, { type Client, type Middleware } from 'openapi-fetch'
 
+import { createApiReportingMiddleware, type ApiReportingController } from '@/observability/sentry'
 import type { paths } from '../schema'
 
-/**
- * Typed API client.
- *
- * `openapi-fetch` turns the generated OpenAPI `paths` into one typed call per
- * endpoint over a single generic fetch (`client.GET("/roadmaps/{id}", ...)`),
- * so request/response shapes come straight from `just codegen` output and are
- * never hand-written. Each call is independently mockable by URL (see
- * `src/mocks`). Views receive a client built here with the deployment's API
- * base URL; the base is injected rather than read here so this stays testable.
- */
-export const createApiClient = (baseUrl: string): Client<paths> => createClient<paths>({ baseUrl, credentials: 'omit' })
+export interface ApiClientOptions {
+  credentials?: RequestCredentials
+  /** Reporting controller for this client stack; one is created when omitted. */
+  reporting?: ApiReportingController
+  /**
+   * Extra middleware registered after the reporting middleware, so its
+   * `onResponse` runs first and can replace a response before reporting
+   * classifies the final one.
+   */
+  middleware?: Middleware
+}
+
+export function createApiClient(baseUrl: string, clientOptions: ApiClientOptions = {}): Client<paths> {
+  const client = createClient<paths>({
+    baseUrl,
+    credentials: clientOptions.credentials ?? 'omit',
+  })
+  client.use(clientOptions.reporting?.middleware ?? createApiReportingMiddleware().middleware)
+  if (clientOptions.middleware) client.use(clientOptions.middleware)
+  return client
+}
 
 export type ApiClient = Client<paths>
-
-/**
- * The session-aware client (credentials + 401→refresh→retry middleware), built
- * by `createSessionClient`. Structurally identical to `ApiClient`; the distinct
- * alias lets the query hooks read as binding separate clients.
- */
 export type SessionClient = Client<paths>
