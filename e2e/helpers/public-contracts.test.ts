@@ -1,23 +1,21 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { expect, test } from 'vitest'
 
 import {
   isAuthorizationServerMetadata,
   isProtectedResourceMetadata,
 } from './public-contracts.ts'
 
-void test('accepts authorization metadata with the canonical issuer and JWKS URI', () => {
-  assert.equal(
+test('accepts authorization metadata with the canonical issuer and JWKS URI', () => {
+  expect(
     isAuthorizationServerMetadata(
       { issuer: 'https://api.wren.test', jwks_uri: 'https://api.wren.test/jwks' },
       'https://api.wren.test',
     ),
-    true,
-  )
+  ).toBe(true)
 })
 
-void test('rejects authorization metadata with expected values in unrelated fields', () => {
-  assert.equal(
+test('rejects authorization metadata with expected values in unrelated fields', () => {
+  expect(
     isAuthorizationServerMetadata(
       {
         issuer: 'https://other.example',
@@ -26,12 +24,11 @@ void test('rejects authorization metadata with expected values in unrelated fiel
       },
       'https://api.wren.test',
     ),
-    false,
-  )
+  ).toBe(false)
 })
 
-void test('accepts only the exact protected-resource metadata shape', () => {
-  assert.equal(
+test('accepts only the exact protected-resource metadata shape', () => {
+  expect(
     isProtectedResourceMetadata(
       {
         resource: 'https://mcp.wren.test',
@@ -40,12 +37,11 @@ void test('accepts only the exact protected-resource metadata shape', () => {
       'https://mcp.wren.test',
       'https://api.wren.test',
     ),
-    true,
-  )
+  ).toBe(true)
 })
 
-void test('rejects protected-resource metadata with extra or misplaced authorization servers', () => {
-  assert.equal(
+test('rejects protected-resource metadata with extra or misplaced authorization servers', () => {
+  expect(
     isProtectedResourceMetadata(
       {
         resource: 'https://mcp.wren.test',
@@ -55,6 +51,5 @@ void test('rejects protected-resource metadata with extra or misplaced authoriza
       'https://mcp.wren.test',
       'https://api.wren.test',
     ),
-    false,
-  )
+  ).toBe(false)
 })

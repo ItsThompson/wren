@@ -45,7 +45,7 @@ export const MCP_BASE_URL = readCanonicalPublicUrl(
   'mcp.wren.test',
 )
 
-function readCanonicalPublicUrl(name: string, fallback: string, expectedHostname: string): string {
+export function readCanonicalPublicUrl(name: string, fallback: string, expectedHostname: string): string {
   const rawValue = process.env[name] ?? fallback
   let parsedUrl: URL
   try {
