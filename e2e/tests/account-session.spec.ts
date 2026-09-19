@@ -37,7 +37,9 @@ test.describe('account and session journey', () => {
     )
 
     await logout(account.page)
-    await expect(account.page.getByText('Log in to see your roadmaps and everything you follow.')).toHaveCount(0)
+    await expect(
+      account.page.getByRole('heading', { name: /learn anything, in the right order/i }),
+    ).toBeVisible()
 
     await login(account.page, account)
     await account.page.goto('/dashboard')

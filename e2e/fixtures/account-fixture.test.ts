@@ -1,4 +1,4 @@
-import type { APIRequestContext, Browser } from '@playwright/test'
+import type { APIRequestContext, Browser, Page } from '@playwright/test'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createAttemptIdentity } from './attempt-identity.ts'
@@ -55,7 +55,8 @@ describe('account fixture factory', () => {
 
   it('creates a browser account without registering through an API helper', async () => {
     const close = vi.fn(async () => undefined)
-    const newPage = vi.fn(async () => ({}))
+    const page = {} as Page
+    const newPage = vi.fn(async (): Promise<Page> => page)
     const browser = {
       newContext: vi.fn(async () => ({ close, newPage })),
     } as unknown as Pick<Browser, 'newContext'>
@@ -67,6 +68,7 @@ describe('account fixture factory', () => {
     expect(account.email).toBe(`${account.username}@example.com`)
     expect(browser.newContext).toHaveBeenCalledWith({ baseURL: 'https://app.wren.test' })
     expect(newPage).toHaveBeenCalledOnce()
+    expect(account.page).toBe(page)
     await owner.closeAll()
     expect(close).toHaveBeenCalledOnce()
   })
