@@ -62,8 +62,12 @@ export function assertDashboard(output: DashboardOutput, context: ToolJourneyCon
 }
 
 export function assertProfile(output: ProfileOutput, context: ToolJourneyContext): Promise<void> {
-  requireCondition(output.handle === context.state.ownerHandle, `profile handle must be ${context.state.ownerHandle}`)
+  const requestedHandle = context.state.toolArguments?.roadmap_get_profile?.handle
+  const expectedHandle = typeof requestedHandle === 'string' ? requestedHandle : context.state.ownerHandle
+  requireCondition(output.handle === expectedHandle, `profile handle must be ${expectedHandle}`)
   for (const card of output.roadmaps) assertRoadmapCard(card)
+  const expectedRoadmapId = context.state.primaryRoadmapId
+  if (expectedRoadmapId !== null) requireCondition(output.roadmaps.some((card) => card.id === expectedRoadmapId), `profile must contain ${expectedRoadmapId}`)
   return Promise.resolve()
 }
 
@@ -83,6 +87,7 @@ export function assertOverview(output: OverviewOutput, context: ToolJourneyConte
   for (const section of output.sections) {
     requireCondition(section.checked_items <= section.total_items, `section ${section.section_id} checked count exceeds total`)
   }
+  if (context.state.sectionId !== null) requireCondition(output.sections.some((section) => section.section_id === context.state.sectionId), `overview must contain ${context.state.sectionId}`)
   return Promise.resolve()
 }
 
@@ -158,7 +163,7 @@ export function assertCreate(output: { roadmap_id: string; revision: number; sta
 }
 
 export function assertPatch(output: PatchRoadmapDraftOutput, context: ToolJourneyContext): Promise<void> {
-  assertMutationIdentity(output, context)
+  assertRoadmapId(output.roadmap_id, context)
   if (context.state.primaryRevision !== null) requireCondition(output.revision > context.state.primaryRevision, 'patch must advance revision')
   return Promise.resolve()
 }
@@ -194,6 +199,12 @@ export function assertFork(output: ForkRoadmapOutput, context: ToolJourneyContex
 export function assertMetadata(output: EditRoadmapMetadataOutput, context: ToolJourneyContext): Promise<void> {
   assertRoadmapId(output.roadmap_id, context)
   requireCondition(output.title.length > 0, 'metadata title must not be empty')
+  const requested = context.state.toolArguments?.edit_roadmap_metadata
+  if (requested !== undefined) {
+    if (typeof requested.title === 'string') requireCondition(output.title === requested.title, 'metadata title differs from request')
+    if (requested.description !== undefined) requireCondition(output.description === requested.description, 'metadata description differs from request')
+    if (Array.isArray(requested.subject_tags)) requireCondition(JSON.stringify(output.subject_tags) === JSON.stringify(requested.subject_tags), 'metadata tags differ from request')
+  }
   return Promise.resolve()
 }
 

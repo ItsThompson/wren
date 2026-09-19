@@ -257,7 +257,9 @@ export interface ChangedNodeOutput {
   readonly kind: string
 }
 
-export interface PatchRoadmapDraftOutput extends RoadmapMutationOutput {
+export interface PatchRoadmapDraftOutput {
+  readonly roadmap_id: string
+  readonly revision: number
   readonly changed_nodes: readonly ChangedNodeOutput[]
   readonly remap: Readonly<Record<string, string>>
 }
