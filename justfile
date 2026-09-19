@@ -220,7 +220,7 @@ setup-e2e:
     #!/usr/bin/env bash
     set -euo pipefail
     if [[ "$(uname -s)" == "Linux" ]]; then (cd e2e && npm ci && npx playwright install --with-deps chromium); else (cd e2e && npm ci && npx playwright install chromium); fi
-    if [[ -w /etc/hosts ]]; then scripts/e2e/setup-hosts.sh; else sudo scripts/e2e/setup-hosts.sh; fi
+    if [ -w /etc/hosts ]; then scripts/e2e/setup-hosts.sh; else sudo scripts/e2e/setup-hosts.sh; fi
     scripts/e2e/setup-certificates.sh
     scripts/e2e/setup-oauth-key.sh
 
@@ -266,7 +266,7 @@ e2e-capture-artifacts:
     #!/usr/bin/env bash
     set -euo pipefail
     export NODE_EXTRA_CA_CERTS="{{e2e_ca}}"
-    export RECORDER_CONTROL_TOKEN="$(cat {{e2e_token}})"
+    if [ -r "{{e2e_token}}" ]; then export RECORDER_CONTROL_TOKEN="$(cat {{e2e_token}})"; fi
     scripts/e2e/capture-artifacts.sh
 
 # Show the six E2E service logs without exposing direct service ports.
@@ -294,5 +294,5 @@ e2e-down:
 
 # Remove only the Wren-managed host entries and isolated CA/leaf material.
 reset-e2e-trust:
-    if [[ -w /etc/hosts ]]; then scripts/e2e/reset-hosts.sh; else sudo scripts/e2e/reset-hosts.sh; fi
+    if [ -w /etc/hosts ]; then scripts/e2e/reset-hosts.sh; else sudo scripts/e2e/reset-hosts.sh; fi
     scripts/e2e/reset-certificates.sh

@@ -103,10 +103,13 @@ const defaults = {
   'postgres-password': process.env.POSTGRES_PASSWORD ?? 'wren',
   'internal-api-token': process.env.E2E_INTERNAL_API_TOKEN ?? process.env.INTERNAL_API_TOKEN ?? 'wren-e2e-internal-token',
   'session-secret': process.env.E2E_SESSION_JWT_SECRET ?? process.env.SESSION_JWT_SECRET ?? 'wren-e2e-session-secret-at-least-32-bytes',
-  'oauth-private-key': readRequired(process.env.OAUTH_PRIVATE_KEY_PATH ?? join(process.env.ROOT_DIR, 'e2e/keys/oauth-private.pem')),
-  'tls-private-key': readRequired(process.env.TLS_PRIVATE_KEY_PATH ?? join(process.env.ROOT_DIR, 'e2e/ingress/certificates/wren-e2e-key.pem')),
 }
 for (const [category, value] of Object.entries(defaults)) add(category, value)
+const addFileIfPresent = (category, path) => {
+  if (existsSync(path)) add(category, readRequired(path))
+}
+addFileIfPresent('oauth-private-key', process.env.OAUTH_PRIVATE_KEY_PATH ?? join(process.env.ROOT_DIR, 'e2e/keys/oauth-private.pem'))
+addFileIfPresent('tls-private-key', process.env.TLS_PRIVATE_KEY_PATH ?? join(process.env.ROOT_DIR, 'e2e/ingress/certificates/wren-e2e-key.pem'))
 if (existsSync(process.env.SENSITIVE_VALUES_DIR)) {
   for (const name of readdirSync(process.env.SENSITIVE_VALUES_DIR)) {
     if (join(process.env.SENSITIVE_VALUES_DIR, name) !== process.env.VALUES_FILE) addSnapshot(name)
