@@ -25,24 +25,26 @@ import {
   type ValidateRoadmapDraftOutput,
 } from './types'
 import {
-  projectCreate,
   projectDashboard,
-  projectFork,
-  projectMetadata,
   projectNext,
   projectNode,
   projectOverview,
-  projectPatch,
   projectProgress,
   projectProgressUpdate,
-  projectPublish,
-  projectReplace,
   projectProfile,
   projectRoadmap,
   projectSearch,
   projectSection,
-  projectValidate,
 } from './projections'
+import {
+  projectCreate,
+  projectFork,
+  projectMetadata,
+  projectPatch,
+  projectPublish,
+  projectReplace,
+  projectValidate,
+} from './write-projections'
 import {
   assertCreate,
   assertDashboard,
