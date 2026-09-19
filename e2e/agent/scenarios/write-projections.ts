@@ -1,4 +1,5 @@
 import type {
+  ChangedNodeOutput,
   CreateRoadmapDraftOutput,
   EditRoadmapMetadataOutput,
   ForkRoadmapOutput,
@@ -7,6 +8,7 @@ import type {
   PublishRoadmapOutput,
   ReplaceRoadmapDraftOutput,
   ValidateRoadmapDraftOutput,
+  ViolationOutput,
 } from './types'
 import { array, booleanValue, nullableString, numberValue, record, stringArray, stringValue, structuredContent, value } from './projection-helpers'
 
@@ -24,6 +26,24 @@ function remap(valueToParse: unknown, field: string): Readonly<Record<string, st
   return Object.fromEntries(Object.entries(source).map(([key, item]) => [key, stringValue(item, `${field}.${key}`)]))
 }
 
+function changedNode(valueToParse: unknown, field: string): ChangedNodeOutput {
+  const source = record(valueToParse, field)
+  return {
+    change: value(source, 'change', stringValue),
+    id: value(source, 'id', stringValue),
+    kind: value(source, 'kind', stringValue),
+  }
+}
+
+function violation(valueToParse: unknown, field: string): ViolationOutput {
+  const source = record(valueToParse, field)
+  return {
+    ids: value(source, 'ids', stringArray),
+    message: value(source, 'message', stringValue),
+    rule: value(source, 'rule', stringValue),
+  }
+}
+
 export function projectCreate(result: McpCallToolResult): CreateRoadmapDraftOutput {
   const source = structuredContent(result)
   return { ...mutation(result), remap: value(source, 'remap', remap) }
@@ -33,7 +53,7 @@ export function projectPatch(result: McpCallToolResult): PatchRoadmapDraftOutput
   const source = structuredContent(result)
   return {
     ...mutation(result),
-    changed_nodes: value(source, 'changed_nodes', (item, field) => array(item, field, (entry, entryField) => record(entry, entryField))),
+    changed_nodes: value(source, 'changed_nodes', (item, field) => array(item, field, changedNode)),
     remap: value(source, 'remap', remap),
   }
 }
@@ -47,7 +67,7 @@ export function projectValidate(result: McpCallToolResult): ValidateRoadmapDraft
   const source = structuredContent(result)
   return {
     publishable: value(source, 'publishable', booleanValue),
-    violations: value(source, 'violations', (item, field) => array(item, field, (entry, entryField) => record(entry, entryField))),
+    violations: value(source, 'violations', (item, field) => array(item, field, violation)),
   }
 }
 

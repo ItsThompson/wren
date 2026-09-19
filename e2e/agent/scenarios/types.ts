@@ -69,10 +69,34 @@ export interface ProfileOutput {
   readonly roadmaps: readonly RoadmapCardOutput[]
 }
 
+export interface RoadmapChecklistItemOutput {
+  readonly id: string
+  readonly text: string
+}
+export interface RoadmapResourceOutput {
+  readonly id: string
+  readonly title: string
+  readonly type: string
+  readonly url: string
+}
+
+export interface RoadmapSubsectionOutput {
+  readonly checklist_items: Readonly<Record<string, RoadmapChecklistItemOutput>>
+  readonly description: string | null
+  readonly effort_estimate: string | null
+  readonly id: string
+  readonly item_order: readonly string[]
+  readonly prereq_ids: readonly string[]
+  readonly resource_order: readonly string[]
+  readonly resources: Readonly<Record<string, RoadmapResourceOutput>>
+  readonly tags: readonly string[]
+  readonly title: string
+}
+
 export interface RoadmapSectionDocumentOutput {
   readonly id: string
   readonly subsection_order: readonly string[]
-  readonly subsections: Readonly<Record<string, object>>
+  readonly subsections: Readonly<Record<string, RoadmapSubsectionOutput>>
   readonly title: string
 }
 
@@ -227,8 +251,14 @@ export interface CreateRoadmapDraftOutput extends RoadmapMutationOutput {
   readonly remap: Readonly<Record<string, string>>
 }
 
+export interface ChangedNodeOutput {
+  readonly change: string
+  readonly id: string
+  readonly kind: string
+}
+
 export interface PatchRoadmapDraftOutput extends RoadmapMutationOutput {
-  readonly changed_nodes: readonly object[]
+  readonly changed_nodes: readonly ChangedNodeOutput[]
   readonly remap: Readonly<Record<string, string>>
 }
 
@@ -236,9 +266,15 @@ export interface ReplaceRoadmapDraftOutput extends RoadmapMutationOutput {
   readonly remap: Readonly<Record<string, string>>
 }
 
+export interface ViolationOutput {
+  readonly ids: readonly string[]
+  readonly message: string
+  readonly rule: string
+}
+
 export interface ValidateRoadmapDraftOutput {
   readonly publishable: boolean
-  readonly violations: readonly object[]
+  readonly violations: readonly ViolationOutput[]
 }
 
 export type PublishRoadmapOutput = RoadmapMutationOutput
