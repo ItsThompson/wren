@@ -198,6 +198,21 @@ export function assertSubsectionTitle(
   if (section?.subsections[subsectionId]?.title !== expectedTitle) throw new Error(`subsection ${subsectionId} did not persist its changed title`)
 }
 
+export function assertSubsectionItemIds(
+  output: {
+    readonly section_order: readonly string[]
+    readonly sections: Readonly<Record<string, { readonly subsections: Readonly<Record<string, { readonly item_order: readonly string[] }>> }>>
+  },
+  subsectionId: string,
+  expectedItemIds: readonly string[],
+): void {
+  const section = output.section_order.map((id) => output.sections[id]).find((candidate) => candidate?.subsections[subsectionId] !== undefined)
+  const actualItemIds = section?.subsections[subsectionId]?.item_order
+  if (JSON.stringify(actualItemIds) !== JSON.stringify(expectedItemIds)) {
+    throw new Error(`subsection ${subsectionId} did not persist its expected checklist identities`)
+  }
+}
+
 export function assertSubsectionTags(
   output: {
     readonly section_order: readonly string[]
