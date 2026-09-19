@@ -169,15 +169,21 @@ describe('artifact sanitization', () => {
     expect([...binary.bytes]).toEqual([0, 1, 2, 3, 255])
   })
 
-  it('withholds static assets that use unquoted sensitive fields', async () => {
-    const result = await sanitizeArtifacts([{
-      path: 'report/app.js',
-      kind: 'report-static',
-      bytes: new TextEncoder().encode('const data={headers:{authorization:"unregistered-secret"}};'),
-    }], createSensitiveValueRegistry())
+  it('withholds static assets that use dynamic sensitive writes', async () => {
+    const result = await sanitizeArtifacts([
+      { path: 'report/object.js', kind: 'report-static', bytes: new TextEncoder().encode('const data={headers:{authorization:"unregistered-secret"}};') },
+      { path: 'report/attribute.js', kind: 'report-static', bytes: new TextEncoder().encode('element.setAttribute("authorization", value);') },
+      { path: 'report/bracket.js', kind: 'report-static', bytes: new TextEncoder().encode('request["body"] = value;') },
+      { path: 'report/storage.js', kind: 'report-static', bytes: new TextEncoder().encode('localStorage.setItem("request", value);') },
+    ], createSensitiveValueRegistry())
 
     expect(result.passed).toBe(false)
-    expect(result.withheldPaths).toEqual(['report/app.js'])
+    expect(result.withheldPaths).toEqual([
+      'report/object.js',
+      'report/attribute.js',
+      'report/bracket.js',
+      'report/storage.js',
+    ])
   })
 
   it('preserves optional chaining in safe static assets', async () => {
@@ -188,6 +194,26 @@ describe('artifact sanitization', () => {
     }, createSensitiveValueRegistry())
 
     expect(new TextDecoder().decode(result.bytes)).toContain('object?.field')
+  })
+
+  it('withholds unstructured service-log lines that may contain request data', async () => {
+    const result = await sanitizeArtifacts([
+      { path: 'log/backend.log', kind: 'log', bytes: new TextEncoder().encode('POST /endpoint {"foo":"bar"}') },
+      { path: 'log/frontend.log', kind: 'log', bytes: new TextEncoder().encode('request body: foo=bar') },
+    ], createSensitiveValueRegistry())
+
+    expect(result.passed).toBe(false)
+    expect(result.withheldPaths).toEqual(['log/backend.log', 'log/frontend.log'])
+  })
+
+  it('sanitizes structured service-log lines', async () => {
+    const result = await sanitizeArtifact({
+      path: 'log/backend.log',
+      kind: 'log',
+      bytes: new TextEncoder().encode('{"level":"info","message":"ready"}'),
+    }, createSensitiveValueRegistry())
+
+    expect(new TextDecoder().decode(result.bytes)).toContain('"message":"ready"')
   })
 
   it('withholds allowlisted projections with invalid scalar values', async () => {

@@ -132,6 +132,25 @@ function sanitizeStructuredValue(value: unknown, registry: SensitiveValueRegistr
   return sanitized
 }
 
+function hasUnsafeDynamicStaticExpression(text: string): boolean {
+  if (/\b(?:setItem|setRequestHeader|defineProperty|Reflect\.set|Object\.assign)\s*\(/i.test(text)) return true
+  for (const match of text.matchAll(/\bsetAttribute\s*\(\s*([^,)]*)(?:,\s*([^)]*))?/gi)) {
+    const field = match[1]?.trim() ?? ''
+    const value = match[2]?.trim() ?? ''
+    if (!/^['"][^'"]*['"]$/.test(field) || SENSITIVE_FIELD.test(field) || CALLBACK_FIELD.test(field) || CALLBACK_FIELD.test(value)) return true
+  }
+  if (/\[[^\]'"\s][^\]]*\]\s*=/.test(text)) return true
+  for (const match of text.matchAll(/\[[\s]*["']([^"']+)["'][\s]*\]\s*=/g)) {
+    const field = match[1] ?? ''
+    if (SENSITIVE_FIELD.test(field) || CALLBACK_FIELD.test(field)) return true
+  }
+  for (const match of text.matchAll(/\.\s*([A-Za-z_$][\w$-]*)\s*=/g)) {
+    const field = match[1] ?? ''
+    if (SENSITIVE_FIELD.test(field) || CALLBACK_FIELD.test(field)) return true
+  }
+  return false
+}
+
 function parseStructuredText(text: string, kind: DiagnosticArtifactKind, registry: SensitiveValueRegistry) {
   const counts = emptyCounts()
   const inputRedaction = registry.redact(text)
@@ -143,10 +162,11 @@ function parseStructuredText(text: string, kind: DiagnosticArtifactKind, registr
     return { text: `${redacted.sanitizedText}\n`, counts }
   } catch {
     if (kind === 'report-static') {
+      if (hasUnsafeDynamicStaticExpression(text)) throw new UnsafeArtifactError([SensitiveValueCategory.INTERNAL_API_TOKEN])
       const sanitizedText = sanitizeString(text, registry)
       return { text: sanitizedText, counts }
     }
-    if (kind === 'trace' || kind === 'report') {
+    if (kind === 'trace' || kind === 'report' || kind === 'log') {
       const lines = inputRedaction.sanitizedText.trim().split('\n').filter((line) => line.length > 0)
       try {
         const safeLines = lines.map((line) => JSON.stringify(sanitizeStructuredValue(JSON.parse(line) as unknown, registry)))
@@ -157,14 +177,7 @@ function parseStructuredText(text: string, kind: DiagnosticArtifactKind, registr
         throw new UnsafeArtifactError([SensitiveValueCategory.INTERNAL_API_TOKEN])
       }
     }
-    if (kind !== 'log') throw new UnsafeArtifactError([SensitiveValueCategory.INTERNAL_API_TOKEN])
-    const redacted = registry.redact(text)
-    mergeCounts(counts, redacted.redactionCounts)
-    const safeLines = redacted.sanitizedText
-      .split('\n')
-      .filter((line) => !SENSITIVE_FIELD.test(line.replace(/[^a-z]/gi, '')) && !SENSITIVE_TEXT.test(line))
-      .map((line) => sanitizeString(line, registry))
-    return { text: safeLines.join('\n'), counts }
+    throw new UnsafeArtifactError([SensitiveValueCategory.INTERNAL_API_TOKEN])
   }
 }
 
