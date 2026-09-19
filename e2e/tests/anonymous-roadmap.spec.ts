@@ -17,7 +17,10 @@ test.describe('anonymous roadmap reading', () => {
     roadmapIdentity,
   }) => {
     const owner = (await accountFactory.create('anonymous-owner')).apiContext
-    const roadmapId = await createPublishableRoadmap(owner, roadmapIdentity)
+    const roadmapId = await createPublishableRoadmap(owner, roadmapIdentity, {
+      arrays: ['arrays'],
+      hashing: ['hashing'],
+    })
     const draftGuest = await accountFactory.createGuest()
     expect((await draftGuest.get(`/roadmaps/${roadmapId}`)).status()).toBe(404)
     await publishRoadmap(owner, roadmapId)
@@ -34,8 +37,11 @@ test.describe('anonymous roadmap reading', () => {
     await page.goto(`/roadmaps/${roadmapId}`)
     await expect(page.getByRole('heading', { level: 1, name: roadmapIdentity.title })).toBeVisible()
     await expect(page.getByRole('heading', { level: 3, name: 'Arrays' })).toBeVisible()
+    await expect(page.getByText('arrays', { exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Guide' })).toHaveAttribute('href', 'https://x.test')
     await expect(page.getByText('Read it')).toBeVisible()
+    await expect(page.getByText('Drill it')).toBeVisible()
+    await expect(page.getByText('Implement a counter')).toBeVisible()
     await expect(page.getByRole('link', { name: 'Log in to track progress' })).toBeVisible()
     await expect(page.getByText('Fork')).not.toBeVisible()
     expect(expectedDocument).toMatchObject({ status: 'published', published_visibility: 'public' })
@@ -48,12 +54,12 @@ test.describe('anonymous roadmap reading', () => {
     await expect(page.getByRole('heading', { level: 3, name: 'Hashing' })).toBeVisible()
 
     const personalRequests = apiRequests.filter(({ path }) =>
-      /\/progress$|\/next$|\/follow$|:publish$|:archive$|\/published-visibility$|\/metadata$/.test(path),
+      /\/progress$|\/next$|\/follow$|:publish$|:archive$|\/published-visibility$|\/metadata$|^\/me\//.test(path),
     )
     expect(personalRequests).toEqual([])
     const documentRequests = apiRequests.filter(({ path }) => path === `/roadmaps/${roadmapId}`)
     expect(documentRequests.length).toBeGreaterThan(0)
-    expect(documentRequests.every(({ cookie }) => cookie === undefined)).toBe(true)
+    expect(apiRequests.every(({ cookie }) => cookie === undefined)).toBe(true)
 
     await archiveRoadmap(owner, roadmapId)
     await page.reload()
