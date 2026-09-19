@@ -26,28 +26,32 @@ test.describe('account and session journey', () => {
     const sessionCookies = cookies
       .filter((cookie) => SESSION_COOKIE_CONTRACTS.some((contract) => contract.name === cookie.name))
       .map(({ name, domain, path, secure }) => ({ name, domain, path, secure }))
-    expect(sessionCookies).toEqual(
-      expect.arrayContaining(
-        SESSION_COOKIE_CONTRACTS.map((contract) => ({
-          ...contract,
-          domain: '.wren.test',
-          secure: true,
-        })),
-      ),
+    const expectedSessionCookies = SESSION_COOKIE_CONTRACTS.map((contract) => ({
+      ...contract,
+      domain: '.wren.test',
+      secure: true,
+    }))
+    expect(sessionCookies.sort((left, right) => left.name.localeCompare(right.name))).toEqual(
+      expectedSessionCookies.sort((left, right) => left.name.localeCompare(right.name)),
     )
 
     await logout(account.page)
     await expect(
       account.page.getByRole('heading', { name: /learn anything, in the right order/i }),
     ).toBeVisible()
+    await account.page.reload()
+    await account.page.goto('/dashboard')
+    await expect(account.page.getByText('Log in to see your roadmaps and everything you follow.')).toBeVisible()
 
     await login(account.page, account)
-    await account.page.goto('/dashboard')
+    const dashboardResponse = await account.page.goto('/dashboard')
+    expect(dashboardResponse?.status()).toBe(200)
     await expectDashboard(account.page)
     await account.page.reload()
     await expectDashboard(account.page)
 
-    await account.page.goto('/settings/connections')
+    const connectionsResponse = await account.page.goto('/settings/connections')
+    expect(connectionsResponse?.status()).toBe(200)
     await expect(account.page.getByRole('heading', { name: 'Connected agents' })).toBeVisible()
     await expect(account.page.getByText('No connected agents yet.')).toBeVisible()
   })
