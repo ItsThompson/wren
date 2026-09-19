@@ -11,16 +11,23 @@ import {
   type RoadmapFixtureIdentity,
   type TestAttemptIdentity,
 } from './attempt-identity'
-import { type AccountFactory, createAccountFactory } from './account-fixture'
+import {
+  type AccountFactory,
+  type BrowserAccountFactory,
+  createAccountFactory,
+  createBrowserAccountFactory,
+} from './account-fixture'
 import { createCallbackListener, type CallbackListener } from './callback-listener'
 import { OwnedContextResources, ownClosable, ownDisposable } from './context-owner'
 import { createRecorderClient, type RecorderClient } from './recorder-client'
+import { createAgentFactory, type AgentFactory } from './agent-fixture'
 
 export interface WrenFixtures {
   attemptIdentity: TestAttemptIdentity
   resourceIdentities: AttemptResourceIdentities
   contextOwner: OwnedContextResources
   accountFactory: AccountFactory
+  browserAccountFactory: BrowserAccountFactory
   apiContext: APIRequestContext
   browserContext: BrowserContext
   roadmapIdentity: RoadmapFixtureIdentity
@@ -28,6 +35,7 @@ export interface WrenFixtures {
   oauthIdentity: OAuthFixtureIdentity
   recorderIdentity: RecorderFixtureIdentity
   recorderClient: RecorderClient
+  agentFactory: AgentFactory
 }
 
 export const test = base.extend<WrenFixtures>({
@@ -64,6 +72,10 @@ export const test = base.extend<WrenFixtures>({
     await use(createAccountFactory(playwright, contextOwner, attemptIdentity))
   },
 
+  browserAccountFactory: async ({ browser, contextOwner, attemptIdentity }, use) => {
+    await use(createBrowserAccountFactory(browser, contextOwner, attemptIdentity))
+  },
+
   roadmapIdentity: async ({ resourceIdentities }, use) => {
     await use(resourceIdentities.roadmap())
   },
@@ -82,6 +94,10 @@ export const test = base.extend<WrenFixtures>({
 
   recorderClient: async ({ playwright, contextOwner, recorderIdentity }, use) => {
     await use(await createRecorderClient(playwright.request, contextOwner, recorderIdentity))
+  },
+
+  agentFactory: async ({ attemptIdentity, contextOwner }, use) => {
+    await use(createAgentFactory(attemptIdentity, contextOwner))
   },
 })
 

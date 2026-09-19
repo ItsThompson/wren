@@ -10,7 +10,8 @@ export async function registerAccount(page: Page, account: AttemptAccountIdentit
   await page.getByLabel('Email').fill(account.email)
   await page.getByLabel('Password').fill(account.password)
   await page.getByRole('button', { name: 'Create account' }).click()
-  await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByRole('button', { name: 'Open account menu' })).toBeVisible()
 }
 
 export async function completeOnboarding(page: Page): Promise<void> {
@@ -39,7 +40,8 @@ export async function login(page: Page, account: BrowserCredentials): Promise<vo
   await page.getByLabel('Email').fill(account.email)
   await page.getByLabel('Password').fill(account.password)
   await page.getByRole('button', { name: 'Log in' }).click()
-  await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByRole('button', { name: 'Open account menu' })).toBeVisible()
 }
 
 export async function expectDashboard(page: Page): Promise<void> {
