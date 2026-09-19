@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Wren end-to-end Playwright suite: the study spine against the live Docker Compose stack, workers:1 / fullyParallel:false, per-test unique users, API seeding + UI smoke.",
+  "description": "Wren end-to-end Playwright suite against the live production-mode HTTPS Docker Compose stack, workers:1 local / workers:2 CI, fullyParallel:false, and per-test unique users.",
   "scripts": {
     "test": "playwright test",
     "test:ui": "playwright test --ui",
