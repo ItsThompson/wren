@@ -5,7 +5,7 @@ import {
   createAttachmentIdentifier,
   createAttemptIdentity,
   createCallbackIdentity,
-  createOAuthClientName,
+  createOAuthIdentity,
   createRecorderQueryIdentity,
   createRoadmapIdentity,
 } from './attempt-identity.ts'
@@ -42,13 +42,23 @@ describe('attempt identity', () => {
     const identity = createAttemptIdentity(input)
     const account = createAccountIdentity(identity, 'long-owner-role', 0)
     const roadmap = createRoadmapIdentity(identity)
+    const oauth = createOAuthIdentity(identity, 0, 'http://127.0.0.1:43210/callback')
+    const callback = createCallbackIdentity(identity)
+    const recorder = createRecorderQueryIdentity(identity)
+    const attachment = createAttachmentIdentifier(identity, 'trace.zip')
 
     expect(account.username).toMatch(/^[a-z0-9_-]{3,32}$/)
-    expect(account.email).toBe(`${account.username}@example.com`)
-    expect(roadmap.title).toContain(identity.resourcePrefix)
-    expect(createOAuthClientName(identity)).toContain(identity.resourcePrefix)
-    expect(createAttachmentIdentifier(identity, 'trace.zip')).toContain(identity.resourcePrefix)
-    expect(createCallbackIdentity(identity)).toContain(identity.resourcePrefix)
-    expect(createRecorderQueryIdentity(identity)).toContain(identity.resourcePrefix)
+    expect(account.email).toMatch(/^[^@]+@example\.com$/)
+    expect(account.email.length).toBeLessThanOrEqual(254)
+    expect(roadmap.title.length).toBeLessThanOrEqual(120)
+    expect(roadmap.proposedIdPrefix.length).toBeLessThanOrEqual(120)
+    expect(roadmap.itemIds).toHaveLength(3)
+    expect(new Set(roadmap.itemIds).size).toBe(3)
+    expect(oauth.clientName.length).toBeLessThanOrEqual(120)
+    expect(oauth.redirectUri).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/callback$/)
+    expect(oauth.state).toContain(identity.resourcePrefix)
+    expect(callback.length).toBeLessThanOrEqual(120)
+    expect(recorder.length).toBeLessThanOrEqual(120)
+    expect(attachment.length).toBeLessThanOrEqual(120)
   })
 })

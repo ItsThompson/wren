@@ -6,9 +6,10 @@ test.describe('roadmap list filters', () => {
   test('supports ANY, ALL, clear, keyboard use, and narrow layouts', async ({
     accountFactory,
     browserContext,
+    roadmapIdentity,
   }) => {
     const owner = (await accountFactory.create('filter-owner')).apiContext
-    const roadmapId = await createPublishableRoadmap(owner, {
+    const roadmapId = await createPublishableRoadmap(owner, roadmapIdentity, {
       arrays: ['arrays', 'shared'],
       hashing: ['hashing', 'shared'],
     })

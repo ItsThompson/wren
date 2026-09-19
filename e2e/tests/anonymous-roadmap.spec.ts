@@ -14,9 +14,10 @@ test.describe('anonymous roadmap reading', () => {
   test('reads published and archived content without personal requests', async ({
     accountFactory,
     browserContext,
+    roadmapIdentity,
   }) => {
     const owner = (await accountFactory.create('anonymous-owner')).apiContext
-    const roadmapId = await createPublishableRoadmap(owner)
+    const roadmapId = await createPublishableRoadmap(owner, roadmapIdentity)
     const draftGuest = await accountFactory.createGuest()
     expect((await draftGuest.get(`/roadmaps/${roadmapId}`)).status()).toBe(404)
     await publishRoadmap(owner, roadmapId)
@@ -31,7 +32,7 @@ test.describe('anonymous roadmap reading', () => {
     })
 
     await page.goto(`/roadmaps/${roadmapId}`)
-    await expect(page.getByRole('heading', { level: 1, name: 'Grokking DSA' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: roadmapIdentity.title })).toBeVisible()
     await expect(page.getByRole('heading', { level: 3, name: 'Arrays' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Guide' })).toHaveAttribute('href', 'https://x.test')
     await expect(page.getByText('Read it')).toBeVisible()
@@ -67,10 +68,13 @@ test.describe('anonymous roadmap reading', () => {
 
   test('keeps explicit private publication access owner-only across lifecycle states', async ({
     accountFactory,
+    roadmapIdentity,
   }) => {
     const owner = (await accountFactory.create('private-owner')).apiContext
     const guest = await accountFactory.createGuest()
-    const roadmapId = await createPublishableRoadmap(owner, { publishedVisibility: 'private' })
+    const roadmapId = await createPublishableRoadmap(owner, roadmapIdentity, {
+      publishedVisibility: 'private',
+    })
 
     expect((await getRoadmap(owner, roadmapId)).published_visibility).toBe('private')
     expect((await guest.get(`/roadmaps/${roadmapId}`)).status()).toBe(404)

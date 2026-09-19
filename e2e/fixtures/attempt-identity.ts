@@ -33,6 +33,29 @@ export interface AttemptAccountIdentity {
   password: string
 }
 
+export interface RoadmapFixtureIdentity {
+  title: string
+  proposedIdPrefix: string
+  itemIds: readonly string[]
+}
+
+export interface OAuthFixtureIdentity {
+  clientName: string
+  redirectUri: string
+  state: string
+}
+
+export interface RecorderFixtureIdentity {
+  queryIdentity: string
+}
+
+export interface AttemptResourceIdentities {
+  roadmap(index?: number): RoadmapFixtureIdentity
+  oauth(index: number, redirectUri: string): OAuthFixtureIdentity
+  callback(index?: number): string
+  recorder(index?: number): RecorderFixtureIdentity
+}
+
 const MAX_USERNAME_LENGTH = 32
 const MAX_RESOURCE_LABEL_LENGTH = 120
 const RUN_ID_MAX_LENGTH = 64
@@ -89,16 +112,37 @@ export function createAccountIdentity(
 export function createRoadmapIdentity(
   identity: TestAttemptIdentity,
   index = 0,
-): { title: string; proposedIdPrefix: string } {
+): RoadmapFixtureIdentity {
   const indexToken = toBase36(index)
+  const proposedIdPrefix = `${identity.resourcePrefix}r${indexToken}`.slice(0, MAX_RESOURCE_LABEL_LENGTH)
   return {
     title: `E2E ${identity.resourcePrefix} roadmap ${indexToken}`.slice(0, MAX_RESOURCE_LABEL_LENGTH),
-    proposedIdPrefix: `${identity.resourcePrefix}r${indexToken}`.slice(0, MAX_RESOURCE_LABEL_LENGTH),
+    proposedIdPrefix,
+    itemIds: [
+      `${proposedIdPrefix}_read`.slice(0, MAX_RESOURCE_LABEL_LENGTH),
+      `${proposedIdPrefix}_drill`.slice(0, MAX_RESOURCE_LABEL_LENGTH),
+      `${proposedIdPrefix}_hash`.slice(0, MAX_RESOURCE_LABEL_LENGTH),
+    ],
   }
 }
 
 export function createOAuthClientName(identity: TestAttemptIdentity, index = 0): string {
   return `e2e-${identity.resourcePrefix}-oauth-${toBase36(index)}`.slice(0, MAX_RESOURCE_LABEL_LENGTH)
+}
+
+export function createOAuthIdentity(
+  identity: TestAttemptIdentity,
+  index: number,
+  redirectUri: string,
+): OAuthFixtureIdentity {
+  return {
+    clientName: createOAuthClientName(identity, index),
+    redirectUri,
+    state: `e2e-${identity.resourcePrefix}-state-${randomBytes(12).toString('base64url')}`.slice(
+      0,
+      MAX_RESOURCE_LABEL_LENGTH,
+    ),
+  }
 }
 
 export function createAttachmentIdentifier(identity: TestAttemptIdentity, name: string): string {
@@ -111,6 +155,17 @@ export function createCallbackIdentity(identity: TestAttemptIdentity, index = 0)
 
 export function createRecorderQueryIdentity(identity: TestAttemptIdentity, index = 0): string {
   return `e2e-${identity.resourcePrefix}-recorder-${toBase36(index)}`.slice(0, MAX_RESOURCE_LABEL_LENGTH)
+}
+
+export function createAttemptResourceIdentities(
+  identity: TestAttemptIdentity,
+): AttemptResourceIdentities {
+  return {
+    roadmap: (index = 0) => createRoadmapIdentity(identity, index),
+    oauth: (index, redirectUri) => createOAuthIdentity(identity, index, redirectUri),
+    callback: (index = 0) => createCallbackIdentity(identity, index),
+    recorder: (index = 0) => ({ queryIdentity: createRecorderQueryIdentity(identity, index) }),
+  }
 }
 
 function readRunId(): string {
