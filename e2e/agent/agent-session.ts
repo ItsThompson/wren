@@ -106,6 +106,8 @@ export async function createAgentSession(
     if (authorizationCode === null) throw new Error('validated OAuth callback lost its authorization code')
     await initialTransport.finishAuth(authorizationCode)
     await initialTransport.close()
+    const initialTransportIndex = transports.indexOf(initialTransport)
+    if (initialTransportIndex >= 0) transports.splice(initialTransportIndex, 1)
 
     const freshTransport = transportFactory(request.mcpServerUrl, provider)
     transports.push(freshTransport)

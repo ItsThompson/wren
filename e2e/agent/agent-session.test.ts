@@ -216,8 +216,10 @@ describe('AgentSession', () => {
     const listener = buildListener(new URL('http://127.0.0.1:43210/callback'), () => callbackState)
     const sensitiveValues = new InMemorySensitiveValueRegistry()
     const transports: McpTransportLike[] = []
+    const transportCloseSpies: ReturnType<typeof vi.fn>[] = []
     let firstFinishAuth: ReturnType<typeof vi.fn> | undefined
     let oauthProvider: Parameters<NonNullable<AgentSessionDependencies['createTransport']>>[1]
+    const clientClose = vi.fn(async () => undefined)
     const connect = vi.fn(async (transport: McpTransportLike) => {
       if (transports.indexOf(transport) === 0) {
         callbackState = (await oauthProvider?.state?.()) ?? ''
@@ -229,7 +231,7 @@ describe('AgentSession', () => {
       connect,
       listTools: vi.fn(async () => ({ tools: [{ name: 'roadmap_get', inputSchema: { type: 'object' } }] })),
       callTool: vi.fn(async () => ({ structuredContent: { id: 'roadmap-1' } })) as McpClientLike['callTool'],
-      close: vi.fn(async () => undefined),
+      close: clientClose,
     }
     const session = await createAgentSession(
       {
@@ -258,10 +260,12 @@ describe('AgentSession', () => {
             await provider.saveDiscoveryState?.({ authorizationServerUrl: 'https://api.wren.test' })
             await provider.saveTokens({ access_token: 'access-token', refresh_token: 'refresh-token', token_type: 'Bearer', expires_in: 1 })
           })
+          const close = vi.fn(async () => undefined)
+          transportCloseSpies.push(close)
           const transport: McpTransportLike = {
             transport: {} as Transport,
             finishAuth,
-            close: vi.fn(async () => undefined),
+            close,
           }
           if (transports.length === 0) firstFinishAuth = finishAuth
           transports.push(transport)
@@ -278,6 +282,76 @@ describe('AgentSession', () => {
     await expect(session.listTools()).resolves.toEqual([{ name: 'roadmap_get', inputSchema: { type: 'object' } }])
     await expect(session.callTool('roadmap_get', { roadmap_id: 'roadmap-1' })).resolves.toEqual({ structuredContent: { id: 'roadmap-1' } })
     await session.close()
+    expect(clientClose).toHaveBeenCalledTimes(2)
+    expect(listener.closeSpy).toHaveBeenCalledOnce()
+    expect(transportCloseSpies).toHaveLength(2)
+    expect(transportCloseSpies[0]).toHaveBeenCalledOnce()
+    expect(transportCloseSpies[1]).toHaveBeenCalledOnce()
+    expect(sensitiveValues.values()).toEqual([])
+  })
+
+  it('cleans up every owned resource when fresh transport initialization fails', async () => {
+    const { page } = buildPage()
+    let callbackState = ''
+    const listener = buildListener(new URL('http://127.0.0.1:43209/callback'), () => callbackState)
+    const sensitiveValues = new InMemorySensitiveValueRegistry()
+    const transports: McpTransportLike[] = []
+    const transportCloseSpies: ReturnType<typeof vi.fn>[] = []
+    let oauthProvider: Parameters<NonNullable<AgentSessionDependencies['createTransport']>>[1]
+    const clientClose = vi.fn(async () => undefined)
+    const connect = vi.fn(async (transport: McpTransportLike) => {
+      if (transports.indexOf(transport) === 0) {
+        callbackState = (await oauthProvider?.state?.()) ?? ''
+        await oauthProvider?.redirectToAuthorization?.(new URL('https://api.wren.test/authorize'))
+        throw new UnauthorizedError()
+      }
+      throw new Error('fresh transport initialization failed')
+    })
+    const client: McpClientLike = {
+      connect,
+      listTools: vi.fn(async () => ({ tools: [] })),
+      callTool: vi.fn(async () => ({})) as McpClientLike['callTool'],
+      close: clientClose,
+    }
+
+    await expect(createAgentSession(
+      {
+        identity: createAttemptIdentity({ runId: 'run', projectName: 'chromium', file: 'failure.spec.ts', title: 'initialization failure', parallelIndex: 0, retry: 0, nonce: 'nonce' }),
+        consentPage: page as never,
+        requestedScopes: [OAuthScope.ROADMAPS_READ],
+        mcpServerUrl: new URL('https://mcp.wren.test'),
+        sensitiveValues,
+        contextOwner: { own: <T>(resource: T): T => resource, closeAll: async () => undefined },
+      },
+      {
+        createCallbackListener: async () => listener,
+        createClient: () => client,
+        createTransport: (_serverUrl, provider) => {
+          oauthProvider = provider
+          const finishAuth = vi.fn(async () => {
+            await provider.saveClientInformation?.({ client_id: 'client-id' })
+            await provider.saveDiscoveryState?.({ authorizationServerUrl: 'https://api.wren.test' })
+            await provider.saveTokens({ access_token: 'access-token', token_type: 'Bearer', expires_in: 1 })
+          })
+          const close = vi.fn(async () => undefined)
+          transportCloseSpies.push(close)
+          const transport: McpTransportLike = {
+            transport: {} as Transport,
+            finishAuth,
+            close,
+          }
+          transports.push(transport)
+          return transport
+        },
+      },
+    )).rejects.toThrow('fresh transport initialization failed')
+
+    expect(connect).toHaveBeenCalledTimes(2)
+    expect(clientClose).toHaveBeenCalledTimes(2)
+    expect(listener.closeSpy).toHaveBeenCalledOnce()
+    expect(transportCloseSpies).toHaveLength(2)
+    expect(transportCloseSpies[0]).toHaveBeenCalledOnce()
+    expect(transportCloseSpies[1]).toHaveBeenCalledOnce()
     expect(sensitiveValues.values()).toEqual([])
   })
 })
