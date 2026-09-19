@@ -4,11 +4,19 @@ import { InMemorySensitiveValueRegistry } from '../fixtures/sensitive-value-regi
 import type { EnvelopeRecord } from '../recorder/src/types'
 import { assertPrivateEnvelope } from './envelope-privacy'
 
-function buildRecord(event: Record<string, unknown>): EnvelopeRecord {
+function buildRecord(
+  event: Record<string, unknown>,
+  additionalEvents: readonly Record<string, unknown>[] = [],
+): EnvelopeRecord {
+  const items = [event, ...additionalEvents]
+  const rawEnvelopeLines = [JSON.stringify({})]
+  for (const item of items) {
+    rawEnvelopeLines.push(JSON.stringify({ type: 'event' }), JSON.stringify(item))
+  }
   return {
     sequence: 1,
     receivedAtIso: '2026-01-01T00:00:00.000Z',
-    rawEnvelopeUtf8: `${JSON.stringify({})}\n${JSON.stringify({ type: 'event' })}\n${JSON.stringify(event)}\n`,
+    rawEnvelopeUtf8: `${rawEnvelopeLines.join('\n')}\n`,
     parseStatus: 'valid',
     operation: 'operation',
     failureKind: 'upstream',
@@ -29,6 +37,18 @@ describe('envelope privacy assertions', () => {
       500,
       registry,
     )).not.toThrow()
+  })
+
+  it('rejects forbidden fields in later envelope items', () => {
+    const registry = new InMemorySensitiveValueRegistry()
+    const record = buildRecord(
+      { contexts: { report: { method: 'GET', status: 500 } } },
+      [{ breadcrumbs: [{ message: 'later event' }] }],
+    )
+
+    expect(() => assertPrivateEnvelope(record, 500, registry)).toThrow(
+      'privacy check failed: forbidden event key breadcrumbs',
+    )
   })
 
   it('keeps privacy failure diagnostics free of raw payloads and sensitive values', () => {
