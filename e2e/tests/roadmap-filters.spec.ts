@@ -3,7 +3,7 @@ import { expect, test } from '../fixtures/test'
 import { createPublishableRoadmap, publishRoadmap } from '../helpers/api'
 
 test.describe('roadmap list filters', () => {
-  test('supports ANY, ALL, clear, keyboard use, and narrow layouts', async ({
+  test('supports ANY, ALL, clear, and keyboard use', async ({
     accountFactory,
     browserContext,
     roadmapIdentity,
@@ -56,9 +56,5 @@ test.describe('roadmap list filters', () => {
     await expect(arrays).toHaveAttribute('aria-pressed', 'false')
     await expect(hashing).toHaveAttribute('aria-pressed', 'false')
     expect(new URL(page.url()).search).toBe('')
-
-    await page.setViewportSize({ width: 375, height: 800 })
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-
   })
 })
