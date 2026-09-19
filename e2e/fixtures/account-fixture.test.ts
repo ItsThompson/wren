@@ -1,8 +1,8 @@
-import type { APIRequestContext } from '@playwright/test'
+import type { APIRequestContext, Browser } from '@playwright/test'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createAttemptIdentity } from './attempt-identity.ts'
-import { createAccountFactory } from './account-fixture.ts'
+import { createAccountFactory, createBrowserAccountFactory } from './account-fixture.ts'
 import { OwnedContextResources } from './context-owner.ts'
 
 function buildAttemptIdentity() {
@@ -51,6 +51,24 @@ describe('account fixture factory', () => {
     ])
     await owner.closeAll()
     expect(disposeCalls.every((dispose) => dispose.mock.calls.length === 1)).toBe(true)
+  })
+
+  it('creates a browser account without registering through an API helper', async () => {
+    const close = vi.fn(async () => undefined)
+    const newPage = vi.fn(async () => ({}))
+    const browser = {
+      newContext: vi.fn(async () => ({ close, newPage })),
+    } as unknown as Pick<Browser, 'newContext'>
+    const owner = new OwnedContextResources()
+    const factory = createBrowserAccountFactory(browser, owner, buildAttemptIdentity())
+
+    const account = await factory.create('human')
+
+    expect(account.email).toBe(`${account.username}@example.com`)
+    expect(browser.newContext).toHaveBeenCalledWith({ baseURL: 'https://app.wren.test' })
+    expect(newPage).toHaveBeenCalledOnce()
+    await owner.closeAll()
+    expect(close).toHaveBeenCalledOnce()
   })
 
   it('keeps the context owned when account registration fails', async () => {
