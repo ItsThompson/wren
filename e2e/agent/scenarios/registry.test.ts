@@ -8,7 +8,7 @@ import {
   ToolCoverageError,
   TOOL_SCENARIO_REGISTRY,
 } from './registry'
-import { ToolJourneyName, type ToolOutput, type ToolScenario } from './types'
+import { ToolJourneyName, type ToolJourneyContext, type ToolOutput, type ToolScenario } from './types'
 
 const emptyScenario = (name: string): ToolScenario<ToolOutput> => ({
   name,
@@ -35,6 +35,62 @@ describe('MCP tool scenario registry', () => {
       expect(typeof scenario.assertStableResult).toBe('function')
       expect(typeof scenario.call).toBe('function')
     }
+  })
+
+  it('routes scenario calls through the official client with journey arguments', async () => {
+    const agentCalls = vi.fn()
+    const callTool: ToolJourneyContext['agent']['callTool'] = async <TOutput>(
+      name: string,
+      arguments_: Record<string, unknown>,
+    ) => {
+      agentCalls(name, arguments_)
+      return {} as TOutput
+    }
+    const context: ToolJourneyContext = {
+      agent: {
+        authorization: {
+          issuer: 'https://api.wren.test',
+          clientId: 'client-id',
+          clientName: 'client-name',
+          grantedScopes: [],
+          accessTokenExpiresAtEpochMs: Date.now(),
+          hasRefreshToken: true,
+        },
+        listTools: async () => [],
+        callTool,
+        waitUntilCurrentAccessTokenExpires: async () => undefined,
+        close: async () => undefined,
+      },
+      restSetup: {
+        createAccount: async () => undefined,
+        createPublishedRoadmap: async () => 'roadmap-1',
+        readRoadmap: async () => ({ id: 'roadmap-1', title: 'Roadmap', status: 'draft', revision: 1 }),
+      },
+      identity: {
+        runId: 'run',
+        testId: 'test',
+        parallelIndex: 0,
+        retry: 0,
+        nonce: 'nonce',
+        resourcePrefix: 'e2etest',
+      },
+      state: {
+        primaryRoadmapId: null,
+        primaryRevision: null,
+        forkedRoadmapId: null,
+        ownerHandle: 'owner',
+        sectionId: null,
+        subsectionIds: [],
+        itemIds: [],
+        toolArguments: { roadmap_list: { include: 'authored' } },
+      },
+    }
+    const scenario = TOOL_SCENARIO_REGISTRY.find((entry) => entry.name === 'roadmap_list')
+    if (scenario === undefined) throw new Error('roadmap_list scenario is missing')
+
+    await scenario.call(context)
+
+    expect(agentCalls).toHaveBeenCalledWith('roadmap_list', { include: 'authored' })
   })
 
   it('reports exact sorted missing and unexpected sets', () => {
