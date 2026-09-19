@@ -87,7 +87,7 @@ export async function createPublishableRoadmap(
   identity: RoadmapFixtureIdentity,
   options: Omit<PublishableRoadmapOptions, 'identity'> = {},
 ): Promise<string> {
-  const response = await context.post('/roadmaps', {
+  const response = await context.post(`${API_BASE_URL}/roadmaps`, {
     data: buildPublishableRoadmap({ ...options, identity }),
   })
   expect(response.status(), await response.text()).toBe(201)
@@ -96,7 +96,7 @@ export async function createPublishableRoadmap(
 }
 
 export async function publishRoadmap(context: APIRequestContext, id: string): Promise<void> {
-  const response = await context.post(`/roadmaps/${id}:publish`)
+  const response = await context.post(`${API_BASE_URL}/roadmaps/${id}:publish`)
   expect(response.status(), await response.text()).toBe(200)
 }
 
