@@ -8,35 +8,16 @@ import {
   createRecorderQueryClient,
   pollForExactlyOneEnvelope,
 } from '../helpers/recorder-client'
+import {
+  assertPrivateEnvelope,
+  assertRawEnvelopeDoesNotContain,
+} from '../helpers/envelope-privacy'
 import type { BrowserFailureKind, EnvelopeRecord } from '../recorder/src/types'
 import type { SensitiveValueRegistry } from '../fixtures/sensitive-value-registry'
 
 const DASHBOARD_OPERATION = 'get_dashboard_me_dashboard_get'
 const CLIENTS_OPERATION = 'list_clients_me_clients_get'
 const RECORDER_INGESTION_PATH = '/_e2e/sentry/api/1/envelope/'
-const SENTRY_OWNED_HOST_PATTERN = /(?:^|\.)sentry\.io$/i
-const FORBIDDEN_EVENT_KEYS = new Set([
-  'request',
-  'user',
-  'breadcrumbs',
-  'extra',
-  'extras',
-  'url',
-  'filename',
-  'abs_path',
-  'headers',
-  'cookies',
-  'authorization',
-  'body',
-  'query',
-  'password',
-  'access_token',
-  'refresh_token',
-  'code_verifier',
-  'email',
-  'username',
-])
-
 interface RecoveryFault {
   readonly wasInjected: () => boolean
   release(): Promise<void>
@@ -104,10 +85,12 @@ function observeRecoveryNetwork(page: Page): RecoveryNetworkEvidence {
   }
   page.on('request', (request) => {
     const url = new URL(request.url())
-    if (SENTRY_OWNED_HOST_PATTERN.test(url.hostname)) evidence.sentryOwnedHosts.push(url.hostname)
-    if (url.origin === FRONTEND_BASE_URL && url.pathname === RECORDER_INGESTION_PATH) {
-      evidence.sentryRequestPaths.push(url.pathname)
+    if (!url.pathname.endsWith('/api/1/envelope/')) return
+    if (url.origin !== FRONTEND_BASE_URL || url.pathname !== RECORDER_INGESTION_PATH) {
+      evidence.sentryOwnedHosts.push(url.hostname)
+      return
     }
+    evidence.sentryRequestPaths.push(url.pathname)
   })
   page.on('response', (response) => {
     const url = new URL(response.url())
@@ -118,48 +101,6 @@ function observeRecoveryNetwork(page: Page): RecoveryNetworkEvidence {
   return evidence
 }
 
-function parseEnvelopeEvent(rawEnvelopeUtf8: string): Record<string, unknown> {
-  const lines = rawEnvelopeUtf8.trimEnd().split('\n')
-  if (lines.length < 3) throw new Error('recorder returned an incomplete envelope')
-  const event = JSON.parse(lines[2]) as unknown
-  if (event === null || typeof event !== 'object' || Array.isArray(event)) {
-    throw new Error('recorder returned a non-object Sentry event')
-  }
-  return event as Record<string, unknown>
-}
-
-function collectObjectKeys(value: unknown, keys: Set<string>): void {
-  if (Array.isArray(value)) {
-    for (const item of value) collectObjectKeys(item, keys)
-    return
-  }
-  if (value === null || typeof value !== 'object') return
-  for (const [key, nested] of Object.entries(value)) {
-    keys.add(key.toLowerCase())
-    collectObjectKeys(nested, keys)
-  }
-}
-
-function assertPrivateEnvelope(
-  record: EnvelopeRecord,
-  status: number | null,
-  sensitiveValues: SensitiveValueRegistry,
-): void {
-  const event = parseEnvelopeEvent(record.rawEnvelopeUtf8)
-  const keys = new Set<string>()
-  collectObjectKeys(event, keys)
-  for (const key of FORBIDDEN_EVENT_KEYS) expect(keys).not.toContain(key)
-  for (const value of sensitiveValues.values()) expect(record.rawEnvelopeUtf8).not.toContain(value)
-  expect(record.rawEnvelopeUtf8).not.toMatch(/\bBearer\s+[A-Za-z0-9._~-]+/i)
-  expect(record.rawEnvelopeUtf8).not.toMatch(/(?:session|refresh|access)[_-]?token\s*[:=]/i)
-  expect(record.rawEnvelopeUtf8).not.toMatch(/https?:\/\//i)
-  expect(event.contexts).toEqual({ report: { method: 'GET', status } })
-  expect(event).not.toHaveProperty('request')
-  expect(event).not.toHaveProperty('user')
-  expect(event).not.toHaveProperty('breadcrumbs')
-  expect(event).not.toHaveProperty('extra')
-}
-
 function assertRecoveryEnvelope(
   record: EnvelopeRecord,
   operation: string,
@@ -167,7 +108,15 @@ function assertRecoveryEnvelope(
   status: number | null,
   sensitiveValues: SensitiveValueRegistry,
 ): void {
-  expect(record).toMatchObject({
+  const metadata = {
+    operation: record.operation,
+    failureKind: record.failureKind,
+    environment: record.environment,
+    service: record.service,
+    method: record.method,
+    status: record.status,
+  }
+  expect(metadata).toEqual({
     operation,
     failureKind,
     environment: 'production',
@@ -185,7 +134,7 @@ function expectRecoveryEvidence(
   expect(evidence.sentryRequestPaths).toContain(RECORDER_INGESTION_PATH)
   expect(evidence.sentryResponseStatuses).toContain(200)
   expect(evidence.sentryOwnedHosts).toEqual([])
-  expect(record.rawEnvelopeUtf8).not.toContain('https://api.wren.test/me/')
+  assertRawEnvelopeDoesNotContain(record, 'https://api.wren.test/me/', 'API URL')
 }
 
 test.describe('browser recovery and envelope privacy', () => {

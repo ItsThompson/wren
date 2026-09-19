@@ -75,7 +75,7 @@ export const test = base.extend<WrenFixtures>({
     await use(browserContext)
   },
 
-  sensitiveValueRegistry: async ({}, use, testInfo) => {
+  sensitiveValueRegistry: async ({ browserName: _browserName }, use, testInfo) => {
     const registry = new InMemorySensitiveValueRegistry()
     registry.register('control-token', RECORDER_CONTROL_TOKEN)
     try {

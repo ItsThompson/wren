@@ -1,0 +1,57 @@
+import { describe, expect, it } from 'vitest'
+
+import { InMemorySensitiveValueRegistry } from '../fixtures/sensitive-value-registry'
+import type { EnvelopeRecord } from '../recorder/src/types'
+import { assertPrivateEnvelope } from './envelope-privacy'
+
+function buildRecord(event: Record<string, unknown>): EnvelopeRecord {
+  return {
+    sequence: 1,
+    receivedAtIso: '2026-01-01T00:00:00.000Z',
+    rawEnvelopeUtf8: `${JSON.stringify({})}\n${JSON.stringify({ type: 'event' })}\n${JSON.stringify(event)}\n`,
+    parseStatus: 'valid',
+    operation: 'operation',
+    failureKind: 'upstream',
+    environment: 'production',
+    service: 'wren-web',
+    method: 'GET',
+    status: 500,
+  }
+}
+
+describe('envelope privacy assertions', () => {
+  it('accepts a scrubbed event with the expected report context', () => {
+    const registry = new InMemorySensitiveValueRegistry()
+    registry.register('password', 'secret-password')
+
+    expect(() => assertPrivateEnvelope(
+      buildRecord({ contexts: { report: { method: 'GET', status: 500 } } }),
+      500,
+      registry,
+    )).not.toThrow()
+  })
+
+  it('keeps privacy failure diagnostics free of raw payloads and sensitive values', () => {
+    const sensitiveValue = 'secret-password'
+    const event = {
+      contexts: { report: { method: 'GET', status: 500 } },
+      password: sensitiveValue,
+    }
+    const rawEnvelope = JSON.stringify(event)
+    const registry = new InMemorySensitiveValueRegistry()
+    registry.register('password', sensitiveValue)
+    const record = buildRecord(event)
+
+    let diagnostic = ''
+    try {
+      assertPrivateEnvelope(record, 500, registry)
+    } catch (error: unknown) {
+      diagnostic = error instanceof Error ? error.message : String(error)
+    }
+
+    expect(diagnostic).toBe('privacy check failed: forbidden event key password')
+    expect(diagnostic).not.toContain(rawEnvelope)
+    expect(diagnostic).not.toContain(sensitiveValue)
+    expect(diagnostic).not.toContain(record.rawEnvelopeUtf8)
+  })
+})
