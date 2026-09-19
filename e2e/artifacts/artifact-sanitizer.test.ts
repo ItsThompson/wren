@@ -242,6 +242,34 @@ describe('artifact sanitization', () => {
     expect(new TextDecoder().decode(result.bytes)).toContain('"message":"ready"')
   })
 
+  it('redacts request bodies from structured messages and drops nested payload fields', async () => {
+    const registry = createSensitiveValueRegistry()
+    registry.register(SensitiveValueCategory.CONTROL_TOKEN, 'registered-secret')
+    const result = await sanitizeArtifact({
+      path: 'log/backend.log',
+      kind: 'log',
+      bytes: jsonBytes({
+        level: 'info',
+        message: 'POST /endpoint {"email":"unregistered@example.com"}',
+        path: '/roadmaps?token=unregistered',
+        headers: { authorization: 'header-secret' },
+        payload: { body: 'payload-secret' },
+        token: 'registered-secret',
+      }),
+    }, registry)
+    const output = new TextDecoder().decode(result.bytes)
+
+    expect(result.kind).toBe('log')
+    expect(output).toContain('[REDACTED:unsafe-log-message]')
+    expect(output).toContain('"path":"/roadmaps"')
+    expect(output).not.toContain('unregistered@example.com')
+    expect(output).not.toContain('header-secret')
+    expect(output).not.toContain('payload-secret')
+    expect(output).not.toContain('registered-secret')
+    expect(output).not.toContain('headers')
+    expect(output).not.toContain('payload')
+  })
+
   it('withholds allowlisted projections with invalid scalar values', async () => {
     const registry = new SensitiveValueRegistry()
     const result = await sanitizeArtifacts([
