@@ -29,27 +29,7 @@ System E2E covers composition, production cookies and origins, forwarded HTTPS, 
 
 ## Exact MCP tool coverage
 
-The initialized official client retrieves the advertised tool list through its public SDK method. The immutable scenario registry must contain exactly these 17 names:
-
-```text
-roadmap_list
-roadmap_get_profile
-roadmap_get
-roadmap_get_overview
-roadmap_get_next
-roadmap_get_node
-roadmap_get_section
-roadmap_search
-progress_get
-progress_update
-create_roadmap_draft
-patch_roadmap_draft
-replace_roadmap_draft
-validate_roadmap_draft
-publish_roadmap
-fork_roadmap
-edit_roadmap_metadata
-```
+The initialized official client retrieves the advertised tool list through its public SDK method. The immutable scenario registry is the canonical source for the 17 tool names and their contracts: [`e2e/agent/scenarios/registry.ts`](../e2e/agent/scenarios/registry.ts). Keep this guide and other documentation linked to that source instead of duplicating the list here.
 
 The gate preserves arrays to detect duplicates, compares the advertised and registry name sets in both directions, and fails with sorted missing and unexpected names. A count-only or subset assertion does not satisfy the invariant. Each registered tool has at least one successful official-client call. Writes have a later independent read of their persisted effect. Assertions select stable IDs, state, relationships, counts, and revisions rather than full payload snapshots.
 
