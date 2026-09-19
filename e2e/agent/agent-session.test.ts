@@ -7,7 +7,11 @@ import { createAttemptIdentity } from '../fixtures/attempt-identity.ts'
 import type { AgentCallbackListener, McpClientLike, McpTransportLike } from './types.ts'
 import type { AgentSessionDependencies } from './agent-session.ts'
 import { OAuthScope } from './types.ts'
-import { createAgentSession, createScopeLimitedFetch } from './agent-session.ts'
+import {
+  createAgentSession,
+  createScopeLimitedFetch,
+  waitUntilAccessTokenExpires,
+} from './agent-session.ts'
 import { createOAuthProvider } from './oauth-provider.ts'
 
 function buildPage() {
@@ -45,6 +49,18 @@ function buildListener(
 }
 
 describe('AgentSession', () => {
+  it('fails loudly when expiry is beyond the bounded wait', async () => {
+    vi.useFakeTimers()
+    try {
+      const wait = waitUntilAccessTokenExpires(Date.now() + 60_000)
+      const assertion = expect(wait).rejects.toThrow('timed out waiting for the current access token to expire')
+      await vi.advanceTimersByTimeAsync(30_000)
+      await assertion
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('closes the callback listener when provider setup fails', async () => {
     const { page } = buildPage()
     const listener = buildListener(new URL('http://127.0.0.1:43213/callback'), () => '')

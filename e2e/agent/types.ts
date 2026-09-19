@@ -20,6 +20,16 @@ export interface AgentSessionRequest {
   contextOwner: ContextOwner
 }
 
+export interface OAuthRefreshOutcome {
+  status: number
+  error: string | null
+}
+
+export interface AgentSessionObservability {
+  onAuthorizationRequired?: () => void
+  onRefreshOutcome?: (outcome: OAuthRefreshOutcome) => void
+}
+
 export interface StoredOAuthAuthorization {
   issuer: string
   clientId: string
