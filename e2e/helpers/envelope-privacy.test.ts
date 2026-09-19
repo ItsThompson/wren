@@ -39,6 +39,25 @@ describe('envelope privacy assertions', () => {
     )).not.toThrow()
   })
 
+  it('rejects malformed and non-JSON envelope content safely', () => {
+    const registry = new InMemorySensitiveValueRegistry()
+    const malformedPayload = {
+      ...buildRecord({ contexts: { report: { method: 'GET', status: 500 } } }),
+      rawEnvelopeUtf8: '{}\n{"type":"event"}\nnot-json\n',
+    }
+    expect(() => assertPrivateEnvelope(malformedPayload, 500, registry)).toThrow(
+      'recorder returned a non-JSON envelope payload',
+    )
+
+    const malformedHeader = {
+      ...buildRecord({ contexts: { report: { method: 'GET', status: 500 } } }),
+      rawEnvelopeUtf8: '{}\nnot-json\n{}\n',
+    }
+    expect(() => assertPrivateEnvelope(malformedHeader, 500, registry)).toThrow(
+      'recorder returned a non-JSON envelope item header',
+    )
+  })
+
   it('rejects forbidden fields in later envelope items', () => {
     const registry = new InMemorySensitiveValueRegistry()
     const record = buildRecord(

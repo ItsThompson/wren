@@ -74,17 +74,21 @@ function parseEnvelopePayloads(rawEnvelopeUtf8: string): readonly unknown[] {
   if (lines.length < 3 || (lines.length - 1) % 2 !== 0) {
     throw new Error('recorder returned an incomplete envelope')
   }
-  const payloads: unknown[] = []
+  const payloads: unknown[] = [parseJsonLine(lines[0], 'envelope header')]
   for (let itemHeaderIndex = 1; itemHeaderIndex < lines.length; itemHeaderIndex += 2) {
-    const payloadLine = lines[itemHeaderIndex + 1]
-    try {
-      payloads.push(JSON.parse(payloadLine) as unknown)
-    } catch {
-      continue
-    }
+    payloads.push(parseJsonLine(lines[itemHeaderIndex], 'envelope item header'))
+    payloads.push(parseJsonLine(lines[itemHeaderIndex + 1], 'envelope payload'))
   }
-  if (payloads.length === 0) throw new Error('recorder returned no JSON envelope payloads')
   return payloads
+}
+
+function parseJsonLine(line: string | undefined, label: string): unknown {
+  if (line === undefined) throw new Error(`recorder returned an incomplete ${label}`)
+  try {
+    return JSON.parse(line) as unknown
+  } catch {
+    throw new Error(`recorder returned a non-JSON ${label}`)
+  }
 }
 
 function collectObjectKeys(value: unknown, keys: Set<string>): void {
