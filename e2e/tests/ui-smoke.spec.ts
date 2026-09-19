@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from '../fixtures/test'
 
 /**
  * SPA smoke against the live stack: proves the built frontend image serves the

@@ -1,20 +1,20 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from '../fixtures/test'
 
-import { createAuthedContext, createPublishableRoadmap, publishRoadmap } from '../helpers/api'
-import { FRONTEND_BASE_URL } from '../helpers/config'
-import { uniqueUser } from '../helpers/users'
+import { createPublishableRoadmap, publishRoadmap } from '../helpers/api'
 
 test.describe('roadmap list filters', () => {
-  test('supports ANY, ALL, clear, keyboard use, and narrow layouts', async ({ browser, playwright }) => {
-    const owner = await createAuthedContext(playwright.request, uniqueUser('filter-owner'))
+  test('supports ANY, ALL, clear, keyboard use, and narrow layouts', async ({
+    accountFactory,
+    browserContext,
+  }) => {
+    const owner = (await accountFactory.create('filter-owner')).apiContext
     const roadmapId = await createPublishableRoadmap(owner, {
       arrays: ['arrays', 'shared'],
       hashing: ['hashing', 'shared'],
     })
     await publishRoadmap(owner, roadmapId)
 
-    const context = await browser.newContext({ baseURL: FRONTEND_BASE_URL })
-    const page = await context.newPage()
+    const page = await browserContext.newPage()
     await page.goto(`/roadmaps/${roadmapId}`)
     const initialUrl = page.url()
     expect(new URL(initialUrl).search).toBe('')
@@ -59,7 +59,5 @@ test.describe('roadmap list filters', () => {
     await page.setViewportSize({ width: 375, height: 800 })
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 
-    await context.close()
-    await owner.dispose()
   })
 })
