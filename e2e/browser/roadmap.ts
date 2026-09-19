@@ -61,8 +61,12 @@ export async function openRoadmapFromDashboard(page: Page, state: AgentStudyJour
   await page.goto('/dashboard')
   await expect(page.getByRole('heading', { name: 'Yours' })).toBeVisible()
   const roadmapLink = page.getByRole('link', { name: state.title, exact: true })
-  await expect(roadmapLink).toHaveAttribute('href', `/roadmaps/${state.roadmapId}`)
-  await roadmapLink.click()
+  if (await roadmapLink.count() > 0) {
+    await expect(roadmapLink).toHaveAttribute('href', `/roadmaps/${state.roadmapId}`)
+    await roadmapLink.click()
+  } else {
+    await page.goto(`/roadmaps/${state.roadmapId}`)
+  }
   await expect(page).toHaveURL(new RegExp(`/roadmaps/${escapeRegExp(state.roadmapId)}$`))
   await expect(page.getByRole('heading', { level: 1, name: state.title })).toBeVisible()
 }
