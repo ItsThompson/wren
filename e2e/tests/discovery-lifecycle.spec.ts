@@ -112,6 +112,8 @@ test.describe('public discovery and learner tracking', () => {
     await setRoadmapVisibility(ownerBrowser.page, 'private')
     await ownerBrowser.page.reload()
     await expect(ownerBrowser.page.getByText('Private access', { exact: true })).toBeVisible()
+    await learnerBrowser.page.goto(`/user/${owner.username}`)
+    await expect(learnerBrowser.page.getByRole('link', { name: editedMetadata.title, exact: true })).toHaveCount(0)
     await learnerBrowser.page.goto(`/roadmaps/${sourceRoadmapId}`)
     await expect(learnerBrowser.page.getByText('Roadmap not found')).toBeVisible()
 
@@ -120,15 +122,28 @@ test.describe('public discovery and learner tracking', () => {
     await expect(ownerBrowser.page.getByText('Public access', { exact: true })).toBeVisible()
     await ownerBrowser.page.goto(`/user/${owner.username}`)
     await expect(ownerBrowser.page.getByRole('link', { name: editedMetadata.title })).toBeVisible()
-    await learnerBrowser.page.goto(`/roadmaps/${sourceRoadmapId}`)
+    await learnerBrowser.page.goto(`/user/${owner.username}`)
+    const restoredSourceLink = learnerBrowser.page.getByRole('link', { name: editedMetadata.title, exact: true })
+    await expect(restoredSourceLink).toBeVisible()
+    await restoredSourceLink.click()
+    await expect(learnerBrowser.page).toHaveURL(new RegExp(`/roadmaps/${sourceRoadmapId}$`))
     await expect(learnerBrowser.page.getByRole('heading', { level: 1, name: editedMetadata.title })).toBeVisible()
 
     await ownerBrowser.page.goto(`/roadmaps/${sourceRoadmapId}`)
     const forkedRoadmapId = await forkRoadmap(ownerBrowser.page)
     expect(forkedRoadmapId).not.toBe(sourceRoadmapId)
     await expect(ownerBrowser.page.getByRole('button', { name: 'Publish' })).toBeVisible()
+    await ownerBrowser.page.goto('/dashboard')
+    await expect(ownerBrowser.page.getByRole('heading', { name: 'Yours' }).locator('..')).toContainText(editedMetadata.title)
+    await expect(
+      ownerBrowser.page.locator(`a[href="/roadmaps/${forkedRoadmapId}"]`).filter({ hasText: editedMetadata.title }),
+    ).toBeVisible()
+
     await ownerBrowser.page.goto(`/roadmaps/${sourceRoadmapId}`)
     await expect(ownerBrowser.page.getByRole('heading', { level: 1, name: editedMetadata.title })).toBeVisible()
+    await expect(ownerBrowser.page.getByText(editedMetadata.description, { exact: true })).toBeVisible()
+    await expect(ownerBrowser.page.getByText('lifecycle', { exact: true })).toBeVisible()
+    await expect(ownerBrowser.page.getByText('browser', { exact: true })).toBeVisible()
     await expect(ownerBrowser.page.getByText('Public access', { exact: true })).toBeVisible()
 
     await archiveRoadmap(ownerBrowser.page)
