@@ -3,9 +3,9 @@ import { defineConfig, devices } from '@playwright/test'
 import { FRONTEND_BASE_URL } from './helpers/config'
 
 /**
- * Playwright config for the Wren spine E2E. Serial by design:
- * `workers: 1` + `fullyParallel: false` so all tests share one live stack
- * deterministically. `globalSetup` pre-flights stack health
+ * Playwright config for the Wren spine E2E. Local runs default to one worker;
+ * `E2E_WORKERS=2` enables shared-stack concurrency while `fullyParallel: false`
+ * preserves ordering within each file. `globalSetup` pre-flights stack health
  * before any test runs.
  */
 const configuredWorkers = process.env.E2E_WORKERS
