@@ -6,8 +6,16 @@ import {
   classifyArtifactKind,
   createSensitiveValueRegistry,
   sanitizeArtifacts,
+  type SensitiveValueRegistry,
 } from './sanitizer-core.ts'
 import type { ArtifactInput, DiagnosticArtifactKind } from './types.ts'
+
+const CATEGORY_ALIASES: Readonly<Record<string, SensitiveValueCategory>> = {
+  token: SensitiveValueCategory.BEARER_TOKEN,
+  'authorization-code': SensitiveValueCategory.OAUTH_CODE,
+  'code-verifier': SensitiveValueCategory.PKCE_VERIFIER,
+  'client-secret': SensitiveValueCategory.INTERNAL_API_TOKEN,
+}
 
 export * from './sanitizer-core.ts'
 export * from './types.ts'
@@ -22,35 +30,33 @@ async function walkFiles(root: string): Promise<string[]> {
   return files
 }
 
+export function registerSensitiveValues(registry: SensitiveValueRegistry, values: unknown): void {
+  if (values === null || typeof values !== 'object' || Array.isArray(values)) throw new Error('sensitive values must be an object')
+  for (const [category, entries] of Object.entries(values)) {
+    const resolvedCategory = Object.values(SensitiveValueCategory).includes(category as SensitiveValueCategory)
+      ? category as SensitiveValueCategory
+      : CATEGORY_ALIASES[category]
+    if (resolvedCategory === undefined || !Array.isArray(entries) || entries.some((value) => typeof value !== 'string' || value.length === 0)) {
+      throw new Error('sensitive values contain an invalid category or entry')
+    }
+    for (const value of entries) registry.register(resolvedCategory, value)
+  }
+}
+
 async function runSanitizerCli(): Promise<void> {
   const inputDir = process.env.ARTIFACT_INPUT_DIR
   const outputDir = process.env.ARTIFACT_OUTPUT_DIR
   if (!inputDir || !outputDir) throw new Error('artifact input and output directories are required')
+  await rm(outputDir, { recursive: true, force: true })
   const registry = createSensitiveValueRegistry()
   const valuesPath = process.env.SENSITIVE_VALUES_FILE
-  if (valuesPath) {
-    const values = JSON.parse(await readFile(valuesPath, 'utf8')) as Record<string, string[]>
-    const categoryAliases: Record<string, SensitiveValueCategory> = {
-      token: SensitiveValueCategory.BEARER_TOKEN,
-      'authorization-code': SensitiveValueCategory.OAUTH_CODE,
-      'code-verifier': SensitiveValueCategory.PKCE_VERIFIER,
-      'client-secret': SensitiveValueCategory.INTERNAL_API_TOKEN,
-    }
-    for (const [category, entries] of Object.entries(values)) {
-      const resolvedCategory = Object.values(SensitiveValueCategory).includes(category as SensitiveValueCategory)
-        ? category as SensitiveValueCategory
-        : categoryAliases[category]
-      if (resolvedCategory === undefined || !Array.isArray(entries)) continue
-      for (const value of entries) if (typeof value === 'string') registry.register(resolvedCategory, value)
-    }
-  }
+  if (valuesPath) registerSensitiveValues(registry, JSON.parse(await readFile(valuesPath, 'utf8')))
   const inputs: ArtifactInput[] = await Promise.all((await walkFiles(inputDir)).map(async (path) => {
     const kindName = relative(inputDir, path).split('/')[0] ?? 'log'
     const containerKind: DiagnosticArtifactKind = ['report', 'trace', 'screenshot', 'attachment', 'log', 'recorder'].includes(kindName) ? kindName as DiagnosticArtifactKind : 'log'
     return { path, kind: classifyArtifactKind(path, containerKind), bytes: await readFile(path) }
   }))
   const result = await sanitizeArtifacts(inputs, registry)
-  await rm(outputDir, { recursive: true, force: true })
   for (const artifact of result.approved) {
     const target = join(outputDir, relative(inputDir, artifact.path))
     await mkdir(dirname(target), { recursive: true })

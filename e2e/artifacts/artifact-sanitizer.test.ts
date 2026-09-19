@@ -1,5 +1,5 @@
 import { execFile as execFileCallback } from 'node:child_process'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -11,6 +11,8 @@ import {
   createSensitiveValueRegistry,
   sanitizeArtifact,
   sanitizeArtifacts,
+  registerSensitiveValues,
+  sanitizeArtifactFiles,
   scanArtifactBytes,
 } from './artifact-sanitizer.ts'
 import { SensitiveValueCategory } from './types.ts'
@@ -154,5 +156,30 @@ describe('artifact sanitization', () => {
     expect(result.passed).toBe(false)
     expect(result.withheldPaths).toEqual(['unsafe.png'])
     expect(result.approvedPaths).toEqual(['safe.json'])
+  })
+
+  it('rejects malformed sensitive-value snapshots', () => {
+    const registry = createSensitiveValueRegistry()
+    expect(() => registerSensitiveValues(registry, { username: ['valid'], unexpected: ['secret'] })).toThrow()
+    expect(() => registerSensitiveValues(registry, { username: [''] })).toThrow()
+    expect(() => registerSensitiveValues(registry, { username: ['valid'] })).not.toThrow()
+  })
+
+  it('removes stale output when a scan withholds an input', async () => {
+    const work = await mkdtemp(join(tmpdir(), 'wren-artifact-output-test-'))
+    try {
+      const input = join(work, 'invalid.json')
+      const output = join(work, 'safe')
+      await writeFile(input, JSON.stringify({ runId: { secret: 'value' } }))
+      await mkdir(output)
+      await writeFile(join(output, 'stale.log'), 'unsafe stale output')
+
+      const result = await sanitizeArtifactFiles([{ path: input, kind: 'attachment' }], output, createSensitiveValueRegistry())
+
+      expect(result.passed).toBe(false)
+      await expect(access(output)).rejects.toThrow()
+    } finally {
+      await rm(work, { recursive: true, force: true })
+    }
   })
 })
