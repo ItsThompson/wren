@@ -12,6 +12,7 @@ import { OAuthScope, type CallbackResult, type StoredOAuthAuthorization } from '
 
 export interface E2EOAuthProvider extends OAuthClientProvider {
   readonly clientName: string
+  readonly requestedScopes: readonly OAuthScope[]
   getAuthorizationUrl(): URL
   validateCallback(callbackUrl: URL): CallbackResult
   getAuthorization(): StoredOAuthAuthorization
@@ -55,6 +56,7 @@ export function createOAuthProvider(options: OAuthProviderOptions): E2EOAuthProv
 
   const provider: E2EOAuthProvider = {
     clientName: options.clientName,
+    requestedScopes,
     redirectUrl: options.callbackUrl,
     clientMetadata,
     state: (): string => {

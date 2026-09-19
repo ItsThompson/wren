@@ -1,6 +1,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js'
 
 import { createCallbackListener } from '../fixtures/callback-listener'
 import { createOAuthProvider, type E2EOAuthProvider } from './oauth-provider'
@@ -26,12 +27,7 @@ export async function createAgentSession(
   request: AgentSessionRequest,
   dependencies: AgentSessionDependencies = {},
 ): Promise<AgentSession> {
-  const createListener = dependencies.createCallbackListener ?? (() => {
-    if (request.contextOwner === undefined) {
-      throw new Error('agent session requires a context owner for its callback listener')
-    }
-    return createCallbackListener(request.identity, request.contextOwner)
-  })
+  const createListener = dependencies.createCallbackListener ?? (() => createCallbackListener(request.identity, request.contextOwner))
   const listener = await createListener()
   const provider = createOAuthProvider({
     callbackUrl: new URL(listener.callbackUrl),
@@ -44,13 +40,20 @@ export async function createAgentSession(
   const transportFactory = dependencies.createTransport ?? createDefaultTransport
   const transports: McpTransportLike[] = []
   let closed = false
+  let clientNeedsClose = false
+
+  const closeClient = async (): Promise<void> => {
+    if (!clientNeedsClose) return
+    await client.close()
+    clientNeedsClose = false
+  }
 
   const closeResources = async (): Promise<void> => {
     if (closed) return
     closed = true
     const failures: unknown[] = []
     try {
-      await client.close()
+      await closeClient()
     } catch (error: unknown) {
       failures.push(error)
     }
@@ -74,11 +77,12 @@ export async function createAgentSession(
     const initialTransport = transportFactory(request.mcpServerUrl, provider)
     transports.push(initialTransport)
     try {
+      clientNeedsClose = true
       await client.connect(initialTransport)
       throw new Error('MCP server accepted an unauthenticated connection')
     } catch (error: unknown) {
       if (!(error instanceof UnauthorizedError)) throw error
-      await client.close()
+      await closeClient()
     }
 
     const authorizationUrl = provider.getAuthorizationUrl()
@@ -92,6 +96,7 @@ export async function createAgentSession(
 
     const freshTransport = transportFactory(request.mcpServerUrl, provider)
     transports.push(freshTransport)
+    clientNeedsClose = true
     await client.connect(freshTransport)
 
     const authorization = provider.getAuthorization()
@@ -150,12 +155,57 @@ function createDefaultClient(name: string): McpClientLike {
 }
 
 function createDefaultTransport(serverUrl: URL, provider: E2EOAuthProvider): McpTransportLike {
-  const transport = new StreamableHTTPClientTransport(serverUrl, { authProvider: provider })
+  const transport = new StreamableHTTPClientTransport(serverUrl, {
+    authProvider: provider,
+    fetch: createScopeLimitedFetch(globalThis.fetch.bind(globalThis) as FetchLike, serverUrl, provider.requestedScopes),
+  })
   return {
     transport,
     finishAuth: (authorizationCode): Promise<void> => transport.finishAuth(authorizationCode),
     close: (): Promise<void> => transport.close(),
   }
+}
+
+interface ProtectedResourceDocument {
+  [key: string]: unknown
+  scopes_supported?: unknown
+}
+
+export function createScopeLimitedFetch(
+  baseFetch: FetchLike,
+  serverUrl: URL,
+  requestedScopes: readonly string[],
+): FetchLike {
+  return async (url, init): Promise<Response> => {
+    const response = await baseFetch(url, init)
+    const requestUrl = new URL(url)
+    if (response.status === 401 || response.status === 403) return removeChallengeScope(response)
+    if (requestUrl.origin !== serverUrl.origin || !requestUrl.pathname.includes('/.well-known/oauth-protected-resource')) {
+      return response
+    }
+    if (!response.ok) return response
+    const document = (await response.clone().json()) as ProtectedResourceDocument
+    if (!Array.isArray(document.scopes_supported)) return response
+    const advertisedScopes = document.scopes_supported.filter((scope): scope is string => typeof scope === 'string')
+    const missingScopes = requestedScopes.filter((scope) => !advertisedScopes.includes(scope))
+    if (missingScopes.length > 0) {
+      throw new Error(`requested OAuth scope is not advertised by PRM: ${missingScopes.join(', ')}`)
+    }
+    return new Response(JSON.stringify({ ...document, scopes_supported: [...requestedScopes] }), {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    })
+  }
+}
+
+function removeChallengeScope(response: Response): Response {
+  const challenge = response.headers.get('www-authenticate')
+  if (challenge === null || !/\bscope=/i.test(challenge)) return response
+  const withoutScope = challenge.replace(/,?\s*scope=(?:"[^"]*"|[^,\s]+)/i, '')
+  const headers = new Headers(response.headers)
+  headers.set('www-authenticate', withoutScope)
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
 }
 
 function accessTokenExpiry(provider: E2EOAuthProvider): number {
