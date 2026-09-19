@@ -269,7 +269,8 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # e2e: run the canonical production-mode HTTPS lifecycle through the same
-  # repository commands used locally. Gated by lint.
+  # repository commands used locally. Gated by lint. This remains one job and
+  # one stable check: sharding is reviewed only after the measured thresholds.
   # ---------------------------------------------------------------------------
   e2e:
     needs: [lint]
@@ -277,6 +278,11 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+
+      - name: Start E2E timing
+        run: |
+          mkdir -p /tmp/wren-e2e-timing
+          date +%s%3N > /tmp/wren-e2e-timing/job-start-ms
 
       - name: Install E2E system dependencies
         run: sudo apt-get update && sudo apt-get install -y just mkcert libnss3-tools
@@ -300,20 +306,28 @@ jobs:
         run: just e2e-up
 
       - name: Run Playwright system tests
-        run: just test-e2e-system
+        id: playwright
+        run: |
+          date +%s%3N > /tmp/wren-e2e-timing/playwright-start-ms
+          set +e
+          just test-e2e-system
+          status=$?
+          set -e
+          date +%s%3N > /tmp/wren-e2e-timing/playwright-end-ms
+          exit "$status"
         env:
           CI: true
+          E2E_WORKERS: 2
+          E2E_RETRIES: 1
           E2E_SENSITIVE_VALUES_DIR: /tmp/wren-e2e-sensitive
 
       - name: Capture and sanitize diagnostics on failure
+        id: capture
         if: failure()
-        run: |
-          export RECORDER_CONTROL_TOKEN="$(cat e2e/keys/recorder-control-token)"
-          export NODE_EXTRA_CA_CERTS="$GITHUB_WORKSPACE/e2e/ingress/certificates/caroot/rootCA.pem"
-          scripts/e2e/capture-artifacts.sh
+        run: just e2e-capture-artifacts
 
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: failure() && steps.capture.outcome == 'success'
         with:
           name: e2e-safe-diagnostics
           path: /tmp/wren-safe-artifacts/
@@ -322,3 +336,40 @@ jobs:
       - name: Stop the stack and remove generated material
         if: always()
         run: just e2e-down
+
+      - name: Reset E2E trust
+        if: always()
+        run: just reset-e2e-trust
+
+      - name: Report E2E runtime evidence
+        if: always()
+        run: |
+          end_ms="$(date +%s%3N)"
+          start_ms="$(cat /tmp/wren-e2e-timing/job-start-ms 2>/dev/null || true)"
+          playwright_start_ms="$(cat /tmp/wren-e2e-timing/playwright-start-ms 2>/dev/null || true)"
+          playwright_end_ms="$(cat /tmp/wren-e2e-timing/playwright-end-ms 2>/dev/null || true)"
+          if [[ "$start_ms" =~ ^[0-9]+$ ]]; then
+            complete_job_duration_ms=$((end_ms - start_ms))
+          else
+            complete_job_duration_ms=null
+          fi
+          if [[ "$playwright_start_ms" =~ ^[0-9]+$ && "$playwright_end_ms" =~ ^[0-9]+$ ]]; then
+            playwright_step_duration_ms=$((playwright_end_ms - playwright_start_ms))
+          else
+            playwright_step_duration_ms=null
+          fi
+          {
+            echo '## E2E runtime evidence'
+            echo
+            echo "- Commit: ${GITHUB_SHA}"
+            echo "- Run: ${GITHUB_RUN_ID} (attempt ${GITHUB_RUN_ATTEMPT})"
+            echo "- Complete-job duration (ms): ${complete_job_duration_ms}"
+            echo "- Playwright-step duration (ms): ${playwright_step_duration_ms}"
+            echo '- Worker count: `2`'
+            echo '- Retry count: `1`'
+            echo '- Browser: `chromium`'
+            echo '- Shards: `none`'
+            echo '- Normal complete-job target: under 300s, excluding runner queue time.'
+            echo '- Sharding review thresholds: complete-job p95 > 240s, Playwright p95 > 180s, worker speedup < 1.3x, repeatable shared-stack contention, or an incompatible environment.'
+            echo '- Collect three to five completed-run summaries before assessing p95 or changing the one-job policy.'
+          } >> "$GITHUB_STEP_SUMMARY"

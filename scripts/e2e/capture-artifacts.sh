@@ -16,7 +16,7 @@ case "$SENSITIVE_VALUES_DIR" in
 esac
 trap 'rm -rf -- "$RAW_DIR" "$SENSITIVE_VALUES_DIR"' EXIT
 rm -rf -- "$SAFE_DIR"
-mkdir -p "$RAW_DIR/log" "$RAW_DIR/report" "$RAW_DIR/recorder"
+mkdir -p "$RAW_DIR/log" "$RAW_DIR/report" "$RAW_DIR/trace" "$RAW_DIR/screenshot" "$RAW_DIR/attachment" "$RAW_DIR/recorder"
 
 for service in ingress frontend backend mcp postgres recorder; do
   docker compose "${COMPOSE[@]}" logs --no-color "$service" > "$RAW_DIR/log/$service.log" 2>&1 || true
@@ -27,6 +27,26 @@ if [[ -d "$ROOT_DIR/e2e/playwright-report" ]]; then
 else
   printf '{"error":"playwright_report_missing"}\n' > "$RAW_DIR/report/missing.json"
 fi
+
+copy_test_results() {
+  local kind=$1
+  local source_root=$2
+  shift 2
+  [[ -d "$source_root" ]] || return 0
+  while IFS= read -r -d '' source_path; do
+    local relative_path=${source_path#"$source_root/"}
+    local target_path="$RAW_DIR/$kind/$relative_path"
+    mkdir -p "$(dirname "$target_path")"
+    cp "$source_path" "$target_path"
+  done < <(find "$source_root" -type f "$@" -print0)
+}
+
+# The HTML report links to these files, but Playwright stores the originals in
+# test-results. Keep each diagnostic class explicit so the sanitizer can apply
+# the right binary, archive, or structured-content policy.
+copy_test_results trace "$ROOT_DIR/e2e/test-results" -name '*.zip'
+copy_test_results screenshot "$ROOT_DIR/e2e/test-results" \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.gif' -o -iname '*.webp' \)
+copy_test_results attachment "$ROOT_DIR/e2e/test-results" \( ! -name '*.zip' ! -iname '*.png' ! -iname '*.jpg' ! -iname '*.jpeg' ! -iname '*.gif' ! -iname '*.webp' ! -iname '*.webm' ! -name '.last-run.json' ! -name 'error-context.md' \)
 
 if [[ -n "${RECORDER_CONTROL_TOKEN:-}" ]]; then
   curl --fail --silent --show-error --cacert "${NODE_EXTRA_CA_CERTS:?NODE_EXTRA_CA_CERTS is required}" \
@@ -95,6 +115,11 @@ if (existsSync(process.env.SENSITIVE_VALUES_DIR)) {
 writeFileSync(process.env.VALUES_FILE, JSON.stringify(values))
 NODE
 
-ARTIFACT_INPUT_DIR="$RAW_DIR" ARTIFACT_OUTPUT_DIR="$SAFE_DIR" SENSITIVE_VALUES_FILE="$VALUES_FILE" \
-  node --experimental-strip-types "$ROOT_DIR/e2e/artifacts/artifact-sanitizer.ts"
+if ! ARTIFACT_INPUT_DIR="$RAW_DIR" ARTIFACT_OUTPUT_DIR="$SAFE_DIR" SENSITIVE_VALUES_FILE="$VALUES_FILE" \
+  node --experimental-strip-types "$ROOT_DIR/e2e/artifacts/artifact-sanitizer.ts"; then
+  # A failed scan may leave approved siblings in the output directory. Remove
+  # the entire bundle so CI cannot upload a partial result after a safety failure.
+  rm -rf -- "$SAFE_DIR"
+  exit 1
+fi
 printf 'artifact capture: approved safe bundle at %s\n' "$SAFE_DIR"

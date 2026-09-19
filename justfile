@@ -261,6 +261,20 @@ test-e2e-system:
     cd e2e
     npx playwright test
 
+# Capture and sanitize diagnostics while the E2E stack and recorder remain available.
+e2e-capture-artifacts:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export NODE_EXTRA_CA_CERTS="{{e2e_ca}}"
+    export RECORDER_CONTROL_TOKEN="$(cat {{e2e_token}})"
+    scripts/e2e/capture-artifacts.sh
+
+# Show the six E2E service logs without exposing direct service ports.
+e2e-logs:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    docker compose {{e2e_compose}} logs --no-color ingress frontend backend mcp postgres recorder
+
 e2e-typecheck:
     cd e2e && npm run typecheck
 
