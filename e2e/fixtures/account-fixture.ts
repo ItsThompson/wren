@@ -1,16 +1,27 @@
-import type { APIRequest, APIRequestContext } from '@playwright/test'
+import type {
+  APIRequest,
+  APIRequestContext,
+  Browser,
+  BrowserContext,
+  Page,
+} from '@playwright/test'
 import { expect } from '@playwright/test'
 
-import { API_BASE_URL } from '../helpers/config'
+import { API_BASE_URL, FRONTEND_BASE_URL } from '../helpers/config'
 import {
   createAccountIdentity,
   type AttemptAccountIdentity,
   type TestAttemptIdentity,
 } from './attempt-identity'
-import { type ContextOwner, ownDisposable } from './context-owner'
+import { type ContextOwner, ownClosable, ownDisposable } from './context-owner'
 
 export interface TestAccount extends AttemptAccountIdentity {
   apiContext: APIRequestContext
+}
+
+export interface BrowserAccount extends AttemptAccountIdentity {
+  context: BrowserContext
+  page: Page
 }
 
 export interface AccountFactory {
@@ -18,8 +29,31 @@ export interface AccountFactory {
   createGuest(): Promise<APIRequestContext>
 }
 
+export interface BrowserAccountFactory {
+  create(role?: string): Promise<BrowserAccount>
+}
+
 interface PlaywrightRequest {
   request: Pick<APIRequest, 'newContext'>
+}
+
+export function createBrowserAccountFactory(
+  browser: Pick<Browser, 'newContext'>,
+  owner: ContextOwner,
+  attemptIdentity: TestAttemptIdentity,
+): BrowserAccountFactory {
+  let accountIndex = 0
+
+  return {
+    async create(role = 'human'): Promise<BrowserAccount> {
+      const accountIdentity = createAccountIdentity(attemptIdentity, role, accountIndex)
+      accountIndex += 1
+      const context = await browser.newContext({ baseURL: FRONTEND_BASE_URL })
+      ownClosable(owner, context, `browser-account-${accountIdentity.username}`)
+      const page = await context.newPage()
+      return { ...accountIdentity, context, page }
+    },
+  }
 }
 
 export function createAccountFactory(
