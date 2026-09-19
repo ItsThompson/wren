@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createAttemptIdentity } from './attempt-identity.ts'
 import { createAccountFactory, createBrowserAccountFactory } from './account-fixture.ts'
 import { OwnedContextResources } from './context-owner.ts'
+import { InMemorySensitiveValueRegistry } from './sensitive-value-registry.ts'
 
 function buildAttemptIdentity() {
   return createAttemptIdentity({
@@ -37,7 +38,8 @@ describe('account fixture factory', () => {
       }),
     }
     const owner = new OwnedContextResources()
-    const factory = createAccountFactory({ request }, owner, buildAttemptIdentity())
+    const sensitiveValues = new InMemorySensitiveValueRegistry()
+    const factory = createAccountFactory({ request }, owner, buildAttemptIdentity(), sensitiveValues)
 
     const first = await factory.create('owner')
     const second = await factory.create('owner')
@@ -45,6 +47,8 @@ describe('account fixture factory', () => {
     expect(first.username).not.toBe(second.username)
     expect(first.email).toBe(`${first.username}@example.com`)
     expect(request.newContext).toHaveBeenCalledTimes(2)
+    expect(sensitiveValues.snapshot().email).toEqual([first.email, second.email])
+    expect(sensitiveValues.snapshot().password).toEqual([first.password])
     expect(registeredPayloads).toEqual([
       { username: first.username, email: first.email, password: first.password },
       { username: second.username, email: second.email, password: second.password },
@@ -58,14 +62,18 @@ describe('account fixture factory', () => {
     const page = {} as Page
     const newPage = vi.fn(async (): Promise<Page> => page)
     const browser = {
-      newContext: vi.fn(async () => ({ close, newPage })),
+      newContext: vi.fn(async () => ({ close, newPage, on: vi.fn() })),
     } as unknown as Pick<Browser, 'newContext'>
     const owner = new OwnedContextResources()
-    const factory = createBrowserAccountFactory(browser, owner, buildAttemptIdentity())
+    const sensitiveValues = new InMemorySensitiveValueRegistry()
+    const factory = createBrowserAccountFactory(browser, owner, buildAttemptIdentity(), sensitiveValues)
 
     const account = await factory.create('human')
 
     expect(account.email).toBe(`${account.username}@example.com`)
+    expect(sensitiveValues.snapshot().username).toEqual([account.username])
+    expect(sensitiveValues.snapshot().email).toEqual([account.email])
+    expect(sensitiveValues.snapshot().password).toEqual([account.password])
     expect(browser.newContext).toHaveBeenCalledWith({ baseURL: 'https://app.wren.test' })
     expect(newPage).toHaveBeenCalledOnce()
     expect(account.page).toBe(page)

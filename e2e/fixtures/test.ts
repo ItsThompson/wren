@@ -1,7 +1,7 @@
 import { test as base, expect } from '@playwright/test'
 import type { APIRequestContext, BrowserContext } from '@playwright/test'
 
-import { API_BASE_URL, FRONTEND_BASE_URL } from '../helpers/config'
+import { API_BASE_URL, FRONTEND_BASE_URL, RECORDER_CONTROL_TOKEN } from '../helpers/config'
 import {
   createAttemptIdentityFromTestInfo,
   createAttemptResourceIdentities,
@@ -21,6 +21,12 @@ import { createCallbackListener, type CallbackListener } from './callback-listen
 import { OwnedContextResources, ownClosable, ownDisposable } from './context-owner'
 import { createRecorderClient, type RecorderClient } from './recorder-client'
 import { createAgentFactory, type AgentFactory } from './agent-fixture'
+import {
+  InMemorySensitiveValueRegistry,
+  persistSensitiveValueSnapshot,
+  sensitiveValueSnapshotPath,
+  type SensitiveValueRegistry,
+} from './sensitive-value-registry'
 
 export interface WrenFixtures {
   attemptIdentity: TestAttemptIdentity
@@ -36,6 +42,7 @@ export interface WrenFixtures {
   recorderIdentity: RecorderFixtureIdentity
   recorderClient: RecorderClient
   agentFactory: AgentFactory
+  sensitiveValueRegistry: SensitiveValueRegistry
 }
 
 export const test = base.extend<WrenFixtures>({
@@ -68,12 +75,23 @@ export const test = base.extend<WrenFixtures>({
     await use(browserContext)
   },
 
-  accountFactory: async ({ playwright, contextOwner, attemptIdentity }, use) => {
-    await use(createAccountFactory(playwright, contextOwner, attemptIdentity))
+  sensitiveValueRegistry: async ({}, use, testInfo) => {
+    const registry = new InMemorySensitiveValueRegistry()
+    registry.register('control-token', RECORDER_CONTROL_TOKEN)
+    try {
+      await use(registry)
+    } finally {
+      const path = sensitiveValueSnapshotPath(testInfo.workerIndex)
+      if (path !== null) await persistSensitiveValueSnapshot(registry, path)
+    }
   },
 
-  browserAccountFactory: async ({ browser, contextOwner, attemptIdentity }, use) => {
-    await use(createBrowserAccountFactory(browser, contextOwner, attemptIdentity))
+  accountFactory: async ({ playwright, contextOwner, attemptIdentity, sensitiveValueRegistry }, use) => {
+    await use(createAccountFactory(playwright, contextOwner, attemptIdentity, sensitiveValueRegistry))
+  },
+
+  browserAccountFactory: async ({ browser, contextOwner, attemptIdentity, sensitiveValueRegistry }, use) => {
+    await use(createBrowserAccountFactory(browser, contextOwner, attemptIdentity, sensitiveValueRegistry))
   },
 
   roadmapIdentity: async ({ resourceIdentities }, use) => {
@@ -96,8 +114,8 @@ export const test = base.extend<WrenFixtures>({
     await use(await createRecorderClient(playwright.request, contextOwner, recorderIdentity))
   },
 
-  agentFactory: async ({ attemptIdentity, contextOwner }, use) => {
-    await use(createAgentFactory(attemptIdentity, contextOwner))
+  agentFactory: async ({ attemptIdentity, contextOwner, sensitiveValueRegistry }, use) => {
+    await use(createAgentFactory(attemptIdentity, contextOwner, sensitiveValueRegistry))
   },
 })
 
