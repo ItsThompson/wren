@@ -243,7 +243,7 @@ test.describe('agent authorization boundaries', () => {
     const created = structuredContent<CreatedDraft>(createdResult)
     expect(created.revision).toBe(1)
 
-    const proposedSubsectionId = `${roadmapIdentity.proposedIdPrefix}_arrays`
+    const proposedSubsectionId = `sub_${roadmapIdentity.proposedIdPrefix}-arrays`
     const subsectionId = created.remap[proposedSubsectionId] ?? proposedSubsectionId
     const firstPatchResult = await session.callTool<McpResult>('patch_roadmap_draft', {
       roadmap_id: created.roadmap_id,

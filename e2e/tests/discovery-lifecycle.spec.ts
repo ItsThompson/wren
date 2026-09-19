@@ -125,6 +125,7 @@ test.describe('public discovery and learner tracking', () => {
     await ownerBrowser.page.goto(`/user/${owner.username}`)
     await expect(ownerBrowser.page.getByRole('link', { name: editedMetadata.title })).toBeVisible()
     await learnerBrowser.page.goto(`/user/${owner.username}`)
+    await learnerBrowser.page.reload()
     const restoredSourceLink = learnerBrowser.page.getByRole('link', { name: editedMetadata.title, exact: true })
     await expect(restoredSourceLink).toBeVisible()
     await restoredSourceLink.click()

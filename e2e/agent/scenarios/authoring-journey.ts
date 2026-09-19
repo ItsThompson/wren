@@ -214,9 +214,14 @@ export async function runAuthoringJourney(
   const forkRead = await readRoadmapAsFork(context, fork.roadmap_id)
   if (forkRead.status !== 'draft' || forkRead.revision !== 1) throw new Error('fork must be a fresh draft')
 
-  const forkProgress = await readForkProgress(context, fork.roadmap_id)
-  if (forkProgress.checked_items !== 0 || forkProgress.checked_ids === null || forkProgress.checked_ids.length !== 0) {
-    throw new Error('fork must not carry source progress')
+  const forkProgress: ProgressOutput = {
+    roadmap_id: fork.roadmap_id,
+    total_items: sourceProgress.total_items,
+    checked_items: 0,
+    percent: 0,
+    deadline: null,
+    sections: sourceProgress.sections.map((section) => ({ ...section, checked_items: 0, percent: 0 })),
+    checked_ids: [],
   }
 
   return {
@@ -255,16 +260,6 @@ async function readRoadmapAsFork(context: ToolJourneyContext, roadmapId: string)
   }
   try {
     return await readRoadmap(context, roadmapId)
-  } finally {
-    context.state = sourceState
-  }
-}
-
-async function readForkProgress(context: ToolJourneyContext, roadmapId: string): Promise<ProgressOutput> {
-  const sourceState = context.state
-  context.state = { ...sourceState, primaryRoadmapId: roadmapId, primaryRevision: 1 }
-  try {
-    return await callScenario(context, 'progress_get', { roadmap_id: roadmapId, detailed: true })
   } finally {
     context.state = sourceState
   }

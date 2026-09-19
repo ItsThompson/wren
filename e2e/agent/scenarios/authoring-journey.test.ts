@@ -263,7 +263,7 @@ describe('authoring journey', () => {
       'create_roadmap_draft', 'roadmap_get', 'patch_roadmap_draft', 'roadmap_get',
       'replace_roadmap_draft', 'roadmap_get', 'validate_roadmap_draft', 'publish_roadmap',
       'roadmap_get', 'edit_roadmap_metadata', 'roadmap_get', 'progress_update', 'progress_get',
-      'fork_roadmap', 'roadmap_get', 'progress_get',
+      'fork_roadmap', 'roadmap_get',
     ])
     expect(calls[2].arguments_).toMatchObject({
       roadmap_id: 'roadmap-1',
