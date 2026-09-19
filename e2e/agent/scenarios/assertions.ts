@@ -17,6 +17,7 @@ import type {
 } from './types'
 
 const ROADMAP_STATUSES = new Set(['draft', 'published', 'archived'])
+const PUBLISHED_VISIBILITIES = new Set(['public', 'private'])
 const SECTION_INCLUDES = new Set(['subsections', 'items', 'both'])
 const SEARCH_KINDS = new Set(['subsection', 'item'])
 
@@ -47,6 +48,7 @@ function assertRoadmapCard(card: DashboardOutput['authored'][number]): void {
   requireCondition(card.id.length > 0, 'roadmap card id must not be empty')
   requireCondition(card.title.length > 0, 'roadmap card title must not be empty')
   assertStatus(card.status, 'roadmap card status')
+  requireCondition(PUBLISHED_VISIBILITIES.has(card.published_visibility), 'roadmap card visibility is invalid')
 }
 
 export function assertDashboard(output: DashboardOutput, context: ToolJourneyContext): Promise<void> {
@@ -101,6 +103,9 @@ export function assertNode(output: NodeOutput, context: ToolJourneyContext): Pro
   const requestedSubsectionId = context.state.toolArguments?.roadmap_get_node?.subsection_id
   if (typeof requestedSubsectionId === 'string') requireCondition(output.subsection_id === requestedSubsectionId, 'node identity differs from request')
   if (context.state.subsectionIds.length > 0) requireCondition(context.state.subsectionIds.includes(output.subsection_id), 'node is outside the attempt fixture')
+  if (context.state.itemIds.length > 0) {
+    requireCondition(output.items.every((item) => context.state.itemIds.includes(item.id)), 'node item is outside the attempt fixture')
+  }
   return Promise.resolve()
 }
 
@@ -109,6 +114,9 @@ export function assertSection(output: SectionPageOutput, context: ToolJourneyCon
   if (typeof requestedSectionId === 'string') requireCondition(output.section_id === requestedSectionId, 'section identity differs from request')
   if (context.state.sectionId !== null) requireCondition(output.section_id === context.state.sectionId, 'section is outside the attempt fixture')
   requireCondition(SECTION_INCLUDES.has(output.include), 'section include has an invalid value')
+  if (context.state.subsectionIds.length > 0) {
+    requireCondition(output.subsections.every((subsection) => context.state.subsectionIds.includes(subsection.subsection_id)), 'section node is outside the attempt fixture')
+  }
   return Promise.resolve()
 }
 
@@ -127,6 +135,9 @@ export function assertProgress(output: ProgressOutput, context: ToolJourneyConte
   requireCondition(output.checked_items <= output.total_items, 'checked count exceeds total')
   requireCondition(output.percent >= 0 && output.percent <= 100, 'progress percent is outside 0..100')
   if (context.state.itemIds.length === 0) requireCondition(output.checked_items === 0, 'initial progress must be empty')
+  if (output.checked_ids !== null && context.state.itemIds.length > 0) {
+    requireCondition(output.checked_ids.every((itemId) => context.state.itemIds.includes(itemId)), 'progress item is outside the attempt fixture')
+  }
   return Promise.resolve()
 }
 
