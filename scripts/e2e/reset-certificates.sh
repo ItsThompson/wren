@@ -16,7 +16,7 @@ if [[ -d "$CAROOT" && -r "$CA" ]]; then
     exit 1
   fi
   case "$fingerprint" in
-    SHA256\ Fingerprint=*) ;;
+    *[Ff]ingerprint=*) ;;
     *) printf 'tls: managed CA fingerprint could not be validated; refusing reset\n' >&2; exit 1 ;;
   esac
   MKCERT_BIN="${E2E_MKCERT_BIN:-mkcert}"

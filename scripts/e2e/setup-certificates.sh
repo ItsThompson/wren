@@ -25,6 +25,13 @@ esac
 
 mkdir -p "$CERT_DIR" "$CAROOT"
 chmod 700 "$CAROOT" "$CERT_DIR"
+if [[ "$(uname -s)" == Linux && -n "${HOME:-}" && -x "$(command -v certutil 2>/dev/null || true)" ]]; then
+  nss_database="$HOME/.pki/nssdb"
+  mkdir -p "$nss_database"
+  if [[ ! -f "$nss_database/cert9.db" ]]; then
+    certutil -N --empty-password -d "sql:$nss_database"
+  fi
+fi
 CAROOT="$CAROOT" "$MKCERT_BIN" -install
 CAROOT="$CAROOT" "$MKCERT_BIN" \
   -cert-file "$LEAF" \
