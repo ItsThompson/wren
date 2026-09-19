@@ -31,10 +31,17 @@ afterEach(async () => {
 })
 
 describe('recorder HTTP boundary', () => {
-  it('requires the control token and reports parser/store readiness', async () => {
+  it('requires the control token on every control route', async () => {
     const baseUrl = await startServer()
-    const unauthorized = await fetch(`${baseUrl}/_e2e/recorder/ready`)
-    expect(unauthorized.status).toBe(401)
+    const controlPaths = [
+      '/_e2e/recorder/ready',
+      '/_e2e/recorder/envelopes',
+      '/_e2e/recorder/artifacts',
+    ]
+    for (const controlPath of controlPaths) {
+      const unauthorized = await fetch(`${baseUrl}${controlPath}`)
+      expect(unauthorized.status).toBe(401)
+    }
 
     const authorized = await fetch(`${baseUrl}/_e2e/recorder/ready`, {
       headers: { 'X-Recorder-Token': token },

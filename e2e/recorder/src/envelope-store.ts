@@ -98,13 +98,15 @@ export class EnvelopeStore {
   query(query: EnvelopeQuery): EnvelopeRecord[] {
     const validated = validateQuery(query, this.limits.maxQueryResults)
     const receivedAfterTime = parseTime(validated.receivedAfterIso)
+    // ISO timestamps have millisecond precision. Include the exact boundary so an
+    // event received in the same millisecond as the caller's cutoff is not lost.
     return this.records
       .filter(
         (record) =>
           record.parseStatus === 'valid' &&
           record.operation === validated.operation &&
           record.failureKind === validated.failureKind &&
-          Date.parse(record.receivedAtIso) > receivedAfterTime,
+          Date.parse(record.receivedAtIso) >= receivedAfterTime,
       )
       .slice(0, validated.limit)
       .map((record) => ({ ...record }))
