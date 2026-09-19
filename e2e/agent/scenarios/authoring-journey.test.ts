@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { AgentSession } from '../types'
 import {
+  assertBoundedRemap,
   authoringScopes,
   buildAuthoringRoadmap,
   buildReplacementRoadmap,
@@ -105,6 +106,19 @@ describe('authoring journey', () => {
     )
   })
 
+  it('rejects unknown, empty, duplicate, and oversized remaps', () => {
+    const draft = buildAuthoringRoadmap(identity)
+    expect(() => assertBoundedRemap({ attempt_arrays: 'sub-1' }, draft)).not.toThrow()
+    expect(() => assertBoundedRemap({ unknown: 'sub-1' }, draft)).toThrow('unknown proposed ID')
+    expect(() => assertBoundedRemap({ attempt_arrays: '' }, draft)).toThrow('non-empty')
+    expect(() => assertBoundedRemap({ attempt_arrays: 'same', attempt_hashing: 'same' }, draft)).toThrow('unique')
+    expect(() => assertBoundedRemap({
+      attempt_foundations: 'a', attempt_arrays: 'b', attempt_hashing: 'c',
+      attempt_arrays_guide: 'd', attempt_hashing_video: 'e', attempt_read: 'f',
+      attempt_drill: 'g', attempt_hash: 'h', extra: 'i',
+    }, draft)).toThrow('exceeds')
+  })
+
   it('applies server remaps to every identity used by later writes', () => {
     expect(resolveRoadmapIds(identity, {
       attempt_foundations: 'section-1',
@@ -123,7 +137,24 @@ describe('authoring journey', () => {
   it('threads returned revisions through the live authoring lifecycle and reads every write back', async () => {
     const calls: Array<{ name: string; arguments_: Record<string, unknown> }> = []
     let roadmapReadCount = 0
-    const sourceIds = resolveRoadmapIds(identity, {})
+    const createRemap = {
+      attempt_foundations: 'section-1',
+      attempt_arrays: 'sub-1',
+      attempt_hashing: 'sub-2',
+      attempt_read: 'item-1',
+      attempt_drill: 'item-2',
+      attempt_hash: 'item-3',
+    }
+    const sourceIds = resolveRoadmapIds(identity, createRemap)
+    const replacementRemap = {
+      attempt_foundations: 'section-2',
+      attempt_arrays: 'sub-3',
+      attempt_hashing: 'sub-4',
+      attempt_read: 'item-4',
+      attempt_drill: 'item-5',
+      attempt_hash: 'item-6',
+    }
+    const replacementIds = resolveRoadmapIds(identity, replacementRemap)
     const forkIds = {
       sectionId: 'fork-foundations',
       subsectionIds: ['fork-arrays', 'fork-hashing'],
@@ -143,14 +174,14 @@ describe('authoring journey', () => {
         calls.push({ name, arguments_ })
         let structuredContent: Record<string, unknown>
         if (name === 'create_roadmap_draft') {
-          structuredContent = { roadmap_id: 'roadmap-1', revision: 1, status: 'draft', remap: {} }
+          structuredContent = { roadmap_id: 'roadmap-1', revision: 1, status: 'draft', remap: createRemap }
         } else if (name === 'patch_roadmap_draft') {
           structuredContent = {
             roadmap_id: 'roadmap-1', revision: 2,
-            changed_nodes: [{ change: 'updated', id: 'attempt_arrays', kind: 'subsection' }], remap: {},
+            changed_nodes: [{ change: 'updated', id: 'sub-1', kind: 'subsection' }], remap: {},
           }
         } else if (name === 'replace_roadmap_draft') {
-          structuredContent = { roadmap_id: 'roadmap-1', revision: 3, status: 'draft', remap: {} }
+          structuredContent = { roadmap_id: 'roadmap-1', revision: 3, status: 'draft', remap: replacementRemap }
         } else if (name === 'validate_roadmap_draft') {
           structuredContent = { publishable: true, violations: [] }
         } else if (name === 'publish_roadmap') {
@@ -172,7 +203,7 @@ describe('authoring journey', () => {
         } else {
           roadmapReadCount += 1
           const isFork = arguments_.roadmap_id === 'roadmap-2'
-          const ids = isFork ? forkIds : sourceIds
+          const ids = isFork ? forkIds : roadmapReadCount >= 3 ? replacementIds : sourceIds
           const metadataRead = !isFork && roadmapReadCount === 5
           const title = metadataRead ? 'Attempt roadmap Published' : identity.title
           const description = metadataRead ? 'Metadata edited through the official client.' : 'A compact authoring journey fixture.'
@@ -188,12 +219,16 @@ describe('authoring journey', () => {
             const section = source[ids.sectionId]
             const subsections = section.subsections as Record<string, Record<string, unknown>>
             subsections[ids.subsectionIds[0]].title = 'Arrays and strings'
+            subsections[ids.subsectionIds[0]].tags = ['foundations', 'arrays']
           }
           if (roadmapReadCount === 3) {
             const source = structuredContent.sections as Record<string, Record<string, unknown>>
             const section = source[ids.sectionId]
             const subsections = section.subsections as Record<string, Record<string, unknown>>
+            subsections[ids.subsectionIds[0]].tags = ['foundations', 'arrays']
             subsections[ids.subsectionIds[1]].title = 'Hash tables'
+            subsections[ids.subsectionIds[1]].tags = ['foundations', 'hashing']
+            structuredContent.description = 'The replaced compact authoring fixture.'
           }
         }
         return { content: [], structuredContent } as TOutput
@@ -207,6 +242,9 @@ describe('authoring journey', () => {
     }, 'attempt-owner')
     const result = await runAuthoringJourney(context, identity)
 
+    expect(result.create.remap).toEqual(createRemap)
+    expect(result.replace.remap).toEqual(replacementRemap)
+    expect(result.replacedRead.section_order).toEqual(['section-2'])
     expect(result.metadataRead.title).toBe('Attempt roadmap Published')
     expect(result.forkProgress.checked_items).toBe(0)
     expect(calls.map((call) => call.name)).toEqual([
@@ -214,8 +252,24 @@ describe('authoring journey', () => {
       'replace_roadmap_draft', 'roadmap_get', 'validate_roadmap_draft', 'publish_roadmap',
       'roadmap_get', 'edit_roadmap_metadata', 'roadmap_get', 'fork_roadmap', 'roadmap_get', 'progress_get',
     ])
-    expect(calls[2].arguments_.revision).toBe(1)
-    expect(calls[4].arguments_).toMatchObject({ roadmap_id: 'roadmap-1' })
+    expect(calls[2].arguments_).toMatchObject({
+      roadmap_id: 'roadmap-1',
+      revision: 1,
+      operations: [
+        { op: 'update_subsection', subsection_id: 'sub-1', title: 'Arrays and strings' },
+        { op: 'set_tags', subsection_id: 'sub-1', tags: ['foundations', 'arrays'] },
+      ],
+    })
+    expect(calls[4].arguments_).toMatchObject({
+      roadmap_id: 'roadmap-1',
+      full_document: {
+        description: 'The replaced compact authoring fixture.',
+        sections: [{ subsections: [
+          { title: 'Arrays and strings', tags: ['foundations', 'arrays'] },
+          { title: 'Hash tables', tags: ['foundations', 'hashing'] },
+        ] }],
+      },
+    })
     expect(calls[4].arguments_.revision).toBeUndefined()
   })
 })

@@ -114,6 +114,30 @@ export function buildReplacementRoadmap(identity: {
   }
 }
 
+export function assertBoundedRemap(
+  remap: Readonly<Record<string, string>>,
+  roadmap: AuthoringRoadmapDraft,
+): void {
+  const proposedIds = new Set<string>()
+  for (const section of roadmap.sections) {
+    proposedIds.add(section.proposed_id)
+    for (const subsection of section.subsections) {
+      proposedIds.add(subsection.proposed_id)
+      for (const resource of subsection.resources) proposedIds.add(resource.proposed_id)
+      for (const item of subsection.checklist_items) proposedIds.add(item.proposed_id)
+    }
+  }
+  const entries = Object.entries(remap)
+  if (entries.length > proposedIds.size) throw new Error('roadmap remap exceeds the compact fixture node count')
+  for (const [proposedId, mintedId] of entries) {
+    if (!proposedIds.has(proposedId)) throw new Error(`roadmap remap contains unknown proposed ID ${proposedId}`)
+    if (proposedId.length === 0 || mintedId.length === 0) throw new Error('roadmap remap IDs must be non-empty')
+  }
+  if (new Set(entries.map(([, mintedId]) => mintedId)).size !== entries.length) {
+    throw new Error('roadmap remap values must be unique')
+  }
+}
+
 export function resolveRoadmapIds(
   identity: { readonly proposedIdPrefix: string; readonly itemIds: readonly string[] },
   remap: Readonly<Record<string, string>>,
@@ -172,6 +196,21 @@ export function assertSubsectionTitle(
 ): void {
   const section = output.section_order.map((id) => output.sections[id]).find((candidate) => candidate?.subsections[subsectionId] !== undefined)
   if (section?.subsections[subsectionId]?.title !== expectedTitle) throw new Error(`subsection ${subsectionId} did not persist its changed title`)
+}
+
+export function assertSubsectionTags(
+  output: {
+    readonly section_order: readonly string[]
+    readonly sections: Readonly<Record<string, { readonly subsections: Readonly<Record<string, { readonly tags: readonly string[] }>> }>>
+  },
+  subsectionId: string,
+  expectedTags: readonly string[],
+): void {
+  const section = output.section_order.map((id) => output.sections[id]).find((candidate) => candidate?.subsections[subsectionId] !== undefined)
+  const actualTags = section?.subsections[subsectionId]?.tags
+  if (JSON.stringify(actualTags) !== JSON.stringify(expectedTags)) {
+    throw new Error(`subsection ${subsectionId} did not persist its expected tags`)
+  }
 }
 
 export function structureSnapshot(output: {
