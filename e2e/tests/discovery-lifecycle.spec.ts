@@ -112,6 +112,8 @@ test.describe('public discovery and learner tracking', () => {
     await setRoadmapVisibility(ownerBrowser.page, 'private')
     await ownerBrowser.page.reload()
     await expect(ownerBrowser.page.getByText('Private access', { exact: true })).toBeVisible()
+    await expect(ownerBrowser.page.getByRole('heading', { level: 1, name: editedMetadata.title })).toBeVisible()
+    await expect(ownerBrowser.page.getByText(editedMetadata.description, { exact: true })).toBeVisible()
     await learnerBrowser.page.goto(`/user/${owner.username}`)
     await expect(learnerBrowser.page.getByRole('link', { name: editedMetadata.title, exact: true })).toHaveCount(0)
     await learnerBrowser.page.goto(`/roadmaps/${sourceRoadmapId}`)
