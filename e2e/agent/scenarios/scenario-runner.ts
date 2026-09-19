@@ -1,12 +1,19 @@
 import { getToolScenario, type ExpectedToolName } from './registry'
 import type {
   CreateRoadmapDraftOutput,
+  DashboardOutput,
   EditRoadmapMetadataOutput,
   ForkRoadmapOutput,
+  NextOutput,
+  NodeOutput,
+  OverviewOutput,
+  ProfileOutput,
   ProgressOutput,
   ProgressUpdateOutput,
   PublishRoadmapOutput,
   RoadmapOutput,
+  SearchOutput,
+  SectionPageOutput,
   ToolJourneyContext,
   ToolOutput,
   PatchRoadmapDraftOutput,
@@ -19,6 +26,41 @@ export function callScenario(
   name: 'create_roadmap_draft',
   arguments_: Record<string, unknown>,
 ): Promise<CreateRoadmapDraftOutput>
+export function callScenario(
+  context: ToolJourneyContext,
+  name: 'roadmap_list',
+  arguments_: Record<string, unknown>,
+): Promise<DashboardOutput>
+export function callScenario(
+  context: ToolJourneyContext,
+  name: 'roadmap_get_profile',
+  arguments_: Record<string, unknown>,
+): Promise<ProfileOutput>
+export function callScenario(
+  context: ToolJourneyContext,
+  name: 'roadmap_get_overview',
+  arguments_: Record<string, unknown>,
+): Promise<OverviewOutput>
+export function callScenario(
+  context: ToolJourneyContext,
+  name: 'roadmap_get_next',
+  arguments_: Record<string, unknown>,
+): Promise<NextOutput>
+export function callScenario(
+  context: ToolJourneyContext,
+  name: 'roadmap_get_node',
+  arguments_: Record<string, unknown>,
+): Promise<NodeOutput>
+export function callScenario(
+  context: ToolJourneyContext,
+  name: 'roadmap_get_section',
+  arguments_: Record<string, unknown>,
+): Promise<SectionPageOutput>
+export function callScenario(
+  context: ToolJourneyContext,
+  name: 'roadmap_search',
+  arguments_: Record<string, unknown>,
+): Promise<SearchOutput>
 export function callScenario(
   context: ToolJourneyContext,
   name: 'roadmap_get',
