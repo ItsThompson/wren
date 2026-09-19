@@ -29,7 +29,7 @@ export function createAgentFactory(
         identity: identityForSession(identity, index),
         consentPage,
         requestedScopes,
-        mcpServerUrl: new URL(MCP_BASE_URL),
+        mcpServerUrl: new URL(`${MCP_BASE_URL}/mcp`),
         sensitiveValues: sessionSensitiveValues,
         contextOwner: owner,
       })
