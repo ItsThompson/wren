@@ -186,8 +186,8 @@ export async function editRoadmapDetails(page: Page, metadata: RoadmapMetadata):
 }
 
 export async function publishRoadmap(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Publish' }).first().click()
-  await expect(page.getByText('Public access', { exact: true })).toBeVisible()
+  await page.locator('button:visible').filter({ hasText: /^Publish$/ }).click()
+  await expect(page.getByRole('button', { name: 'Public access' }).first()).toBeVisible()
 }
 
 export async function setRoadmapVisibility(page: Page, visibility: 'public' | 'private'): Promise<void> {

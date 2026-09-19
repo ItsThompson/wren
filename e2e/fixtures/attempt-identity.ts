@@ -120,9 +120,9 @@ export function createRoadmapIdentity(
     title: `E2E ${identity.resourcePrefix} roadmap ${indexToken}`.slice(0, MAX_RESOURCE_LABEL_LENGTH),
     proposedIdPrefix,
     itemIds: [
-      `chk_${proposedIdPrefix}_read`.slice(0, MAX_RESOURCE_LABEL_LENGTH),
-      `chk_${proposedIdPrefix}_drill`.slice(0, MAX_RESOURCE_LABEL_LENGTH),
-      `chk_${proposedIdPrefix}_hash`.slice(0, MAX_RESOURCE_LABEL_LENGTH),
+      `chk_${proposedIdPrefix}-read`.slice(0, MAX_RESOURCE_LABEL_LENGTH),
+      `chk_${proposedIdPrefix}-drill`.slice(0, MAX_RESOURCE_LABEL_LENGTH),
+      `chk_${proposedIdPrefix}-hash`.slice(0, MAX_RESOURCE_LABEL_LENGTH),
     ],
   }
 }

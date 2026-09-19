@@ -296,21 +296,17 @@ def test_fork_mints_the_new_roadmap_id_and_resets_lifecycle() -> None:
     assert fork.created_at == _LATER == fork.updated_at
 
 
-def test_fork_copies_content_with_fresh_child_identities() -> None:
+def test_fork_copies_all_content_verbatim() -> None:
     source = _source_roadmap()
     fork = assemble_fork(source, "grokking-dsa-9x2b", owner="forker", now=_LATER)
     assert fork.title == source.title
     assert fork.description == source.description
     assert fork.subject_tags == source.subject_tags
-    assert fork.section_order == ["sec_foundations-fork"]
-    assert fork.suggested_path == ["sub_arrays-fork", "sub_hashing-fork"]
-    fork_sub = fork.sections["sec_foundations-fork"].subsections
-    assert set(fork_sub) == {"sub_arrays-fork", "sub_hashing-fork"}
-    assert fork_sub["sub_hashing-fork"].prereq_ids == ["sub_arrays-fork"]
-    source_ids = {"sec_foundations", "sub_arrays", "sub_hashing"}
-    fork_ids = set(fork.section_order) | set(fork_sub)
-    fork_ids.update(fork_sub["sub_arrays-fork"].item_order)
-    assert source_ids.isdisjoint(fork_ids)
+    assert fork.section_order == source.section_order
+    assert fork.suggested_path == source.suggested_path
+    fork_sub = fork.sections["sec_foundations"].subsections
+    assert set(fork_sub) == {"sub_arrays", "sub_hashing"}
+    assert fork_sub["sub_hashing"].prereq_ids == ["sub_arrays"]
 
 
 def test_fork_does_not_mutate_the_source() -> None:
