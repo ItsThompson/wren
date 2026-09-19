@@ -20,7 +20,7 @@ describe('EnvelopeStore', () => {
     const records = store.query({
       operation: 'get_dashboard_me_dashboard_get',
       failureKind: 'upstream',
-      receivedAfterIso: '2026-09-18T23:59:59.999Z',
+      receivedAfterIso: receivedAt.toISOString(),
     })
     expect(records).toHaveLength(1)
     expect(records[0]?.sequence).toBe(1)
@@ -58,7 +58,7 @@ describe('EnvelopeStore', () => {
     expect(store.query({
       operation: 'get_dashboard_me_dashboard_get',
       failureKind: 'upstream',
-      receivedAfterIso: '2026-09-18T23:59:59.999Z',
+      receivedAfterIso: receivedAt.toISOString(),
       limit: 2,
     })).toHaveLength(2)
   })

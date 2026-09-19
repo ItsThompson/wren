@@ -3,10 +3,13 @@ import { timingSafeEqual } from 'node:crypto'
 
 import { MalformedEnvelopeError, parseSentryEnvelope } from './envelope-parser.ts'
 import { EnvelopeStore, RecorderStorageLimitError, RecorderValidationError } from './envelope-store.ts'
-import { BROWSER_FAILURE_KINDS, type RecorderLimits } from './types.ts'
+import {
+  BROWSER_FAILURE_KINDS,
+  DEFAULT_RECORDER_LIMITS,
+  type RecorderLimits,
+} from './types.ts'
 
 const INGESTION_PATH = /^\/_e2e\/sentry\/api\/[1-9][0-9]*\/envelope\/$/
-const MAX_REQUEST_BODY_BYTES = 1 * 1024 * 1024
 
 class HttpRequestError extends Error {
   readonly statusCode: number
@@ -190,7 +193,8 @@ async function handleRequest(
 
 export function createRecorderServer(options: RecorderServerOptions): RecorderServer {
   const store = options.store ?? new EnvelopeStore(options.limits)
-  const maxEnvelopeBytes = options.limits?.maxEnvelopeBytes ?? MAX_REQUEST_BODY_BYTES
+  const maxEnvelopeBytes =
+    options.limits?.maxEnvelopeBytes ?? DEFAULT_RECORDER_LIMITS.maxEnvelopeBytes
   const server = createServer((request, response) => {
     void handleRequest(request, response, store, options.controlToken, maxEnvelopeBytes).catch(() => {
       if (!response.headersSent) respondError(response, 500, 'recorder_failure')
