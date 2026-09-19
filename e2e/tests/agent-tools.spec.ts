@@ -76,7 +76,7 @@ test.describe('official MCP tool journeys', () => {
     expect(result.list.authored.some((card) => card.id === roadmapId)).toBe(true)
     expect(result.profile.handle).toBe(account.username)
     expect(result.overview.overall.checked_items).toBe(0)
-    expect(result.node.prereqs[0].id).toBe(`${roadmapIdentity.proposedIdPrefix}_arrays`)
+    expect(result.node.prereqs[0].id).toBe(`sub_${roadmapIdentity.proposedIdPrefix}-arrays`)
     expect(result.section.next_cursor).toBeNull()
     expect(result.search.hits.length).toBeGreaterThan(0)
     expect(result.initialProgress.checked_items).toBe(0)
