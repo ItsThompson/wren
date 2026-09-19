@@ -243,12 +243,18 @@ function removeChallengeScope(response: Response): Response {
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
 }
 
+const ACCESS_TOKEN_EXPIRY_MARGIN_MS = 1_000
+const ACCESS_TOKEN_EXPIRY_WAIT_LIMIT_MS = 30_000
+
 function accessTokenExpiry(provider: E2EOAuthProvider): number {
   return provider.getAuthorization().accessTokenExpiresAtEpochMs
 }
 
 async function waitUntil(expiryEpochMs: number): Promise<void> {
-  const deadline = Math.min(expiryEpochMs + 250, Date.now() + 30_000)
+  const deadline = Math.min(
+    expiryEpochMs + ACCESS_TOKEN_EXPIRY_MARGIN_MS,
+    Date.now() + ACCESS_TOKEN_EXPIRY_WAIT_LIMIT_MS,
+  )
   while (Date.now() < deadline) {
     await new Promise<void>((resolve) => {
       const timeout = setTimeout(resolve, Math.min(100, deadline - Date.now()))
