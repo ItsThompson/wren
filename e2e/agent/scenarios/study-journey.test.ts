@@ -60,7 +60,7 @@ describe('study journey', () => {
               overall: { total_items: 3, checked_items: updated ? 2 : 0, percent: updated ? 67 : 0 },
               revision: 1,
               roadmap_id: roadmap.roadmapId,
-              sections: [{ section_id: 'sec_attempt-foundations', title: 'Foundations', total_items: 3, checked_items: updated ? 2 : 0, percent: updated ? 67 : 0 }],
+              sections: [{ section_id: 'sec_foundations', title: 'Foundations', total_items: 3, checked_items: updated ? 2 : 0, percent: updated ? 67 : 0 }],
               status: 'published',
               title: roadmap.title,
             }
@@ -69,7 +69,7 @@ describe('study journey', () => {
             return node(hashingId, ['chk_attempt-hash'], [{ id: arraysId, title: 'Arrays', done: updated }])
           }
           if (name === 'roadmap_get_section') {
-            return { include: 'both', next_cursor: null, section_id: 'sec_attempt-foundations', steering: null, subsections: [node(arraysId, ['chk_attempt-read', 'chk_attempt-drill']), node(hashingId, ['chk_attempt-hash'], [{ id: arraysId, title: 'Arrays', done: updated }])], title: 'Foundations' }
+            return { include: 'both', next_cursor: null, section_id: 'sec_foundations', steering: null, subsections: [node(arraysId, ['chk_attempt-read', 'chk_attempt-drill']), node(hashingId, ['chk_attempt-hash'], [{ id: arraysId, title: 'Arrays', done: updated }])], title: 'Foundations' }
           }
           if (name === 'roadmap_search') {
             return { hits: [{ item_id: null, kind: 'subsection', matched_tags: null, subsection_id: hashingId, title_or_text: 'Hashing' }] }
@@ -116,7 +116,7 @@ describe('study journey', () => {
       },
       {
         name: 'roadmap_get_section',
-        arguments_: { roadmap_id: roadmap.roadmapId, section_id: 'sec_attempt-foundations', include: 'both' },
+        arguments_: { roadmap_id: roadmap.roadmapId, section_id: 'sec_foundations', include: 'both' },
       },
       { name: 'roadmap_search', arguments_: { roadmap_id: roadmap.roadmapId, query: 'hash' } },
       { name: 'progress_get', arguments_: { roadmap_id: roadmap.roadmapId, detailed: true } },

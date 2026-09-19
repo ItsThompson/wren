@@ -43,7 +43,7 @@ export function createStudyContext(
   identity: TestAttemptIdentity,
   roadmap: StudyRoadmapIdentity,
 ): ToolJourneyContext {
-  const sectionId = `sec_${roadmap.proposedIdPrefix}-foundations`
+  const sectionId = 'sec_foundations'
   const subsectionIds = [
     `sub_${roadmap.proposedIdPrefix}-arrays`,
     `sub_${roadmap.proposedIdPrefix}-hashing`,
