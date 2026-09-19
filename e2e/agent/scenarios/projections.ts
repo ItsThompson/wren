@@ -1,8 +1,5 @@
 import type {
-  CreateRoadmapDraftOutput,
   DashboardOutput,
-  EditRoadmapMetadataOutput,
-  ForkRoadmapOutput,
   ItemStateOutput,
   McpCallToolResult,
   NextItemOutput,
@@ -10,13 +7,10 @@ import type {
   NodeOutput,
   OverviewDetailsOutput,
   OverviewOutput,
-  PatchRoadmapDraftOutput,
   PrereqOutput,
   ProfileOutput,
   ProgressOutput,
   ProgressUpdateOutput,
-  PublishRoadmapOutput,
-  ReplaceRoadmapDraftOutput,
   ResourceLinkOutput,
   ResourceOutput,
   RoadmapCardOutput,
@@ -26,61 +20,20 @@ import type {
   SearchOutput,
   SectionOverviewOutput,
   SectionPageOutput,
-  ValidateRoadmapDraftOutput,
 } from './types'
-
-type StructuredContent = Record<string, unknown>
-type ValueParser<T> = (value: unknown, field: string) => T
-
-function structuredContent(result: McpCallToolResult): StructuredContent {
-  if (result.isError === true) throw new Error('MCP tool returned an error result')
-  return record(result.structuredContent, 'structuredContent')
-}
-
-function record(value: unknown, field: string): StructuredContent {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new Error(`${field} must be an object`)
-  }
-  return value as StructuredContent
-}
-
-function stringValue(value: unknown, field: string): string {
-  if (typeof value !== 'string') throw new Error(`${field} must be a string`)
-  return value
-}
-
-function numberValue(value: unknown, field: string): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(`${field} must be a finite number`)
-  return value
-}
-
-function booleanValue(value: unknown, field: string): boolean {
-  if (typeof value !== 'boolean') throw new Error(`${field} must be a boolean`)
-  return value
-}
-
-function nullableString(value: unknown, field: string): string | null {
-  if (value === null) return null
-  return stringValue(value, field)
-}
-
-function value<T>(source: StructuredContent, field: string, parser: ValueParser<T>): T {
-  return parser(source[field], field)
-}
-
-function array<T>(valueToParse: unknown, field: string, parser: ValueParser<T>): T[] {
-  if (!Array.isArray(valueToParse)) throw new Error(`${field} must be an array`)
-  return valueToParse.map((item, index) => parser(item, `${field}[${index}]`))
-}
-
-function stringArray(valueToParse: unknown, field: string): string[] {
-  return array(valueToParse, field, stringValue)
-}
-
-function objectMap<T>(valueToParse: unknown, field: string, parser: ValueParser<T>): Record<string, T> {
-  const source = record(valueToParse, field)
-  return Object.fromEntries(Object.entries(source).map(([key, item]) => [key, parser(item, `${field}.${key}`)]))
-}
+import {
+  array,
+  booleanValue,
+  nullableString,
+  numberValue,
+  objectMap,
+  record,
+  stringArray,
+  stringValue,
+  structuredContent,
+  value,
+  type StructuredContent,
+} from './projection-helpers'
 
 function card(valueToParse: unknown, field: string): RoadmapCardOutput {
   const source = record(valueToParse, field)
@@ -329,62 +282,3 @@ export function projectProgressUpdate(result: McpCallToolResult): ProgressUpdate
   }
 }
 
-function mutation(result: McpCallToolResult): { roadmap_id: string; revision: number; status: string } {
-  const source = structuredContent(result)
-  return {
-    roadmap_id: value(source, 'roadmap_id', stringValue),
-    revision: value(source, 'revision', numberValue),
-    status: value(source, 'status', stringValue),
-  }
-}
-
-function remap(valueToParse: unknown, field: string): Readonly<Record<string, string>> {
-  const source = record(valueToParse, field)
-  return Object.fromEntries(Object.entries(source).map(([key, item]) => [key, stringValue(item, `${field}.${key}`)]))
-}
-
-export function projectCreate(result: McpCallToolResult): CreateRoadmapDraftOutput {
-  const source = structuredContent(result)
-  return { ...mutation(result), remap: value(source, 'remap', remap) }
-}
-
-export function projectPatch(result: McpCallToolResult): PatchRoadmapDraftOutput {
-  const source = structuredContent(result)
-  return {
-    ...mutation(result),
-    changed_nodes: value(source, 'changed_nodes', (item, field) => array(item, field, (entry, entryField) => record(entry, entryField))),
-    remap: value(source, 'remap', remap),
-  }
-}
-
-export function projectReplace(result: McpCallToolResult): ReplaceRoadmapDraftOutput {
-  const source = structuredContent(result)
-  return { ...mutation(result), remap: value(source, 'remap', remap) }
-}
-
-export function projectValidate(result: McpCallToolResult): ValidateRoadmapDraftOutput {
-  const source = structuredContent(result)
-  return {
-    publishable: value(source, 'publishable', booleanValue),
-    violations: value(source, 'violations', (item, field) => array(item, field, (entry, entryField) => record(entry, entryField))),
-  }
-}
-
-export function projectPublish(result: McpCallToolResult): PublishRoadmapOutput {
-  return mutation(result)
-}
-
-export function projectFork(result: McpCallToolResult): ForkRoadmapOutput {
-  const source = structuredContent(result)
-  return { ...mutation(result), source_roadmap_id: value(source, 'source_roadmap_id', stringValue) }
-}
-
-export function projectMetadata(result: McpCallToolResult): EditRoadmapMetadataOutput {
-  const source = structuredContent(result)
-  return {
-    roadmap_id: value(source, 'roadmap_id', stringValue),
-    title: value(source, 'title', stringValue),
-    description: value(source, 'description', nullableString),
-    subject_tags: value(source, 'subject_tags', stringArray),
-  }
-}
