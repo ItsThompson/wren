@@ -1,4 +1,3 @@
-import { OAuthScope, type AgentSession } from '../types'
 import {
   type CreateRoadmapDraftOutput,
   type EditRoadmapMetadataOutput,
@@ -27,6 +26,7 @@ import {
 } from './authoring-fixture'
 
 export type { AuthoringRoadmapDraft } from './authoring-fixture'
+export { createAuthoringContext, authoringScopes } from './authoring-context'
 
 export interface AuthoringJourneyResult {
   readonly create: CreateRoadmapDraftOutput
@@ -279,38 +279,4 @@ async function readForkProgress(context: ToolJourneyContext, roadmapId: string):
 function requireRevision(context: ToolJourneyContext): number {
   if (context.state.primaryRevision === null) throw new Error('authoring journey has no current roadmap revision')
   return context.state.primaryRevision
-}
-
-export function createAuthoringContext(
-  agent: AgentSession,
-  identity: ToolJourneyContext['identity'],
-  ownerHandle: string,
-): ToolJourneyContext {
-  return {
-    agent,
-    restSetup: {
-      createAccount: async () => undefined,
-      createPublishedRoadmap: async () => {
-        throw new Error('authoring journey does not seed roadmaps through REST')
-      },
-      readRoadmap: async () => {
-        throw new Error('authoring journey reads roadmaps through the official client')
-      },
-    },
-    identity,
-    state: {
-      primaryRoadmapId: null,
-      primaryRevision: null,
-      forkedRoadmapId: null,
-      ownerHandle,
-      sectionId: null,
-      subsectionIds: [],
-      itemIds: [],
-      toolArguments: {},
-    },
-  }
-}
-
-export function authoringScopes(): readonly OAuthScope[] {
-  return [OAuthScope.ROADMAPS_READ, OAuthScope.ROADMAPS_WRITE, OAuthScope.PROGRESS_WRITE]
 }
