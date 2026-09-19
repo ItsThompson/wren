@@ -13,9 +13,12 @@ import type {
   ProgressUpdateOutput,
   ResourceLinkOutput,
   ResourceOutput,
+  RoadmapChecklistItemOutput,
   RoadmapCardOutput,
   RoadmapOutput,
   RoadmapSectionDocumentOutput,
+  RoadmapResourceOutput,
+  RoadmapSubsectionOutput,
   SearchHitOutput,
   SearchOutput,
   SectionOverviewOutput,
@@ -85,12 +88,46 @@ export function projectProfile(result: McpCallToolResult): ProfileOutput {
   }
 }
 
+function roadmapChecklistItem(valueToParse: unknown, field: string): RoadmapChecklistItemOutput {
+  const source = record(valueToParse, field)
+  return {
+    id: value(source, 'id', stringValue),
+    text: value(source, 'text', stringValue),
+  }
+}
+
+function roadmapResource(valueToParse: unknown, field: string): RoadmapResourceOutput {
+  const source = record(valueToParse, field)
+  return {
+    id: value(source, 'id', stringValue),
+    title: value(source, 'title', stringValue),
+    type: value(source, 'type', stringValue),
+    url: value(source, 'url', stringValue),
+  }
+}
+
+function roadmapSubsection(valueToParse: unknown, field: string): RoadmapSubsectionOutput {
+  const source = record(valueToParse, field)
+  return {
+    checklist_items: value(source, 'checklist_items', (item, itemField) => objectMap(item, itemField, roadmapChecklistItem)),
+    description: value(source, 'description', nullableString),
+    effort_estimate: value(source, 'effort_estimate', nullableString),
+    id: value(source, 'id', stringValue),
+    item_order: value(source, 'item_order', stringArray),
+    prereq_ids: value(source, 'prereq_ids', stringArray),
+    resource_order: value(source, 'resource_order', stringArray),
+    resources: value(source, 'resources', (item, itemField) => objectMap(item, itemField, roadmapResource)),
+    tags: value(source, 'tags', stringArray),
+    title: value(source, 'title', stringValue),
+  }
+}
+
 function roadmapSection(valueToParse: unknown, field: string): RoadmapSectionDocumentOutput {
   const source = record(valueToParse, field)
   return {
     id: value(source, 'id', stringValue),
     subsection_order: value(source, 'subsection_order', stringArray),
-    subsections: value(source, 'subsections', (item, itemField) => objectMap(item, itemField, (entry) => record(entry, itemField))),
+    subsections: value(source, 'subsections', (item, itemField) => objectMap(item, itemField, roadmapSubsection)),
     title: value(source, 'title', stringValue),
   }
 }
