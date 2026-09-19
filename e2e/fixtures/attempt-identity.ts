@@ -105,6 +105,14 @@ export function createAttachmentIdentifier(identity: TestAttemptIdentity, name: 
   return `e2e-${identity.resourcePrefix}-${normalizeToken(name).slice(0, 16) || 'artifact'}`.slice(0, MAX_RESOURCE_LABEL_LENGTH)
 }
 
+export function createCallbackIdentity(identity: TestAttemptIdentity, index = 0): string {
+  return `e2e-${identity.resourcePrefix}-callback-${toBase36(index)}`.slice(0, MAX_RESOURCE_LABEL_LENGTH)
+}
+
+export function createRecorderQueryIdentity(identity: TestAttemptIdentity, index = 0): string {
+  return `e2e-${identity.resourcePrefix}-recorder-${toBase36(index)}`.slice(0, MAX_RESOURCE_LABEL_LENGTH)
+}
+
 function readRunId(): string {
   return (
     process.env.E2E_RUN_ID ??
