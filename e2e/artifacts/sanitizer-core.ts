@@ -19,7 +19,10 @@ const SAFE_ATTACHMENT_FIELDS = new Set([
   'operation', 'failureKind', 'environment', 'service', 'method', 'status',
 ])
 const SENSITIVE_FIELD = /(authorization|headers?|cookie|cookies|query|string|querystring|body|requestbody|callbackurl|callbackuri|storage|localstorage|sessionstorage|user|breadcrumbs?|extra|extras|envelope|payload|password|token|secret|privatekey|oauth|pkce|refresh)/i
-const SENSITIVE_TEXT = /(bearer\s+[^\s"']+|-----begin [^-]+private key-----|[?&](?:token|code|password|secret|access_token|refresh_token|state)=[^\s&"']+)/i
+const SENSITIVE_TEXT = /(bearer\s+[^\s"']+|-----begin [^-]+private key-----|https?:\/\/[^\s"'<>?]+\?[^\s"'<>]+|[?&][A-Za-z0-9_-]+=[^\s&"'<>]+)/i
+const CALLBACK_FIELD = /(callback|redirect|authorization.*url|consent)/i
+const STATIC_REPORT_EXTENSIONS = new Set(['.html', '.htm', '.css', '.js', '.mjs', '.svg', '.ico', '.woff', '.woff2', '.map'])
+const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp'])
 const CATEGORY_BY_FIELD: readonly [RegExp, SensitiveValueCategory][] = [
   [/authorization|bearer/i, SensitiveValueCategory.AUTHORIZATION_HEADER],
   [/cookie/i, SensitiveValueCategory.SESSION_COOKIE],
@@ -100,14 +103,30 @@ export class SensitiveValueRegistry {
   }
 }
 
+function sanitizeUrl(value: string): string {
+  try {
+    const parsed = new URL(value)
+    if (CALLBACK_FIELD.test(parsed.pathname)) return '[REDACTED:callback-url]'
+    return `${parsed.origin}${parsed.pathname}`
+  } catch {
+    return value.replace(/[?].*$/, '').replace(/#.*/, '')
+  }
+}
+
+function sanitizeString(value: string, registry: SensitiveValueRegistry): string {
+  const redacted = registry.redact(value).sanitizedText
+  return redacted.replace(/https?:\/\/[^\s"'<>]+/gi, sanitizeUrl).replace(/[?][^\s"'<>]*/g, '').replace(/#[^\s"'<>]*/g, '')
+}
+
 function sanitizeStructuredValue(value: unknown, registry: SensitiveValueRegistry): unknown {
   if (Array.isArray(value)) return value.map((item) => sanitizeStructuredValue(item, registry))
-  if (typeof value === 'string') return registry.redact(value).sanitizedText
+  if (typeof value === 'string') return sanitizeString(value, registry)
   if (value === null || typeof value !== 'object') return value
   const sanitized: Record<string, unknown> = {}
-  for (const [field, fieldValue] of Object.entries(value)) {
-    if (SENSITIVE_FIELD.test(field.replace(/[^a-z]/gi, ''))) continue
-    sanitized[field] = sanitizeStructuredValue(fieldValue, registry)
+  for (const [childField, fieldValue] of Object.entries(value)) {
+    const normalizedField = childField.replace(/[^a-z]/gi, '')
+    if (SENSITIVE_FIELD.test(normalizedField) || CALLBACK_FIELD.test(normalizedField)) continue
+    sanitized[childField] = sanitizeStructuredValue(fieldValue, registry)
   }
   return sanitized
 }
@@ -122,6 +141,10 @@ function parseStructuredText(text: string, kind: DiagnosticArtifactKind, registr
     mergeCounts(counts, redacted.redactionCounts)
     return { text: `${redacted.sanitizedText}\n`, counts }
   } catch {
+    if (kind === 'report-static') {
+      const sanitizedText = sanitizeString(text, registry)
+      return { text: sanitizedText, counts }
+    }
     if (kind === 'trace' || kind === 'report') {
       const lines = inputRedaction.sanitizedText.trim().split('\n').filter((line) => line.length > 0)
       try {
@@ -139,7 +162,7 @@ function parseStructuredText(text: string, kind: DiagnosticArtifactKind, registr
     const safeLines = redacted.sanitizedText
       .split('\n')
       .filter((line) => !SENSITIVE_FIELD.test(line.replace(/[^a-z]/gi, '')) && !SENSITIVE_TEXT.test(line))
-      .map((line) => line.replace(/[?][^\s"']+/g, ''))
+      .map((line) => sanitizeString(line, registry))
     return { text: safeLines.join('\n'), counts }
   }
 }
@@ -166,7 +189,15 @@ async function walkFiles(root: string): Promise<string[]> {
   return files
 }
 
-async function rebuildZip(bytes: Uint8Array, registry: SensitiveValueRegistry) {
+export function classifyArtifactKind(path: string, parentKind: DiagnosticArtifactKind = 'report'): DiagnosticArtifactKind {
+  const extension = extname(path).toLowerCase()
+  if (IMAGE_EXTENSIONS.has(extension)) return 'screenshot'
+  if (extension === '.zip') return parentKind
+  if (parentKind === 'report' && STATIC_REPORT_EXTENSIONS.has(extension)) return 'report-static'
+  return parentKind
+}
+
+async function rebuildZip(bytes: Uint8Array, registry: SensitiveValueRegistry, archiveKind: DiagnosticArtifactKind) {
   const work = await mkdtemp(join(tmpdir(), 'wren-artifact-'))
   const input = join(work, 'input.zip')
   const extracted = join(work, 'extracted')
@@ -175,17 +206,24 @@ async function rebuildZip(bytes: Uint8Array, registry: SensitiveValueRegistry) {
   try {
     await writeFile(input, bytes)
     const listing = await execFile('unzip', ['-Z1', input], { maxBuffer: 2 * 1024 * 1024 })
-    if (listing.stdout.split('\n').some((entry) => entry.startsWith('/') || normalize(entry).startsWith('../'))) throw new UnsafeArtifactError()
+    if (listing.stdout.split('\n').some((entry) => {
+      const normalized = entry.replaceAll('\\', '/')
+      const hasWindowsRoot = normalized.length > 2 && /^[A-Za-z]:$/.test(normalized.slice(0, 2)) && normalized[2] === '/'
+      return normalized.includes('\0') || normalized.startsWith('/') || hasWindowsRoot || normalize(normalized).split('/').includes('..')
+    })) throw new UnsafeArtifactError()
     await execFile('unzip', ['-qq', input, '-d', extracted])
     for (const path of await walkFiles(extracted)) {
       const member = await readFile(path)
-      const kind: DiagnosticArtifactKind = /\.(png|jpe?g|gif|webp)$/i.test(path) ? 'screenshot' : 'trace'
+      const kind = classifyArtifactKind(path, archiveKind)
       const safe = sanitizeBytes(member, kind, registry)
       mergeCounts(counts, safe.counts)
       await writeFile(path, safe.bytes)
     }
     await execFile('zip', ['-q', '-r', '-X', output, '.'], { cwd: extracted })
-    return { bytes: await readFile(output), counts }
+    const rebuiltBytes = await readFile(output)
+    const categories = finalScan(rebuiltBytes, registry)
+    if (categories.length > 0) throw new UnsafeArtifactError(categories)
+    return { bytes: rebuiltBytes, counts }
   } catch (error) {
     if (error instanceof UnsafeArtifactError) throw error
     throw new UnsafeArtifactError([SensitiveValueCategory.INTERNAL_API_TOKEN])
@@ -193,10 +231,23 @@ async function rebuildZip(bytes: Uint8Array, registry: SensitiveValueRegistry) {
 }
 
 function sanitizeBytes(bytes: Uint8Array, kind: DiagnosticArtifactKind, registry: SensitiveValueRegistry) {
-  if (kind === 'screenshot') {
-    const categories = finalScan(bytes, registry)
-    if (categories.length > 0) throw new UnsafeArtifactError(categories)
-    return { bytes, counts: emptyCounts() }
+  if (kind === 'screenshot' || kind === 'report-static') {
+    let text: string
+    try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes) } catch {
+      const categories = finalScan(bytes, registry)
+      if (categories.length > 0) throw new UnsafeArtifactError(categories)
+      return { bytes, counts: emptyCounts() }
+    }
+    if (kind === 'screenshot') {
+      const categories = finalScan(bytes, registry)
+      if (categories.length > 0) throw new UnsafeArtifactError(categories)
+      return { bytes, counts: emptyCounts() }
+    }
+    const parsedStatic = parseStructuredText(text, kind, registry)
+    const staticBytes = new TextEncoder().encode(parsedStatic.text)
+    const staticCategories = finalScan(staticBytes, registry)
+    if (staticCategories.length > 0) throw new UnsafeArtifactError(staticCategories)
+    return { bytes: staticBytes, counts: parsedStatic.counts }
   }
   let text: string
   try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes) } catch { throw new UnsafeArtifactError([SensitiveValueCategory.INTERNAL_API_TOKEN]) }
@@ -209,26 +260,53 @@ function sanitizeBytes(bytes: Uint8Array, kind: DiagnosticArtifactKind, registry
 
 function isArchive(path: string): boolean { return extname(path).toLowerCase() === '.zip' }
 
+function hasControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    if (value.charCodeAt(index) < 32) return true
+  }
+  return false
+}
+
+function validateProjectionValue(field: string, value: unknown): unknown {
+  const integerFields = new Set(['worker', 'retry', 'sequence', 'status'])
+  if (field === 'status' && value === null) return null
+  if (integerFields.has(field)) {
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > (field === 'status' ? 599 : 1_000_000_000)) throw new UnsafeArtifactError()
+    return value
+  }
+  if (field === 'failureKind') {
+    if (value !== 'upstream' && value !== 'network') throw new UnsafeArtifactError()
+    return value
+  }
+  const hasUnsafeCharacters = typeof value === 'string' && hasControlCharacter(value)
+  if (typeof value !== 'string' || value.length === 0 || value.length > 200 || hasUnsafeCharacters || value.includes('?') || value.includes('#')) throw new UnsafeArtifactError()
+  if (field === 'receivedAtIso' && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) throw new UnsafeArtifactError()
+  return value
+}
+
 function attachmentProjection(value: unknown): unknown {
   const records = Array.isArray(value) ? value : typeof value === 'object' && value !== null && Array.isArray((value as { records?: unknown }).records) ? (value as { records: unknown[] }).records : [value]
   return records.map((record) => {
     if (typeof record !== 'object' || record === null || Array.isArray(record)) throw new UnsafeArtifactError()
     const projection: Record<string, unknown> = {}
-    for (const [field, fieldValue] of Object.entries(record)) if (SAFE_ATTACHMENT_FIELDS.has(field)) projection[field] = fieldValue
+    for (const [field, fieldValue] of Object.entries(record)) {
+      if (SAFE_ATTACHMENT_FIELDS.has(field)) projection[field] = validateProjectionValue(field, fieldValue)
+    }
     if (Object.keys(projection).length === 0) throw new UnsafeArtifactError()
     return projection
   })
 }
 
 export async function sanitizeArtifact(input: ArtifactInput, registry: SensitiveValueRegistry): Promise<SanitizedArtifact> {
+  const effectiveKind = classifyArtifactKind(input.path, input.kind)
   let safe
-  if (isArchive(input.path)) safe = await rebuildZip(input.bytes, registry)
-  else if (input.kind === 'attachment' || input.kind === 'recorder') {
+  if (isArchive(input.path)) safe = await rebuildZip(input.bytes, registry, effectiveKind)
+  else if (effectiveKind === 'attachment' || effectiveKind === 'recorder') {
     let value: unknown
     try { value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(input.bytes)) } catch { throw new UnsafeArtifactError() }
     safe = sanitizeBytes(new TextEncoder().encode(JSON.stringify(attachmentProjection(value))), 'recorder', registry)
-  } else safe = sanitizeBytes(input.bytes, input.kind, registry)
-  return { path: input.path, kind: input.kind, bytes: safe.bytes, redactionCounts: safe.counts }
+  } else safe = sanitizeBytes(input.bytes, effectiveKind, registry)
+  return { path: input.path, kind: effectiveKind, bytes: safe.bytes, redactionCounts: safe.counts }
 }
 
 export async function sanitizeArtifacts(inputs: readonly ArtifactInput[], registry: SensitiveValueRegistry): Promise<ArtifactSafetyResult> {

@@ -20,6 +20,7 @@ export type SensitiveValueCategory = typeof SensitiveValueCategory[keyof typeof 
 
 export type DiagnosticArtifactKind =
   | 'report'
+  | 'report-static'
   | 'trace'
   | 'screenshot'
   | 'attachment'

@@ -99,6 +99,49 @@ describe('artifact sanitization', () => {
     expect(JSON.parse(new TextDecoder().decode(result.bytes))).toEqual([{ sequence: 1, operation: 'dashboard', status: 500 }])
   })
 
+  it('removes URL queries, fragments, and callback data from reports', async () => {
+    const registry = new SensitiveValueRegistry()
+    const result = await sanitizeArtifact({
+      path: 'report.json',
+      kind: 'report',
+      bytes: jsonBytes({ url: 'https://app.wren.test/roadmaps?filter=secret#node', redirectUri: 'https://api.wren.test/callback?code=secret' }),
+    }, registry)
+    const report = new TextDecoder().decode(result.bytes)
+
+    expect(report).toContain('https://app.wren.test/roadmaps')
+    expect(report).not.toContain('filter=secret')
+    expect(report).not.toContain('redirectUri')
+    expect(report).not.toContain('callback?')
+  })
+
+  it('retains safe HTML and binary assets from a standard report', async () => {
+    const registry = new SensitiveValueRegistry()
+    const html = await sanitizeArtifact({
+      path: 'report/index.html',
+      kind: 'report-static',
+      bytes: new TextEncoder().encode('<a href="https://app.wren.test/test?case=one">test</a>'),
+    }, registry)
+    const binary = await sanitizeArtifact({
+      path: 'report/assets/font.woff2',
+      kind: 'report-static',
+      bytes: new Uint8Array([0, 1, 2, 3, 255]),
+    }, registry)
+
+    expect(new TextDecoder().decode(html.bytes)).toContain('https://app.wren.test/test')
+    expect(new TextDecoder().decode(html.bytes)).not.toContain('?case=one')
+    expect([...binary.bytes]).toEqual([0, 1, 2, 3, 255])
+  })
+
+  it('withholds allowlisted projections with invalid scalar values', async () => {
+    const registry = new SensitiveValueRegistry()
+    const result = await sanitizeArtifacts([
+      { path: 'invalid.json', kind: 'attachment', bytes: jsonBytes({ runId: { secret: 'value' } }) },
+    ], registry)
+
+    expect(result.passed).toBe(false)
+    expect(result.withheldPaths).toEqual(['invalid.json'])
+  })
+
   it('runs a final byte scan and withholds unsafe artifacts', async () => {
     const registry = new SensitiveValueRegistry()
     registry.register(SensitiveValueCategory.CONTROL_TOKEN, 'control-secret')

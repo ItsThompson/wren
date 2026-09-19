@@ -303,6 +303,7 @@ jobs:
         run: just test-e2e-system
         env:
           CI: true
+          E2E_SENSITIVE_VALUES_DIR: /tmp/wren-e2e-sensitive
 
       - name: Capture and sanitize diagnostics on failure
         if: failure()
