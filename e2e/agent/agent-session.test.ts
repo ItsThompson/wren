@@ -114,6 +114,23 @@ describe('AgentSession', () => {
     expect(challenge.headers.get('www-authenticate')).toBe('Bearer')
   })
 
+  it('keeps refresh observer failures outside the OAuth response', async () => {
+    const fetchWithObserver = createScopeLimitedFetch(
+      async () => new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400 }),
+      new URL('https://mcp.wren.test'),
+      [OAuthScope.ROADMAPS_READ],
+      { onRefreshOutcome: () => { throw new Error('observer failed') } },
+    )
+
+    const response = await fetchWithObserver('https://api.wren.test/token', {
+      method: 'POST',
+      body: 'grant_type=refresh_token',
+    })
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toEqual({ error: 'invalid_grant' })
+  })
+
   it('passes only requested scopes to SDK registration and authorization', async () => {
     const sensitiveValues = new InMemorySensitiveValueRegistry()
     const provider = createOAuthProvider({

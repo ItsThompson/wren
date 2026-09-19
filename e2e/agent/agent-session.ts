@@ -231,7 +231,11 @@ export function createScopeLimitedFetch(
     const response = await baseFetch(url, init)
     const requestUrl = new URL(url)
     if (isRefreshTokenRequest(init)) {
-      observability?.onRefreshOutcome?.(await readRefreshOutcome(response))
+      try {
+        observability?.onRefreshOutcome?.(await readRefreshOutcome(response))
+      } catch {
+        // Diagnostic callbacks cannot change the OAuth operation.
+      }
     }
     if (response.status === 401 || response.status === 403) return removeChallengeScope(response)
     if (requestUrl.origin !== serverUrl.origin || !requestUrl.pathname.includes('/.well-known/oauth-protected-resource')) {

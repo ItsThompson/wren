@@ -90,7 +90,11 @@ export function createOAuthProvider(options: OAuthProviderOptions): E2EOAuthProv
       if (!interactiveAuthorizationAllowed) {
         throw new UnauthorizedError('interactive authorization is required after session initialization')
       }
-      options.observability?.onAuthorizationRequired?.()
+      try {
+        options.observability?.onAuthorizationRequired?.()
+      } catch {
+        // Diagnostic callbacks cannot change the OAuth operation.
+      }
       authorizationUrl = nextAuthorizationUrl
     },
     saveCodeVerifier: (nextCodeVerifier): void => {
