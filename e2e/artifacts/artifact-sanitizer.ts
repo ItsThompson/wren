@@ -3,6 +3,7 @@ import { dirname, join, relative } from 'node:path'
 
 import { SensitiveValueCategory } from './types.ts'
 import {
+  classifyArtifactKind,
   createSensitiveValueRegistry,
   sanitizeArtifacts,
 } from './sanitizer-core.ts'
@@ -29,27 +30,36 @@ async function runSanitizerCli(): Promise<void> {
   const valuesPath = process.env.SENSITIVE_VALUES_FILE
   if (valuesPath) {
     const values = JSON.parse(await readFile(valuesPath, 'utf8')) as Record<string, string[]>
+    const categoryAliases: Record<string, SensitiveValueCategory> = {
+      token: SensitiveValueCategory.BEARER_TOKEN,
+      'authorization-code': SensitiveValueCategory.OAUTH_CODE,
+      'code-verifier': SensitiveValueCategory.PKCE_VERIFIER,
+      'client-secret': SensitiveValueCategory.INTERNAL_API_TOKEN,
+    }
     for (const [category, entries] of Object.entries(values)) {
-      if (!Object.values(SensitiveValueCategory).includes(category as SensitiveValueCategory)) continue
-      for (const value of entries) registry.register(category as SensitiveValueCategory, value)
+      const resolvedCategory = Object.values(SensitiveValueCategory).includes(category as SensitiveValueCategory)
+        ? category as SensitiveValueCategory
+        : categoryAliases[category]
+      if (resolvedCategory === undefined || !Array.isArray(entries)) continue
+      for (const value of entries) if (typeof value === 'string') registry.register(resolvedCategory, value)
     }
   }
   const inputs: ArtifactInput[] = await Promise.all((await walkFiles(inputDir)).map(async (path) => {
     const kindName = relative(inputDir, path).split('/')[0] ?? 'log'
-    const kind: DiagnosticArtifactKind = ['report', 'trace', 'screenshot', 'attachment', 'log', 'recorder'].includes(kindName) ? kindName as DiagnosticArtifactKind : 'log'
-    return { path, kind, bytes: await readFile(path) }
+    const containerKind: DiagnosticArtifactKind = ['report', 'trace', 'screenshot', 'attachment', 'log', 'recorder'].includes(kindName) ? kindName as DiagnosticArtifactKind : 'log'
+    return { path, kind: classifyArtifactKind(path, containerKind), bytes: await readFile(path) }
   }))
   const result = await sanitizeArtifacts(inputs, registry)
   await rm(outputDir, { recursive: true, force: true })
-  if (!result.passed) {
-    process.stdout.write(JSON.stringify({ passed: false, withheldPaths: result.withheldPaths, unsafeCategories: result.unsafeCategories }) + '\n')
-    process.exitCode = 1
-    return
-  }
   for (const artifact of result.approved) {
     const target = join(outputDir, relative(inputDir, artifact.path))
     await mkdir(dirname(target), { recursive: true })
     await writeFile(target, artifact.bytes)
+  }
+  if (!result.passed) {
+    process.stdout.write(JSON.stringify({ passed: false, approvedPaths: result.approvedPaths, withheldPaths: result.withheldPaths, unsafeCategories: result.unsafeCategories }) + '\n')
+    process.exitCode = 1
+    return
   }
   process.stdout.write(JSON.stringify({ passed: true, approvedPaths: result.approvedPaths, redactionCounts: result.redactionCounts }) + '\n')
 }
