@@ -1,10 +1,9 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from '../fixtures/test'
 
 import {
   archiveRoadmap,
   callMcpTool,
   createAgentAccessToken,
-  createAuthedContext,
   createPublishableRoadmap,
   forkRoadmap,
   followRoadmap,
@@ -15,13 +14,12 @@ import {
   publishRoadmap,
   setPublishedVisibility,
 } from '../helpers/api'
-import { API_BASE_URL } from '../helpers/config'
-import { uniqueUser } from '../helpers/users'
 
 test.describe('roadmap lifecycle and discovery', () => {
-  test('keeps the complete read and owner self-follow dashboard coherent', async ({ playwright }) => {
-    const authorUser = uniqueUser('life')
-    const author = await createAuthedContext(playwright.request, authorUser)
+  test('keeps the complete read and owner self-follow dashboard coherent', async ({ accountFactory }) => {
+    const authorAccount = await accountFactory.create('life')
+    const authorUser = authorAccount
+    const author = authorAccount.apiContext
     const roadmapId = await createPublishableRoadmap(author)
     await publishRoadmap(author, roadmapId)
     await followRoadmap(author, roadmapId)
@@ -82,11 +80,12 @@ test.describe('roadmap lifecycle and discovery', () => {
       ]),
     )
 
-    await author.dispose()
   })
 
-  test('forks a private source into an owner-only public-on-publish draft', async ({ playwright }) => {
-    const owner = await createAuthedContext(playwright.request, uniqueUser('fork-owner'))
+  test('forks a private source into an owner-only public-on-publish draft', async ({
+    accountFactory,
+  }) => {
+    const owner = (await accountFactory.create('fork-owner')).apiContext
     const sourceId = await createPublishableRoadmap(owner, { publishedVisibility: 'private' })
     await publishRoadmap(owner, sourceId)
 
@@ -94,10 +93,7 @@ test.describe('roadmap lifecycle and discovery', () => {
     expect(fork).toMatchObject({ status: 'draft', published_visibility: 'public' })
     if (typeof fork.id !== 'string') throw new Error('fork response did not return an ID')
     const forkId = fork.id
-    const guest = await playwright.request.newContext({ baseURL: API_BASE_URL })
+    const guest = await accountFactory.createGuest()
     expect((await guest.get(`/roadmaps/${forkId}`)).status()).toBe(404)
-
-    await guest.dispose()
-    await owner.dispose()
   })
 })

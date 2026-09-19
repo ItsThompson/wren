@@ -1,31 +1,28 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from '../fixtures/test'
+
+import { API_BASE_URL } from '../helpers/config'
 
 import {
   archiveRoadmap,
-  createAuthedContext,
   createPublishableRoadmap,
   getRoadmap,
   publishRoadmap,
   setPublishedVisibility,
 } from '../helpers/api'
-import { API_BASE_URL, FRONTEND_BASE_URL } from '../helpers/config'
-import { uniqueUser } from '../helpers/users'
 
 test.describe('anonymous roadmap reading', () => {
   test('reads published and archived content without personal requests', async ({
-    browser,
-    playwright,
+    accountFactory,
+    browserContext,
   }) => {
-    const owner = await createAuthedContext(playwright.request, uniqueUser('anonymous-owner'))
+    const owner = (await accountFactory.create('anonymous-owner')).apiContext
     const roadmapId = await createPublishableRoadmap(owner)
-    const draftGuest = await playwright.request.newContext({ baseURL: API_BASE_URL })
+    const draftGuest = await accountFactory.createGuest()
     expect((await draftGuest.get(`/roadmaps/${roadmapId}`)).status()).toBe(404)
-    await draftGuest.dispose()
     await publishRoadmap(owner, roadmapId)
     const expectedDocument = await getRoadmap(owner, roadmapId)
 
-    const guestContext = await browser.newContext({ baseURL: FRONTEND_BASE_URL })
-    const page = await guestContext.newPage()
+    const page = await browserContext.newPage()
     const apiRequests: { path: string; cookie: string | undefined }[] = []
     page.on('request', (request) => {
       if (!request.url().startsWith(API_BASE_URL)) return
@@ -66,15 +63,13 @@ test.describe('anonymous roadmap reading', () => {
     await page.reload()
     await expect(page.getByText('Roadmap not found')).toBeVisible()
 
-    await guestContext.close()
-    await owner.dispose()
   })
 
   test('keeps explicit private publication access owner-only across lifecycle states', async ({
-    playwright,
+    accountFactory,
   }) => {
-    const owner = await createAuthedContext(playwright.request, uniqueUser('private-owner'))
-    const guest = await playwright.request.newContext({ baseURL: API_BASE_URL })
+    const owner = (await accountFactory.create('private-owner')).apiContext
+    const guest = await accountFactory.createGuest()
     const roadmapId = await createPublishableRoadmap(owner, { publishedVisibility: 'private' })
 
     expect((await getRoadmap(owner, roadmapId)).published_visibility).toBe('private')
@@ -92,7 +87,5 @@ test.describe('anonymous roadmap reading', () => {
     await setPublishedVisibility(owner, roadmapId, 'private')
     expect((await guest.get(`/roadmaps/${roadmapId}`)).status()).toBe(404)
 
-    await guest.dispose()
-    await owner.dispose()
   })
 })
