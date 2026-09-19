@@ -1,5 +1,5 @@
 import { execFile as execFileCallback } from 'node:child_process'
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -93,6 +93,41 @@ describe('artifact sanitization', () => {
     }
   })
 
+  it('withholds ZIP symlinks and unsafe member names', async () => {
+    const work = await mkdtemp(join(tmpdir(), 'wren-artifact-zip-test-'))
+    try {
+      const target = join(work, 'target')
+      const link = join(work, 'link')
+      const archive = join(work, 'unsafe.zip')
+      await writeFile(target, 'safe')
+      await symlink('target', link)
+      await execFile('zip', ['-q', '-y', archive, 'target', 'link'], { cwd: work })
+
+      const result = await sanitizeArtifacts([{
+        path: archive,
+        kind: 'trace',
+        bytes: await readFile(archive),
+      }], createSensitiveValueRegistry())
+
+      expect(result.passed).toBe(false)
+      expect(result.withheldPaths).toEqual([archive])
+
+      const callbackName = join(work, 'callback?code=secret')
+      const callbackArchive = join(work, 'callback-name.zip')
+      await writeFile(callbackName, 'safe')
+      await execFile('zip', ['-q', '-j', callbackArchive, callbackName], { cwd: work })
+      const callbackResult = await sanitizeArtifacts([{
+        path: callbackArchive,
+        kind: 'trace',
+        bytes: await readFile(callbackArchive),
+      }], createSensitiveValueRegistry())
+      expect(callbackResult.passed).toBe(false)
+      expect(callbackResult.withheldPaths).toEqual([callbackArchive])
+    } finally {
+      await rm(work, { recursive: true, force: true })
+    }
+  })
+
   it('projects attachments and recorder exports onto safe fields', async () => {
     const registry = new SensitiveValueRegistry()
     const bytes = jsonBytes({ records: [{ sequence: 1, operation: 'dashboard', status: 500, password: 'bad', callbackUrl: 'https://app.wren.test/callback?code=bad' }] })
@@ -132,6 +167,27 @@ describe('artifact sanitization', () => {
     expect(new TextDecoder().decode(html.bytes)).toContain('https://app.wren.test/test')
     expect(new TextDecoder().decode(html.bytes)).not.toContain('?case=one')
     expect([...binary.bytes]).toEqual([0, 1, 2, 3, 255])
+  })
+
+  it('withholds static assets that use unquoted sensitive fields', async () => {
+    const result = await sanitizeArtifacts([{
+      path: 'report/app.js',
+      kind: 'report-static',
+      bytes: new TextEncoder().encode('const data={headers:{authorization:"unregistered-secret"}};'),
+    }], createSensitiveValueRegistry())
+
+    expect(result.passed).toBe(false)
+    expect(result.withheldPaths).toEqual(['report/app.js'])
+  })
+
+  it('preserves optional chaining in safe static assets', async () => {
+    const result = await sanitizeArtifact({
+      path: 'report/app.js',
+      kind: 'report-static',
+      bytes: new TextEncoder().encode('const value = object?.field;'),
+    }, createSensitiveValueRegistry())
+
+    expect(new TextDecoder().decode(result.bytes)).toContain('object?.field')
   })
 
   it('withholds allowlisted projections with invalid scalar values', async () => {
@@ -178,6 +234,21 @@ describe('artifact sanitization', () => {
 
       expect(result.passed).toBe(false)
       await expect(access(output)).rejects.toThrow()
+    } finally {
+      await rm(work, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects an input inside the output directory before publishing', async () => {
+    const work = await mkdtemp(join(tmpdir(), 'wren-artifact-overlap-test-'))
+    try {
+      const output = join(work, 'safe')
+      const input = join(output, 'input.json')
+      await mkdir(output)
+      await writeFile(input, JSON.stringify({ runId: 'run-1' }))
+
+      await expect(sanitizeArtifactFiles([{ path: input, kind: 'attachment' }], output, createSensitiveValueRegistry())).rejects.toThrow('overlap')
+      await expect(access(input)).resolves.toBeUndefined()
     } finally {
       await rm(work, { recursive: true, force: true })
     }
