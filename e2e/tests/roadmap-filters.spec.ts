@@ -30,6 +30,7 @@ test.describe('roadmap list filters', () => {
     const hashing = tags.getByRole('button', { name: 'hashing' })
     await arrays.focus()
     await page.keyboard.press('Space')
+    await expect(panel.getByText('Showing 1 of 2 topics')).toBeVisible()
     await hashing.click()
     await expect(panel.getByText('Showing 2 of 2 topics')).toBeVisible()
     await expect(arrays).toHaveAttribute('aria-pressed', 'true')
@@ -42,6 +43,7 @@ test.describe('roadmap list filters', () => {
 
     const emptyState = page.getByRole('group', { name: 'Filter results' })
     await emptyState.getByRole('button', { name: 'Clear filters' }).click()
+    expect(page.url()).toBe(initialUrl)
     await expect(panel.getByRole('radio', { name: 'ALL' })).toHaveAttribute('aria-checked', 'true')
     await expect(panel.getByText('Showing 2 of 2 topics')).toBeVisible()
     await expect(page.getByRole('heading', { level: 3, name: 'Arrays' })).toBeVisible()
