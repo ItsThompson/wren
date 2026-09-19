@@ -151,6 +151,67 @@ function hasUnsafeDynamicStaticExpression(text: string): boolean {
   return false
 }
 
+const COMPOSE_LOG_PREFIX = /^[A-Za-z0-9_.-]+-\d+\s+\|\s*/
+const NGINX_ACCESS_LINE = /"([A-Z]+)\s+(\S+)\s+(HTTP\/\d(?:\.\d)?)"\s+(\d{3})\s+(\d+)/
+const POSTGRES_LOG_LINE = /^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:\s+UTC)?)\s+\[(\d+)\]\s+([A-Z]+):\s*(.*)$/
+const UNSAFE_PLAIN_LOG = /(?:request\s+body|response\s+body|\b(?:authorization|cookie|password|token|secret|private\s*key)\b\s*[:=]|\b(?:GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s+\S+\s+.*(?:\{|\[)|\b(?:statement|detail|query)\s*:\s*(?:select|insert|update|delete|with)\b|[?&][A-Za-z0-9_-]+=)/i
+
+function stripComposePrefix(line: string): string {
+  return line.replace(COMPOSE_LOG_PREFIX, '')
+}
+
+function sanitizeRequestTarget(target: string): string {
+  if (target.startsWith('/')) return target.replace(/[?#].*$/, '')
+  try { return new URL(target).pathname } catch { return target.replace(/[?#].*$/, '') }
+}
+
+function safePlainLogMessage(message: string, registry: SensitiveValueRegistry): string {
+  const normalized = sanitizeString(message.replace(/[\r\n]+/g, ' ').trim(), registry)
+  return UNSAFE_PLAIN_LOG.test(normalized) ? '[REDACTED:unsafe-log-message]' : normalized
+}
+
+function sanitizeServiceLog(text: string, registry: SensitiveValueRegistry) {
+  const counts = emptyCounts()
+  const lines = text.split('\n').map(stripComposePrefix).filter((line) => line.trim().length > 0)
+  const safeLines = lines.map((line) => {
+    const inputRedaction = registry.redact(line)
+    mergeCounts(counts, inputRedaction.redactionCounts)
+    const normalized = inputRedaction.sanitizedText.trim()
+    try {
+      const parsed = JSON.parse(normalized) as unknown
+      return JSON.stringify(sanitizeStructuredValue(parsed, registry))
+    } catch {
+      const nginxAccess = normalized.match(NGINX_ACCESS_LINE)
+      if (nginxAccess) {
+        const [, method, target, protocol, status, bytes] = nginxAccess
+        return JSON.stringify({
+          format: 'nginx-access',
+          method,
+          path: sanitizeRequestTarget(target ?? '/'),
+          protocol,
+          status: Number(status),
+          bytes: Number(bytes),
+        })
+      }
+      const postgresLog = normalized.match(POSTGRES_LOG_LINE)
+      if (postgresLog) {
+        const [, timestamp, processId, severity, message] = postgresLog
+        return JSON.stringify({
+          format: 'postgres-log',
+          timestamp,
+          processId: Number(processId),
+          severity,
+          message: safePlainLogMessage(message ?? '', registry),
+        })
+      }
+      return JSON.stringify({ format: 'service-log', message: safePlainLogMessage(normalized, registry) })
+    }
+  })
+  const redacted = registry.redact(safeLines.join('\n'))
+  mergeCounts(counts, redacted.redactionCounts)
+  return { text: `${redacted.sanitizedText}${safeLines.length > 0 ? '\n' : ''}`, counts }
+}
+
 function parseStructuredText(text: string, kind: DiagnosticArtifactKind, registry: SensitiveValueRegistry) {
   const counts = emptyCounts()
   const inputRedaction = registry.redact(text)
@@ -166,7 +227,8 @@ function parseStructuredText(text: string, kind: DiagnosticArtifactKind, registr
       const sanitizedText = sanitizeString(text, registry)
       return { text: sanitizedText, counts }
     }
-    if (kind === 'trace' || kind === 'report' || kind === 'log') {
+    if (kind === 'log') return sanitizeServiceLog(text, registry)
+    if (kind === 'trace' || kind === 'report') {
       const lines = inputRedaction.sanitizedText.trim().split('\n').filter((line) => line.length > 0)
       try {
         const safeLines = lines.map((line) => JSON.stringify(sanitizeStructuredValue(JSON.parse(line) as unknown, registry)))
