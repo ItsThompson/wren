@@ -1,28 +1,11 @@
 import { OAuthScope, type AgentSession, type AdvertisedTool } from '../types'
 import {
-  type CreateRoadmapDraftOutput,
-  type DashboardOutput,
-  type EditRoadmapMetadataOutput,
-  type ForkRoadmapOutput,
   type McpCallToolResult,
-  type NextOutput,
-  type NodeOutput,
-  type OverviewOutput,
-  type PatchRoadmapDraftOutput,
-  type ProgressOutput,
-  type ProgressUpdateOutput,
-  type PublishRoadmapOutput,
-  type ReplaceRoadmapDraftOutput,
-  type ProfileOutput,
-  type RoadmapOutput,
-  type SearchOutput,
-  type SectionPageOutput,
   type ToolCoverageDifference,
   type ToolJourneyContext,
   ToolJourneyName,
   type ToolOutput,
   type ToolScenario,
-  type ValidateRoadmapDraftOutput,
 } from './types'
 import {
   projectDashboard,
@@ -109,20 +92,33 @@ function liveCall<TOutput extends ToolOutput>(
   }
 }
 
-function createScenario<TOutput extends ToolOutput>(
-  name: ExpectedToolName,
+function createScenario<
+  TOutput extends ToolOutput,
+  TName extends ExpectedToolName = ExpectedToolName,
+>(
+  name: TName,
   journey: ToolJourneyName,
   requiredScopes: readonly OAuthScope[],
   projectOutput: (result: McpCallToolResult) => TOutput,
   assertStableResult: (output: TOutput, context: ToolJourneyContext) => Promise<void>,
-): ToolScenario<TOutput> {
+): ToolScenario<TOutput> & {
+  readonly name: TName
+  readonly run: (context: ToolJourneyContext) => Promise<TOutput>
+} {
+  const call = liveCall<TOutput>(name, projectOutput)
+  const run = async (context: ToolJourneyContext): Promise<TOutput> => {
+    const output = await call(context)
+    await assertStableResult(output, context)
+    return output
+  }
   return Object.freeze({
     name,
     journey,
     requiredScopes: Object.freeze([...requiredScopes]),
-    call: liveCall<TOutput>(name, projectOutput),
+    call,
     projectOutput,
     assertStableResult,
+    run,
   })
 }
 
@@ -150,24 +146,36 @@ export function createToolScenarioRegistry<
 }
 
 export const TOOL_SCENARIO_REGISTRY = createToolScenarioRegistry([
-  createScenario<DashboardOutput>('roadmap_list', ToolJourneyName.STUDY, [OAuthScope.ROADMAPS_READ], projectDashboard, assertDashboard),
-  createScenario<ProfileOutput>('roadmap_get_profile', ToolJourneyName.STUDY, [OAuthScope.ROADMAPS_READ], projectProfile, assertProfile),
-  createScenario<RoadmapOutput>('roadmap_get', ToolJourneyName.AUTHORING, [OAuthScope.ROADMAPS_READ], projectRoadmap, assertRoadmap),
-  createScenario<OverviewOutput>('roadmap_get_overview', ToolJourneyName.STUDY, [OAuthScope.ROADMAPS_READ], projectOverview, assertOverview),
-  createScenario<NextOutput>('roadmap_get_next', ToolJourneyName.STUDY, [OAuthScope.ROADMAPS_READ], projectNext, assertNext),
-  createScenario<NodeOutput>('roadmap_get_node', ToolJourneyName.STUDY, [OAuthScope.ROADMAPS_READ], projectNode, assertNode),
-  createScenario<SectionPageOutput>('roadmap_get_section', ToolJourneyName.STUDY, [OAuthScope.ROADMAPS_READ], projectSection, assertSection),
-  createScenario<SearchOutput>('roadmap_search', ToolJourneyName.STUDY, [OAuthScope.ROADMAPS_READ], projectSearch, assertSearch),
-  createScenario<ProgressOutput>('progress_get', ToolJourneyName.STUDY, [OAuthScope.ROADMAPS_READ], projectProgress, assertProgress),
-  createScenario<ProgressUpdateOutput>('progress_update', ToolJourneyName.STUDY, [OAuthScope.PROGRESS_WRITE], projectProgressUpdate, assertProgressUpdate),
-  createScenario<CreateRoadmapDraftOutput>('create_roadmap_draft', ToolJourneyName.AUTHORING, [OAuthScope.ROADMAPS_WRITE], projectCreate, assertCreate),
-  createScenario<PatchRoadmapDraftOutput>('patch_roadmap_draft', ToolJourneyName.AUTHORING, [OAuthScope.ROADMAPS_WRITE], projectPatch, assertPatch),
-  createScenario<ReplaceRoadmapDraftOutput>('replace_roadmap_draft', ToolJourneyName.AUTHORING, [OAuthScope.ROADMAPS_WRITE], projectReplace, assertReplace),
-  createScenario<ValidateRoadmapDraftOutput>('validate_roadmap_draft', ToolJourneyName.AUTHORING, [OAuthScope.ROADMAPS_WRITE], projectValidate, assertValidate),
-  createScenario<PublishRoadmapOutput>('publish_roadmap', ToolJourneyName.AUTHORING, [OAuthScope.ROADMAPS_WRITE], projectPublish, assertPublish),
-  createScenario<ForkRoadmapOutput>('fork_roadmap', ToolJourneyName.AUTHORING, [OAuthScope.ROADMAPS_WRITE], projectFork, assertFork),
-  createScenario<EditRoadmapMetadataOutput>('edit_roadmap_metadata', ToolJourneyName.AUTHORING, [OAuthScope.ROADMAPS_WRITE], projectMetadata, assertMetadata),
+  createScenario('roadmap_list', ToolJourneyName.STUDY, [OAuthScope.ROADMAPS_READ], projectDashboard, assertDashboard),
+  createScenario('roadmap_get_profile', ToolJourneyName.STUDY, [OAuthScope.ROADMAPS_READ], projectProfile, assertProfile),
+  createScenario('roadmap_get', ToolJourneyName.AUTHORING, [OAuthScope.ROADMAPS_READ], projectRoadmap, assertRoadmap),
+  createScenario('roadmap_get_overview', ToolJourneyName.STUDY, [OAuthScope.ROADMAPS_READ], projectOverview, assertOverview),
+  createScenario('roadmap_get_next', ToolJourneyName.STUDY, [OAuthScope.ROADMAPS_READ], projectNext, assertNext),
+  createScenario('roadmap_get_node', ToolJourneyName.STUDY, [OAuthScope.ROADMAPS_READ], projectNode, assertNode),
+  createScenario('roadmap_get_section', ToolJourneyName.STUDY, [OAuthScope.ROADMAPS_READ], projectSection, assertSection),
+  createScenario('roadmap_search', ToolJourneyName.STUDY, [OAuthScope.ROADMAPS_READ], projectSearch, assertSearch),
+  createScenario('progress_get', ToolJourneyName.STUDY, [OAuthScope.ROADMAPS_READ], projectProgress, assertProgress),
+  createScenario('progress_update', ToolJourneyName.STUDY, [OAuthScope.PROGRESS_WRITE], projectProgressUpdate, assertProgressUpdate),
+  createScenario('create_roadmap_draft', ToolJourneyName.AUTHORING, [OAuthScope.ROADMAPS_WRITE], projectCreate, assertCreate),
+  createScenario('patch_roadmap_draft', ToolJourneyName.AUTHORING, [OAuthScope.ROADMAPS_WRITE], projectPatch, assertPatch),
+  createScenario('replace_roadmap_draft', ToolJourneyName.AUTHORING, [OAuthScope.ROADMAPS_WRITE], projectReplace, assertReplace),
+  createScenario('validate_roadmap_draft', ToolJourneyName.AUTHORING, [OAuthScope.ROADMAPS_WRITE], projectValidate, assertValidate),
+  createScenario('publish_roadmap', ToolJourneyName.AUTHORING, [OAuthScope.ROADMAPS_WRITE], projectPublish, assertPublish),
+  createScenario('fork_roadmap', ToolJourneyName.AUTHORING, [OAuthScope.ROADMAPS_WRITE], projectFork, assertFork),
+  createScenario('edit_roadmap_metadata', ToolJourneyName.AUTHORING, [OAuthScope.ROADMAPS_WRITE], projectMetadata, assertMetadata),
 ] as const)
+
+type RegisteredToolScenario = (typeof TOOL_SCENARIO_REGISTRY)[number]
+export type ToolScenarioByName<TName extends ExpectedToolName> = Extract<RegisteredToolScenario, { readonly name: TName }>
+export type ToolOutputByName<TName extends ExpectedToolName> = Awaited<ReturnType<ToolScenarioByName<TName>['call']>>
+
+export function getToolScenario<TName extends ExpectedToolName>(name: TName): ToolScenarioByName<TName> {
+  const scenario = TOOL_SCENARIO_REGISTRY.find(
+    (candidate): candidate is ToolScenarioByName<TName> => candidate.name === name,
+  )
+  if (scenario === undefined) throw new Error(`missing tool scenario ${name}`)
+  return scenario
+}
 
 export function compareToolCoverage(
   advertisedTools: readonly AdvertisedTool[] | readonly string[],

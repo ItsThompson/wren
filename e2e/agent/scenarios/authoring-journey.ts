@@ -7,15 +7,15 @@ import {
   type PublishRoadmapOutput,
   type RoadmapOutput,
   type ToolJourneyContext,
-  type ToolOutput,
-  type ToolScenario,
   type PatchRoadmapDraftOutput,
   type ReplaceRoadmapDraftOutput,
   type ValidateRoadmapDraftOutput,
 } from './types'
-import { TOOL_SCENARIO_REGISTRY } from './registry'
+import { callScenario } from './scenario-runner'
 import {
+  assertBoundedRemap,
   assertRoadmapSnapshot,
+  assertSubsectionTags,
   assertSubsectionTitle,
   buildAuthoringRoadmap,
   buildReplacementRoadmap,
@@ -44,7 +44,9 @@ export interface AuthoringJourneyResult {
 }
 
 export {
+  assertBoundedRemap,
   assertRoadmapSnapshot,
+  assertSubsectionTags,
   assertSubsectionTitle,
   buildAuthoringRoadmap,
   buildReplacementRoadmap,
@@ -63,10 +65,11 @@ export async function runAuthoringJourney(
 ): Promise<AuthoringJourneyResult> {
   const initialRoadmap = buildAuthoringRoadmap(roadmapIdentity)
   const replacementRoadmap = buildReplacementRoadmap(roadmapIdentity)
-  const create = await callScenario<CreateRoadmapDraftOutput>(context, 'create_roadmap_draft', { roadmap: initialRoadmap })
+  const create = await callScenario(context, 'create_roadmap_draft', { roadmap: initialRoadmap })
+  assertBoundedRemap(create.remap, initialRoadmap)
   context.state.primaryRoadmapId = create.roadmap_id
   context.state.primaryRevision = create.revision
-  const resolvedIds = resolveRoadmapIds(roadmapIdentity, create.remap)
+  let resolvedIds = resolveRoadmapIds(roadmapIdentity, create.remap)
   context.state.sectionId = resolvedIds.sectionId
   context.state.subsectionIds = resolvedIds.subsectionIds
   context.state.itemIds = resolvedIds.itemIds
@@ -81,7 +84,7 @@ export async function runAuthoringJourney(
     subsectionIds: resolvedIds.subsectionIds,
   })
 
-  const patch = await callScenario<PatchRoadmapDraftOutput>(context, 'patch_roadmap_draft', {
+  const patch = await callScenario(context, 'patch_roadmap_draft', {
     roadmap_id: create.roadmap_id,
     revision: requireRevision(context),
     operations: [
@@ -97,6 +100,7 @@ export async function runAuthoringJourney(
       },
     ],
   })
+  assertBoundedRemap(patch.remap, initialRoadmap)
   context.state.primaryRevision = patch.revision
   const patchedRead = await readRoadmap(context, create.roadmap_id)
   assertRoadmapSnapshot(patchedRead, {
@@ -108,11 +112,17 @@ export async function runAuthoringJourney(
     subsectionIds: resolvedIds.subsectionIds,
   })
   assertSubsectionTitle(patchedRead, resolvedIds.subsectionIds[0], 'Arrays and strings')
+  assertSubsectionTags(patchedRead, resolvedIds.subsectionIds[0], ['foundations', 'arrays'])
 
-  const replace = await callScenario<ReplaceRoadmapDraftOutput>(context, 'replace_roadmap_draft', {
+  const replace = await callScenario(context, 'replace_roadmap_draft', {
     roadmap_id: create.roadmap_id,
     full_document: replacementRoadmap,
   })
+  assertBoundedRemap(replace.remap, replacementRoadmap)
+  resolvedIds = resolveRoadmapIds(roadmapIdentity, replace.remap)
+  context.state.sectionId = resolvedIds.sectionId
+  context.state.subsectionIds = resolvedIds.subsectionIds
+  context.state.itemIds = resolvedIds.itemIds
   context.state.primaryRevision = replace.revision
   const replacedRead = await readRoadmap(context, create.roadmap_id)
   assertRoadmapSnapshot(replacedRead, {
@@ -124,15 +134,20 @@ export async function runAuthoringJourney(
     subsectionIds: resolvedIds.subsectionIds,
   })
   assertSubsectionTitle(replacedRead, resolvedIds.subsectionIds[1], 'Hash tables')
+  assertSubsectionTags(replacedRead, resolvedIds.subsectionIds[0], ['foundations', 'arrays'])
+  assertSubsectionTags(replacedRead, resolvedIds.subsectionIds[1], ['foundations', 'hashing'])
+  if (replacedRead.description !== replacementRoadmap.description) {
+    throw new Error('replace read-back did not persist the replacement description')
+  }
 
-  const validation = await callScenario<ValidateRoadmapDraftOutput>(context, 'validate_roadmap_draft', {
+  const validation = await callScenario(context, 'validate_roadmap_draft', {
     roadmap_id: create.roadmap_id,
   })
   if (!validation.publishable || validation.violations.length !== 0) {
     throw new Error('authoring fixture must validate as publishable')
   }
 
-  const publish = await callScenario<PublishRoadmapOutput>(context, 'publish_roadmap', {
+  const publish = await callScenario(context, 'publish_roadmap', {
     roadmap_id: create.roadmap_id,
   })
   context.state.primaryRevision = publish.revision
@@ -153,7 +168,7 @@ export async function runAuthoringJourney(
     description: 'Metadata edited through the official client.',
     subject_tags: ['algorithms', 'authoring'],
   }
-  const metadata = await callScenario<EditRoadmapMetadataOutput>(context, 'edit_roadmap_metadata', metadataRequest)
+  const metadata = await callScenario(context, 'edit_roadmap_metadata', metadataRequest)
   const metadataRead = await readRoadmap(context, create.roadmap_id)
   if (
     metadataRead.title !== metadataRequest.title ||
@@ -166,7 +181,7 @@ export async function runAuthoringJourney(
     throw new Error('metadata edit changed structural roadmap content')
   }
 
-  const fork = await callScenario<ForkRoadmapOutput>(context, 'fork_roadmap', {
+  const fork = await callScenario(context, 'fork_roadmap', {
     source_roadmap_id: create.roadmap_id,
   })
   context.state.forkedRoadmapId = fork.roadmap_id
@@ -202,7 +217,7 @@ export async function runAuthoringJourney(
 }
 
 async function readRoadmap(context: ToolJourneyContext, roadmapId: string): Promise<RoadmapOutput> {
-  return callScenario<RoadmapOutput>(context, 'roadmap_get', { roadmap_id: roadmapId })
+  return callScenario(context, 'roadmap_get', { roadmap_id: roadmapId })
 }
 
 async function readRoadmapAsFork(context: ToolJourneyContext, roadmapId: string): Promise<RoadmapOutput> {
@@ -226,28 +241,10 @@ async function readForkProgress(context: ToolJourneyContext, roadmapId: string):
   const sourceState = context.state
   context.state = { ...sourceState, primaryRoadmapId: roadmapId, primaryRevision: 1 }
   try {
-    return await callScenario<ProgressOutput>(context, 'progress_get', { roadmap_id: roadmapId, detailed: true })
+    return await callScenario(context, 'progress_get', { roadmap_id: roadmapId, detailed: true })
   } finally {
     context.state = sourceState
   }
-}
-
-async function callScenario<TOutput extends ToolOutput>(
-  context: ToolJourneyContext,
-  name: string,
-  arguments_: Record<string, unknown>,
-): Promise<TOutput> {
-  const scenario = findScenario<TOutput>(name)
-  context.state.toolArguments = { ...context.state.toolArguments, [name]: arguments_ }
-  const output = await scenario.call(context)
-  await scenario.assertStableResult(output, context)
-  return output
-}
-
-function findScenario<TOutput extends ToolOutput>(name: string): ToolScenario<TOutput> {
-  const scenario = TOOL_SCENARIO_REGISTRY.find((candidate) => candidate.name === name)
-  if (scenario === undefined) throw new Error(`missing authoring scenario ${name}`)
-  return scenario as unknown as ToolScenario<TOutput>
 }
 
 function requireRevision(context: ToolJourneyContext): number {
