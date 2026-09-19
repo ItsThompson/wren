@@ -4,7 +4,9 @@ import {
   createAccountIdentity,
   createAttachmentIdentifier,
   createAttemptIdentity,
+  createCallbackIdentity,
   createOAuthClientName,
+  createRecorderQueryIdentity,
   createRoadmapIdentity,
 } from './attempt-identity.ts'
 
@@ -46,5 +48,7 @@ describe('attempt identity', () => {
     expect(roadmap.title).toContain(identity.resourcePrefix)
     expect(createOAuthClientName(identity)).toContain(identity.resourcePrefix)
     expect(createAttachmentIdentifier(identity, 'trace.zip')).toContain(identity.resourcePrefix)
+    expect(createCallbackIdentity(identity)).toContain(identity.resourcePrefix)
+    expect(createRecorderQueryIdentity(identity)).toContain(identity.resourcePrefix)
   })
 })
