@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures/test'
 import type { APIRequestContext } from '@playwright/test'
 import { OAuthScope } from '../agent/types'
 import { registerAccount, completeOnboarding } from '../browser/auth'
+import { expectConnectedAgent, openConnections, revokeConnectedAgent } from '../browser/connections'
 import {
   buildPublishableRoadmap,
   createPublishableRoadmap,
@@ -129,6 +130,64 @@ test.describe('agent authorization boundaries', () => {
       before.map((card) => card.id).sort((left, right) => left.localeCompare(right)),
     )
     expect(after.some((card) => card.title === deniedIdentity.title)).toBe(false)
+  })
+
+  test('refreshes after the measured access expiry while the grant remains active', async ({
+    accountFactory,
+    browserAccountFactory,
+    roadmapIdentity,
+    agentFactory,
+  }) => {
+    const seedAccount = (await accountFactory.create('seed')).apiContext
+    const publicRoadmapId = await createPublishableRoadmap(seedAccount, roadmapIdentity, {
+      publishedVisibility: 'public',
+    })
+    await publishRoadmap(seedAccount, publicRoadmapId)
+
+    const agent = await browserAccountFactory.create('refresh')
+    await registerAccount(agent.page, agent)
+    await completeOnboarding(agent.page)
+    const session = await agentFactory.create(agent.page, [OAuthScope.ROADMAPS_READ])
+
+    expect(session.authorization.accessTokenExpiresAtEpochMs).toBeGreaterThan(Date.now())
+    expect(session.authorization.hasRefreshToken).toBe(true)
+    await expect(session.callTool('roadmap_get', { roadmap_id: publicRoadmapId })).resolves.toMatchObject({
+      structuredContent: { id: publicRoadmapId },
+    })
+
+    await session.waitUntilCurrentAccessTokenExpires()
+    await expect(session.callTool('roadmap_get', { roadmap_id: publicRoadmapId })).resolves.toMatchObject({
+      structuredContent: { id: publicRoadmapId },
+    })
+  })
+
+  test('revokes the visible agent and fails after expiry without new consent', async ({
+    accountFactory,
+    browserAccountFactory,
+    roadmapIdentity,
+    agentFactory,
+  }) => {
+    const seedAccount = (await accountFactory.create('seed')).apiContext
+    const publicRoadmapId = await createPublishableRoadmap(seedAccount, roadmapIdentity, {
+      publishedVisibility: 'public',
+    })
+    await publishRoadmap(seedAccount, publicRoadmapId)
+
+    const agent = await browserAccountFactory.create('revoke')
+    await registerAccount(agent.page, agent)
+    await completeOnboarding(agent.page)
+    const session = await agentFactory.create(agent.page, [OAuthScope.ROADMAPS_READ])
+
+    await expect(session.callTool('roadmap_get', { roadmap_id: publicRoadmapId })).resolves.toMatchObject({
+      structuredContent: { id: publicRoadmapId },
+    })
+    await openConnections(agent.page)
+    await expectConnectedAgent(agent.page, session.authorization.clientName)
+    await revokeConnectedAgent(agent.page, session.authorization.clientName)
+
+    await session.waitUntilCurrentAccessTokenExpires()
+    await expect(session.callTool('roadmap_get', { roadmap_id: publicRoadmapId })).rejects.toThrow()
+    expect(new URL(agent.page.url()).pathname).toBe('/settings/connections')
   })
 
   test('rereads a stale revision before retrying a roadmap patch', async ({
