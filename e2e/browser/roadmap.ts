@@ -214,7 +214,7 @@ export async function archiveRoadmap(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Archive' }).click()
   await page.getByRole('button', { name: 'Confirm archive' }).click()
   await expect(page.getByText('Archived', { exact: true })).toBeVisible()
-  await expect(page.getByText(/hidden from discovery/i)).toBeVisible()
+  await expect(page.getByText(/hidden from discovery/i).first()).toBeVisible()
 }
 
 export async function deleteRoadmap(page: Page): Promise<void> {
