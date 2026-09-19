@@ -1,7 +1,7 @@
 import { execFile as execFileCallback } from 'node:child_process'
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile, rename } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile, rename } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, dirname, extname, join, normalize, relative, resolve } from 'node:path'
+import { basename, dirname, extname, join, normalize, relative, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 
 import {
@@ -21,6 +21,7 @@ const SAFE_ATTACHMENT_FIELDS = new Set([
 const SENSITIVE_FIELD = /(authorization|headers?|cookie|cookies|query|string|querystring|body|requestbody|callbackurl|callbackuri|storage|localstorage|sessionstorage|user|breadcrumbs?|extra|extras|envelope|payload|password|token|secret|privatekey|oauth|pkce|refresh)/i
 const SENSITIVE_TEXT = /(bearer\s+[^\s"']+|-----begin [^-]+private key-----|https?:\/\/[^\s"'<>?]+\?[^\s"'<>]+|[?&][A-Za-z0-9_-]+=[^\s&"'<>]+)/i
 const CALLBACK_FIELD = /(callback|redirect|authorization.*url|consent)/i
+const CALLBACK_URL = /https?:\/\/[^\s"'<>]*(?:callback|redirect|authorize|consent)[^\s"'<>]*/i
 const STATIC_REPORT_EXTENSIONS = new Set(['.html', '.htm', '.css', '.js', '.mjs', '.svg', '.ico', '.woff', '.woff2', '.map'])
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp'])
 const CATEGORY_BY_FIELD: readonly [RegExp, SensitiveValueCategory][] = [
@@ -115,7 +116,7 @@ function sanitizeUrl(value: string): string {
 
 function sanitizeString(value: string, registry: SensitiveValueRegistry): string {
   const redacted = registry.redact(value).sanitizedText
-  return redacted.replace(/https?:\/\/[^\s"'<>]+/gi, sanitizeUrl).replace(/[?][^\s"'<>]*/g, '').replace(/#[^\s"'<>]*/g, '')
+  return redacted.replace(/https?:\/\/[^\s"'<>]+/gi, sanitizeUrl)
 }
 
 function sanitizeStructuredValue(value: unknown, registry: SensitiveValueRegistry): unknown {
@@ -171,20 +172,27 @@ function finalScan(bytes: Uint8Array, registry: SensitiveValueRegistry): Sensiti
   const categories = registry.categoriesFound(bytes)
   let text: string
   try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes) } catch { return categories }
-  if (SENSITIVE_TEXT.test(text)) categories.push(SensitiveValueCategory.INTERNAL_API_TOKEN)
+  if (SENSITIVE_TEXT.test(text) || CALLBACK_URL.test(text)) categories.push(SensitiveValueCategory.INTERNAL_API_TOKEN)
   for (const match of text.matchAll(/["']([^"']+)["']\s*:/g)) {
     const field = match[1] ?? ''
-    if (SENSITIVE_FIELD.test(field.replace(/[^a-z]/gi, ''))) categories.push(categoryForField(field))
+    if (SENSITIVE_FIELD.test(field.replace(/[^a-z]/gi, '')) || CALLBACK_FIELD.test(field)) categories.push(categoryForField(field))
+  }
+  for (const match of text.matchAll(/(?:^|[,{;\s])([A-Za-z_$][\w$-]*)\s*(?::|=)/g)) {
+    const field = match[1] ?? ''
+    if (SENSITIVE_FIELD.test(field.replace(/[^a-z]/gi, '')) || CALLBACK_FIELD.test(field)) categories.push(categoryForField(field))
   }
   return [...new Set(categories)]
 }
 
-async function walkFiles(root: string): Promise<string[]> {
+async function walkArchiveFiles(root: string): Promise<string[]> {
   const files: string[] = []
   for (const entry of await readdir(root, { withFileTypes: true })) {
     const path = join(root, entry.name)
-    if (entry.isDirectory()) files.push(...await walkFiles(path))
-    else if (entry.isFile()) files.push(path)
+    const metadata = await lstat(path)
+    if (metadata.isSymbolicLink()) throw new UnsafeArtifactError()
+    if (metadata.isDirectory()) files.push(...await walkArchiveFiles(path))
+    else if (metadata.isFile()) files.push(path)
+    else throw new UnsafeArtifactError()
   }
   return files
 }
@@ -197,6 +205,34 @@ export function classifyArtifactKind(path: string, parentKind: DiagnosticArtifac
   return parentKind
 }
 
+function validateArchiveListing(listing: string, registry: SensitiveValueRegistry): void {
+  const memberNames = listing.split('\n').filter((name) => name.length > 0)
+  for (const memberName of memberNames) {
+    const normalized = memberName.replaceAll('\\', '/')
+    const hasWindowsRoot = normalized.length > 2 && /^[A-Za-z]:$/.test(normalized.slice(0, 2)) && normalized[2] === '/'
+    if (normalized.includes('\0') || normalized.startsWith('/') || hasWindowsRoot || normalize(normalized).split('/').includes('..')) throw new UnsafeArtifactError()
+    const categories = archiveMetadataCategories(memberName, registry)
+    if (categories.length > 0) throw new UnsafeArtifactError(categories)
+  }
+}
+
+function archiveMetadataCategories(text: string, registry: SensitiveValueRegistry): SensitiveValueCategory[] {
+  const bytes = new TextEncoder().encode(text)
+  const categories = registry.categoriesFound(bytes)
+  if (SENSITIVE_TEXT.test(text) || CALLBACK_URL.test(text)) categories.push(SensitiveValueCategory.INTERNAL_API_TOKEN)
+  return [...new Set(categories)]
+}
+
+function validateArchiveMetadata(verboseListing: string, registry: SensitiveValueRegistry): void {
+  const attributes = verboseListing.matchAll(/Unix file attributes \(\d+ octal\):\s+([^\r\n]+)/g)
+  for (const match of attributes) {
+    const fileType = match[1]?.trim()[0]
+    if (fileType !== '-' && fileType !== 'd') throw new UnsafeArtifactError()
+  }
+  const categories = archiveMetadataCategories(verboseListing, registry)
+  if (categories.length > 0) throw new UnsafeArtifactError(categories)
+}
+
 async function rebuildZip(bytes: Uint8Array, registry: SensitiveValueRegistry, archiveKind: DiagnosticArtifactKind) {
   const work = await mkdtemp(join(tmpdir(), 'wren-artifact-'))
   const input = join(work, 'input.zip')
@@ -206,13 +242,11 @@ async function rebuildZip(bytes: Uint8Array, registry: SensitiveValueRegistry, a
   try {
     await writeFile(input, bytes)
     const listing = await execFile('unzip', ['-Z1', input], { maxBuffer: 2 * 1024 * 1024 })
-    if (listing.stdout.split('\n').some((entry) => {
-      const normalized = entry.replaceAll('\\', '/')
-      const hasWindowsRoot = normalized.length > 2 && /^[A-Za-z]:$/.test(normalized.slice(0, 2)) && normalized[2] === '/'
-      return normalized.includes('\0') || normalized.startsWith('/') || hasWindowsRoot || normalize(normalized).split('/').includes('..')
-    })) throw new UnsafeArtifactError()
+    validateArchiveListing(listing.stdout, registry)
+    const verboseListing = await execFile('unzip', ['-Z', '-v', input], { maxBuffer: 4 * 1024 * 1024 })
+    validateArchiveMetadata(verboseListing.stdout, registry)
     await execFile('unzip', ['-qq', input, '-d', extracted])
-    for (const path of await walkFiles(extracted)) {
+    for (const path of await walkArchiveFiles(extracted)) {
       const member = await readFile(path)
       const kind = classifyArtifactKind(path, archiveKind)
       const safe = sanitizeBytes(member, kind, registry)
@@ -221,6 +255,10 @@ async function rebuildZip(bytes: Uint8Array, registry: SensitiveValueRegistry, a
     }
     await execFile('zip', ['-q', '-r', '-X', output, '.'], { cwd: extracted })
     const rebuiltBytes = await readFile(output)
+    const rebuiltListing = await execFile('unzip', ['-Z1', output], { maxBuffer: 2 * 1024 * 1024 })
+    validateArchiveListing(rebuiltListing.stdout, registry)
+    const rebuiltMetadata = await execFile('unzip', ['-Z', '-v', output], { maxBuffer: 4 * 1024 * 1024 })
+    validateArchiveMetadata(rebuiltMetadata.stdout, registry)
     const categories = finalScan(rebuiltBytes, registry)
     if (categories.length > 0) throw new UnsafeArtifactError(categories)
     return { bytes: rebuiltBytes, counts }
@@ -328,9 +366,15 @@ export async function sanitizeArtifacts(inputs: readonly ArtifactInput[], regist
 }
 
 export async function sanitizeArtifactFiles(inputs: readonly ArtifactFileManifestEntry[], outputDir: string, registry: SensitiveValueRegistry): Promise<ArtifactSafetyResult> {
-  await rm(outputDir, { recursive: true, force: true })
+  const resolvedOutputDir = resolve(outputDir)
+  const overlapsOutput = inputs.some((input) => {
+    const resolvedInput = resolve(input.path)
+    return resolvedInput === resolvedOutputDir || resolvedInput.startsWith(`${resolvedOutputDir}${sep}`)
+  })
+  if (overlapsOutput) throw new Error('artifact input cannot overlap output directory')
   const artifacts = await Promise.all(inputs.map(async (input) => ({ ...input, bytes: await readFile(input.path) })))
   const result = await sanitizeArtifacts(artifacts, registry)
+  await rm(outputDir, { recursive: true, force: true })
   if (!result.passed) return result
 
   const outputParent = dirname(outputDir)
