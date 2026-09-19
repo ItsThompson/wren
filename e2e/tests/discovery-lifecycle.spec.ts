@@ -157,10 +157,10 @@ test.describe('public discovery and learner tracking', () => {
     await expect(ownerBrowser.page.getByRole('link', { name: editedMetadata.title })).toHaveCount(0)
     await ownerBrowser.page.goto(`/roadmaps/${sourceRoadmapId}`)
     await expect(ownerBrowser.page.getByText('Archived', { exact: true })).toBeVisible()
-    await expect(ownerBrowser.page.getByText(/hidden from discovery, but you keep it and your progress/i)).toBeVisible()
+    await expect(ownerBrowser.page.getByText(/hidden from discovery, but you keep it and your progress/i).first()).toBeVisible()
     await learnerBrowser.page.goto(`/roadmaps/${sourceRoadmapId}`)
     await expect(learnerBrowser.page.getByText('Archived', { exact: true })).toBeVisible()
-    await expect(learnerBrowser.page.getByText(/hidden from discovery, but you keep it and your progress/i)).toBeVisible()
+    await expect(learnerBrowser.page.getByText(/hidden from discovery, but you keep it and your progress/i).first()).toBeVisible()
 
     await ownerBrowser.page.goto(`/roadmaps/${deletableRoadmapId}`)
     await expect(ownerBrowser.page.getByRole('heading', { level: 1, name: deletableIdentity.title })).toBeVisible()
