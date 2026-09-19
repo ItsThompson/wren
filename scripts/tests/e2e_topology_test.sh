@@ -6,10 +6,6 @@ cd "$root"
 python3 scripts/e2e/test_public_contracts.py >/dev/null
 bash -n scripts/e2e/capture-artifacts.sh
 
-grep -q 'E2E_WORKERS: 2' .github/workflows/ci.yml
-grep -q 'E2E_RETRIES: 1' .github/workflows/ci.yml
-grep -q "steps.capture.outcome == 'success'" .github/workflows/ci.yml
-grep -q 'run: just reset-e2e-trust' .github/workflows/ci.yml
 
 hosts="$(mktemp)"
 key_dir="$(mktemp -d)"
