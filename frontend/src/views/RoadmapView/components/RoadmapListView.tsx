@@ -74,7 +74,7 @@ export function RoadmapListView({ roadmap, isOwner, isAuthenticated, actions, on
     <section className="reading-width py-10">
       <header className="border-b border-border pb-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
             <h1 className="display-l min-w-0 max-w-full break-words text-foreground">{roadmap.title}</h1>
             {roadmap.status === 'archived' ? (
               <span className="rounded-full border border-muted-foreground/50 px-3 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
