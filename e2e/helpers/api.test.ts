@@ -21,14 +21,14 @@ describe('API fixture payloads', () => {
 
     expect(roadmap.title).toBe(roadmapIdentity.title)
     expect(roadmap.suggested_path).toEqual([
-      `${roadmapIdentity.proposedIdPrefix}_arrays`,
-      `${roadmapIdentity.proposedIdPrefix}_hashing`,
+      `sub_${roadmapIdentity.proposedIdPrefix}_arrays`,
+      `sub_${roadmapIdentity.proposedIdPrefix}_hashing`,
     ])
-    expect(subsections[0].proposed_id).toBe(`${roadmapIdentity.proposedIdPrefix}_arrays`)
+    expect(subsections[0].proposed_id).toBe(`sub_${roadmapIdentity.proposedIdPrefix}_arrays`)
     expect(subsections[0].checklist_items.map((item) => item.proposed_id)).toEqual(
       roadmapIdentity.itemIds.slice(0, 2),
     )
-    expect(subsections[1].proposed_id).toBe(`${roadmapIdentity.proposedIdPrefix}_hashing`)
+    expect(subsections[1].proposed_id).toBe(`sub_${roadmapIdentity.proposedIdPrefix}_hashing`)
     expect(subsections[1].checklist_items[0].proposed_id).toBe(roadmapIdentity.itemIds[2])
   })
 })

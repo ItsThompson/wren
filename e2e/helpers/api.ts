@@ -33,8 +33,8 @@ export interface PublishableRoadmapOptions {
  */
 export function buildPublishableRoadmap(options: PublishableRoadmapOptions) {
   const subsectionIds = {
-    arrays: `${options.identity.proposedIdPrefix}_arrays`,
-    hashing: `${options.identity.proposedIdPrefix}_hashing`,
+    arrays: `sub_${options.identity.proposedIdPrefix}_arrays`,
+    hashing: `sub_${options.identity.proposedIdPrefix}_hashing`,
   }
   const roadmap = {
     title: options.identity.title,
