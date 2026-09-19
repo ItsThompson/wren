@@ -94,4 +94,30 @@ describe('createAgentStudyJourneyState', () => {
       ),
     ).toThrow('two subsections and three checklist items')
   })
+
+  it('rejects an official subsection ID that the returned roadmap does not contain', () => {
+    expect(() =>
+      createAgentStudyJourneyState(
+        buildRoadmap(),
+        {
+          subsectionIds: ['missing-subsection-id', 'second-server-id'],
+          itemIds: ['first-item-server-id', 'second-item-server-id', 'final-item-server-id'],
+        },
+        '2099-12-31',
+      ),
+    ).toThrow('did not contain subsection missing-subsection-id')
+  })
+
+  it('rejects an official checklist ID that the returned subsection does not contain', () => {
+    expect(() =>
+      createAgentStudyJourneyState(
+        buildRoadmap(),
+        {
+          subsectionIds: ['first-server-id', 'second-server-id'],
+          itemIds: ['missing-item-id', 'second-item-server-id', 'final-item-server-id'],
+        },
+        '2099-12-31',
+      ),
+    ).toThrow('did not contain checklist item missing-item-id')
+  })
 })
