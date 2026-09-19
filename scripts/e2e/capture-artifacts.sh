@@ -36,7 +36,8 @@ else
   printf '{"error":"recorder_control_token_missing"}\n' > "$RAW_DIR/recorder/missing.json"
 fi
 
-VALUES_FILE="$RAW_DIR/sensitive-values.json"
+mkdir -p "$SENSITIVE_VALUES_DIR"
+VALUES_FILE="$SENSITIVE_VALUES_DIR/merged-values.json"
 export VALUES_FILE SENSITIVE_VALUES_DIR ROOT_DIR
 node --input-type=module <<'NODE'
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
