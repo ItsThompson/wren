@@ -4,6 +4,8 @@ import { type APIRequest, type APIRequestContext, expect } from '@playwright/tes
 
 import { API_BASE_URL, MCP_BASE_URL } from './config'
 import type { NextResult, ProgressSnapshot } from './types'
+import type { ContextOwner } from '../fixtures/context-owner'
+import { ownDisposable } from '../fixtures/context-owner'
 import type { TestUser } from './users'
 
 /**
@@ -68,8 +70,10 @@ export const SPINE_ITEM_IDS = ['chk_read', 'chk_drill', 'chk_hash']
 export async function createAuthedContext(
   request: APIRequest,
   user: TestUser,
+  owner: ContextOwner,
 ): Promise<APIRequestContext> {
   const context = await request.newContext({ baseURL: API_BASE_URL })
+  ownDisposable(owner, context, `api-account-${user.username}`)
   const response = await context.post('/auth/register', { data: user })
   expect(response.status(), await response.text()).toBe(201)
   return context
