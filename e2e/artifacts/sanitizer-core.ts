@@ -1,7 +1,7 @@
 import { execFile as execFileCallback } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile, rename } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, extname, join, normalize, relative, resolve } from 'node:path'
+import { basename, dirname, extname, join, normalize, relative, resolve } from 'node:path'
 import { promisify } from 'node:util'
 
 import {
@@ -328,15 +328,25 @@ export async function sanitizeArtifacts(inputs: readonly ArtifactInput[], regist
 }
 
 export async function sanitizeArtifactFiles(inputs: readonly ArtifactFileManifestEntry[], outputDir: string, registry: SensitiveValueRegistry): Promise<ArtifactSafetyResult> {
+  await rm(outputDir, { recursive: true, force: true })
   const artifacts = await Promise.all(inputs.map(async (input) => ({ ...input, bytes: await readFile(input.path) })))
   const result = await sanitizeArtifacts(artifacts, registry)
   if (!result.passed) return result
-  for (const artifact of result.approved) {
-    const target = resolve(outputDir, relative(resolve('/'), resolve(artifact.path)))
-    await mkdir(dirname(target), { recursive: true })
-    const temporary = `${target}.tmp-${process.pid}`
-    await writeFile(temporary, artifact.bytes)
-    await rename(temporary, target)
+
+  const outputParent = dirname(outputDir)
+  await mkdir(outputParent, { recursive: true })
+  const stagingDir = await mkdtemp(join(outputParent, `.${basename(outputDir)}-`))
+  try {
+    for (const artifact of result.approved) {
+      const target = resolve(stagingDir, relative(resolve('/'), resolve(artifact.path)))
+      await mkdir(dirname(target), { recursive: true })
+      await writeFile(target, artifact.bytes)
+    }
+    await rename(stagingDir, outputDir)
+  } catch (error) {
+    await rm(stagingDir, { recursive: true, force: true })
+    await rm(outputDir, { recursive: true, force: true })
+    throw error
   }
   return result
 }

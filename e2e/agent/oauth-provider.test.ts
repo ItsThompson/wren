@@ -70,4 +70,24 @@ describe('E2EOAuthProvider', () => {
     expect(provider.clientInformation()).toBeUndefined()
     expect(provider.tokens()).toBeUndefined()
   })
+
+  it('preserves OAuth values in the snapshot sink after live state cleanup', async () => {
+    const snapshot = new InMemorySensitiveValueRegistry()
+    const live = new InMemorySensitiveValueRegistry(snapshot)
+    const provider = createOAuthProvider({
+      callbackUrl: new URL('http://127.0.0.1:43123/callback'),
+      clientName: 'e2e-attempt-client',
+      requestedScopes: [OAuthScope.ROADMAPS_READ],
+      resourceUrl: new URL('https://mcp.wren.test'),
+      sensitiveValues: live,
+    })
+    await provider.state!()
+    await provider.saveCodeVerifier('verifier-value')
+    await provider.saveTokens({ access_token: 'access-token', refresh_token: 'refresh-token', token_type: 'Bearer', expires_in: 2 })
+
+    provider.clear()
+
+    expect(live.values()).toEqual([])
+    expect(snapshot.values()).toEqual(expect.arrayContaining(['verifier-value', 'access-token', 'refresh-token']))
+  })
 })
