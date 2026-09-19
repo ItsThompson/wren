@@ -39,7 +39,11 @@ test.describe('direct routes and responsive controls', () => {
     const unknownResponse = await publicPage.goto('/route-that-does-not-exist')
     expect(unknownResponse?.status()).toBe(200)
     await expect(publicPage.getByText('This page isn’t here.')).toBeVisible()
-    await expect(publicPage.getByRole('link', { name: 'Back to Wren' })).toBeVisible()
+    await publicPage.getByRole('link', { name: 'Back to Wren' }).click()
+    await expect(publicPage).toHaveURL(/\/$/)
+    await expect(
+      publicPage.getByRole('heading', { name: /learn anything, in the right order/i }),
+    ).toBeVisible()
   })
 
   test('resolves authenticated routes directly', async ({
@@ -58,7 +62,6 @@ test.describe('direct routes and responsive controls', () => {
     const connectionsResponse = await authenticatedPage.goto('/settings/connections')
     expect(connectionsResponse?.status()).toBe(200)
     await expect(authenticatedPage.getByRole('heading', { name: 'Connected agents' })).toBeVisible()
-
   })
 
   test('keeps direct OAuth consent outside onboarding', async ({
@@ -102,6 +105,7 @@ test.describe('direct routes and responsive controls', () => {
     await page.goto(`/roadmaps/${roadmapId}`)
     await expect(page.getByRole('link', { name: 'Tree' })).toBeVisible()
     await expect(page.getByRole('checkbox').first()).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
     await page.getByRole('checkbox').first().check()
     await expect(page.getByRole('checkbox').first()).toBeChecked()
 
