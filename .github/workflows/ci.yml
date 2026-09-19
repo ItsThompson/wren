@@ -304,25 +304,18 @@ jobs:
         env:
           CI: true
 
-      - name: Capture stack logs on failure
+      - name: Capture and sanitize diagnostics on failure
         if: failure()
         run: |
-          RECORDER_CONTROL_TOKEN=ci-diagnostics-placeholder \
-            docker compose -f docker-compose.yml -f e2e/docker-compose.e2e.yml logs --no-color \
-            > /tmp/wren-stack-logs.txt 2>&1
+          export RECORDER_CONTROL_TOKEN="$(cat e2e/keys/recorder-control-token)"
+          export NODE_EXTRA_CA_CERTS="$GITHUB_WORKSPACE/e2e/ingress/certificates/caroot/rootCA.pem"
+          scripts/e2e/capture-artifacts.sh
 
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
-          path: e2e/playwright-report/
-          retention-days: 7
-
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: stack-logs
-          path: /tmp/wren-stack-logs.txt
+          name: e2e-safe-diagnostics
+          path: /tmp/wren-safe-artifacts/
           retention-days: 7
 
       - name: Stop the stack and remove generated material
