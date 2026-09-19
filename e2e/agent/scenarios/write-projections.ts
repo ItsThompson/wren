@@ -21,6 +21,14 @@ function mutation(result: McpCallToolResult): { roadmap_id: string; revision: nu
   }
 }
 
+function patchMutation(result: McpCallToolResult): { roadmap_id: string; revision: number } {
+  const source = structuredContent(result)
+  return {
+    roadmap_id: value(source, 'roadmap_id', stringValue),
+    revision: value(source, 'revision', numberValue),
+  }
+}
+
 function remap(valueToParse: unknown, field: string): Readonly<Record<string, string>> {
   const source = record(valueToParse, field)
   return Object.fromEntries(Object.entries(source).map(([key, item]) => [key, stringValue(item, `${field}.${key}`)]))
@@ -52,7 +60,7 @@ export function projectCreate(result: McpCallToolResult): CreateRoadmapDraftOutp
 export function projectPatch(result: McpCallToolResult): PatchRoadmapDraftOutput {
   const source = structuredContent(result)
   return {
-    ...mutation(result),
+    ...patchMutation(result),
     changed_nodes: value(source, 'changed_nodes', (item, field) => array(item, field, changedNode)),
     remap: value(source, 'remap', remap),
   }
