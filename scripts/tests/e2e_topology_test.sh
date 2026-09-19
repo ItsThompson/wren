@@ -4,7 +4,7 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$root"
 python3 scripts/e2e/test_public_contracts.py >/dev/null
-python3 -m unittest discover -s e2e/recorder -p 'test_*.py' >/dev/null
+(cd e2e && npm run test:unit >/dev/null)
 
 hosts="$(mktemp)"
 key_dir="$(mktemp -d)"

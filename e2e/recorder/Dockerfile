@@ -1,8 +1,8 @@
-FROM python:3.12-alpine
+FROM node:22-alpine
 
 WORKDIR /app
-COPY server.py /app/server.py
+COPY src /app/src
 
-USER nobody
+USER node
 EXPOSE 8080
-CMD ["python", "/app/server.py"]
+CMD ["node", "--experimental-strip-types", "/app/src/server.ts"]
