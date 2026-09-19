@@ -10,6 +10,8 @@ import type {
   AgentSession,
   AgentSessionRequest,
   AdvertisedTool,
+  AgentSessionObservability,
+  OAuthRefreshOutcome,
   McpClientFactory,
   McpClientLike,
   McpTransportFactory,
@@ -21,6 +23,7 @@ export interface AgentSessionDependencies {
   createTransport?: McpTransportFactory['create']
   createCallbackListener?: () => Promise<AgentCallbackListener>
   callbackTimeoutMs?: number
+  observability?: AgentSessionObservability
 }
 
 export async function createAgentSession(
@@ -37,6 +40,7 @@ export async function createAgentSession(
       requestedScopes: request.requestedScopes,
       resourceUrl: new URL(request.mcpServerUrl.origin),
       sensitiveValues: request.sensitiveValues,
+      observability: dependencies.observability,
     })
   } catch (error: unknown) {
     await closeSetupResources(listener, undefined, error)
@@ -50,7 +54,8 @@ export async function createAgentSession(
     await closeSetupResources(listener, provider, error)
     throw error
   }
-  const transportFactory = dependencies.createTransport ?? createDefaultTransport
+  const transportFactory = dependencies.createTransport ?? ((serverUrl, provider) =>
+    createDefaultTransport(serverUrl, provider as E2EOAuthProvider, dependencies.observability))
   const transports: McpTransportLike[] = []
   let closed = false
   let clientNeedsClose = false
@@ -105,6 +110,7 @@ export async function createAgentSession(
     const authorizationCode = callbackUrl.searchParams.get('code')
     if (authorizationCode === null) throw new Error('validated OAuth callback lost its authorization code')
     await initialTransport.finishAuth(authorizationCode)
+    provider.preventInteractiveAuthorization()
     await initialTransport.close()
     const initialTransportIndex = transports.indexOf(initialTransport)
     if (initialTransportIndex >= 0) transports.splice(initialTransportIndex, 1)
@@ -126,7 +132,7 @@ export async function createAgentSession(
         return result as TOutput
       },
       waitUntilCurrentAccessTokenExpires: async (): Promise<void> => {
-        await waitUntil(accessTokenExpiry(provider))
+        await waitUntilAccessTokenExpires(accessTokenExpiry(provider))
       },
       close: closeResources,
     }
@@ -189,10 +195,19 @@ function createDefaultClient(name: string): McpClientLike {
   }
 }
 
-function createDefaultTransport(serverUrl: URL, provider: E2EOAuthProvider): McpTransportLike {
+function createDefaultTransport(
+  serverUrl: URL,
+  provider: E2EOAuthProvider,
+  observability?: AgentSessionObservability,
+): McpTransportLike {
   const transport = new StreamableHTTPClientTransport(serverUrl, {
     authProvider: provider,
-    fetch: createScopeLimitedFetch(globalThis.fetch.bind(globalThis) as FetchLike, serverUrl, provider.requestedScopes),
+    fetch: createScopeLimitedFetch(
+      globalThis.fetch.bind(globalThis) as FetchLike,
+      serverUrl,
+      provider.requestedScopes,
+      observability,
+    ),
   })
   return {
     transport,
@@ -210,10 +225,14 @@ export function createScopeLimitedFetch(
   baseFetch: FetchLike,
   serverUrl: URL,
   requestedScopes: readonly string[],
+  observability?: AgentSessionObservability,
 ): FetchLike {
   return async (url, init): Promise<Response> => {
     const response = await baseFetch(url, init)
     const requestUrl = new URL(url)
+    if (isRefreshTokenRequest(init)) {
+      observability?.onRefreshOutcome?.(await readRefreshOutcome(response))
+    }
     if (response.status === 401 || response.status === 403) return removeChallengeScope(response)
     if (requestUrl.origin !== serverUrl.origin || !requestUrl.pathname.includes('/.well-known/oauth-protected-resource')) {
       return response
@@ -250,15 +269,36 @@ function accessTokenExpiry(provider: E2EOAuthProvider): number {
   return provider.getAuthorization().accessTokenExpiresAtEpochMs
 }
 
-async function waitUntil(expiryEpochMs: number): Promise<void> {
-  const deadline = Math.min(
-    expiryEpochMs + ACCESS_TOKEN_EXPIRY_MARGIN_MS,
-    Date.now() + ACCESS_TOKEN_EXPIRY_WAIT_LIMIT_MS,
-  )
+export async function waitUntilAccessTokenExpires(expiryEpochMs: number): Promise<void> {
+  if (!Number.isFinite(expiryEpochMs)) {
+    throw new Error('access-token expiry metadata is not finite')
+  }
+  const expiryDeadline = expiryEpochMs + ACCESS_TOKEN_EXPIRY_MARGIN_MS
+  const timeoutDeadline = Date.now() + ACCESS_TOKEN_EXPIRY_WAIT_LIMIT_MS
+  const deadline = Math.min(expiryDeadline, timeoutDeadline)
   while (Date.now() < deadline) {
     await new Promise<void>((resolve) => {
       const timeout = setTimeout(resolve, Math.min(100, deadline - Date.now()))
       timeout.unref()
     })
   }
+  if (Date.now() < expiryDeadline) {
+    throw new Error('timed out waiting for the current access token to expire')
+  }
+}
+
+function isRefreshTokenRequest(init: RequestInit | undefined): boolean {
+  const body = init?.body
+  if (typeof body === 'string') return new URLSearchParams(body).get('grant_type') === 'refresh_token'
+  if (body instanceof URLSearchParams) return body.get('grant_type') === 'refresh_token'
+  return false
+}
+
+async function readRefreshOutcome(response: Response): Promise<OAuthRefreshOutcome> {
+  const body: unknown = await response.clone().json().catch(() => undefined)
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    return { status: response.status, error: null }
+  }
+  const error = 'error' in body && typeof body.error === 'string' ? body.error : null
+  return { status: response.status, error }
 }

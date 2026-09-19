@@ -2,14 +2,18 @@ import type { Page } from '@playwright/test'
 
 import { MCP_BASE_URL } from '../helpers/config'
 import { createAgentSession } from '../agent/agent-session'
-import type { AgentSession } from '../agent/types'
+import type { AgentSession, AgentSessionObservability } from '../agent/types'
 import { type ContextOwner, ownClosable } from './context-owner'
 import type { OAuthScope } from '../agent/types'
 import { createAttemptResourceIdentities, type TestAttemptIdentity } from './attempt-identity'
 import { InMemorySensitiveValueRegistry, type SensitiveValueRegistry } from './sensitive-value-registry'
 
 export interface AgentFactory {
-  create(consentPage: Page, requestedScopes: readonly OAuthScope[]): Promise<AgentSession>
+  create(
+    consentPage: Page,
+    requestedScopes: readonly OAuthScope[],
+    observability?: AgentSessionObservability,
+  ): Promise<AgentSession>
 }
 
 export function createAgentFactory(
@@ -20,7 +24,7 @@ export function createAgentFactory(
   let sessionIndex = 0
   const resourceIdentities = createAttemptResourceIdentities(identity)
   return {
-    async create(consentPage, requestedScopes): Promise<AgentSession> {
+    async create(consentPage, requestedScopes, observability): Promise<AgentSession> {
       const index = sessionIndex
       sessionIndex += 1
       const sessionSensitiveValues = new InMemorySensitiveValueRegistry(sensitiveValues)
@@ -31,7 +35,7 @@ export function createAgentFactory(
         mcpServerUrl: new URL(`${MCP_BASE_URL}/mcp`),
         sensitiveValues: sessionSensitiveValues,
         contextOwner: owner,
-      })
+      }, { observability })
       ownClosable(owner, session, `agent-session-${resourceIdentities.oauth(index, '').clientName}`)
       return session
     },

@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
 
-import type { OAuthClientProvider, OAuthDiscoveryState } from '@modelcontextprotocol/sdk/client/auth.js'
+import { UnauthorizedError, type OAuthClientProvider, type OAuthDiscoveryState } from '@modelcontextprotocol/sdk/client/auth.js'
 import type {
   OAuthClientInformationMixed,
   OAuthClientMetadata,
@@ -8,12 +8,18 @@ import type {
 } from '@modelcontextprotocol/sdk/shared/auth.js'
 
 import type { SensitiveValueCategory, SensitiveValueRegistry } from '../fixtures/sensitive-value-registry'
-import { OAuthScope, type CallbackResult, type StoredOAuthAuthorization } from './types'
+import {
+  OAuthScope,
+  type AgentSessionObservability,
+  type CallbackResult,
+  type StoredOAuthAuthorization,
+} from './types'
 
 export interface E2EOAuthProvider extends OAuthClientProvider {
   readonly clientName: string
   readonly requestedScopes: readonly OAuthScope[]
   getAuthorizationUrl(): URL
+  preventInteractiveAuthorization(): void
   validateCallback(callbackUrl: URL): CallbackResult
   getAuthorization(): StoredOAuthAuthorization
   clear(): void
@@ -25,6 +31,7 @@ interface OAuthProviderOptions {
   requestedScopes: readonly OAuthScope[]
   resourceUrl: URL
   sensitiveValues: SensitiveValueRegistry
+  observability?: AgentSessionObservability
 }
 
 export function createOAuthProvider(options: OAuthProviderOptions): E2EOAuthProvider {
@@ -49,6 +56,7 @@ export function createOAuthProvider(options: OAuthProviderOptions): E2EOAuthProv
   let authorizationUrl: URL | undefined
   let discoveryState: OAuthDiscoveryState | undefined
   let accessTokenExpiresAtEpochMs: number | undefined
+  let interactiveAuthorizationAllowed = true
 
   const registerSensitive = (category: SensitiveValueCategory, value: string | undefined): void => {
     if (value !== undefined) options.sensitiveValues.register(category, value)
@@ -79,6 +87,10 @@ export function createOAuthProvider(options: OAuthProviderOptions): E2EOAuthProv
       accessTokenExpiresAtEpochMs = Date.now() + nextTokens.expires_in * 1_000
     },
     redirectToAuthorization: (nextAuthorizationUrl): void => {
+      if (!interactiveAuthorizationAllowed) {
+        throw new UnauthorizedError('interactive authorization is required after session initialization')
+      }
+      options.observability?.onAuthorizationRequired?.()
       authorizationUrl = nextAuthorizationUrl
     },
     saveCodeVerifier: (nextCodeVerifier): void => {
@@ -111,6 +123,9 @@ export function createOAuthProvider(options: OAuthProviderOptions): E2EOAuthProv
     getAuthorizationUrl: (): URL => {
       if (authorizationUrl === undefined) throw new Error('authorization URL is unavailable')
       return authorizationUrl
+    },
+    preventInteractiveAuthorization: (): void => {
+      interactiveAuthorizationAllowed = false
     },
     validateCallback: (callbackUrl): CallbackResult => {
       if (callbackUrl.origin !== options.callbackUrl.origin || callbackUrl.pathname !== options.callbackUrl.pathname) {

@@ -1,6 +1,7 @@
+import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js'
 import { test, expect } from '../fixtures/test'
 import type { APIRequestContext } from '@playwright/test'
-import { OAuthScope } from '../agent/types'
+import { OAuthScope, type OAuthRefreshOutcome } from '../agent/types'
 import { registerAccount, completeOnboarding } from '../browser/auth'
 import { expectConnectedAgent, openConnections, revokeConnectedAgent } from '../browser/connections'
 import {
@@ -176,7 +177,17 @@ test.describe('agent authorization boundaries', () => {
     const agent = await browserAccountFactory.create('revoke')
     await registerAccount(agent.page, agent)
     await completeOnboarding(agent.page)
-    const session = await agentFactory.create(agent.page, [OAuthScope.ROADMAPS_READ])
+    const refreshOutcomes: OAuthRefreshOutcome[] = []
+    let authorizationRequiredCount = 0
+    const session = await agentFactory.create(agent.page, [OAuthScope.ROADMAPS_READ], {
+      onAuthorizationRequired: () => {
+        authorizationRequiredCount += 1
+      },
+      onRefreshOutcome: (outcome) => {
+        refreshOutcomes.push(outcome)
+      },
+    })
+    const authorizationRequiredCountBeforeRevocation = authorizationRequiredCount
 
     await expect(session.callTool('roadmap_get', { roadmap_id: publicRoadmapId })).resolves.toMatchObject({
       structuredContent: { id: publicRoadmapId },
@@ -186,7 +197,29 @@ test.describe('agent authorization boundaries', () => {
     await revokeConnectedAgent(agent.page, session.authorization.clientName)
 
     await session.waitUntilCurrentAccessTokenExpires()
-    await expect(session.callTool('roadmap_get', { roadmap_id: publicRoadmapId })).rejects.toThrow()
+    let authorizationRequestCount = 0
+    let authorizationNavigationCount = 0
+    const onRequest = (request: { url(): string }): void => {
+      if (new URL(request.url()).pathname === '/authorize') authorizationRequestCount += 1
+    }
+    const onNavigation = (frame: { url(): string }): void => {
+      if (new URL(frame.url()).pathname === '/authorize') authorizationNavigationCount += 1
+    }
+    agent.page.on('request', onRequest)
+    agent.page.on('framenavigated', onNavigation)
+    try {
+      await expect(session.callTool('roadmap_get', { roadmap_id: publicRoadmapId })).rejects.toBeInstanceOf(
+        UnauthorizedError,
+      )
+    } finally {
+      agent.page.off('request', onRequest)
+      agent.page.off('framenavigated', onNavigation)
+    }
+
+    expect(refreshOutcomes.some((outcome) => outcome.status === 400 && outcome.error === 'invalid_grant')).toBe(true)
+    expect(authorizationRequiredCount).toBe(authorizationRequiredCountBeforeRevocation)
+    expect(authorizationRequestCount).toBe(0)
+    expect(authorizationNavigationCount).toBe(0)
     expect(new URL(agent.page.url()).pathname).toBe('/settings/connections')
   })
 
