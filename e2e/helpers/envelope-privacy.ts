@@ -28,9 +28,9 @@ export function assertPrivateEnvelope(
   status: number | null,
   sensitiveValues: SensitiveValueRegistry,
 ): void {
-  const event = parseEnvelopeEvent(record.rawEnvelopeUtf8)
+  const payloads = parseEnvelopePayloads(record.rawEnvelopeUtf8)
   const keys = new Set<string>()
-  collectObjectKeys(event, keys)
+  for (const payload of payloads) collectObjectKeys(payload, keys)
   for (const key of FORBIDDEN_EVENT_KEYS) {
     if (keys.has(key)) throw new Error(`privacy check failed: forbidden event key ${key}`)
   }
@@ -44,6 +44,7 @@ export function assertPrivateEnvelope(
   assertRawEnvelopeDoesNotMatch(record, /(?:session|refresh|access)[_-]?token\s*[:=]/i, 'token field')
   assertRawEnvelopeDoesNotMatch(record, /https?:\/\//i, 'HTTP URL')
 
+  const event = payloads.find((payload) => getObjectProperty(payload, 'contexts') !== undefined)
   const contexts = getObjectProperty(event, 'contexts')
   const report = contexts === undefined ? undefined : getObjectProperty(contexts, 'report')
   if (report === undefined) throw new Error('privacy check failed: report context missing')
@@ -68,12 +69,22 @@ function assertRawEnvelopeDoesNotMatch(record: EnvelopeRecord, pattern: RegExp, 
   }
 }
 
-function parseEnvelopeEvent(rawEnvelopeUtf8: string): Record<string, unknown> {
+function parseEnvelopePayloads(rawEnvelopeUtf8: string): readonly unknown[] {
   const lines = rawEnvelopeUtf8.trimEnd().split('\n')
-  if (lines.length < 3) throw new Error('recorder returned an incomplete envelope')
-  const event: unknown = JSON.parse(lines[2])
-  if (!isObject(event)) throw new Error('recorder returned a non-object Sentry event')
-  return event
+  if (lines.length < 3 || (lines.length - 1) % 2 !== 0) {
+    throw new Error('recorder returned an incomplete envelope')
+  }
+  const payloads: unknown[] = []
+  for (let itemHeaderIndex = 1; itemHeaderIndex < lines.length; itemHeaderIndex += 2) {
+    const payloadLine = lines[itemHeaderIndex + 1]
+    try {
+      payloads.push(JSON.parse(payloadLine) as unknown)
+    } catch {
+      continue
+    }
+  }
+  if (payloads.length === 0) throw new Error('recorder returned no JSON envelope payloads')
+  return payloads
 }
 
 function collectObjectKeys(value: unknown, keys: Set<string>): void {

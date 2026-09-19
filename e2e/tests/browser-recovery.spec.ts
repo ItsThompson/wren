@@ -12,6 +12,7 @@ import {
   assertPrivateEnvelope,
   assertRawEnvelopeDoesNotContain,
 } from '../helpers/envelope-privacy'
+import { classifySentryRequest } from '../helpers/sentry-network'
 import type { BrowserFailureKind, EnvelopeRecord } from '../recorder/src/types'
 import type { SensitiveValueRegistry } from '../fixtures/sensitive-value-registry'
 
@@ -85,12 +86,12 @@ function observeRecoveryNetwork(page: Page): RecoveryNetworkEvidence {
   }
   page.on('request', (request) => {
     const url = new URL(request.url())
-    if (!url.pathname.endsWith('/api/1/envelope/')) return
-    if (url.origin !== FRONTEND_BASE_URL || url.pathname !== RECORDER_INGESTION_PATH) {
+    const classification = classifySentryRequest(request.url(), FRONTEND_BASE_URL, RECORDER_INGESTION_PATH)
+    if (classification === 'unexpected-sentry') {
       evidence.sentryOwnedHosts.push(url.hostname)
       return
     }
-    evidence.sentryRequestPaths.push(url.pathname)
+    if (classification === 'local-ingestion') evidence.sentryRequestPaths.push(url.pathname)
   })
   page.on('response', (response) => {
     const url = new URL(response.url())
