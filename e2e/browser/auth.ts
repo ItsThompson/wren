@@ -37,6 +37,7 @@ export async function logout(page: Page): Promise<void> {
 
 export async function login(page: Page, account: BrowserCredentials): Promise<void> {
   await page.goto('/auth')
+  await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible()
   await page.getByLabel('Email').fill(account.email)
   await page.getByLabel('Password').fill(account.password)
   await page.getByRole('button', { name: 'Log in' }).click()
