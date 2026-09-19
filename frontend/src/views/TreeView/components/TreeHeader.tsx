@@ -13,7 +13,7 @@ interface TreeHeaderProps {
 export function TreeHeader({ roadmapId, title }: TreeHeaderProps) {
   return (
     <header className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
-      <h1 className="display-m text-foreground">{title}</h1>
+      <h1 className="display-m min-w-0 max-w-full break-words text-foreground">{title}</h1>
       <RoadmapViewTabs roadmapId={roadmapId} active="tree" />
     </header>
   )
