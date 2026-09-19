@@ -29,14 +29,27 @@ export async function createAgentSession(
 ): Promise<AgentSession> {
   const createListener = dependencies.createCallbackListener ?? (() => createCallbackListener(request.identity, request.contextOwner))
   const listener = await createListener()
-  const provider = createOAuthProvider({
-    callbackUrl: new URL(listener.callbackUrl),
-    clientName: `e2e-${request.identity.resourcePrefix}-mcp`,
-    requestedScopes: request.requestedScopes,
-    resourceUrl: request.mcpServerUrl,
-    sensitiveValues: request.sensitiveValues,
-  })
-  const client = (dependencies.createClient ?? createDefaultClient)(provider.clientName)
+  let provider: E2EOAuthProvider
+  try {
+    provider = createOAuthProvider({
+      callbackUrl: new URL(listener.callbackUrl),
+      clientName: `e2e-${request.identity.resourcePrefix}-mcp`,
+      requestedScopes: request.requestedScopes,
+      resourceUrl: request.mcpServerUrl,
+      sensitiveValues: request.sensitiveValues,
+    })
+  } catch (error: unknown) {
+    await closeSetupResources(listener, undefined, error)
+    throw error
+  }
+
+  let client: McpClientLike
+  try {
+    client = (dependencies.createClient ?? createDefaultClient)(provider.clientName)
+  } catch (error: unknown) {
+    await closeSetupResources(listener, provider, error)
+    throw error
+  }
   const transportFactory = dependencies.createTransport ?? createDefaultTransport
   const transports: McpTransportLike[] = []
   let closed = false
@@ -132,14 +145,34 @@ async function approveConsent(
 ): Promise<void> {
   await request.consentPage.goto(authorizationUrl.toString(), { waitUntil: 'domcontentloaded' })
   const clientName = request.consentPage.getByText(provider.clientName, { exact: true })
-  if (!(await clientName.isVisible())) throw new Error('OAuth consent page did not show the client name')
+  await clientName.waitFor({ state: 'visible' })
   for (const scope of request.requestedScopes) {
     const scopeText = request.consentPage.getByText(scope, { exact: true })
-    if (!(await scopeText.isVisible())) throw new Error(`OAuth consent page did not show scope ${scope}`)
+    await scopeText.waitFor({ state: 'visible' })
   }
   const authorizeButton = request.consentPage.getByRole('button', { name: 'Authorize', exact: true })
-  if (!(await authorizeButton.isVisible())) throw new Error('OAuth consent page did not show its approval control')
+  await authorizeButton.waitFor({ state: 'visible' })
   await authorizeButton.click()
+}
+
+async function closeSetupResources(
+  listener: AgentCallbackListener,
+  provider: E2EOAuthProvider | undefined,
+  setupError: unknown,
+): Promise<never> {
+  const failures: unknown[] = []
+  try {
+    await listener.close()
+  } catch (error: unknown) {
+    failures.push(error)
+  }
+  try {
+    provider?.clear()
+  } catch (error: unknown) {
+    failures.push(error)
+  }
+  if (failures.length > 0) throw new AggregateError([setupError, ...failures], 'agent session setup cleanup failed')
+  throw setupError
 }
 
 function createDefaultClient(name: string): McpClientLike {

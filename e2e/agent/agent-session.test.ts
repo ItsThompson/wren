@@ -11,7 +11,10 @@ import { createAgentSession, createScopeLimitedFetch } from './agent-session.ts'
 import { createOAuthProvider } from './oauth-provider.ts'
 
 function buildPage() {
-  const visible = { isVisible: vi.fn(async () => true) }
+  const visible = {
+    isVisible: vi.fn(async () => true),
+    waitFor: vi.fn(async () => undefined),
+  }
   const authorizeButton = { ...visible, click: vi.fn(async () => undefined) }
   return {
     page: {
@@ -38,6 +41,41 @@ function buildListener(callbackUrl: URL, readState: () => string): TestCallbackL
 }
 
 describe('AgentSession', () => {
+  it('closes the callback listener when provider setup fails', async () => {
+    const { page } = buildPage()
+    const listener = buildListener(new URL('http://127.0.0.1:43213/callback'), () => '')
+    const sensitiveValues = new InMemorySensitiveValueRegistry()
+    await expect(createAgentSession({
+      identity: createAttemptIdentity({ runId: 'run', projectName: 'chromium', file: 'setup.spec.ts', title: 'provider failure', parallelIndex: 0, retry: 0, nonce: 'nonce' }),
+      consentPage: page as never,
+      requestedScopes: [],
+      mcpServerUrl: new URL('https://mcp.wren.test/mcp'),
+      sensitiveValues,
+      contextOwner: { own: <T>(resource: T): T => resource, closeAll: async () => undefined },
+    }, { createCallbackListener: async () => listener })).rejects.toThrow('at least one scope')
+    expect(listener.closeSpy).toHaveBeenCalledOnce()
+    expect(sensitiveValues.values()).toEqual([])
+  })
+
+  it('closes the callback listener when client setup fails', async () => {
+    const { page } = buildPage()
+    const listener = buildListener(new URL('http://127.0.0.1:43214/callback'), () => '')
+    const sensitiveValues = new InMemorySensitiveValueRegistry()
+    await expect(createAgentSession({
+      identity: createAttemptIdentity({ runId: 'run', projectName: 'chromium', file: 'setup.spec.ts', title: 'client failure', parallelIndex: 0, retry: 0, nonce: 'nonce' }),
+      consentPage: page as never,
+      requestedScopes: [OAuthScope.ROADMAPS_READ],
+      mcpServerUrl: new URL('https://mcp.wren.test/mcp'),
+      sensitiveValues,
+      contextOwner: { own: <T>(resource: T): T => resource, closeAll: async () => undefined },
+    }, {
+      createCallbackListener: async () => listener,
+      createClient: () => { throw new Error('client setup failed') },
+    })).rejects.toThrow('client setup failed')
+    expect(listener.closeSpy).toHaveBeenCalledOnce()
+    expect(sensitiveValues.values()).toEqual([])
+  })
+
   it('limits SDK discovery scope to the requested subset of PRM scopes', async () => {
     const fetchPrm = createScopeLimitedFetch(
       async () => new Response(JSON.stringify({ scopes_supported: ['roadmaps:read', 'roadmaps:write'] })),
