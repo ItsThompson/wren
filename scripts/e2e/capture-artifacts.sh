@@ -19,7 +19,7 @@ rm -rf -- "$SAFE_DIR"
 mkdir -p "$RAW_DIR/log" "$RAW_DIR/report" "$RAW_DIR/trace" "$RAW_DIR/screenshot" "$RAW_DIR/attachment" "$RAW_DIR/recorder"
 
 for service in ingress frontend backend mcp postgres recorder; do
-  docker compose "${COMPOSE[@]}" logs --no-color "$service" > "$RAW_DIR/log/$service.log" 2>&1 || true
+  docker compose "${COMPOSE[@]}" logs --no-color --no-log-prefix "$service" > "$RAW_DIR/log/$service.log" 2>&1 || true
 done
 
 if [[ -d "$ROOT_DIR/e2e/playwright-report" ]]; then
@@ -48,12 +48,15 @@ copy_test_results trace "$ROOT_DIR/e2e/test-results" -name '*.zip'
 copy_test_results screenshot "$ROOT_DIR/e2e/test-results" \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.gif' -o -iname '*.webp' \)
 copy_test_results attachment "$ROOT_DIR/e2e/test-results" \( ! -name '*.zip' ! -iname '*.png' ! -iname '*.jpg' ! -iname '*.jpeg' ! -iname '*.gif' ! -iname '*.webp' ! -iname '*.webm' ! -name '.last-run.json' ! -name 'error-context.md' \)
 
-if [[ -n "${RECORDER_CONTROL_TOKEN:-}" ]]; then
-  curl --fail --silent --show-error --cacert "${NODE_EXTRA_CA_CERTS:?NODE_EXTRA_CA_CERTS is required}" \
+if [[ -n "${RECORDER_CONTROL_TOKEN:-}" && -n "${NODE_EXTRA_CA_CERTS:-}" ]]; then
+  if ! curl --fail --silent --show-error --cacert "$NODE_EXTRA_CA_CERTS" \
     -H "X-Recorder-Token: $RECORDER_CONTROL_TOKEN" \
-    "https://app.wren.test/_e2e/recorder/artifacts" > "$RAW_DIR/recorder/export.json"
+    "https://app.wren.test/_e2e/recorder/artifacts" > "$RAW_DIR/recorder/export.json"; then
+    rm -f "$RAW_DIR/recorder/export.json"
+    printf '{"error":"recorder_capture_unavailable"}\n' > "$RAW_DIR/log/recorder-capture.log"
+  fi
 else
-  printf '{"error":"recorder_control_token_missing"}\n' > "$RAW_DIR/recorder/missing.json"
+  printf '{"error":"recorder_capture_unavailable"}\n' > "$RAW_DIR/log/recorder-capture.log"
 fi
 
 mkdir -p "$SENSITIVE_VALUES_DIR"

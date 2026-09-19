@@ -196,14 +196,40 @@ describe('artifact sanitization', () => {
     expect(new TextDecoder().decode(result.bytes)).toContain('object?.field')
   })
 
-  it('withholds unstructured service-log lines that may contain request data', async () => {
+  it('retains plain logs while replacing request-bearing lines with a safe marker', async () => {
     const result = await sanitizeArtifacts([
       { path: 'log/backend.log', kind: 'log', bytes: new TextEncoder().encode('POST /endpoint {"foo":"bar"}') },
       { path: 'log/frontend.log', kind: 'log', bytes: new TextEncoder().encode('request body: foo=bar') },
     ], createSensitiveValueRegistry())
 
-    expect(result.passed).toBe(false)
-    expect(result.withheldPaths).toEqual(['log/backend.log', 'log/frontend.log'])
+    expect(result.passed).toBe(true)
+    expect(result.withheldPaths).toEqual([])
+    expect(new TextDecoder().decode(result.approved[0]?.bytes)).toContain('[REDACTED:unsafe-log-message]')
+    expect(new TextDecoder().decode(result.approved[1]?.bytes)).toContain('[REDACTED:unsafe-log-message]')
+  })
+
+  it('sanitizes Compose-prefixed logs from all six E2E services', async () => {
+    const logs = [
+      ['ingress', 'wren-ingress-1 | 10.0.0.4 - - [19/Sep/2026:17:00:00 +0000] "GET /roadmaps?token=secret HTTP/1.1" 200 123 "-" "Mozilla"'],
+      ['frontend', 'wren-frontend-1 | frontend server ready'],
+      ['backend', '{"level":"info","message":"wren backend ready"}'],
+      ['mcp', 'wren-mcp-1 | {"level":"info","message":"mcp ready"}'],
+      ['postgres', 'wren-postgres-1 | 2026-09-19 17:00:00.123 UTC [42] LOG: database system is ready to accept connections'],
+      ['recorder', 'wren-recorder-1 | recorder ready'],
+    ] as const
+    const result = await sanitizeArtifacts(logs.map(([service, line]) => ({
+      path: `log/${service}.log`,
+      kind: 'log' as const,
+      bytes: new TextEncoder().encode(line),
+    })), createSensitiveValueRegistry())
+
+    expect(result.passed).toBe(true)
+    expect(result.approvedPaths).toHaveLength(6)
+    expect(result.withheldPaths).toEqual([])
+    const output = result.approved.map((artifact) => new TextDecoder().decode(artifact.bytes)).join('\n')
+    expect(output).toContain('"path":"/roadmaps"')
+    expect(output).not.toContain('token=secret')
+    expect(output).toContain('"format":"postgres-log"')
   })
 
   it('sanitizes structured service-log lines', async () => {

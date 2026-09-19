@@ -284,6 +284,8 @@ jobs:
     needs: [lint]
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      WREN_E2E_RELEASE: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
 
