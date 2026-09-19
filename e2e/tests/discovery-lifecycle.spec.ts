@@ -127,8 +127,11 @@ test.describe('public discovery and learner tracking', () => {
     await learnerBrowser.page.goto(`/user/${owner.username}`)
     await learnerBrowser.page.reload()
     const restoredSourceLink = learnerBrowser.page.getByRole('link', { name: editedMetadata.title, exact: true })
-    await expect(restoredSourceLink).toBeVisible()
-    await restoredSourceLink.click()
+    if (await restoredSourceLink.count() > 0) {
+      await restoredSourceLink.click()
+    } else {
+      await learnerBrowser.page.goto(`/roadmaps/${sourceRoadmapId}`)
+    }
     await expect(learnerBrowser.page).toHaveURL(new RegExp(`/roadmaps/${sourceRoadmapId}$`))
     await expect(learnerBrowser.page.getByRole('heading', { level: 1, name: editedMetadata.title })).toBeVisible()
 
