@@ -43,10 +43,10 @@ export function createStudyContext(
   identity: TestAttemptIdentity,
   roadmap: StudyRoadmapIdentity,
 ): ToolJourneyContext {
-  const sectionId = `sec_${roadmap.proposedIdPrefix}_foundations`
+  const sectionId = `sec_${roadmap.proposedIdPrefix}-foundations`
   const subsectionIds = [
-    `sub_${roadmap.proposedIdPrefix}_arrays`,
-    `sub_${roadmap.proposedIdPrefix}_hashing`,
+    `sub_${roadmap.proposedIdPrefix}-arrays`,
+    `sub_${roadmap.proposedIdPrefix}-hashing`,
   ]
   return {
     agent,

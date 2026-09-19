@@ -40,13 +40,13 @@ test.describe('public discovery and learner tracking', () => {
 
     await ownerBrowser.page.goto(`/roadmaps/${publicRoadmapId}`)
     await expect(ownerBrowser.page.getByRole('heading', { level: 1, name: publicIdentity.title })).toBeVisible()
-    await ownerBrowser.page.getByRole('button', { name: 'Publish' }).first().click()
+    await ownerBrowser.page.locator('button:visible').filter({ hasText: /^Publish$/ }).click()
     await expect(ownerBrowser.page.getByRole('heading', { level: 1, name: publicIdentity.title })).toBeVisible()
     await expect(ownerBrowser.page.getByText('Public access')).toBeVisible()
 
     await ownerBrowser.page.goto(`/roadmaps/${privatePublishedId}`)
     await expect(ownerBrowser.page.getByRole('heading', { level: 1, name: privatePublishedIdentity.title })).toBeVisible()
-    await ownerBrowser.page.getByRole('button', { name: 'Publish' }).first().click()
+    await ownerBrowser.page.locator('button:visible').filter({ hasText: /^Publish$/ }).click()
     await expect(ownerBrowser.page.getByRole('heading', { level: 1, name: privatePublishedIdentity.title })).toBeVisible()
     await expect(ownerBrowser.page.getByText('Private access')).toBeVisible()
 

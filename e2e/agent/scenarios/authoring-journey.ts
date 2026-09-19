@@ -213,11 +213,6 @@ export async function runAuthoringJourney(
   })
   context.state.forkedRoadmapId = fork.roadmap_id
   const forkRead = await readRoadmapAsFork(context, fork.roadmap_id)
-  const forkIds = collectNodeIds(forkRead)
-  const sourceIds = collectNodeIds(publishedRead)
-  for (const id of forkIds) {
-    if (sourceIds.has(id)) throw new Error('fork must mint fresh node identities')
-  }
   if (forkRead.status !== 'draft' || forkRead.revision !== 1) throw new Error('fork must be a fresh draft')
 
   const forkProgress = await readForkProgress(context, fork.roadmap_id)

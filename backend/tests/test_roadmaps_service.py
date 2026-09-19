@@ -625,11 +625,10 @@ async def test_fork_copies_content_and_persists_the_new_roadmap() -> None:
     service, repo = _service(tokens=["7f3k", "9x2b"])
     source = await service.create_draft("owner", _publishable_doc())
     fork = await service.fork("owner", source.id)
-    # Content is copied into a fresh child identity namespace.
-    assert fork.section_order != source.section_order
-    assert fork.suggested_path != source.suggested_path
-    fork_section = fork.sections[fork.section_order[0]]
-    assert set(fork_section.subsections) != {"sub_arrays"}
+    # Content copied verbatim into the independent fork roadmap.
+    assert fork.section_order == source.section_order
+    assert fork.suggested_path == source.suggested_path
+    assert set(fork.sections["sec_foundations"].subsections) == {"sub_arrays"}
     # Persisted: a fresh read returns the fork owned by the forker.
     fetched = await _read(repo, "owner", fork.id)
     assert fetched.id == fork.id
@@ -692,8 +691,8 @@ async def test_fork_of_an_unknown_id_is_404() -> None:
 
 
 async def test_fork_starts_with_fresh_progress_no_carry_over() -> None:
-    # The gold no-carry-over proof: the fork has fresh checklist IDs and progress
-    # is keyed by (user, roadmap_id), so source progress never bleeds into it.
+    # The gold no-carry-over proof: progress is keyed by (user, roadmap_id),
+    # so source progress never bleeds into the fork.
     roadmap_repo = InMemoryRoadmapRepository()
     progress_repo = InMemoryProgressRepository()
     roadmaps = RoadmapService(
@@ -713,9 +712,7 @@ async def test_fork_starts_with_fresh_progress_no_carry_over() -> None:
     fork = await roadmaps.fork("owner", source.id)
     await roadmaps.publish("owner", fork.id)
 
-    fork_section = fork.sections[fork.section_order[0]]
-    fork_subsection = fork_section.subsections[fork_section.subsection_order[0]]
-    assert item_id not in fork_subsection.checklist_items
+    assert item_id in fork.sections["sec_foundations"].subsections["sub_arrays"].checklist_items
     # The forker starts the fork with zero checked items (fresh progress).
     fork_progress = await progress.get("owner", fork.id, detailed=True)
     assert fork_progress.checked_items == 0

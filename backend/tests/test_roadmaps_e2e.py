@@ -373,14 +373,13 @@ def test_fork_with_fresh_progress_end_to_end_over_http(
         assert fork.status_code == 201, fork.text
         fork_id = fork.json()["id"]
         assert fork_id != source_id
-        fork_body = fork.json()
-        fork_section_id = fork_body["section_order"][0]
-        fork_subsection_id = fork_body["sections"][fork_section_id]["subsection_order"][0]
-        fork_item_ids = fork_body["sections"][fork_section_id]["subsections"][fork_subsection_id][
-            "item_order"
-        ]
-        assert fork_item_ids
-        assert item_id not in fork_item_ids
+        # The fork copied the same item ID within its independent roadmap namespace.
+        assert (
+            item_id
+            in fork.json()["sections"]["sec_foundations"]["subsections"]["sub_arrays"][
+                "checklist_items"
+            ]
+        )
 
         # Publish the fork, then its progress is empty: no carry-over across the fork.
         assert client.post(f"/roadmaps/{fork_id}:publish").status_code == 200

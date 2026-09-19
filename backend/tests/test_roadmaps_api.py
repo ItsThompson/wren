@@ -884,12 +884,9 @@ def test_fork_returns_201_with_a_fresh_draft(make_settings: MakeSettings) -> Non
     assert body["status"] == "draft"
     assert body["published_visibility"] == "public"
     assert body["revision"] == 1
-    # Fork child IDs are fresh, and references point to the fresh namespace.
-    section_id = body["section_order"][0]
-    subsection_id = body["suggested_path"][0]
-    assert section_id != "sec_foundations"
-    assert subsection_id != "sub_arrays"
-    assert subsection_id in body["sections"][section_id]["subsections"]
+    # Content is copied into the fork's independent roadmap namespace.
+    assert "sub_arrays" in body["sections"]["sec_foundations"]["subsections"]
+    assert body["suggested_path"] == ["sub_arrays"]
     # The source is untouched and still owned by its creator.
     assert client.get(f"/roadmaps/{source_id}").json()["id"] == source_id
 

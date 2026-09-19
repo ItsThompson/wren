@@ -119,76 +119,7 @@ def assemble_draft(
 
 
 def assemble_fork(source: Roadmap, new_roadmap_id: str, owner: str, *, now: datetime) -> Roadmap:
-    """Copy ``source`` into a draft while minting fresh child identities.
-
-    A fork receives a new roadmap ID and a separate identity namespace for every
-    section, subsection, resource, and checklist item. Internal references are
-    remapped so the copied graph remains valid, while progress stays empty because
-    the service creates no progress record for the new roadmap.
-    """
-    id_map: dict[str, str] = {}
-    used_ids: set[str] = set()
-
-    def mint_child_id(source_id: str) -> str:
-        candidate = f"{source_id}-fork"
-        suffix = 2
-        while candidate in used_ids:
-            candidate = f"{source_id}-fork-{suffix}"
-            suffix += 1
-        used_ids.add(candidate)
-        id_map[source_id] = candidate
-        return candidate
-
-    for section_id in source.section_order:
-        section = source.sections[section_id]
-        mint_child_id(section_id)
-        for subsection_id in section.subsection_order:
-            subsection = section.subsections[subsection_id]
-            mint_child_id(subsection_id)
-            for resource_id in subsection.resource_order:
-                mint_child_id(resource_id)
-            for item_id in subsection.item_order:
-                mint_child_id(item_id)
-
-    def remap(value: str) -> str:
-        return id_map.get(value, value)
-
-    sections: dict[str, Section] = {}
-    for section_id in source.section_order:
-        source_section = source.sections[section_id]
-        new_section_id = remap(section_id)
-        subsections: dict[str, Subsection] = {}
-        for subsection_id in source_section.subsection_order:
-            source_subsection = source_section.subsections[subsection_id]
-            resources = {
-                remap(resource_id): resource.model_copy(update={"id": remap(resource_id)})
-                for resource_id, resource in source_subsection.resources.items()
-            }
-            checklist_items = {
-                remap(item_id): item.model_copy(update={"id": remap(item_id)})
-                for item_id, item in source_subsection.checklist_items.items()
-            }
-            new_subsection = source_subsection.model_copy(
-                deep=True,
-                update={
-                    "id": remap(subsection_id),
-                    "prereq_ids": [remap(value) for value in source_subsection.prereq_ids],
-                    "resources": resources,
-                    "resource_order": [remap(value) for value in source_subsection.resource_order],
-                    "checklist_items": checklist_items,
-                    "item_order": [remap(value) for value in source_subsection.item_order],
-                },
-            )
-            subsections[new_subsection.id] = new_subsection
-        sections[new_section_id] = source_section.model_copy(
-            deep=True,
-            update={
-                "id": new_section_id,
-                "subsections": subsections,
-                "subsection_order": [remap(value) for value in source_section.subsection_order],
-            },
-        )
-
+    """Copy ``source`` content into a brand-new public-on-publish draft."""
     return source.model_copy(
         deep=True,
         update={
@@ -197,9 +128,6 @@ def assemble_fork(source: Roadmap, new_roadmap_id: str, owner: str, *, now: date
             "published_visibility": PublishedVisibility.PUBLIC,
             "status": RoadmapStatus.DRAFT,
             "revision": 1,
-            "sections": sections,
-            "section_order": [remap(value) for value in source.section_order],
-            "suggested_path": [remap(value) for value in source.suggested_path],
             "created_at": now,
             "updated_at": now,
         },

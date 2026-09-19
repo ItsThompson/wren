@@ -55,18 +55,18 @@ test.describe('roadmap lifecycle and discovery', () => {
       sections: expect.any(Object),
       section_order: ['sec_foundations'],
       suggested_path: [
-        `${roadmapIdentity.proposedIdPrefix}_arrays`,
-        `${roadmapIdentity.proposedIdPrefix}_hashing`,
+        `sub_${roadmapIdentity.proposedIdPrefix}-arrays`,
+        `sub_${roadmapIdentity.proposedIdPrefix}-hashing`,
       ],
     })
     const section = (roadmap.sections as Record<string, Record<string, unknown>>).sec_foundations
     expect(section.subsection_order).toEqual([
-      `${roadmapIdentity.proposedIdPrefix}_arrays`,
-      `${roadmapIdentity.proposedIdPrefix}_hashing`,
+      `sub_${roadmapIdentity.proposedIdPrefix}-arrays`,
+      `sub_${roadmapIdentity.proposedIdPrefix}-hashing`,
     ])
     expect(
       (section.subsections as Record<string, Record<string, unknown>>)[
-        `${roadmapIdentity.proposedIdPrefix}_arrays`
+        `sub_${roadmapIdentity.proposedIdPrefix}-arrays`
       ].resources,
     ).toBeTruthy()
 
