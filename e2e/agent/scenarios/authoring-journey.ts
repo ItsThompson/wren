@@ -15,6 +15,7 @@ import { callScenario } from './scenario-runner'
 import {
   assertBoundedRemap,
   assertRoadmapSnapshot,
+  assertSubsectionItemIds,
   assertSubsectionTags,
   assertSubsectionTitle,
   buildAuthoringRoadmap,
@@ -46,6 +47,7 @@ export interface AuthoringJourneyResult {
 export {
   assertBoundedRemap,
   assertRoadmapSnapshot,
+  assertSubsectionItemIds,
   assertSubsectionTags,
   assertSubsectionTitle,
   buildAuthoringRoadmap,
@@ -83,6 +85,8 @@ export async function runAuthoringJourney(
     sectionId: resolvedIds.sectionId,
     subsectionIds: resolvedIds.subsectionIds,
   })
+  assertSubsectionItemIds(initialRead, resolvedIds.subsectionIds[0], resolvedIds.itemIds.slice(0, 2))
+  assertSubsectionItemIds(initialRead, resolvedIds.subsectionIds[1], [resolvedIds.itemIds[2]])
 
   const patch = await callScenario(context, 'patch_roadmap_draft', {
     roadmap_id: create.roadmap_id,
@@ -136,6 +140,8 @@ export async function runAuthoringJourney(
   assertSubsectionTitle(replacedRead, resolvedIds.subsectionIds[1], 'Hash tables')
   assertSubsectionTags(replacedRead, resolvedIds.subsectionIds[0], ['foundations', 'arrays'])
   assertSubsectionTags(replacedRead, resolvedIds.subsectionIds[1], ['foundations', 'hashing'])
+  assertSubsectionItemIds(replacedRead, resolvedIds.subsectionIds[0], resolvedIds.itemIds.slice(0, 2))
+  assertSubsectionItemIds(replacedRead, resolvedIds.subsectionIds[1], [resolvedIds.itemIds[2]])
   if (replacedRead.description !== replacementRoadmap.description) {
     throw new Error('replace read-back did not persist the replacement description')
   }
