@@ -223,6 +223,12 @@ validate_deploy_identity() {
     || die "SENTRY_RELEASE must equal DEPLOY_SHA"
 }
 
+assert_generated_ingress_current() {
+  log "==> Preflight: assert generated ingress output is current"
+  python3 "${REPO_ROOT}/scripts/ingress_contract.py" --check \
+    || die "generated ingress output is stale; run python3 scripts/ingress_contract.py --write"
+}
+
 assert_secret_env_present() {
   log "==> Preflight: assert required config/secret env vars are set"
   local missing=() var
@@ -400,6 +406,7 @@ main() {
   CURRENT_SHA="${DEPLOY_SHA:-$(git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null || echo "")}"
   log "=== Wren deploy -> context ${CONTEXT_NAME} (${SSH_TARGET}); dry-run=${DRY_RUN} ==="
 
+  assert_generated_ingress_current
   assert_secret_env_present
   validate_deploy_identity
 

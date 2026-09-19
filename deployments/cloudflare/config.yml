@@ -1,65 +1,24 @@
-# =============================================================================
-# Cloudflare Tunnel ingress for Wren.
-#
-# This is the COMMITTED TEMPLATE. CI renders it with envsubst (substituting only
-# the CF_* vars below, sourced from the committed .env.prod) into the
-# WREN_CLOUDFLARED_INGRESS env var, and cloudflared (docker-compose.tunnel.yml)
-# receives it as an environment-sourced Compose config mounted read-only at
-# /etc/cloudflared/config.yml. No rendered file is written to the box; the
-# credentials are delivered the same way (a GitHub secret).
-#
-# One named tunnel, four routed hosts, outbound-only (zero inbound ports).
-# TLS terminates at the Cloudflare edge; origin traffic inside Docker is
-# plaintext http:// on app-net.
-#
-# Rule order matters: cloudflared evaluates top-to-bottom, first match wins.
-# =============================================================================
+# GENERATED FILE: python3 scripts/ingress_contract.py --write
+# Source: deployments/ingress/contract.json
 tunnel: ${CF_TUNNEL_ID}
 credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
-  # 1. SPA (usewren.com) -> nginx static frontend.
   - hostname: ${CF_APP_HOSTNAME}
     service: http://frontend:80
-
-  # 2. External API (api.usewren.com) -> backend external app (:8000). The
-  #    internal app (:8001) is never routed here (it stays non-tunnel-routed on
-  #    app-net, token-gated).
-  #    The observability/health surface (/metrics, /healthz, /readyz) is scraped
-  #    and probed in-network and MUST NOT be tunnel-reachable, so it is
-  #    blocked here at ingress BEFORE the catch-through to the backend (mirrors
-  #    the mcp host's path allow-list below; observability-plane intent).
-  #    /metrics on the AS host would otherwise leak internal Prometheus data
-  #    (oauth_tokens_issued_total, service_method_failures_total, 5xx rates,
-  #    route templates); Prometheus still scrapes backend:8000/:8001 internally.
   - hostname: ${CF_API_HOSTNAME}
     path: '^/(metrics|healthz|readyz)/?$'
     service: http_status:404
   - hostname: ${CF_API_HOSTNAME}
     service: http://backend:8000
-
-  # 3. MCP (mcp.usewren.com): PUBLICLY expose ONLY the PRM discovery document
-  #    (/.well-known/oauth-protected-resource) and the /mcp transport. The MCP
-  #    server's /metrics, /healthz and /readyz are scraped in-network
-  #    and MUST NOT be reachable through the tunnel. The path allow-list is
-  #    enforced here at ingress: any other path
-  #    on this hostname falls through to the per-host 404 rule below.
   - hostname: ${CF_MCP_HOSTNAME}
     path: '^/(mcp(/.*)?|\.well-known/oauth-protected-resource)$'
     service: http://mcp:9000
   - hostname: ${CF_MCP_HOSTNAME}
     service: http_status:404
-
-  # 4. docs (docs.usewren.com) -> static docs site. /healthz is local-only to the
-  #    container's compose health gate and MUST NOT be tunnel-reachable, so it is
-  #    blocked here BEFORE the catch-through to the docs origin (mirrors the api
-  #    and mcp hosts). Rules are first-match top-to-bottom, so both docs rules sit
-  #    before the terminal per-host 404 below (S6).
   - hostname: ${CF_DOCS_HOSTNAME}
     path: '^/healthz/?$'
     service: http_status:404
   - hostname: ${CF_DOCS_HOSTNAME}
     service: http://docs:80
-
-  # 5. Catch-all: everything else is refused at the edge.
   - service: http_status:404

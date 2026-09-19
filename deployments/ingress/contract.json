@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "hosts": [
+    {
+      "id": "app",
+      "cloudflare_variable": "CF_APP_HOSTNAME",
+      "e2e_hostname": "app.wren.test",
+      "routes": [
+        {
+          "id": "app",
+          "match": {"kind": "all"},
+          "action": {"kind": "proxy", "service": "http://frontend:80"}
+        }
+      ]
+    },
+    {
+      "id": "api",
+      "cloudflare_variable": "CF_API_HOSTNAME",
+      "e2e_hostname": "api.wren.test",
+      "routes": [
+        {
+          "id": "api-observability-block",
+          "match": {
+            "kind": "paths",
+            "paths": ["/metrics", "/healthz", "/readyz"],
+            "trailing_slash": true
+          },
+          "action": {"kind": "status", "status": 404}
+        },
+        {
+          "id": "api",
+          "match": {"kind": "all"},
+          "action": {"kind": "proxy", "service": "http://backend:8000"}
+        }
+      ]
+    },
+    {
+      "id": "mcp",
+      "cloudflare_variable": "CF_MCP_HOSTNAME",
+      "e2e_hostname": "mcp.wren.test",
+      "routes": [
+        {
+          "id": "mcp-public",
+          "match": {
+            "kind": "allowlist",
+            "exact": ["/.well-known/oauth-protected-resource"],
+            "prefix": ["/mcp"]
+          },
+          "action": {"kind": "proxy", "service": "http://mcp:9000"}
+        },
+        {
+          "id": "mcp-catch-all",
+          "match": {"kind": "all"},
+          "action": {"kind": "status", "status": 404}
+        }
+      ]
+    },
+    {
+      "id": "docs",
+      "cloudflare_variable": "CF_DOCS_HOSTNAME",
+      "e2e_hostname": null,
+      "routes": [
+        {
+          "id": "docs-health-block",
+          "match": {
+            "kind": "paths",
+            "paths": ["/healthz"],
+            "trailing_slash": true
+          },
+          "action": {"kind": "status", "status": 404}
+        },
+        {
+          "id": "docs",
+          "match": {"kind": "all"},
+          "action": {"kind": "proxy", "service": "http://docs:80"}
+        }
+      ]
+    }
+  ],
+  "catch_all": {"kind": "status", "status": 404},
+  "e2e_adapter": {
+    "tls": {
+      "certificate": "/etc/nginx/certs/wren-e2e.pem",
+      "key": "/etc/nginx/certs/wren-e2e-key.pem"
+    },
+    "recorder_routes": [
+      {
+        "path": "/_e2e/sentry/api/1/envelope/",
+        "headers": []
+      },
+      {
+        "path": "/_e2e/recorder/ready",
+        "headers": ["X-Recorder-Token $http_x_recorder_token"]
+      },
+      {
+        "path": "/_e2e/recorder/envelopes",
+        "headers": ["X-Recorder-Token $http_x_recorder_token"]
+      },
+      {
+        "path": "/_e2e/recorder/artifacts",
+        "headers": ["X-Recorder-Token $http_x_recorder_token"]
+      }
+    ],
+    "recorder_service": "http://recorder:8080"
+  }
+}

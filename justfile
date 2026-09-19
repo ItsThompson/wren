@@ -176,17 +176,27 @@ codegen-mcp:
 
 # --- Deploy / ops -----------------------------------------------------------
 
+# Render the ingress contract into the production Cloudflare and E2E Nginx files.
+generate-ingress:
+    python3 scripts/ingress_contract.py --write
+
+# Fail when either checked-in ingress output does not match the contract.
+check-ingress:
+    python3 scripts/ingress_contract.py --check
+
 # Deploy the whole stack to a VPS over a Docker Context; DEPLOY_SHA optional
 # (defaults to the checkout HEAD). Register the context and export the
 # config/secret env first (see docs/runbooks/bring-up.md Phase E). Match
 # DEPLOY_SHA to the CD-built image tags: DEPLOY_SHA=$(git rev-parse HEAD) just deploy 203.0.113.10
 deploy ip user='deploy':
+    python3 scripts/ingress_contract.py --check
     ./scripts/deploy.sh {{ip}} {{user}}
 
 # Print the deploy plan (every docker --context compose line + the ssh lines)
 # without touching a server. The preflight runs, so the required config/secret
 # env vars must be set (even dummy values) to reach the plan.
 deploy-plan ip user='deploy':
+    python3 scripts/ingress_contract.py --check
     DRY_RUN=1 ./scripts/deploy.sh {{ip}} {{user}}
 
 # Run the deploy-script test harness (pure helpers, dry-run plan, rollback).
@@ -195,6 +205,7 @@ test-deploy:
 
 # Preview the rendered Cloudflare tunnel ingress config from the local .env.
 render-tunnel:
+    python3 scripts/ingress_contract.py --check
     set -a; . ./.env; set +a; \
     envsubst '$CF_TUNNEL_ID $CF_APP_HOSTNAME $CF_API_HOSTNAME $CF_MCP_HOSTNAME $CF_DOCS_HOSTNAME' \
       < deployments/cloudflare/config.yml
@@ -219,6 +230,7 @@ e2e_token := e2e_root + "/e2e/keys/recorder-control-token"
 setup-e2e:
     #!/usr/bin/env bash
     set -euo pipefail
+    python3 scripts/ingress_contract.py --check
     if [[ "$(uname -s)" == "Linux" ]]; then (cd e2e && npm ci && npx playwright install --with-deps chromium); else (cd e2e && npm ci && npx playwright install chromium); fi
     if [ -w /etc/hosts ]; then scripts/e2e/setup-hosts.sh; else sudo scripts/e2e/setup-hosts.sh; fi
     scripts/e2e/setup-certificates.sh
@@ -229,6 +241,7 @@ setup-e2e:
 e2e-up:
     #!/usr/bin/env bash
     set -euo pipefail
+    python3 scripts/ingress_contract.py --check
     export WREN_PROMETHEUS_CONFIG="$(cat deployments/prometheus/prometheus.yml)"
     export WREN_PROMETHEUS_ALERTS="$(cat deployments/prometheus/alerts.yml)"
     scripts/e2e/setup-oauth-key.sh

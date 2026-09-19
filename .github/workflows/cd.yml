@@ -260,6 +260,7 @@ jobs:
           set -euo pipefail
           : "${DISCORD_WEBHOOK_URL:?DISCORD_WEBHOOK_URL is required (Alertmanager exits on a blank webhook and fails the gate after migrations)}"
           set -a
+          python3 scripts/ingress_contract.py --check
           source .env.prod
           # Pull from the same owner build-and-push pushed to (owner-agnostic).
           GHCR_OWNER="${GITHUB_REPOSITORY_OWNER,,}"
