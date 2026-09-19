@@ -32,7 +32,7 @@ export async function logout(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await page.getByRole('menuitem', { name: 'Log out' }).click()
   await expect(page).toHaveURL(/\/$/)
-  await expect(page.getByRole('link', { name: 'Log in' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Log in' }).first()).toBeVisible()
 }
 
 export async function login(page: Page, account: BrowserCredentials): Promise<void> {

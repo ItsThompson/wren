@@ -37,7 +37,7 @@ test.describe('anonymous roadmap reading', () => {
     await page.goto(`/roadmaps/${roadmapId}`)
     await expect(page.getByRole('heading', { level: 1, name: roadmapIdentity.title })).toBeVisible()
     await expect(page.getByRole('heading', { level: 3, name: 'Arrays' })).toBeVisible()
-    await expect(page.getByText('arrays', { exact: true })).toBeVisible()
+    await expect(page.getByText('arrays', { exact: true }).first()).toBeVisible()
     await expect(page.getByText('hashing', { exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Guide' })).toHaveAttribute('href', 'https://x.test')
     await expect(page.getByRole('link', { name: 'Vid' })).toHaveAttribute('href', 'https://y.test')

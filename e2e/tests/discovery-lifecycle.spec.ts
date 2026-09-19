@@ -40,13 +40,13 @@ test.describe('public discovery and learner tracking', () => {
 
     await ownerBrowser.page.goto(`/roadmaps/${publicRoadmapId}`)
     await expect(ownerBrowser.page.getByRole('heading', { level: 1, name: publicIdentity.title })).toBeVisible()
-    await ownerBrowser.page.getByRole('button', { name: 'Publish' }).click()
+    await ownerBrowser.page.getByRole('button', { name: 'Publish' }).first().click()
     await expect(ownerBrowser.page.getByRole('heading', { level: 1, name: publicIdentity.title })).toBeVisible()
     await expect(ownerBrowser.page.getByText('Public access')).toBeVisible()
 
     await ownerBrowser.page.goto(`/roadmaps/${privatePublishedId}`)
     await expect(ownerBrowser.page.getByRole('heading', { level: 1, name: privatePublishedIdentity.title })).toBeVisible()
-    await ownerBrowser.page.getByRole('button', { name: 'Publish' }).click()
+    await ownerBrowser.page.getByRole('button', { name: 'Publish' }).first().click()
     await expect(ownerBrowser.page.getByRole('heading', { level: 1, name: privatePublishedIdentity.title })).toBeVisible()
     await expect(ownerBrowser.page.getByText('Private access')).toBeVisible()
 
@@ -134,7 +134,7 @@ test.describe('public discovery and learner tracking', () => {
     await ownerBrowser.page.goto(`/roadmaps/${sourceRoadmapId}`)
     const forkedRoadmapId = await forkRoadmap(ownerBrowser.page)
     expect(forkedRoadmapId).not.toBe(sourceRoadmapId)
-    await expect(ownerBrowser.page.getByRole('button', { name: 'Publish' })).toBeVisible()
+    await expect(ownerBrowser.page.getByRole('button', { name: 'Publish' }).first()).toBeVisible()
     await ownerBrowser.page.goto('/dashboard')
     await expect(ownerBrowser.page.getByRole('heading', { name: 'Yours' }).locator('..')).toContainText(editedMetadata.title)
     await expect(

@@ -58,6 +58,7 @@ export interface AttemptResourceIdentities {
 
 const MAX_USERNAME_LENGTH = 32
 const MAX_RESOURCE_LABEL_LENGTH = 120
+const MAX_ROADMAP_PREFIX_LENGTH = MAX_RESOURCE_LABEL_LENGTH - '_hashing'.length
 const RUN_ID_MAX_LENGTH = 64
 const NONCE_LENGTH = 12
 
@@ -114,7 +115,7 @@ export function createRoadmapIdentity(
   index = 0,
 ): RoadmapFixtureIdentity {
   const indexToken = toBase36(index)
-  const proposedIdPrefix = `${identity.resourcePrefix}r${indexToken}`.slice(0, MAX_RESOURCE_LABEL_LENGTH)
+  const proposedIdPrefix = `${identity.resourcePrefix}r${indexToken}`.slice(0, MAX_ROADMAP_PREFIX_LENGTH)
   return {
     title: `E2E ${identity.resourcePrefix} roadmap ${indexToken}`.slice(0, MAX_RESOURCE_LABEL_LENGTH),
     proposedIdPrefix,
