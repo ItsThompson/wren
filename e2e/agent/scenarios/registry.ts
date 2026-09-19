@@ -56,9 +56,11 @@ export class ToolCoverageError extends Error {
   }
 }
 
-function deferredCall<TOutput extends ToolOutput>(name: string): (context: ToolJourneyContext) => Promise<TOutput> {
-  return async (_context: ToolJourneyContext): Promise<TOutput> => {
-    throw new Error(`tool scenario ${name} has no journey binding`)
+function liveCall<TOutput extends ToolOutput>(name: string): (context: ToolJourneyContext) => Promise<TOutput> {
+  return async (context: ToolJourneyContext): Promise<TOutput> => {
+    const arguments_ = context.state.toolArguments?.[name]
+    if (arguments_ === undefined) throw new Error(`tool scenario ${name} has no journey arguments`)
+    return context.agent.callTool<TOutput>(name, arguments_)
   }
 }
 
@@ -82,7 +84,7 @@ function createScenario<TOutput extends ToolOutput>(
     name,
     journey,
     requiredScopes: Object.freeze([...requiredScopes]),
-    call: deferredCall<TOutput>(name),
+    call: liveCall<TOutput>(name),
     projectOutput: identityProjection,
     assertStableResult: assertNonEmptyOutput,
   })
