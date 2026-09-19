@@ -46,7 +46,7 @@ describe('OwnedContextResources', () => {
     expect(closed).toEqual(['api'])
   })
 
-  it('does not close resources again after timeout teardown has completed', async () => {
+  it('closes resources exactly once when a fixture body times out', async () => {
     const owner = new OwnedContextResources()
     let closeCount = 0
     owner.own({
@@ -56,7 +56,15 @@ describe('OwnedContextResources', () => {
       },
     })
 
-    await owner.closeAll()
+    const fixtureFinalizer = async (): Promise<void> => {
+      try {
+        await Promise.reject(new Error('test timed out'))
+      } finally {
+        await owner.closeAll()
+      }
+    }
+
+    await expect(fixtureFinalizer()).rejects.toThrow('test timed out')
     await owner.closeAll()
 
     expect(closeCount).toBe(1)
