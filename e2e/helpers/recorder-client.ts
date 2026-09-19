@@ -1,11 +1,16 @@
 import { FRONTEND_BASE_URL, RECORDER_CONTROL_TOKEN } from './config'
 import type { BrowserFailureKind, EnvelopeRecord } from '../recorder/src/types'
 
+export interface RecorderQueryOptions {
+  signal?: AbortSignal
+}
+
 export interface RecorderQueryClient {
   query(
     operation: string,
     failureKind: BrowserFailureKind,
     receivedAfterIso: string,
+    options?: RecorderQueryOptions,
   ): Promise<readonly EnvelopeRecord[]>
 }
 
@@ -23,7 +28,7 @@ export function createRecorderQueryClient(options: RecorderQueryClientOptions = 
   const queryIdentity = options.queryIdentity ?? 'e2e-recorder-query'
 
   return {
-    async query(operation, failureKind, receivedAfterIso): Promise<readonly EnvelopeRecord[]> {
+    async query(operation, failureKind, receivedAfterIso, queryOptions): Promise<readonly EnvelopeRecord[]> {
       const url = new URL('/_e2e/recorder/envelopes', baseUrl)
       url.searchParams.set('operation', operation)
       url.searchParams.set('failureKind', failureKind)
@@ -33,6 +38,7 @@ export function createRecorderQueryClient(options: RecorderQueryClientOptions = 
           'X-Recorder-Token': controlToken,
           'X-Recorder-Query-Identity': queryIdentity,
         },
+        signal: queryOptions?.signal,
       })
       if (!response.ok) throw new Error(`recorder query failed with status ${response.status}`)
       return parseRecorderQueryResponse(await response.json())
@@ -45,15 +51,29 @@ export async function pollForExactlyOneEnvelope(
   operation: string,
   failureKind: BrowserFailureKind,
   receivedAfterIso: string,
-  options: { timeoutMs?: number; pollIntervalMs?: number } = {},
+  options: { timeoutMs?: number; pollIntervalMs?: number; requestTimeoutMs?: number } = {},
 ): Promise<EnvelopeRecord> {
   const timeoutMs = options.timeoutMs ?? 10_000
   const pollIntervalMs = options.pollIntervalMs ?? 100
+  const requestTimeoutMs = options.requestTimeoutMs ?? 2_000
   const deadline = Date.now() + timeoutMs
   let observedCount = 0
 
   while (Date.now() <= deadline) {
-    const records = await client.query(operation, failureKind, receivedAfterIso)
+    const requestController = new AbortController()
+    const requestTimeout = setTimeout(() => requestController.abort(), Math.min(requestTimeoutMs, deadline - Date.now()))
+    let records: readonly EnvelopeRecord[]
+    try {
+      records = await client.query(operation, failureKind, receivedAfterIso, {
+        signal: requestController.signal,
+      })
+    } catch (error: unknown) {
+      if (!requestController.signal.aborted) throw error
+      if (Date.now() >= deadline) break
+      continue
+    } finally {
+      clearTimeout(requestTimeout)
+    }
     observedCount = records.length
     if (records.length > 1) {
       throw new Error(`recorder query returned duplicate ${operation}/${failureKind} envelopes`)
@@ -75,16 +95,31 @@ function parseRecorderQueryResponse(value: unknown): readonly EnvelopeRecord[] {
 function isEnvelopeRecord(value: unknown): value is EnvelopeRecord {
   if (!isObject(value)) return false
   return (
-    typeof value.sequence === 'number' &&
-    typeof value.receivedAtIso === 'string' &&
+    isPositiveSafeInteger(value.sequence) &&
+    isIsoTimestamp(value.receivedAtIso) &&
     typeof value.rawEnvelopeUtf8 === 'string' &&
+    (value.parseStatus === 'valid' || value.parseStatus === 'unsupported') &&
     (value.operation === null || typeof value.operation === 'string') &&
     (value.failureKind === null || value.failureKind === 'upstream' || value.failureKind === 'network') &&
     (value.environment === null || typeof value.environment === 'string') &&
     (value.service === null || typeof value.service === 'string') &&
     (value.method === null || typeof value.method === 'string') &&
-    (value.status === null || typeof value.status === 'number')
+    (value.status === null || isHttpStatus(value.status))
   )
+}
+
+function isPositiveSafeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
+}
+
+function isHttpStatus(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 599
+}
+
+function isIsoTimestamp(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) && new Date(timestamp).toISOString() === value
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

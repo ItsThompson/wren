@@ -51,6 +51,22 @@ interface RecoveryNetworkEvidence {
 const dashboardEndpoint = new URL('/me/dashboard', API_BASE_URL).toString()
 const clientsEndpoint = new URL('/me/clients', API_BASE_URL).toString()
 
+function assertSensitiveValuesRegistered(
+  registry: SensitiveValueRegistry,
+  account: { username: string; email: string; password: string },
+  expectOAuthValues: boolean,
+): void {
+  const snapshot = registry.snapshot()
+  expect(snapshot.username?.includes(account.username)).toBe(true)
+  expect(snapshot.email?.includes(account.email)).toBe(true)
+  expect(snapshot.password?.includes(account.password)).toBe(true)
+  expect((snapshot['session-cookie']?.length ?? 0) > 0).toBe(true)
+  if (!expectOAuthValues) return
+  expect((snapshot.token?.length ?? 0) > 0).toBe(true)
+  expect((snapshot['authorization-code']?.length ?? 0) > 0).toBe(true)
+  expect((snapshot['code-verifier']?.length ?? 0) > 0).toBe(true)
+}
+
 async function installRecoveryFault(
   page: Page,
   endpoint: string,
@@ -124,7 +140,11 @@ function collectObjectKeys(value: unknown, keys: Set<string>): void {
   }
 }
 
-function assertPrivateEnvelope(record: EnvelopeRecord, sensitiveValues: SensitiveValueRegistry): void {
+function assertPrivateEnvelope(
+  record: EnvelopeRecord,
+  status: number | null,
+  sensitiveValues: SensitiveValueRegistry,
+): void {
   const event = parseEnvelopeEvent(record.rawEnvelopeUtf8)
   const keys = new Set<string>()
   collectObjectKeys(event, keys)
@@ -133,7 +153,7 @@ function assertPrivateEnvelope(record: EnvelopeRecord, sensitiveValues: Sensitiv
   expect(record.rawEnvelopeUtf8).not.toMatch(/\bBearer\s+[A-Za-z0-9._~-]+/i)
   expect(record.rawEnvelopeUtf8).not.toMatch(/(?:session|refresh|access)[_-]?token\s*[:=]/i)
   expect(record.rawEnvelopeUtf8).not.toMatch(/https?:\/\//i)
-  expect(event.contexts).toEqual({ report: expect.objectContaining({ method: 'GET' }) })
+  expect(event.contexts).toEqual({ report: { method: 'GET', status } })
   expect(event).not.toHaveProperty('request')
   expect(event).not.toHaveProperty('user')
   expect(event).not.toHaveProperty('breadcrumbs')
@@ -155,13 +175,13 @@ function assertRecoveryEnvelope(
     method: 'GET',
     status,
   })
-  assertPrivateEnvelope(record, sensitiveValues)
+  assertPrivateEnvelope(record, status, sensitiveValues)
 }
 
-async function expectRecoveryEvidence(
+function expectRecoveryEvidence(
   evidence: RecoveryNetworkEvidence,
   record: EnvelopeRecord,
-): Promise<void> {
+): void {
   expect(evidence.sentryRequestPaths).toContain(RECORDER_INGESTION_PATH)
   expect(evidence.sentryResponseStatuses).toContain(200)
   expect(evidence.sentryOwnedHosts).toEqual([])
@@ -177,6 +197,8 @@ test.describe('browser recovery and envelope privacy', () => {
     const account = await browserAccountFactory.create('recovery-dashboard')
     await registerAccount(account.page, account)
     await completeOnboarding(account.page)
+    await account.registerSensitiveCookies()
+    assertSensitiveValuesRegistered(sensitiveValueRegistry, account, false)
 
     const evidence = observeRecoveryNetwork(account.page)
     const receivedAfterIso = new Date().toISOString()
@@ -206,7 +228,7 @@ test.describe('browser recovery and envelope privacy', () => {
       receivedAfterIso,
     )
     assertRecoveryEnvelope(record, DASHBOARD_OPERATION, 'upstream', 500, sensitiveValueRegistry)
-    await expectRecoveryEvidence(evidence, record)
+    expectRecoveryEvidence(evidence, record)
   })
 
   test('recovers a connected-agents network abort and keeps the authorized list', async ({
@@ -219,6 +241,8 @@ test.describe('browser recovery and envelope privacy', () => {
     await registerAccount(account.page, account)
     await completeOnboarding(account.page)
     const session = await agentFactory.create(account.page, [OAuthScope.ROADMAPS_READ])
+    await account.registerSensitiveCookies()
+    assertSensitiveValuesRegistered(sensitiveValueRegistry, account, true)
 
     const evidence = observeRecoveryNetwork(account.page)
     const receivedAfterIso = new Date().toISOString()
@@ -248,6 +272,6 @@ test.describe('browser recovery and envelope privacy', () => {
       receivedAfterIso,
     )
     assertRecoveryEnvelope(record, CLIENTS_OPERATION, 'network', null, sensitiveValueRegistry)
-    await expectRecoveryEvidence(evidence, record)
+    expectRecoveryEvidence(evidence, record)
   })
 })
