@@ -11,7 +11,7 @@ services:
       args:
         VITE_API_BASE_URL: https://api.wren.test
         VITE_MCP_BASE_URL: https://mcp.wren.test
-        VITE_SENTRY_DSN: https://e2e-public-key@app.wren.test/_e2e/sentry/1
+        VITE_SENTRY_DSN: https://e2epublickey@app.wren.test/_e2e/sentry/1
         VITE_SENTRY_RELEASE: ${WREN_E2E_RELEASE:-e2e-local}
 
   backend:
