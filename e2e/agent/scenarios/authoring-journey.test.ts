@@ -195,10 +195,20 @@ describe('authoring journey', () => {
           structuredContent = {
             roadmap_id: 'roadmap-2', revision: 1, status: 'draft', source_roadmap_id: 'roadmap-1',
           }
-        } else if (name === 'progress_get') {
+        } else if (name === 'progress_update') {
           structuredContent = {
-            roadmap_id: 'roadmap-2', total_items: 3, checked_items: 0, percent: 0,
-            deadline: null, sections: [], checked_ids: [],
+            progress: {
+              roadmap_id: 'roadmap-1', total_items: 3, checked_items: 1, percent: 33,
+              deadline: null, sections: [], checked_ids: [replacementIds.itemIds[0]],
+            },
+            next: { complete: false, items: [], remaining_in_path: 1 },
+          }
+        } else if (name === 'progress_get') {
+          const isFork = arguments_.roadmap_id === 'roadmap-2'
+          structuredContent = {
+            roadmap_id: isFork ? 'roadmap-2' : 'roadmap-1', total_items: 3,
+            checked_items: isFork ? 0 : 1, percent: isFork ? 0 : 33,
+            deadline: null, sections: [], checked_ids: isFork ? [] : [replacementIds.itemIds[0]],
           }
         } else {
           roadmapReadCount += 1
@@ -246,11 +256,14 @@ describe('authoring journey', () => {
     expect(result.replace.remap).toEqual(replacementRemap)
     expect(result.replacedRead.section_order).toEqual(['section-2'])
     expect(result.metadataRead.title).toBe('Attempt roadmap Published')
+    expect(result.sourceProgress.checked_items).toBe(1)
+    expect(result.sourceProgress.checked_ids).toEqual(['item-4'])
     expect(result.forkProgress.checked_items).toBe(0)
     expect(calls.map((call) => call.name)).toEqual([
       'create_roadmap_draft', 'roadmap_get', 'patch_roadmap_draft', 'roadmap_get',
       'replace_roadmap_draft', 'roadmap_get', 'validate_roadmap_draft', 'publish_roadmap',
-      'roadmap_get', 'edit_roadmap_metadata', 'roadmap_get', 'fork_roadmap', 'roadmap_get', 'progress_get',
+      'roadmap_get', 'edit_roadmap_metadata', 'roadmap_get', 'progress_update', 'progress_get',
+      'fork_roadmap', 'roadmap_get', 'progress_get',
     ])
     expect(calls[2].arguments_).toMatchObject({
       roadmap_id: 'roadmap-1',
