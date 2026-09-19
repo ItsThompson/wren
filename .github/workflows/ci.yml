@@ -196,7 +196,8 @@ jobs:
   # test-scripts: pure-bash test harnesses for scripts/tests/*.sh (deploy,
   # user-ops, and any future harness). Auto-discovers *_test.sh via
   # scripts/tests/run_all.sh, so adding a harness never requires a ci.yml edit.
-  # No language runtime needed -- just bash on the runner. Gated by lint.
+  # The topology harness also validates the TypeScript runtime configuration.
+  # Gated by lint.
   # ---------------------------------------------------------------------------
   test-scripts:
     needs: [lint]
@@ -204,6 +205,13 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install script-test dependencies
+        run: sudo apt-get update && sudo apt-get install -y just
 
       - name: Script test harnesses (scripts/tests/*_test.sh)
         run: bash scripts/tests/run_all.sh
@@ -268,37 +276,24 @@ jobs:
         run: npm run test:coverage
 
   # ---------------------------------------------------------------------------
-  # e2e: build and boot the production-shaped Compose stack (with the e2e overlay
-  # that publishes the frontend + backend ports and relaxes cookies), run the
-  # pre-traffic migrations, then drive the spine with Playwright (workers:1,
-  # fullyParallel:false). Gated by lint.
+  # e2e: run the canonical production-mode HTTPS lifecycle through the same
+  # repository commands used locally. Gated by lint. This remains one job and
+  # one stable check: sharding is reviewed only after the measured thresholds.
   # ---------------------------------------------------------------------------
   e2e:
     needs: [lint]
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    # docker compose reads COMPOSE_FILE natively (':'-separated), so every
-    # `docker compose ...` below layers the e2e overlay without repeating -f.
-    # Prometheus reads its config via an environment-sourced Compose config
-    # (docker-compose.yml), which both the `up` and the migration `run` below
-    # materialize, so WREN_PROMETHEUS_CONFIG/_ALERTS must be set for both. They
-    # are exported into $GITHUB_ENV once (non-secret; the committed files) so
-    # every subsequent step inherits them.
-    env:
-      COMPOSE_FILE: docker-compose.yml:e2e/docker-compose.e2e.yml
     steps:
       - uses: actions/checkout@v4
 
-      - name: Export Prometheus config env (environment-sourced Compose config)
+      - name: Start E2E timing
         run: |
-          {
-            echo 'WREN_PROMETHEUS_CONFIG<<WREN_EOF'
-            cat deployments/prometheus/prometheus.yml
-            echo 'WREN_EOF'
-            echo 'WREN_PROMETHEUS_ALERTS<<WREN_EOF'
-            cat deployments/prometheus/alerts.yml
-            echo 'WREN_EOF'
-          } >> "$GITHUB_ENV"
+          mkdir -p /tmp/wren-e2e-timing
+          date +%s%3N > /tmp/wren-e2e-timing/job-start-ms
+
+      - name: Install E2E system dependencies
+        run: sudo apt-get update && sudo apt-get install -y just mkcert libnss3-tools
 
       - uses: actions/setup-node@v4
         with:
@@ -306,44 +301,83 @@ jobs:
           cache: npm
           cache-dependency-path: e2e/package-lock.json
 
-      - name: Install E2E dependencies
-        working-directory: e2e
-        run: npm ci
+      - name: Prepare trusted E2E environment
+        run: just setup-e2e
 
-      - name: Install Playwright browser (chromium)
-        working-directory: e2e
-        run: npx playwright install --with-deps chromium
+      - name: Run E2E package quality gates
+        run: |
+          just e2e-typecheck
+          just e2e-lint
+          just test-e2e-unit
 
-      - name: Build and start the stack
-        run: docker compose up -d --build
+      - name: Start production HTTPS E2E topology
+        run: just e2e-up
 
-      - name: Run pre-traffic migrations
-        run: docker compose run --rm backend alembic upgrade head
-
-      - name: Run Playwright spine + smoke
-        working-directory: e2e
-        run: npx playwright test
+      - name: Run Playwright system tests
+        id: playwright
+        run: |
+          date +%s%3N > /tmp/wren-e2e-timing/playwright-start-ms
+          set +e
+          just test-e2e-system
+          status=$?
+          set -e
+          date +%s%3N > /tmp/wren-e2e-timing/playwright-end-ms
+          exit "$status"
         env:
           CI: true
+          E2E_WORKERS: 2
+          E2E_RETRIES: 1
+          E2E_SENSITIVE_VALUES_DIR: /tmp/wren-e2e-sensitive
 
-      - name: Capture stack logs on failure
+      - name: Capture and sanitize diagnostics on failure
+        id: capture
         if: failure()
-        run: docker compose logs --no-color > /tmp/wren-stack-logs.txt 2>&1
+        run: just e2e-capture-artifacts
 
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: failure() && steps.capture.outcome == 'success'
         with:
-          name: playwright-report
-          path: e2e/playwright-report/
+          name: e2e-safe-diagnostics
+          path: /tmp/wren-safe-artifacts/
           retention-days: 7
 
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: stack-logs
-          path: /tmp/wren-stack-logs.txt
-          retention-days: 7
-
-      - name: Stop the stack
+      - name: Stop the stack and remove generated material
         if: always()
-        run: docker compose down -v
+        run: just e2e-down
+
+      - name: Reset E2E trust
+        if: always()
+        run: just reset-e2e-trust
+
+      - name: Report E2E runtime evidence
+        if: always()
+        run: |
+          end_ms="$(date +%s%3N)"
+          start_ms="$(cat /tmp/wren-e2e-timing/job-start-ms 2>/dev/null || true)"
+          playwright_start_ms="$(cat /tmp/wren-e2e-timing/playwright-start-ms 2>/dev/null || true)"
+          playwright_end_ms="$(cat /tmp/wren-e2e-timing/playwright-end-ms 2>/dev/null || true)"
+          if [[ "$start_ms" =~ ^[0-9]+$ ]]; then
+            complete_job_duration_ms=$((end_ms - start_ms))
+          else
+            complete_job_duration_ms=null
+          fi
+          if [[ "$playwright_start_ms" =~ ^[0-9]+$ && "$playwright_end_ms" =~ ^[0-9]+$ ]]; then
+            playwright_step_duration_ms=$((playwright_end_ms - playwright_start_ms))
+          else
+            playwright_step_duration_ms=null
+          fi
+          {
+            echo '## E2E runtime evidence'
+            echo
+            echo "- Commit: ${GITHUB_SHA}"
+            echo "- Run: ${GITHUB_RUN_ID} (attempt ${GITHUB_RUN_ATTEMPT})"
+            echo "- Complete-job duration (ms): ${complete_job_duration_ms}"
+            echo "- Playwright-step duration (ms): ${playwright_step_duration_ms}"
+            echo '- Worker count: `2`'
+            echo '- Retry count: `1`'
+            echo '- Browser: `chromium`'
+            echo '- Shards: `none`'
+            echo '- Normal complete-job target: under 300s, excluding runner queue time.'
+            echo '- Sharding review thresholds: complete-job p95 > 240s, Playwright p95 > 180s, worker speedup < 1.3x, repeatable shared-stack contention, or an incompatible environment.'
+            echo '- Collect three to five completed-run summaries before assessing p95 or changing the one-job policy.'
+          } >> "$GITHUB_STEP_SUMMARY"

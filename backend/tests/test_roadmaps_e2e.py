@@ -373,7 +373,7 @@ def test_fork_with_fresh_progress_end_to_end_over_http(
         assert fork.status_code == 201, fork.text
         fork_id = fork.json()["id"]
         assert fork_id != source_id
-        # The fork copied the same item ID verbatim.
+        # The fork copied the same item ID within its independent roadmap namespace.
         assert (
             item_id
             in fork.json()["sections"]["sec_foundations"]["subsections"]["sub_arrays"][

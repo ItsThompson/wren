@@ -16,7 +16,10 @@ failed=0
 for f in "${dir}"/*_test.sh; do
   [[ -f "$f" ]] || continue
   # Run each harness in its own bash so set -e inside it can't abort the loop.
-  bash "$f" || failed=1
+  if ! bash "$f"; then
+    printf 'failed harness: %s\n' "$f" >&2
+    failed=1
+  fi
 done
 
 exit "$failed"

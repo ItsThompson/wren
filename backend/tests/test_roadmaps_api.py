@@ -884,7 +884,7 @@ def test_fork_returns_201_with_a_fresh_draft(make_settings: MakeSettings) -> Non
     assert body["status"] == "draft"
     assert body["published_visibility"] == "public"
     assert body["revision"] == 1
-    # Content copied verbatim (same child IDs, uniqueness is within-roadmap).
+    # Content is copied into the fork's independent roadmap namespace.
     assert "sub_arrays" in body["sections"]["sec_foundations"]["subsections"]
     assert body["suggested_path"] == ["sub_arrays"]
     # The source is untouched and still owned by its creator.

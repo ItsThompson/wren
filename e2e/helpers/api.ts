@@ -3,6 +3,9 @@ import { createHash, randomBytes } from 'node:crypto'
 import { type APIRequest, type APIRequestContext, expect } from '@playwright/test'
 
 import { API_BASE_URL, MCP_BASE_URL } from './config'
+import type { ContextOwner } from '../fixtures/context-owner'
+import { ownDisposable } from '../fixtures/context-owner'
+import type { OAuthFixtureIdentity, RoadmapFixtureIdentity } from '../fixtures/attempt-identity'
 import type { NextResult, ProgressSnapshot } from './types'
 import type { TestUser } from './users'
 
@@ -16,6 +19,7 @@ import type { TestUser } from './users'
 
 /** Optional fixture tags and publication setting. */
 export interface PublishableRoadmapOptions {
+  identity: RoadmapFixtureIdentity
   arrays?: string[]
   hashing?: string[]
   publishedVisibility?: 'public' | 'private'
@@ -27,31 +31,35 @@ export interface PublishableRoadmapOptions {
  * Publication access is omitted by default so the API default is exercised.
  * Rebuilt per create so tests never share a mutable literal.
  */
-export function buildPublishableRoadmap(options: PublishableRoadmapOptions = {}) {
+export function buildPublishableRoadmap(options: PublishableRoadmapOptions) {
+  const subsectionIds = {
+    arrays: `sub_${options.identity.proposedIdPrefix}-arrays`,
+    hashing: `sub_${options.identity.proposedIdPrefix}-hashing`,
+  }
   const roadmap = {
-    title: 'Grokking DSA',
-    suggested_path: ['sub_arrays', 'sub_hashing'],
+    title: options.identity.title,
+    suggested_path: [subsectionIds.arrays, subsectionIds.hashing],
     sections: [
       {
         title: 'Foundations',
         subsections: [
           {
-            proposed_id: 'sub_arrays',
+            proposed_id: subsectionIds.arrays,
             title: 'Arrays',
             tags: options.arrays ?? [],
             resources: [{ title: 'Guide', url: 'https://x.test', type: 'article' }],
             checklist_items: [
-              { proposed_id: 'chk_read', text: 'Read it' },
-              { proposed_id: 'chk_drill', text: 'Drill it' },
+              { proposed_id: options.identity.itemIds[0], text: 'Read it' },
+              { proposed_id: options.identity.itemIds[1], text: 'Drill it' },
             ],
           },
           {
-            proposed_id: 'sub_hashing',
+            proposed_id: subsectionIds.hashing,
             title: 'Hashing',
             tags: options.hashing ?? [],
-            prereq_ids: ['sub_arrays'],
+            prereq_ids: [subsectionIds.arrays],
             resources: [{ title: 'Vid', url: 'https://y.test', type: 'video' }],
-            checklist_items: [{ proposed_id: 'chk_hash', text: 'Implement a counter' }],
+            checklist_items: [{ proposed_id: options.identity.itemIds[2], text: 'Implement a counter' }],
           },
         ],
       },
@@ -61,15 +69,14 @@ export function buildPublishableRoadmap(options: PublishableRoadmapOptions = {})
   return { ...roadmap, published_visibility: options.publishedVisibility }
 }
 
-/** Every checklist item in the fixture above, in path order. */
-export const SPINE_ITEM_IDS = ['chk_read', 'chk_drill', 'chk_hash']
-
 /** Register `user` in a fresh API context; its cookie jar carries the session. */
 export async function createAuthedContext(
   request: APIRequest,
   user: TestUser,
+  owner: ContextOwner,
 ): Promise<APIRequestContext> {
   const context = await request.newContext({ baseURL: API_BASE_URL })
+  ownDisposable(owner, context, `api-account-${user.username}`)
   const response = await context.post('/auth/register', { data: user })
   expect(response.status(), await response.text()).toBe(201)
   return context
@@ -77,16 +84,19 @@ export async function createAuthedContext(
 
 export async function createPublishableRoadmap(
   context: APIRequestContext,
-  options: PublishableRoadmapOptions = {},
+  identity: RoadmapFixtureIdentity,
+  options: Omit<PublishableRoadmapOptions, 'identity'> = {},
 ): Promise<string> {
-  const response = await context.post('/roadmaps', { data: buildPublishableRoadmap(options) })
+  const response = await context.post(`${API_BASE_URL}/roadmaps`, {
+    data: buildPublishableRoadmap({ ...options, identity }),
+  })
   expect(response.status(), await response.text()).toBe(201)
   const body = (await response.json()) as { id: string }
   return body.id
 }
 
 export async function publishRoadmap(context: APIRequestContext, id: string): Promise<void> {
-  const response = await context.post(`/roadmaps/${id}:publish`)
+  const response = await context.post(`${API_BASE_URL}/roadmaps/${id}:publish`)
   expect(response.status(), await response.text()).toBe(200)
 }
 
@@ -166,12 +176,15 @@ export async function archiveRoadmap(context: APIRequestContext, id: string): Pr
   expect(response.status(), await response.text()).toBe(200)
 }
 
-export async function createAgentAccessToken(context: APIRequestContext): Promise<string> {
-  const redirectUri = 'http://127.0.0.1:8765/callback'
+export async function createAgentAccessToken(
+  context: APIRequestContext,
+  oauthIdentity: OAuthFixtureIdentity,
+): Promise<string> {
+  const { clientName, redirectUri, state } = oauthIdentity
   const verifier = randomBytes(32).toString('base64url')
   const challenge = createHash('sha256').update(verifier).digest('base64url')
   const registration = await context.post('/register', {
-    data: { client_name: 'Wren E2E agent', redirect_uris: [redirectUri], scope: 'roadmaps:read' },
+    data: { client_name: clientName, redirect_uris: [redirectUri], scope: 'roadmaps:read' },
   })
   expect(registration.status(), await registration.text()).toBe(201)
   const { client_id: clientId } = (await registration.json()) as { client_id: string }
@@ -185,7 +198,7 @@ export async function createAgentAccessToken(context: APIRequestContext): Promis
       code_challenge: challenge,
       code_challenge_method: 'S256',
       scope: 'roadmaps:read',
-      state: 'e2e',
+      state,
       resource: MCP_BASE_URL,
     },
   })

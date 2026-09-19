@@ -1,10 +1,9 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from '../fixtures/test'
 
 import {
   archiveRoadmap,
   callMcpTool,
   createAgentAccessToken,
-  createAuthedContext,
   createPublishableRoadmap,
   forkRoadmap,
   followRoadmap,
@@ -15,19 +14,22 @@ import {
   publishRoadmap,
   setPublishedVisibility,
 } from '../helpers/api'
-import { API_BASE_URL } from '../helpers/config'
-import { uniqueUser } from '../helpers/users'
 
 test.describe('roadmap lifecycle and discovery', () => {
-  test('keeps the complete read and owner self-follow dashboard coherent', async ({ playwright }) => {
-    const authorUser = uniqueUser('life')
-    const author = await createAuthedContext(playwright.request, authorUser)
-    const roadmapId = await createPublishableRoadmap(author)
+  test('keeps the complete read and owner self-follow dashboard coherent', async ({
+    accountFactory,
+    roadmapIdentity,
+    oauthIdentity,
+  }) => {
+    const authorAccount = await accountFactory.create('life')
+    const authorUser = authorAccount
+    const author = authorAccount.apiContext
+    const roadmapId = await createPublishableRoadmap(author, roadmapIdentity)
     await publishRoadmap(author, roadmapId)
     await followRoadmap(author, roadmapId)
 
     const roadmap = await getRoadmap(author, roadmapId)
-    const agentToken = await createAgentAccessToken(author)
+    const agentToken = await createAgentAccessToken(author, oauthIdentity)
     const tools = await listMcpTools(author, agentToken)
     const toolNames = tools.map((tool) => String(tool.name))
     expect(toolNames).toEqual(expect.arrayContaining(['roadmap_list', 'roadmap_get']))
@@ -52,12 +54,20 @@ test.describe('roadmap lifecycle and discovery', () => {
       published_visibility: 'public',
       sections: expect.any(Object),
       section_order: ['sec_foundations'],
-      suggested_path: ['sub_arrays', 'sub_hashing'],
+      suggested_path: [
+        `sub_${roadmapIdentity.proposedIdPrefix}-arrays`,
+        `sub_${roadmapIdentity.proposedIdPrefix}-hashing`,
+      ],
     })
     const section = (roadmap.sections as Record<string, Record<string, unknown>>).sec_foundations
-    expect(section.subsection_order).toEqual(['sub_arrays', 'sub_hashing'])
+    expect(section.subsection_order).toEqual([
+      `sub_${roadmapIdentity.proposedIdPrefix}-arrays`,
+      `sub_${roadmapIdentity.proposedIdPrefix}-hashing`,
+    ])
     expect(
-      (section.subsections as Record<string, Record<string, unknown>>).sub_arrays.resources,
+      (section.subsections as Record<string, Record<string, unknown>>)[
+        `sub_${roadmapIdentity.proposedIdPrefix}-arrays`
+      ].resources,
     ).toBeTruthy()
 
     await setPublishedVisibility(author, roadmapId, 'private')
@@ -82,22 +92,23 @@ test.describe('roadmap lifecycle and discovery', () => {
       ]),
     )
 
-    await author.dispose()
   })
 
-  test('forks a private source into an owner-only public-on-publish draft', async ({ playwright }) => {
-    const owner = await createAuthedContext(playwright.request, uniqueUser('fork-owner'))
-    const sourceId = await createPublishableRoadmap(owner, { publishedVisibility: 'private' })
+  test('forks a private source into an owner-only public-on-publish draft', async ({
+    accountFactory,
+    roadmapIdentity,
+  }) => {
+    const owner = (await accountFactory.create('fork-owner')).apiContext
+    const sourceId = await createPublishableRoadmap(owner, roadmapIdentity, {
+      publishedVisibility: 'private',
+    })
     await publishRoadmap(owner, sourceId)
 
     const fork = await forkRoadmap(owner, sourceId)
     expect(fork).toMatchObject({ status: 'draft', published_visibility: 'public' })
     if (typeof fork.id !== 'string') throw new Error('fork response did not return an ID')
     const forkId = fork.id
-    const guest = await playwright.request.newContext({ baseURL: API_BASE_URL })
+    const guest = await accountFactory.createGuest()
     expect((await guest.get(`/roadmaps/${forkId}`)).status()).toBe(404)
-
-    await guest.dispose()
-    await owner.dispose()
   })
 })

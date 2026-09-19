@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from '../fixtures/test'
 
 import { expectRedirectedToOnboarding, registerNewUser } from '../helpers/onboarding'
 import type { AuthenticatedUser } from '../helpers/types'
@@ -16,8 +16,9 @@ import { uniqueUser } from '../helpers/users'
 test.describe('onboarding (register -> wizard -> dashboard, no redirect loop)', () => {
   test('a new account is guided through the wizard and completes onto the dashboard', async ({
     page,
+    attemptIdentity,
   }) => {
-    await registerNewUser(page, uniqueUser('onb'))
+    await registerNewUser(page, uniqueUser('onb', attemptIdentity))
     await expectRedirectedToOnboarding(page)
 
     // the wizard is full-screen and chrome-free (no AppShell top bar),
@@ -65,8 +66,9 @@ test.describe('onboarding (register -> wizard -> dashboard, no redirect loop)', 
 
   test('skipping every step still completes onboarding and lands on the dashboard', async ({
     page,
+    attemptIdentity,
   }) => {
-    await registerNewUser(page, uniqueUser('skip'))
+    await registerNewUser(page, uniqueUser('skip', attemptIdentity))
     await expectRedirectedToOnboarding(page)
     await expect(page.getByText('Welcome to Wren')).toBeVisible()
 
@@ -94,8 +96,11 @@ test.describe('onboarding (register -> wizard -> dashboard, no redirect loop)', 
     await expect(page.getByRole('heading', { name: /your dashboard/i })).toBeVisible()
   })
 
-  test('an onboarded user visiting /onboarding is redirected to the dashboard', async ({ page }) => {
-    await registerNewUser(page, uniqueUser('bounce'))
+  test('an onboarded user visiting /onboarding is redirected to the dashboard', async ({
+    page,
+    attemptIdentity,
+  }) => {
+    await registerNewUser(page, uniqueUser('bounce', attemptIdentity))
     await expectRedirectedToOnboarding(page)
     await page.getByRole('button', { name: 'Skip' }).click()
     await expect(page).toHaveURL(/\/dashboard$/)
@@ -107,8 +112,11 @@ test.describe('onboarding (register -> wizard -> dashboard, no redirect loop)', 
     await expect(page.getByRole('heading', { name: /your dashboard/i })).toBeVisible()
   })
 
-  test('an un-onboarded user on /authorize sees consent, not onboarding', async ({ page }) => {
-    await registerNewUser(page, uniqueUser('consent'))
+  test('an un-onboarded user on /authorize sees consent, not onboarding', async ({
+    page,
+    attemptIdentity,
+  }) => {
+    await registerNewUser(page, uniqueUser('consent', attemptIdentity))
 
     // /authorize is mounted OUTSIDE the OnboardingGate, so an
     // un-onboarded user is never bounced to /onboarding. Without a live
