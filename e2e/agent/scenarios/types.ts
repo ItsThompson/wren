@@ -299,8 +299,8 @@ export interface ToolScenario<TOutput extends ToolOutput> {
   readonly journey: ToolJourneyName
   readonly requiredScopes: readonly OAuthScope[]
   readonly call: (context: ToolJourneyContext) => Promise<TOutput>
-  projectOutput(output: McpCallToolResult): TOutput
-  assertStableResult(output: TOutput, context: ToolJourneyContext): Promise<void>
+  readonly projectOutput: (output: McpCallToolResult) => TOutput
+  readonly assertStableResult: (output: TOutput, context: ToolJourneyContext) => Promise<void>
 }
 
 export interface ToolCoverageDifference {

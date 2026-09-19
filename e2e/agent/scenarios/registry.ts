@@ -126,9 +126,9 @@ function createScenario<TOutput extends ToolOutput>(
   })
 }
 
-export function createToolScenarioRegistry<T extends readonly ToolScenario<ToolOutput>[]>(
-  entries: T,
-): Readonly<T> {
+export function createToolScenarioRegistry<
+  T extends readonly { readonly name: string; readonly requiredScopes: readonly OAuthScope[] }[],
+>(entries: T): Readonly<T> {
   const names = entries.map((entry) => entry.name)
   const duplicateScenarioNames = duplicateNames(names)
   if (duplicateScenarioNames.length > 0) {
@@ -171,7 +171,7 @@ export const TOOL_SCENARIO_REGISTRY = createToolScenarioRegistry([
 
 export function compareToolCoverage(
   advertisedTools: readonly AdvertisedTool[] | readonly string[],
-  registry: readonly ToolScenario<ToolOutput>[] = TOOL_SCENARIO_REGISTRY,
+  registry: readonly Pick<ToolScenario<ToolOutput>, 'name'>[] = TOOL_SCENARIO_REGISTRY,
 ): ToolCoverageDifference {
   const advertisedNames = advertisedTools.map((tool) => (typeof tool === 'string' ? tool : tool.name))
   const scenarioNames = registry.map((scenario) => scenario.name)
@@ -188,7 +188,7 @@ export function compareToolCoverage(
 
 export async function assertToolCoverage(
   agent: Pick<AgentSession, 'listTools'>,
-  registry: readonly ToolScenario<ToolOutput>[] = TOOL_SCENARIO_REGISTRY,
+  registry: readonly Pick<ToolScenario<ToolOutput>, 'name'>[] = TOOL_SCENARIO_REGISTRY,
 ): Promise<void> {
   const advertisedTools = await agent.listTools()
   const difference = compareToolCoverage(advertisedTools, registry)
