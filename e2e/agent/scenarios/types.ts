@@ -14,6 +14,7 @@ export interface ToolJourneyState {
   sectionId: string | null
   subsectionIds: readonly string[]
   itemIds: readonly string[]
+  toolArguments?: Readonly<Record<string, Readonly<Record<string, unknown>>>>
 }
 
 export interface RestSetup {
