@@ -8,10 +8,17 @@ import { FRONTEND_BASE_URL } from './helpers/config'
  * deterministically. `globalSetup` pre-flights stack health
  * before any test runs.
  */
+const configuredWorkers = process.env.E2E_WORKERS
+  ? Number.parseInt(process.env.E2E_WORKERS, 10)
+  : 1
+if (!Number.isInteger(configuredWorkers) || configuredWorkers < 1) {
+  throw new Error('E2E_WORKERS must be a positive integer')
+}
+
 export default defineConfig({
   testDir: './tests',
   globalSetup: './global-setup.ts',
-  workers: 1,
+  workers: configuredWorkers,
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,

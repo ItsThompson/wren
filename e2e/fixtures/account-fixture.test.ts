@@ -20,11 +20,16 @@ function buildAttemptIdentity() {
 describe('account fixture factory', () => {
   it('registers unique attempt-scoped accounts and owns each API context', async () => {
     const disposeCalls: Array<ReturnType<typeof vi.fn>> = []
+    const registeredPayloads: Array<Record<string, string>> = []
     const request = {
       newContext: vi.fn(async () => {
         const dispose = vi.fn(async () => undefined)
+        const post = vi.fn(async (_path: string, options: { data: Record<string, string> }) => {
+          registeredPayloads.push(options.data)
+          return { status: () => 201, text: async () => '' }
+        })
         const context = {
-          post: vi.fn(async () => ({ status: () => 201, text: async () => '' })),
+          post,
           dispose,
         } as unknown as APIRequestContext
         disposeCalls.push(dispose)
@@ -40,6 +45,10 @@ describe('account fixture factory', () => {
     expect(first.username).not.toBe(second.username)
     expect(first.email).toBe(`${first.username}@example.com`)
     expect(request.newContext).toHaveBeenCalledTimes(2)
+    expect(registeredPayloads).toEqual([
+      { username: first.username, email: first.email, password: first.password },
+      { username: second.username, email: second.email, password: second.password },
+    ])
     await owner.closeAll()
     expect(disposeCalls.every((dispose) => dispose.mock.calls.length === 1)).toBe(true)
   })
