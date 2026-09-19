@@ -154,7 +154,12 @@ function hasUnsafeDynamicStaticExpression(text: string): boolean {
 const COMPOSE_LOG_PREFIX = /^[A-Za-z0-9_.-]+-\d+\s+\|\s*/
 const NGINX_ACCESS_LINE = /"([A-Z]+)\s+(\S+)\s+(HTTP\/\d(?:\.\d)?)"\s+(\d{3})\s+(\d+)/
 const POSTGRES_LOG_LINE = /^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:\s+UTC)?)\s+\[(\d+)\]\s+([A-Z]+):\s*(.*)$/
-const UNSAFE_PLAIN_LOG = /(?:request\s+body|response\s+body|\b(?:authorization|cookie|password|token|secret|private\s*key)\b\s*[:=]|\b(?:GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s+\S+\s+.*(?:\{|\[)|\b(?:statement|detail|query)\s*:\s*(?:select|insert|update|delete|with)\b|[?&][A-Za-z0-9_-]+=)/i
+const UNSAFE_PLAIN_LOG = /(?:request\s+body|response\s+body|\b(?:authorization|cookie|password|token|secret|private\s*key|envelope|payload|headers?|body|storage|querystring)\b\s*[:=]?|\b(?:GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s+\S+\s+.*(?:\{|\[)|\b(?:statement|detail|query)\s*:\s*(?:select|insert|update|delete|with)\b|[?&][A-Za-z0-9_-]+=)/i
+const SAFE_SERVICE_LOG_FIELDS = new Set([
+  'level', 'severity', 'timestamp', 'time', 'service', 'event', 'operation',
+  'status', 'method', 'path', 'protocol', 'bytes', 'message', 'error',
+])
+
 
 function stripComposePrefix(line: string): string {
   return line.replace(COMPOSE_LOG_PREFIX, '')
@@ -170,6 +175,24 @@ function safePlainLogMessage(message: string, registry: SensitiveValueRegistry):
   return UNSAFE_PLAIN_LOG.test(normalized) ? '[REDACTED:unsafe-log-message]' : normalized
 }
 
+function sanitizeStructuredServiceLog(value: unknown, registry: SensitiveValueRegistry): unknown {
+  if (Array.isArray(value)) return value.map((item) => sanitizeStructuredServiceLog(item, registry))
+  if (typeof value === 'string') return safePlainLogMessage(value, registry)
+  if (value === null || typeof value !== 'object') return value
+  const projection: Record<string, unknown> = {}
+  for (const [field, fieldValue] of Object.entries(value)) {
+    if (!SAFE_SERVICE_LOG_FIELDS.has(field)) continue
+    if (typeof fieldValue === 'string') {
+      projection[field] = field === 'path'
+        ? sanitizeRequestTarget(sanitizeString(fieldValue, registry))
+        : safePlainLogMessage(fieldValue, registry)
+      continue
+    }
+    if (typeof fieldValue === 'number' || typeof fieldValue === 'boolean' || fieldValue === null) projection[field] = fieldValue
+  }
+  return projection
+}
+
 function sanitizeServiceLog(text: string, registry: SensitiveValueRegistry) {
   const counts = emptyCounts()
   const lines = text.split('\n').map(stripComposePrefix).filter((line) => line.trim().length > 0)
@@ -179,7 +202,7 @@ function sanitizeServiceLog(text: string, registry: SensitiveValueRegistry) {
     const normalized = inputRedaction.sanitizedText.trim()
     try {
       const parsed = JSON.parse(normalized) as unknown
-      return JSON.stringify(sanitizeStructuredValue(parsed, registry))
+      return JSON.stringify(sanitizeStructuredServiceLog(parsed, registry))
     } catch {
       const nginxAccess = normalized.match(NGINX_ACCESS_LINE)
       if (nginxAccess) {
@@ -216,6 +239,7 @@ function parseStructuredText(text: string, kind: DiagnosticArtifactKind, registr
   const counts = emptyCounts()
   const inputRedaction = registry.redact(text)
   mergeCounts(counts, inputRedaction.redactionCounts)
+  if (kind === 'log') return sanitizeServiceLog(text, registry)
   try {
     const parsed = JSON.parse(inputRedaction.sanitizedText.trim()) as unknown
     const redacted = registry.redact(JSON.stringify(sanitizeStructuredValue(parsed, registry)))
@@ -227,7 +251,6 @@ function parseStructuredText(text: string, kind: DiagnosticArtifactKind, registr
       const sanitizedText = sanitizeString(text, registry)
       return { text: sanitizedText, counts }
     }
-    if (kind === 'log') return sanitizeServiceLog(text, registry)
     if (kind === 'trace' || kind === 'report') {
       const lines = inputRedaction.sanitizedText.trim().split('\n').filter((line) => line.length > 0)
       try {
