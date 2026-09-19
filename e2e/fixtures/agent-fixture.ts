@@ -6,7 +6,7 @@ import type { AgentSession } from '../agent/types'
 import { type ContextOwner, ownClosable } from './context-owner'
 import type { OAuthScope } from '../agent/types'
 import { createAttemptResourceIdentities, type TestAttemptIdentity } from './attempt-identity'
-import { InMemorySensitiveValueRegistry } from './sensitive-value-registry'
+import { InMemorySensitiveValueRegistry, type SensitiveValueRegistry } from './sensitive-value-registry'
 
 export interface AgentFactory {
   create(consentPage: Page, requestedScopes: readonly OAuthScope[]): Promise<AgentSession>
@@ -15,9 +15,11 @@ export interface AgentFactory {
 export function createAgentFactory(
   identity: TestAttemptIdentity,
   owner: ContextOwner,
+  sensitiveValues?: SensitiveValueRegistry,
 ): AgentFactory {
   let sessionIndex = 0
   const resourceIdentities = createAttemptResourceIdentities(identity)
+  const sessionSensitiveValues = sensitiveValues ?? new InMemorySensitiveValueRegistry()
 
   return {
     async create(consentPage, requestedScopes): Promise<AgentSession> {
@@ -28,7 +30,7 @@ export function createAgentFactory(
         consentPage,
         requestedScopes,
         mcpServerUrl: new URL(MCP_BASE_URL),
-        sensitiveValues: new InMemorySensitiveValueRegistry(),
+        sensitiveValues: sessionSensitiveValues,
         contextOwner: owner,
       })
       ownClosable(owner, session, `agent-session-${resourceIdentities.oauth(index, '').clientName}`)

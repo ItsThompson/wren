@@ -1,4 +1,4 @@
-import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js'
+import { auth, UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js'
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -7,7 +7,8 @@ import { createAttemptIdentity } from '../fixtures/attempt-identity.ts'
 import type { AgentCallbackListener, McpClientLike, McpTransportLike } from './types.ts'
 import type { AgentSessionDependencies } from './agent-session.ts'
 import { OAuthScope } from './types.ts'
-import { createAgentSession } from './agent-session.ts'
+import { createAgentSession, createScopeLimitedFetch } from './agent-session.ts'
+import { createOAuthProvider } from './oauth-provider.ts'
 
 function buildPage() {
   const visible = { isVisible: vi.fn(async () => true) }
@@ -22,15 +23,147 @@ function buildPage() {
   }
 }
 
-function buildListener(callbackUrl: URL, readState: () => string): AgentCallbackListener {
+interface TestCallbackListener extends AgentCallbackListener {
+  closeSpy: ReturnType<typeof vi.fn>
+}
+
+function buildListener(callbackUrl: URL, readState: () => string): TestCallbackListener {
+  const closeSpy = vi.fn(async () => undefined)
   return {
     callbackUrl,
     waitForCallback: vi.fn(async () => new URL(`${callbackUrl}?code=code-value&state=${readState()}`)),
-    close: vi.fn(async () => undefined),
+    close: closeSpy,
+    closeSpy,
   }
 }
 
 describe('AgentSession', () => {
+  it('limits SDK discovery scope to the requested subset of PRM scopes', async () => {
+    const fetchPrm = createScopeLimitedFetch(
+      async () => new Response(JSON.stringify({ scopes_supported: ['roadmaps:read', 'roadmaps:write'] })),
+      new URL('https://mcp.wren.test'),
+      ['roadmaps:read'],
+    )
+    const response = await fetchPrm('https://mcp.wren.test/.well-known/oauth-protected-resource')
+    await expect(response.json()).resolves.toEqual({ scopes_supported: ['roadmaps:read'] })
+
+    const fetchChallenge = createScopeLimitedFetch(
+      async () => new Response(null, { status: 401, headers: { 'www-authenticate': 'Bearer scope="roadmaps:read roadmaps:write"' } }),
+      new URL('https://mcp.wren.test'),
+      ['roadmaps:read'],
+    )
+    const challenge = await fetchChallenge('https://mcp.wren.test/mcp')
+    expect(challenge.headers.get('www-authenticate')).toBe('Bearer')
+  })
+
+  it('passes only requested scopes to SDK registration and authorization', async () => {
+    const sensitiveValues = new InMemorySensitiveValueRegistry()
+    const provider = createOAuthProvider({
+      callbackUrl: new URL('http://127.0.0.1:43212/callback'),
+      clientName: 'scope-test-client',
+      requestedScopes: [OAuthScope.ROADMAPS_READ],
+      resourceUrl: new URL('https://mcp.wren.test'),
+      sensitiveValues,
+    })
+    const requests: { url: string; body: string }[] = []
+    const baseFetch = async (url: string | URL, init?: RequestInit): Promise<Response> => {
+      const requestUrl = new URL(url)
+      requests.push({ url: requestUrl.toString(), body: typeof init?.body === 'string' ? init.body : '' })
+      if (requestUrl.pathname.includes('/.well-known/oauth-protected-resource')) {
+        return new Response(JSON.stringify({
+          resource: 'https://mcp.wren.test',
+          authorization_servers: ['https://api.wren.test'],
+          bearer_methods_supported: ['header'],
+          scopes_supported: ['roadmaps:read', 'roadmaps:write', 'progress:write'],
+        }), { headers: { 'content-type': 'application/json' } })
+      }
+      if (requestUrl.pathname.endsWith('/.well-known/oauth-authorization-server')) {
+        return new Response(JSON.stringify({
+          issuer: 'https://api.wren.test',
+          authorization_endpoint: 'https://api.wren.test/authorize',
+          token_endpoint: 'https://api.wren.test/token',
+          registration_endpoint: 'https://api.wren.test/register',
+          response_types_supported: ['code'],
+          grant_types_supported: ['authorization_code', 'refresh_token'],
+          token_endpoint_auth_methods_supported: ['none'],
+          code_challenge_methods_supported: ['S256'],
+        }), { headers: { 'content-type': 'application/json' } })
+      }
+      if (requestUrl.pathname === '/register') {
+        return new Response(JSON.stringify({
+          client_id: 'scope-client-id',
+          redirect_uris: ['http://127.0.0.1:43212/callback'],
+          token_endpoint_auth_method: 'none',
+          grant_types: ['authorization_code', 'refresh_token'],
+          response_types: ['code'],
+          client_name: 'scope-test-client',
+          scope: 'roadmaps:read',
+        }), { headers: { 'content-type': 'application/json' } })
+      }
+      throw new Error(`unexpected OAuth request: ${requestUrl}`)
+    }
+
+    await expect(auth(provider, {
+      serverUrl: new URL('https://mcp.wren.test/mcp'),
+      fetchFn: createScopeLimitedFetch(baseFetch, new URL('https://mcp.wren.test'), provider.requestedScopes),
+    })).resolves.toBe('REDIRECT')
+
+    const registration = JSON.parse(requests.find((request) => request.url.endsWith('/register'))?.body ?? '{}') as { scope?: string }
+    const authorization = new URL(provider.getAuthorizationUrl())
+    expect(registration.scope).toBe('roadmaps:read')
+    expect(authorization.searchParams.get('scope')).toBe('roadmaps:read')
+  })
+
+  it('rejects a requested scope that PRM does not advertise', async () => {
+    const fetchPrm = createScopeLimitedFetch(
+      async () => new Response(JSON.stringify({ scopes_supported: ['roadmaps:read'] })),
+      new URL('https://mcp.wren.test'),
+      ['roadmaps:write'],
+    )
+    await expect(fetchPrm('https://mcp.wren.test/.well-known/oauth-protected-resource')).rejects.toThrow('not advertised')
+  })
+
+  it('closes owned resources when callback validation fails', async () => {
+    const { page } = buildPage()
+    const listener = buildListener(new URL('http://127.0.0.1:43211/callback'), () => 'wrong-state')
+    const sensitiveValues = new InMemorySensitiveValueRegistry()
+    let oauthProvider: Parameters<NonNullable<AgentSessionDependencies['createTransport']>>[1]
+    const transportClose = vi.fn(async () => undefined)
+    const clientClose = vi.fn(async () => undefined)
+    const client: McpClientLike = {
+      connect: vi.fn(async () => {
+        const state = (await oauthProvider?.state?.()) ?? ''
+        await oauthProvider?.redirectToAuthorization?.(new URL(`https://api.wren.test/authorize?state=${state}`))
+        throw new UnauthorizedError()
+      }),
+      listTools: vi.fn(async () => ({ tools: [] })),
+      callTool: vi.fn(async () => ({})) as McpClientLike['callTool'],
+      close: clientClose,
+    }
+    await expect(createAgentSession(
+      {
+        identity: createAttemptIdentity({ runId: 'run', projectName: 'chromium', file: 'failure.spec.ts', title: 'cleanup', parallelIndex: 0, retry: 0, nonce: 'nonce' }),
+        consentPage: page as never,
+        requestedScopes: [OAuthScope.ROADMAPS_READ],
+        mcpServerUrl: new URL('https://mcp.wren.test'),
+        sensitiveValues,
+        contextOwner: { own: <T>(resource: T): T => resource, closeAll: async () => undefined },
+      },
+      {
+        createCallbackListener: async () => listener,
+        createClient: () => client,
+        createTransport: (_serverUrl, provider) => {
+          oauthProvider = provider
+          return { transport: {} as Transport, finishAuth: vi.fn(async () => undefined), close: transportClose }
+        },
+      },
+    )).rejects.toThrow('state')
+    expect(clientClose).toHaveBeenCalledOnce()
+    expect(transportClose).toHaveBeenCalledOnce()
+    expect(listener.closeSpy).toHaveBeenCalledOnce()
+    expect(sensitiveValues.values()).toEqual([])
+  })
+
   it('uses the SDK authorization boundary, then reconnects with a fresh transport', async () => {
     const { page, authorizeButton } = buildPage()
     let callbackState = ''
