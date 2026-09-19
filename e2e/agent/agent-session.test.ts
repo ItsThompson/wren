@@ -30,11 +30,15 @@ interface TestCallbackListener extends AgentCallbackListener {
   closeSpy: ReturnType<typeof vi.fn>
 }
 
-function buildListener(callbackUrl: URL, readState: () => string): TestCallbackListener {
+function buildListener(
+  callbackUrl: URL,
+  readState: () => string,
+  buildQuery: (state: string) => string = (state) => `code=code-value&state=${state}`,
+): TestCallbackListener {
   const closeSpy = vi.fn(async () => undefined)
   return {
     callbackUrl,
-    waitForCallback: vi.fn(async () => new URL(`${callbackUrl}?code=code-value&state=${readState()}`)),
+    waitForCallback: vi.fn(async () => new URL(`${callbackUrl}?${buildQuery(readState())}`)),
     close: closeSpy,
     closeSpy,
   }
@@ -161,9 +165,13 @@ describe('AgentSession', () => {
     await expect(fetchPrm('https://mcp.wren.test/.well-known/oauth-protected-resource')).rejects.toThrow('not advertised')
   })
 
-  it('closes owned resources when callback validation fails', async () => {
+  it('closes owned resources when consent is denied', async () => {
     const { page } = buildPage()
-    const listener = buildListener(new URL('http://127.0.0.1:43211/callback'), () => 'wrong-state')
+    const listener = buildListener(
+      new URL('http://127.0.0.1:43211/callback'),
+      () => 'expected-state',
+      (state) => `error=access_denied&state=${state}`,
+    )
     const sensitiveValues = new InMemorySensitiveValueRegistry()
     let oauthProvider: Parameters<NonNullable<AgentSessionDependencies['createTransport']>>[1]
     const transportClose = vi.fn(async () => undefined)
@@ -195,7 +203,7 @@ describe('AgentSession', () => {
           return { transport: {} as Transport, finishAuth: vi.fn(async () => undefined), close: transportClose }
         },
       },
-    )).rejects.toThrow('state')
+    )).rejects.toThrow('authorization failed: access_denied')
     expect(clientClose).toHaveBeenCalledOnce()
     expect(transportClose).toHaveBeenCalledOnce()
     expect(listener.closeSpy).toHaveBeenCalledOnce()

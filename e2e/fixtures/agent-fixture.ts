@@ -19,12 +19,11 @@ export function createAgentFactory(
 ): AgentFactory {
   let sessionIndex = 0
   const resourceIdentities = createAttemptResourceIdentities(identity)
-  const sessionSensitiveValues = sensitiveValues ?? new InMemorySensitiveValueRegistry()
-
   return {
     async create(consentPage, requestedScopes): Promise<AgentSession> {
       const index = sessionIndex
       sessionIndex += 1
+      const sessionSensitiveValues = new InMemorySensitiveValueRegistry(sensitiveValues)
       const session = await createAgentSession({
         identity: identityForSession(identity, index),
         consentPage,

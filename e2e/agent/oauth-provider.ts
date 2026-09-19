@@ -123,8 +123,10 @@ export function createOAuthProvider(options: OAuthProviderOptions): E2EOAuthProv
         throw new Error('OAuth callback state did not match the authorization request')
       }
       const issuer = callbackUrl.searchParams.get('iss')
-      if (issuer !== null && discoveryState?.authorizationServerUrl !== undefined && issuer !== discoveryState.authorizationServerUrl) {
-        throw new Error('OAuth callback issuer did not match the discovered authorization server')
+      if (issuer !== null) {
+        const expectedIssuer = discoveryState?.authorizationServerUrl
+        if (expectedIssuer === undefined) throw new Error('OAuth callback issuer cannot be validated before authorization-server discovery')
+        if (issuer !== expectedIssuer) throw new Error('OAuth callback issuer did not match the discovered authorization server')
       }
       const code = callbackUrl.searchParams.get('code')
       if (code === null || code.length === 0) throw new Error('OAuth callback did not include an authorization code')

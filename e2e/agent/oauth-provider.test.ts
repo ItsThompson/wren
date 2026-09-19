@@ -49,6 +49,22 @@ describe('E2EOAuthProvider', () => {
     expect(sensitiveValues.values()).not.toContain('bad-code')
   })
 
+  it('rejects callback issuers that are missing or differ from discovery', async () => {
+    const missingDiscovery = buildProvider()
+    const missingState = await missingDiscovery.provider.state!()
+    expect(() => missingDiscovery.provider.validateCallback(new URL(
+      `http://127.0.0.1:43123/callback?code=code-value&state=${missingState}&iss=https%3A%2F%2Fapi.wren.test`,
+    ))).toThrow('cannot be validated')
+
+    const mismatched = buildProvider()
+    const state = await mismatched.provider.state!()
+    await mismatched.provider.saveDiscoveryState!({ authorizationServerUrl: 'https://api.wren.test' })
+    expect(() => mismatched.provider.validateCallback(new URL(
+      `http://127.0.0.1:43123/callback?code=code-value&state=${state}&iss=https%3A%2F%2Fevil.test`,
+    ))).toThrow('did not match')
+    expect(mismatched.sensitiveValues.values()).not.toContain('code-value')
+  })
+
   it('exposes safe authorization metadata and erases sensitive state on clear', async () => {
     const { provider, sensitiveValues } = buildProvider()
     await provider.state!()
