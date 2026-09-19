@@ -199,7 +199,7 @@ export async function setRoadmapVisibility(page: Page, visibility: 'public' | 'p
 
 export async function forkRoadmap(page: Page): Promise<string> {
   await page.getByRole('button', { name: 'Fork' }).click()
-  await expect(page).toHaveURL(/\\/roadmaps\\/[^/]+$/)
+  await expect(page).toHaveURL(/\/roadmaps\/[^/]+$/)
   await expect(page.getByText('Draft · preview', { exact: true })).toBeVisible()
   const roadmapId = new URL(page.url()).pathname.split('/').pop()
   if (!roadmapId) throw new Error('Fork navigation did not include a roadmap ID')
@@ -216,5 +216,5 @@ export async function archiveRoadmap(page: Page): Promise<void> {
 export async function deleteRoadmap(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Delete' }).click()
   await page.getByRole('button', { name: 'Confirm delete' }).click()
-  await expect(page).toHaveURL(/\\/$/)
+  await expect(page).toHaveURL(/\/$/)
 }
