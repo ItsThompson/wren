@@ -35,7 +35,7 @@ export async function createAgentSession(
       callbackUrl: new URL(listener.callbackUrl),
       clientName: `e2e-${request.identity.resourcePrefix}-mcp`,
       requestedScopes: request.requestedScopes,
-      resourceUrl: request.mcpServerUrl,
+      resourceUrl: new URL(request.mcpServerUrl.origin),
       sensitiveValues: request.sensitiveValues,
     })
   } catch (error: unknown) {
