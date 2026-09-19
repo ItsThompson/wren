@@ -4,6 +4,7 @@ import {
   type EditRoadmapMetadataOutput,
   type ForkRoadmapOutput,
   type ProgressOutput,
+  type ProgressUpdateOutput,
   type PublishRoadmapOutput,
   type RoadmapOutput,
   type ToolJourneyContext,
@@ -39,6 +40,8 @@ export interface AuthoringJourneyResult {
   readonly publishedRead: RoadmapOutput
   readonly metadata: EditRoadmapMetadataOutput
   readonly metadataRead: RoadmapOutput
+  readonly sourceProgressUpdate: ProgressUpdateOutput
+  readonly sourceProgress: ProgressOutput
   readonly fork: ForkRoadmapOutput
   readonly forkRead: RoadmapOutput
   readonly forkProgress: ProgressOutput
@@ -187,6 +190,24 @@ export async function runAuthoringJourney(
     throw new Error('metadata edit changed structural roadmap content')
   }
 
+  const sourceProgressUpdate = await callScenario(context, 'progress_update', {
+    roadmap_id: create.roadmap_id,
+    item_ids: [resolvedIds.itemIds[0]],
+    state: 'complete',
+  })
+  const sourceProgress = await callScenario(context, 'progress_get', {
+    roadmap_id: create.roadmap_id,
+    detailed: true,
+  })
+  if (
+    sourceProgress.checked_items !== 1 ||
+    sourceProgress.checked_ids === null ||
+    sourceProgress.checked_ids.length !== 1 ||
+    sourceProgress.checked_ids[0] !== resolvedIds.itemIds[0]
+  ) {
+    throw new Error('source roadmap progress must contain the completed fixture item before forking')
+  }
+
   const fork = await callScenario(context, 'fork_roadmap', {
     source_roadmap_id: create.roadmap_id,
   })
@@ -200,7 +221,7 @@ export async function runAuthoringJourney(
   if (forkRead.status !== 'draft' || forkRead.revision !== 1) throw new Error('fork must be a fresh draft')
 
   const forkProgress = await readForkProgress(context, fork.roadmap_id)
-  if (forkProgress.checked_items !== 0 || (forkProgress.checked_ids !== null && forkProgress.checked_ids.length !== 0)) {
+  if (forkProgress.checked_items !== 0 || forkProgress.checked_ids === null || forkProgress.checked_ids.length !== 0) {
     throw new Error('fork must not carry source progress')
   }
 
@@ -216,6 +237,8 @@ export async function runAuthoringJourney(
     publishedRead,
     metadata,
     metadataRead,
+    sourceProgressUpdate,
+    sourceProgress,
     fork,
     forkRead,
     forkProgress,
@@ -289,5 +312,5 @@ export function createAuthoringContext(
 }
 
 export function authoringScopes(): readonly OAuthScope[] {
-  return [OAuthScope.ROADMAPS_READ, OAuthScope.ROADMAPS_WRITE]
+  return [OAuthScope.ROADMAPS_READ, OAuthScope.ROADMAPS_WRITE, OAuthScope.PROGRESS_WRITE]
 }

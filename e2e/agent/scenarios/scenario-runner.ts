@@ -4,6 +4,7 @@ import type {
   EditRoadmapMetadataOutput,
   ForkRoadmapOutput,
   ProgressOutput,
+  ProgressUpdateOutput,
   PublishRoadmapOutput,
   RoadmapOutput,
   ToolJourneyContext,
@@ -58,6 +59,11 @@ export function callScenario(
   name: 'progress_get',
   arguments_: Record<string, unknown>,
 ): Promise<ProgressOutput>
+export function callScenario(
+  context: ToolJourneyContext,
+  name: 'progress_update',
+  arguments_: Record<string, unknown>,
+): Promise<ProgressUpdateOutput>
 export async function callScenario(
   context: ToolJourneyContext,
   name: ExpectedToolName,
