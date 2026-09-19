@@ -1,4 +1,4 @@
-import type { AgentSession, AdvertisedTool, OAuthScope } from '../types'
+import type { AgentSession, OAuthScope } from '../types'
 import type { TestAttemptIdentity } from '../../fixtures/attempt-identity'
 
 export enum ToolJourneyName {
@@ -39,113 +39,229 @@ export interface ToolJourneyContext {
   state: ToolJourneyState
 }
 
-export type ToolOutput = { readonly [key: string]: unknown }
-export type ToolOutputProjection<TOutput extends ToolOutput> = (output: TOutput) => TOutput
+export interface McpCallToolResult {
+  readonly content: readonly McpContentBlock[]
+  readonly isError?: boolean
+  readonly structuredContent?: unknown
+}
 
-export interface RoadmapSummaryOutput extends ToolOutput {
+export interface McpContentBlock {
+  readonly type: string
+  readonly text?: string
+}
+
+export interface RoadmapCardOutput {
   readonly id: string
-  readonly title: string
+  readonly published_visibility: string
   readonly status: string
-  readonly revision?: number
+  readonly subject_tags: readonly string[]
+  readonly title: string
 }
 
-export interface RoadmapListOutput extends ToolOutput {
-  readonly authored?: readonly RoadmapSummaryOutput[]
-  readonly following?: readonly RoadmapSummaryOutput[]
+export interface DashboardOutput {
+  readonly authored: readonly RoadmapCardOutput[]
+  readonly followed: readonly RoadmapCardOutput[]
 }
 
-export interface RoadmapProfileOutput extends ToolOutput {
+export interface ProfileOutput {
+  readonly display_name: string
   readonly handle: string
-  readonly roadmaps?: readonly RoadmapSummaryOutput[]
+  readonly roadmaps: readonly RoadmapCardOutput[]
 }
 
-export interface RoadmapGetOutput extends ToolOutput {
+export interface RoadmapSectionDocumentOutput {
+  readonly id: string
+  readonly subsection_order: readonly string[]
+  readonly subsections: Readonly<Record<string, object>>
+  readonly title: string
+}
+
+export interface RoadmapOutput {
+  readonly created_at: string
+  readonly description: string | null
+  readonly id: string
+  readonly owner: string
+  readonly published_visibility: string
+  readonly revision: number
+  readonly section_order: readonly string[]
+  readonly sections: Readonly<Record<string, RoadmapSectionDocumentOutput>>
+  readonly status: string
+  readonly subject_tags: readonly string[]
+  readonly suggested_path: readonly string[]
+  readonly title: string
+  readonly updated_at: string
+}
+
+export interface SectionOverviewOutput {
+  readonly section_id: string
+  readonly title: string
+  readonly total_items: number
+  readonly checked_items: number
+  readonly percent: number
+}
+
+export interface OverallProgressOutput {
+  readonly total_items: number
+  readonly checked_items: number
+  readonly percent: number
+}
+
+export interface OverviewDetailsOutput {
+  readonly owner: string
+  readonly description: string | null
+  readonly subject_tags: readonly string[]
+  readonly published_visibility: string
+  readonly created_at: string
+  readonly updated_at: string
+  readonly suggested_path: readonly string[]
+}
+
+export interface OverviewOutput {
+  readonly details: OverviewDetailsOutput | null
+  readonly overall: OverallProgressOutput
+  readonly revision: number
+  readonly roadmap_id: string
+  readonly sections: readonly SectionOverviewOutput[]
+  readonly status: string
+  readonly title: string
+}
+
+export interface ResourceLinkOutput {
+  readonly title: string
+  readonly url: string
+  readonly type: string
+}
+
+export interface NextItemOutput {
+  readonly item_id: string
+  readonly path_position: number | null
+  readonly resources: readonly ResourceLinkOutput[]
+  readonly subsection_id: string
+  readonly text: string
+  readonly why_now: string
+}
+
+export interface NextOutput {
+  readonly complete: boolean
+  readonly items: readonly NextItemOutput[]
+  readonly remaining_in_path: number
+}
+
+export interface ItemStateOutput {
+  readonly id: string
+  readonly text: string
+  readonly done: boolean
+}
+
+export interface PrereqOutput {
   readonly id: string
   readonly title: string
-  readonly status: string
-  readonly revision: number
-  readonly sectionIds?: readonly string[]
-  readonly suggestedPath?: readonly string[]
+  readonly done: boolean
 }
 
-export interface RoadmapOverviewOutput extends RoadmapGetOutput {
-  readonly progress?: ToolOutput
+export interface ResourceOutput extends ResourceLinkOutput {
+  readonly id: string
 }
 
-export interface RoadmapNextOutput extends ToolOutput {
-  readonly itemIds: readonly string[]
-  readonly complete: boolean
-  readonly remainingInPath: number
-}
-
-export interface RoadmapNodeOutput extends ToolOutput {
-  readonly subsectionId: string
+export interface NodeOutput {
+  readonly description: string | null
+  readonly effort_estimate: string | null
+  readonly items: readonly ItemStateOutput[]
+  readonly prereqs: readonly PrereqOutput[]
+  readonly resources: readonly ResourceOutput[]
+  readonly subsection_id: string
+  readonly tags: readonly string[]
   readonly title: string
-  readonly itemIds: readonly string[]
 }
 
-export interface RoadmapSectionOutput extends ToolOutput {
-  readonly sectionId: string
-  readonly subsectionIds: readonly string[]
+export interface SectionPageOutput {
+  readonly include: string
+  readonly next_cursor: string | null
+  readonly section_id: string
+  readonly steering: string | null
+  readonly subsections: readonly NodeOutput[]
+  readonly title: string
 }
 
-export interface RoadmapSearchOutput extends ToolOutput {
-  readonly hits: readonly ToolOutput[]
+export interface SearchHitOutput {
+  readonly item_id: string | null
+  readonly kind: string
+  readonly matched_tags: readonly string[] | null
+  readonly subsection_id: string
+  readonly title_or_text: string
 }
 
-export interface ProgressGetOutput extends ToolOutput {
-  readonly roadmapId: string
-  readonly checkedItems: number
+export interface SearchOutput {
+  readonly hits: readonly SearchHitOutput[]
+}
+
+export interface SectionProgressOutput {
+  readonly section_id: string
+  readonly total_items: number
+  readonly checked_items: number
   readonly percent: number
-  readonly checkedIds: readonly string[]
 }
 
-export interface ProgressUpdateOutput extends ProgressGetOutput {
-  readonly next?: RoadmapNextOutput
+export interface ProgressOutput {
+  readonly roadmap_id: string
+  readonly total_items: number
+  readonly checked_items: number
+  readonly percent: number
+  readonly deadline: string | null
+  readonly sections: readonly SectionProgressOutput[]
+  readonly checked_ids: readonly string[] | null
 }
 
-export interface RoadmapMutationOutput extends ToolOutput {
-  readonly roadmapId: string
+export interface ProgressUpdateOutput {
+  readonly progress: ProgressOutput
+  readonly next: NextOutput
+}
+
+export interface RoadmapMutationOutput {
+  readonly roadmap_id: string
   readonly revision: number
   readonly status: string
 }
 
 export interface CreateRoadmapDraftOutput extends RoadmapMutationOutput {
-  readonly remap?: ToolOutput
+  readonly remap: Readonly<Record<string, string>>
 }
 
 export interface PatchRoadmapDraftOutput extends RoadmapMutationOutput {
-  readonly changedNodeIds?: readonly string[]
+  readonly changed_nodes: readonly object[]
+  readonly remap: Readonly<Record<string, string>>
 }
 
 export interface ReplaceRoadmapDraftOutput extends RoadmapMutationOutput {
-  readonly remap?: ToolOutput
+  readonly remap: Readonly<Record<string, string>>
 }
 
-export interface ValidateRoadmapDraftOutput extends ToolOutput {
+export interface ValidateRoadmapDraftOutput {
   readonly publishable: boolean
-  readonly violations: readonly ToolOutput[]
+  readonly violations: readonly object[]
 }
 
-export interface PublishRoadmapOutput extends RoadmapMutationOutput {}
+export type PublishRoadmapOutput = RoadmapMutationOutput
 
 export interface ForkRoadmapOutput extends RoadmapMutationOutput {
-  readonly sourceRoadmapId: string
+  readonly source_roadmap_id: string
 }
 
-export interface EditRoadmapMetadataOutput extends ToolOutput {
-  readonly roadmapId: string
+export interface EditRoadmapMetadataOutput {
+  readonly roadmap_id: string
   readonly title: string
-  readonly description?: string
-  readonly subjectTags?: readonly string[]
+  readonly description: string | null
+  readonly subject_tags: readonly string[]
 }
+
+export type ToolOutput = object
 
 export interface ToolScenario<TOutput extends ToolOutput> {
   readonly name: string
   readonly journey: ToolJourneyName
   readonly requiredScopes: readonly OAuthScope[]
   readonly call: (context: ToolJourneyContext) => Promise<TOutput>
-  projectOutput(output: TOutput): TOutput
+  projectOutput(output: McpCallToolResult): TOutput
   assertStableResult(output: TOutput, context: ToolJourneyContext): Promise<void>
 }
 
@@ -156,4 +272,3 @@ export interface ToolCoverageDifference {
   readonly duplicateScenarioNames: readonly string[]
 }
 
-export type AdvertisedToolList = readonly AdvertisedTool[]
