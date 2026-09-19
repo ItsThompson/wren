@@ -168,8 +168,14 @@ function assertOverviewCounts(output: OverviewOutput, context: ToolJourneyContex
   ) {
     throw new Error('roadmap overview does not report the stable initial study counts')
   }
+  const sectionIds = output.sections.map((section) => section.section_id)
   const section = output.sections.find((candidate) => candidate.section_id === context.state.sectionId)
-  if (section === undefined || section.total_items !== context.state.itemIds.length || section.checked_items !== 0) {
+  if (
+    JSON.stringify(sectionIds) !== JSON.stringify([context.state.sectionId]) ||
+    section === undefined ||
+    section.total_items !== context.state.itemIds.length ||
+    section.checked_items !== 0
+  ) {
     throw new Error('roadmap overview does not report the expected section counts')
   }
 }
