@@ -1,41 +1,80 @@
 # CI/CD
 
-This guide describes the continuous-integration jobs, the continuous-deployment phases, the merge gates, and the required secrets. It documents the current implemented state. The deploy and rollback mechanics live in the runbooks; this guide owns the pipeline view.
-
-Canonical sources:
-
-- CI: `.github/workflows/ci.yml`
-- CD: `.github/workflows/cd.yml`
-- Uptime probe: `.github/workflows/healthcheck.yml`
-- Deploy script: `scripts/deploy.sh`
+This guide describes the CI gate, diagnostic policy, deployment phases, and merge gates. The deploy and rollback mechanics live in the runbooks. Canonical sources are `.github/workflows/ci.yml`, `.github/workflows/cd.yml`, `.github/workflows/healthcheck.yml`, and `scripts/deploy.sh`.
 
 ## Pipeline overview
 
 ```mermaid
 graph LR
-  pr["Pull request or push to main"] --> ci["CI: lint, drift, tests, e2e"]
+  pr["Pull request or push to main"] --> ci["CI: lint, drift, tests, required e2e"]
   ci -->|"success on main"| cd["CD: build, push, deploy"]
   cd --> vps["VPS over the Docker Context"]
   cron["Every 12 hours"] --> hc["Healthcheck probe"]
 ```
 
-CI runs on every pull request and on pushes to `main`. CD runs after CI concludes successfully on `main`, or by manual dispatch. The healthcheck workflow runs on a schedule, independent of a deploy.
+CI runs on every pull request and push to `main`. The `e2e` job is one stable required system-test check. CD runs after CI succeeds on `main` or through manual dispatch. The healthcheck workflow runs independently on a schedule.
 
 ## CI jobs
 
 | Job | Gates | Notes |
-|-----|-------|-------|
-| `lint` | Format, style, and types for the Python workspace and the frontend | Ruff and mypy for backend, MCP, and wren-common; `tsc` and oxlint for the frontend. Gates the test jobs. |
-| `codegen-drift` | The frozen frontend REST client | Regenerates the OpenAPI document and the TS client, then fails on a stale committed client. Independent of `lint`. |
-| `mcp-codegen-drift` | The generated MCP Group-A schemas | Regenerates the internal-app OpenAPI artifact and the Group-A schema module, then fails on a stale committed artifact or module. Independent of `lint`. |
-| `contract-drift` | Cross-package wire contracts | Runs the `contract/` project: the internal-boundary header constants, the OAuth scope constants, that the generated MCP Group-A module is exactly Group A, and that each lean write result is a field-subset of its backend source. Needs `lint`. |
-| `test-backend` | Backend and MCP behavior | pytest with the 80% backend coverage gate, then the MCP suite with its 80% gate, then the wren-common seam tests. Real Postgres per test via testcontainers. Needs `lint`. |
-| `test-frontend` | Frontend behavior | vitest with the 70% coverage gate. Needs `lint`. |
-| `e2e` | The full spine | Builds and boots the Compose stack with the e2e overlay, runs pre-traffic migrations, then runs Playwright. Needs `lint`. |
+|---|---|---|
+| `lint` | Python and frontend format, style, and type checks | Gates the test jobs. |
+| `codegen-drift` | Generated frontend REST client | Fails when committed output is stale. |
+| `mcp-codegen-drift` | Generated MCP Group-A schemas | Fails when committed output is stale. |
+| `contract-drift` | Cross-package headers, scopes, schemas, and lean results | Runs the `contract/` project. |
+| `test-backend` | Backend, MCP, and wren-common behavior | Uses the existing coverage gates and testcontainers. |
+| `test-frontend` | Frontend behavior | Uses the existing frontend coverage gate. |
+| `e2e` | Complete production-mode HTTPS system suite | Uses one stack, Chromium, two workers, and the command contract below. |
 
-Route coverage is not a separate job. The `test_route_registry.py` coverage check runs inside the backend pytest suite.
+Route coverage runs inside the backend pytest suite. Every uv job resolves against the shared root `uv.lock`.
 
-Every `uv` job resolves against the single root `uv.lock`: it syncs the shared workspace venv once with `uv sync --all-packages --frozen`, then runs each member's tools with `uv run --no-sync`. There are no per-package lockfiles. See `docs/packaging.md`.
+## Required E2E gate
+
+The `e2e` job runs for every pull request and push to `main`. Keep the job name stable because branch protection must require the `e2e` check. A workflow file alone does not configure branch protection.
+
+The job installs the E2E dependencies, runs `just setup-e2e`, then runs these static gates before Compose or browser startup:
+
+```sh
+just e2e-typecheck
+just e2e-lint
+just test-e2e-unit
+```
+
+It then uses the same lifecycle as local runs:
+
+```sh
+just e2e-up
+just test-e2e-system
+just e2e-capture-artifacts   # on failure, before teardown
+just e2e-down
+just reset-e2e-trust
+```
+
+The system run uses one focused stack at `app.wren.test`, `api.wren.test`, and `mcp.wren.test` with ingress, frontend, one backend container, MCP, Postgres, and recorder. The backend container has separate external and internal listeners, not separate containers. It uses Chromium, two workers, `fullyParallel: false`, one CI retry, and `trace: on-first-retry`. Screenshots are captured on failure. The CI job has a 25-minute hard timeout. Static checks, setup, migration, readiness, Playwright, artifact safety, and teardown failures fail the job.
+
+## Runtime evidence
+
+The job records the commit SHA, GitHub run and attempt identity, complete-job duration, Playwright-step duration, worker count, retry count, browser, and shard status in the job summary. Runner queue time is excluded. Normal complete-job duration remains under 300 seconds, or five minutes, across representative completed runs.
+
+Review sharding after any of these five conditions:
+
+1. Complete-job p95 exceeds 240 seconds.
+2. Two-worker Playwright p95 exceeds 180 seconds.
+3. Worker speedup versus one worker is below 1.3x.
+4. Repeatable shared-stack CPU or database contention occurs.
+5. A scenario requires an environment that cannot coexist in one stack.
+
+The initial delivery adds no GitHub Actions shards.
+
+## Failure artifacts and cleanup
+
+On failure, CI captures the Playwright HTML report, first-retry traces, failure screenshots, safe test attachments, logs for ingress, frontend, backend, MCP, Postgres, and recorder, and a sanitized recorder projection. The sanitizer redacts registered synthetic secrets and sensitive request fields, rebuilds the output, scans the final bytes, and fails closed. CI uploads `/tmp/wren-safe-artifacts/` only when that scan passes. A failed scan uploads no diagnostic bundle.
+
+Capture runs before teardown while the recorder and sensitive-value registries remain available. Teardown runs after capture and upload outcomes with `if: always()`, then trust reset runs with `if: always()`. Teardown removes the disposable stack, volumes, control token, and generated OAuth signing material. Private keys, raw envelopes, cookies, tokens, passwords, request bodies, and unsafe traces are never uploaded.
+
+## Future shard shape
+
+When a sharding review is approved, use a two-shard matrix with `fail-fast: false`. Give each shard its own Compose project and database, one Playwright worker initially, a shard-specific run identity and artifact name, and a Playwright blob report. Merge blob reports downstream. Every shard and the merged result remain required checks. Do not choose shard count dynamically from one run's duration.
 
 ## Merge gates
 

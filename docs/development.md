@@ -1,85 +1,65 @@
 # Development
 
-This guide covers local setup, the per-area development loops, code generation, and the environment-variable groups. It documents the current implemented state. Commands run through `just`; run `just --list` for the full recipe set.
+This guide separates the fast development inner loop from production-mode system E2E. Commands run through `just`; run `just --list` for the full recipe set.
 
 ## Prerequisites
 
 | Tool | Purpose | Install |
-|------|---------|---------|
-| uv | Python package and venv manager (backend, MCP) | https://docs.astral.sh/uv/ |
-| just | Command runner for all recipes | https://github.com/casey/just |
-| Node.js | Frontend toolchain (version 22) | https://nodejs.org/ |
-| Docker | Postgres, the full stack, and E2E | https://docs.docker.com/get-docker/ |
+|---|---|---|
+| uv | Python package and virtual-environment manager | https://docs.astral.sh/uv/ |
+| just | Repository command runner | https://github.com/casey/just |
+| Node.js 22 | Frontend and E2E toolchain | https://nodejs.org/ |
+| Docker | Postgres, development stack, and E2E topology | https://docs.docker.com/get-docker/ |
+| mkcert | Isolated local E2E CA and certificate | https://github.com/FiloSottile/mkcert |
 
-## Environment setup
+## Development inner loop
 
-Copy the annotated example file to a working `.env`:
+The inner loop favors fast reloads and direct local ports. It uses the existing development cookie and transport posture. It is not the production-parity E2E environment.
 
 ```sh
 cp .env.example .env
+just setup
+just dev-infra
+just dev-api           # external app on http://127.0.0.1:8000
+just dev-api-internal  # internal app on http://127.0.0.1:8001
+just migrate
+just setup-frontend
+just dev-web
 ```
 
-`.env.example` is the canonical, sectioned list of every variable, grouped by consumer. Read it for the meaning and default of each key. This guide names the groups; it does not restate each variable.
+Run the two backend apps in separate terminals. Use `just dev-mock` for frontend iteration without a backend. Use `just dev-mcp` for the MCP Resource Server on local port `9000`.
 
-The host inner-loop recipes read `.env` from the repo root. `wren.core.settings` anchors the file to the repo root, so `just dev-api` loads it regardless of the recipe working directory.
+For the full development stack, run `just up-dev`, `just down-dev`, or `just reset`. This stack uses bind mounts, reload, and development cookie behavior. It is separate from E2E.
 
-## Development workflows
+## Production-mode E2E
 
-### Python workspace
+E2E verifies public HTTPS contracts through exactly these hosts:
 
-The Python packages (`backend`, `mcp`, `contract`, `shared/wren-common`) form a uv workspace with one shared root `.venv` and a single root `uv.lock`. `just setup` (or `uv sync --all-packages` from the repo root) installs every member and its dev tools into that venv, so `cd backend && uv run pytest` and the sibling recipes resolve against it. Images install one member's locked deps instead; see `docs/packaging.md` for that and the repo-root Docker build context.
+- `https://app.wren.test` for the SPA, browser consent, and recorder routes.
+- `https://api.wren.test` for REST and OAuth authorization-server routes.
+- `https://mcp.wren.test` for protected-resource metadata and `/mcp` transport.
 
-### Backend host inner loop
+The topology contains ingress, frontend, one backend container with external and internal listeners, MCP, disposable Postgres, and recorder. Only ingress publishes host port `443`. The backend listeners are not separate containers. E2E runs with `ENVIRONMENT=production`, Secure `.wren.test` cookies, trusted forwarded HTTPS headers, and internal HTTP only after ingress or MCP routing has selected the service.
+
+The E2E environment never uses the production database, production keys, production hostnames, production Sentry service, or Cloudflare tunnel. It uses synthetic test-only secrets, a disposable database, an isolated mkcert `CAROOT`, and generated OAuth RSA signing material. Generated files live under ignored E2E paths and are removed by teardown or trust reset.
+
+### Setup and command sequence
 
 ```sh
-just setup             # sync the workspace venv (uv sync --all-packages)
-just dev-infra         # start local Postgres in Docker
-just dev-api           # external app on http://127.0.0.1:8000, autoreload
-just dev-api-internal  # internal app on http://127.0.0.1:8001, autoreload
-just migrate           # apply migrations up to head
+just setup-e2e          # Install npm and Chromium dependencies, hosts, CA, and OAuth key
+just test-e2e-unit      # Run E2E Vitest unit and harness tests without Compose
+just e2e-up             # Run migrations, start the focused stack, and wait for HTTPS readiness
+just test-e2e           # Run typecheck, lint, Vitest, and Playwright
+just e2e-logs           # Show six-service logs
+just e2e-down           # Stop the stack and remove disposable volumes and generated OAuth material
+just reset-e2e-trust    # Remove only Wren-managed hosts and isolated certificate material
 ```
 
-Run the two apps in separate terminals. The external app serves the SPA and the OAuth AS; the internal app serves the routes the MCP server calls.
+`just setup-e2e` supports macOS contributor workstations and Ubuntu CI hosts. It maps `app.wren.test`, `api.wren.test`, and `mcp.wren.test` to local ingress, issues a certificate for all three names, installs or verifies OS trust, validates Node trust through `NODE_EXTRA_CA_CERTS`, and creates the generated OAuth signing key. It is safe to run again. Host reset preserves unrelated entries and certificate authorities.
 
-### Frontend
+`just e2e-up` starts Postgres, runs the migration before application traffic, builds only the focused topology, and waits for app root, API authorization-server metadata, MCP PRM and JWKS health, and recorder readiness. It fails closed on any check. Use `just test-e2e-system` for only the Playwright run against an already-ready stack. Use `just e2e-capture-artifacts` before teardown to create the safe failure bundle.
 
-```sh
-just setup-frontend    # install frontend dependencies (npm install)
-just dev-web           # SPA against the real backend
-just dev-mock          # SPA against the zero-backend MSW mock harness
-```
-
-Use `just dev-mock` to develop the SPA with no backend running. It starts the MSW mock worker (`VITE_MOCK_API=true`).
-
-### MCP server
-
-```sh
-just setup-mcp         # sync the workspace venv (same shared venv as just setup)
-just dev-mcp           # MCP Resource Server on :9000, autoreload
-```
-
-The MCP Inspector attaches to `:9000`. The RS validates agent tokens against the external app's JWKS, so run the external app (or the full stack) alongside it.
-
-### Full stack
-
-```sh
-just up-dev            # full stack in Docker: bind mounts, reload, relaxed cookies
-just down-dev          # stop the dev stack (keeps named volumes)
-just reset             # stop the dev stack and drop its volumes
-```
-
-`just up-dev` builds and runs every service locally as a self-contained stack.
-
-### End-to-end
-
-```sh
-just setup-e2e         # install the Playwright runner and the chromium browser (once)
-just e2e-up            # build and boot the e2e stack, run pre-traffic migrations
-just test-e2e          # run the Playwright spine and smoke
-just e2e-down          # tear down the e2e stack and drop its volumes
-```
-
-See `docs/testing.md` for the test layers and `docs/ci-cd.md` for how CI runs E2E.
+Always clean up with `just e2e-down`. Run `just reset-e2e-trust` when the E2E hosts or CA are no longer needed. Teardown is safe after interruption and removes containers, networks, Postgres and recorder volumes, control tokens, and generated OAuth signing material.
 
 ## Code generation
 
