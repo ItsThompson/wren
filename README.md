@@ -106,6 +106,23 @@ just dev-web           # boot the SPA against the real backend
 
 See `docs/development.md` for the full development guide.
 
+## Production-mode E2E
+
+The E2E suite runs through trusted HTTPS at `app.wren.test`, `api.wren.test`, and `mcp.wren.test`. It starts one focused stack with ingress, frontend, one backend container with external and internal listeners, MCP, disposable Postgres, and recorder. Only ingress publishes host port `443`.
+
+Run the canonical lifecycle:
+
+```sh
+just setup-e2e
+just e2e-up
+just test-e2e
+just e2e-logs
+just e2e-down
+just reset-e2e-trust
+```
+
+Use `just test-e2e-unit` for E2E Vitest tests without Compose and `just test-e2e-system` for only the Playwright suite against a running stack. See [`e2e/README.md`](e2e/README.md) for clean-workstation setup, official MCP consent, recorder behavior, artifacts, and troubleshooting. See [`docs/testing.md`](docs/testing.md) for test ownership and [`docs/ci-cd.md`](docs/ci-cd.md) for the required gate.
+
 ## Alternate run modes
 
 | Recipe | Mode |
@@ -113,7 +130,6 @@ See `docs/development.md` for the full development guide.
 | `just dev-mock` | SPA against the zero-backend MSW mock harness |
 | `just dev-mcp` | MCP Resource Server on `:9000` (the MCP Inspector attaches here) |
 | `just up-dev` | Full stack in Docker with bind mounts and reload |
-| `just e2e-up` | E2E stack with published ports for Playwright |
 
 ## Common commands
 
@@ -131,7 +147,7 @@ See `docs/development.md` for the full development guide.
 
 Run `just --list` for the full recipe set.
 
-Health and metrics are available on all apps: `GET /healthz` (liveness), `GET /readyz` (readiness), and `GET /metrics` (Prometheus).
+Development app listeners expose `GET /healthz`, `GET /readyz`, and `GET /metrics` for local diagnostics. The production-mode E2E ingress denies these public paths and checks the documented HTTPS contracts instead.
 
 Configuration comes from environment variables. See `.env.example` for the canonical annotated list.
 
@@ -152,8 +168,8 @@ A `contract/` project holds cross-package tests, `shared/wren-common` holds the 
 |----------|-------------|
 | [docs/architecture.md](docs/architecture.md) | System topology, component roles, trust zones, and request flows |
 | [docs/development.md](docs/development.md) | Prerequisites, environment setup, per-area workflows, and codegen |
-| [docs/testing.md](docs/testing.md) | Test layers, commands, patterns, and high-value targets |
-| [docs/ci-cd.md](docs/ci-cd.md) | CI jobs, CD phases, merge gates, and required secrets |
+| [docs/testing.md](docs/testing.md) | Test ownership, system E2E boundaries, and high-value targets |
+| [docs/ci-cd.md](docs/ci-cd.md) | Required CI gate, diagnostics, runtime policy, and CD phases |
 | [docs/api.md](docs/api.md) | REST route catalog, access rules, response contracts, and the error contract |
 | [docs/data-model.md](docs/data-model.md) | Storage ownership, per-store schemas, and the roadmap lifecycle |
 | [docs/auth.md](docs/auth.md) | Trust boundaries, session model, OAuth 2.1 AS, and the MCP bearer boundary |

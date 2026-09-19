@@ -1,105 +1,82 @@
 # Testing
 
-This guide describes the test layers, how to run each one, the main patterns, and the high-value targets. It documents the current implemented state.
+This guide defines ownership for each test layer. It keeps system E2E focused on public contracts that lower layers cannot prove alone.
 
-## Philosophy
+## Test layers and ownership
 
-- Pure deep modules (the DAG validator, the next-item computation, the projection helpers) are exhaustively tested, including property tests.
-- Trust boundaries fail closed and are tested for the deny path.
-- Cross-package wire contracts are machine-gated, so drift between the backend and the MCP server fails a test rather than a request in production.
-- The frontend pins its SWR posture and a coverage floor, so test behavior cannot drift from production behavior.
+| Layer | Owns | Tooling and command |
+|---|---|---|
+| Pure unit | Domain rules, projections, configuration validation, attempt identity, registry differences, envelope parsing, and artifact projections | pytest or Vitest; package-specific commands |
+| Property | DAG validation, patch operations, next-item calculation, and slugs | pytest and Hypothesis through `just test-backend` |
+| Backend integration | Services, repositories, routers, OAuth, and database behavior | pytest and testcontainers through `just test-backend` |
+| Frontend unit and component | Components, hooks, session middleware, data-layer states, and retry UI | Vitest, Testing Library, and MSW through `just test-frontend` |
+| Contract and codegen drift | Cross-package headers and scopes, generated clients, Group-A schemas, and lean result subsets | `contract-drift`, `codegen-drift`, and `mcp-codegen-drift` CI jobs |
+| MCP integration | Tool registration, internal client, bearer boundary, schemas, and protocol permutations | pytest through `just test-mcp` |
+| E2E unit and harness | Fixture ownership, callback lifecycle, OAuth storage, recorder behavior, registry set equality, and sanitizer safety | Vitest through `just test-e2e-unit`; no separate percentage floor |
+| System E2E | Public HTTPS, official MCP authorization, browser journeys, persisted effects, concurrent isolation, and browser recovery | Playwright and the official MCP TypeScript client through `just e2e-up` and `just test-e2e` |
 
-## Test layers
+Backend and MCP suites retain their existing 80% floors. Frontend retains its existing 70% floor. E2E unit and harness tests have no numeric floor, but every new deep module has direct behavioral tests.
 
-| Layer | Scope | Tooling | Command |
-|-------|-------|---------|---------|
-| Backend unit and integration | Service rules, repositories, routers, OAuth flow, DB integration | pytest, Postgres via testcontainers, 80% coverage gate | `just test-backend` |
-| Backend property tests | The DAG validator, patch operations, validation, next, slugs | pytest plus hypothesis | `just test-backend` |
-| Frontend unit and component | Components, hooks, the data layer | vitest plus Testing Library, 70% coverage gate | `just test-frontend` |
-| Frontend acceptance | The SWR data layer against a mock backend | vitest plus MSW | `just test-frontend` |
-| Contract drift | Cross-package header/scope constants, that the generated MCP Group-A module is exactly Group A (no leaked domain types), and that each lean write result is a field-subset of its backend source | pytest in the `contract/` project | (CI `contract-drift` job) |
-| Codegen drift | The committed frontend client and the generated MCP Group-A schema module are regenerated and diffed against a clean tree | `just codegen` / `just codegen-mcp`, then `git diff --exit-code` | (CI `codegen-drift` + `mcp-codegen-drift` jobs) |
-| MCP | Tool registration, the internal client, the bearer boundary, the frozen tool-schema snapshot and its structural guard | pytest, 80% coverage gate | `just test-mcp` |
-| wren-common seams | The logging/metrics/health injection seams (metrics registry, readiness checks) | pytest | `cd shared/wren-common && uv run pytest` (also in CI `test-backend`) |
-| E2E | The full spine and UI smoke against the running stack | Playwright | `just test-e2e` |
+## System E2E boundary
 
-The contract project is the only interpreter where the backend and MCP packages import together. Run it with `cd contract && uv run pytest`, or let the CI `contract-drift` job run it.
+System E2E runs one production-mode Compose topology through trusted HTTPS at `app.wren.test`, `api.wren.test`, and `mcp.wren.test`. It uses nginx, the frontend, one backend container with external and internal listeners, MCP, Postgres, and the local recorder. The listeners are not separate containers. It does not mock the backend, OAuth server, MCP server, database, or frontend API on success paths.
 
-## Patterns
+The agent boundary is the official MCP client through `https://mcp.wren.test`, MCP, the internal backend listener, shared services, and Postgres. Agent tests own discovery, browser consent, dynamic registration, PKCE, initialization, refresh, revocation, tool calls, and persisted read-backs. They do not handcraft MCP JSON-RPC or duplicate lower-layer schema and error matrices.
 
-The examples below are illustrative, not copied source. They show the shape of each style.
+The human boundary is Chromium against `https://app.wren.test` and `https://api.wren.test`. Visible registration, onboarding, consent, navigation, form controls, checklist changes, lifecycle actions, and recovery actions use real browser controls. API helpers may create unrelated setup accounts and perform independent postcondition reads. They may not perform the user interaction under test.
 
-### A pure-module unit test
+System E2E covers composition, production cookies and origins, forwarded HTTPS, public routing, official-client behavior, stable persisted effects, and browser recovery. Lower layers own detailed REST validation, full schema and annotation snapshots, route and render permutations, pure domain rules, cryptographic claim matrices, cursor boundaries, and exhaustive protocol errors.
 
-A pure deep module takes inputs and returns a result, so a test asserts on the return value with no I/O or mocks.
+## Exact MCP tool coverage
 
-```python
-def test_next_skips_checked_items():
-    roadmap = build_roadmap(items=["a", "b"], edges=[("a", "b")])
-    progress = build_progress(checked={"a"})
-    result = compute_next(roadmap, progress)
-    assert [item.id for item in result.items] == ["b"]
+The initialized official client retrieves the advertised tool list through its public SDK method. The immutable scenario registry must contain exactly these 17 names:
+
+```text
+roadmap_list
+roadmap_get_profile
+roadmap_get
+roadmap_get_overview
+roadmap_get_next
+roadmap_get_node
+roadmap_get_section
+roadmap_search
+progress_get
+progress_update
+create_roadmap_draft
+patch_roadmap_draft
+replace_roadmap_draft
+validate_roadmap_draft
+publish_roadmap
+fork_roadmap
+edit_roadmap_metadata
 ```
 
-### An MSW-backed hook test
+The gate preserves arrays to detect duplicates, compares the advertised and registry name sets in both directions, and fails with sorted missing and unexpected names. A count-only or subset assertion does not satisfy the invariant. Each registered tool has at least one successful official-client call. Writes have a later independent read of their persisted effect. Assertions select stable IDs, state, relationships, counts, and revisions rather than full payload snapshots.
 
-A data-layer test renders a hook through the provider stack and serves the REST response from an MSW handler, so the test pins the real client contract.
+## Fixtures, cleanup, retries, and concurrency
 
-```tsx
-it("returns the dashboard body", async () => {
-  server.use(http.get("*/me/dashboard", () => HttpResponse.json(dashboard)));
-  const { result } = renderHook(() => useDashboard(), { wrapper: renderWithProviders });
-  await waitFor(() => expect(result.current.data).toEqual(dashboard));
-});
-```
+Every custom browser context, API context, callback listener, MCP session, and recorder query belongs to a fixture or resource owner. Owners register resources immediately after creation, close them in reverse order, continue after one close failure, and report aggregate cleanup errors. Cleanup runs after pass, failure, timeout, and retry.
 
-### A route-coverage assertion
+Each attempt has a run ID, test identity, worker index, retry number, and nonce. Accounts, roadmaps, OAuth clients, and recorder tags use that identity. A retry creates fresh attempt data and never depends on deleting rows from its first attempt. Specs do not require an empty shared database, one global account, one global recorder event, or a fixed execution order.
 
-Every mounted product route needs a `route_registry.py` entry per app. The coverage test cross-checks the mounted routes against the registry in both directions, so an undeclared route fails deny.
+Local debugging uses one worker and zero retries. CI uses two workers against one stack, `fullyParallel: false`, one retry, and a first-retry trace. Files can run concurrently, while a stateful journey keeps its local ordering inside one test.
 
-```python
-def test_every_mounted_route_is_declared():
-    missing = verify_route_coverage(app, registry)
-    assert missing == set()
-```
+## Browser recovery and recorder scope
 
-Canonical source: `backend/tests/`.
+The browser uses the real SDK transport with the local recorder in place of Sentry. Recovery E2E injects one dashboard HTTP 500 and one connected-agents network failure through Playwright routing. It asserts the existing retry UI, recovery, and a matching scrubbed envelope. No E2E request contacts a Sentry-owned host.
 
-## High-value targets
+The recorder stores append-only envelopes and supports bounded matching by attempt, operation, and failure kind. Tests never clear it globally or select its latest event. Artifact export contains only a sanitized projection. Lower-layer frontend tests continue to own SDK initialization, scrubber behavior, and route or render permutations.
 
-| Priority | Target | Focus |
-|----------|--------|-------|
-| High | The DAG validator | Property tests over graph shapes; cycles and ordering |
-| High | Route coverage | `test_route_registry.py`; an undeclared route fails deny |
-| High | The generated Group-A module, the lean-write-result subset, and header/scope constants | `contract/tests/`; cross-package drift fails a test |
-| High | Revalidate-after-write | `frontend/src/test/acceptance/`; no stale flash, no extra GET |
-| High | Auth boundaries | `require_user` and `require_internal_user` deny paths; the OAuth cleanup reaper |
-| Medium | Next-item computation and projections | Server-computed study order, `concise` and `detailed` shapes |
+## Commands and runtime target
 
-## End-to-end scenarios
+Use `just setup-e2e`, `just e2e-up`, `just test-e2e`, `just e2e-logs`, `just e2e-down`, and `just reset-e2e-trust` for the documented local workflow. `just test-e2e-unit`, `just e2e-typecheck`, and `just e2e-lint` run E2E gates without starting Compose.
 
-The Playwright spine drives the full stack. The scenarios cover:
+The normal full CI job target is under five minutes excluding runner queue time. CI records complete-job and Playwright-step durations. The initial policy uses one shared stack and no shards. Review sharding when complete-job p95 exceeds 240 seconds, two-worker Playwright p95 exceeds 180 seconds, worker speedup is below 1.3x, shared-stack CPU or database contention repeats, or a scenario requires an incompatible environment.
 
-| Scenario | Path |
-|----------|------|
-| Register | A human registers in the SPA |
-| Agent OAuth connect | An agent walks the 401, PRM, AS authorize, and token flow |
-| Author to publish | An agent creates a draft, validates, and publishes it |
-| Follow and study | A human follows a published roadmap and reads the next node |
-
-Canonical source: `e2e/tests/`.
-
-## Coverage gates
-
-| Suite | Floor | Enforced by |
-|-------|-------|-------------|
-| Backend | 80% | `just test-backend` (pytest config) |
-| MCP | 80% | `just test-mcp` (pytest config) |
-| Frontend | 70% | `just test-frontend` (`vite.config.ts` thresholds) |
-
-A run below a floor fails locally and in CI.
+Canonical sources: `e2e/tests/`, `e2e/fixtures/`, `e2e/agent/`, and `e2e/artifacts/`.
 
 ## Cross-references
 
-- Commands and local setup: `docs/development.md`.
-- CI jobs and gates: `docs/ci-cd.md`.
+- Operational E2E setup and troubleshooting: [`e2e/README.md`](../e2e/README.md).
+- Development inner loops and production-mode E2E: [`docs/development.md`](development.md).
+- Required CI gate and diagnostics: [`docs/ci-cd.md`](ci-cd.md).
