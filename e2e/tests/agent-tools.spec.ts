@@ -1,8 +1,5 @@
 import { expect, test } from '../fixtures/test'
-import type { APIRequestContext } from '@playwright/test'
-import type { RoadmapFixtureIdentity } from '../fixtures/attempt-identity'
-import { API_BASE_URL } from '../helpers/config'
-import { buildPublishableRoadmap } from '../helpers/api'
+import { createPublishableRoadmap, publishRoadmap } from '../helpers/api'
 import { assertToolCoverage } from '../agent/scenarios/registry'
 import {
   authoringScopes,
@@ -63,7 +60,8 @@ test.describe('official MCP tool journeys', () => {
     await registerAccount(account.page, account)
     await completeOnboarding(account.page)
 
-    const roadmapId = await seedPublishedRoadmap(account.context.request, roadmapIdentity)
+    const roadmapId = await createPublishableRoadmap(account.context.request, roadmapIdentity)
+    await publishRoadmap(account.context.request, roadmapId)
     const session = await agentFactory.create(account.page, studyScopes())
     await assertToolCoverage(session)
 
@@ -90,17 +88,3 @@ test.describe('official MCP tool journeys', () => {
     expect(result.finalNext.remaining_in_path).toBe(1)
   })
 })
-
-async function seedPublishedRoadmap(
-  request: APIRequestContext,
-  identity: RoadmapFixtureIdentity,
-): Promise<string> {
-  const createResponse = await request.post(`${API_BASE_URL}/roadmaps`, {
-    data: buildPublishableRoadmap({ identity }),
-  })
-  expect(createResponse.status(), await createResponse.text()).toBe(201)
-  const created = (await createResponse.json()) as { id: string }
-  const publishResponse = await request.post(`${API_BASE_URL}/roadmaps/${created.id}:publish`)
-  expect(publishResponse.status(), await publishResponse.text()).toBe(200)
-  return created.id
-}

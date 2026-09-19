@@ -31,7 +31,7 @@ function node(subsectionId: string, itemIds: readonly string[], prereqs: readonl
 
 describe('study journey', () => {
   it('reads the published study surface and observes progress advancement', async () => {
-    const calls: string[] = []
+    const calls: Array<{ name: string; arguments_: Record<string, unknown> }> = []
     let updated = false
     const agent: AgentSession = {
       authorization: {
@@ -43,8 +43,8 @@ describe('study journey', () => {
         hasRefreshToken: true,
       },
       listTools: async () => [],
-      callTool: async <TOutput>(name: string): Promise<TOutput> => {
-        calls.push(name)
+      callTool: async <TOutput>(name: string, arguments_: Record<string, unknown>): Promise<TOutput> => {
+        calls.push({ name, arguments_ })
         const arraysId = 'attempt_arrays'
         const hashingId = 'attempt_hashing'
         const content = (() => {
@@ -107,9 +107,26 @@ describe('study journey', () => {
     expect(result.initialNext.items.map((item) => item.item_id)).toEqual(['attempt_read', 'attempt_drill'])
     expect(result.finalNext.items.map((item) => item.item_id)).toEqual(['attempt_hash'])
     expect(calls).toEqual([
-      'roadmap_list', 'roadmap_get_profile', 'roadmap_get_overview', 'roadmap_get_node',
-      'roadmap_get_section', 'roadmap_search', 'progress_get', 'roadmap_get_next',
-      'progress_update', 'progress_get', 'roadmap_get_next',
+      { name: 'roadmap_list', arguments_: {} },
+      { name: 'roadmap_get_profile', arguments_: { handle: roadmap.ownerHandle } },
+      { name: 'roadmap_get_overview', arguments_: { roadmap_id: roadmap.roadmapId } },
+      {
+        name: 'roadmap_get_node',
+        arguments_: { roadmap_id: roadmap.roadmapId, subsection_id: 'attempt_hashing', format: 'detailed' },
+      },
+      {
+        name: 'roadmap_get_section',
+        arguments_: { roadmap_id: roadmap.roadmapId, section_id: 'attempt_foundations', include: 'both' },
+      },
+      { name: 'roadmap_search', arguments_: { roadmap_id: roadmap.roadmapId, query: 'hash' } },
+      { name: 'progress_get', arguments_: { roadmap_id: roadmap.roadmapId, detailed: true } },
+      { name: 'roadmap_get_next', arguments_: { roadmap_id: roadmap.roadmapId, format: 'detailed' } },
+      {
+        name: 'progress_update',
+        arguments_: { roadmap_id: roadmap.roadmapId, item_ids: ['attempt_read', 'attempt_drill'], state: 'complete' },
+      },
+      { name: 'progress_get', arguments_: { roadmap_id: roadmap.roadmapId, detailed: true } },
+      { name: 'roadmap_get_next', arguments_: { roadmap_id: roadmap.roadmapId, format: 'detailed' } },
     ])
   })
 })
