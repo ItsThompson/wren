@@ -196,7 +196,8 @@ jobs:
   # test-scripts: pure-bash test harnesses for scripts/tests/*.sh (deploy,
   # user-ops, and any future harness). Auto-discovers *_test.sh via
   # scripts/tests/run_all.sh, so adding a harness never requires a ci.yml edit.
-  # No language runtime needed -- just bash on the runner. Gated by lint.
+  # The topology harness also validates the TypeScript runtime configuration.
+  # Gated by lint.
   # ---------------------------------------------------------------------------
   test-scripts:
     needs: [lint]
@@ -204,6 +205,10 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
       - name: Script test harnesses (scripts/tests/*_test.sh)
         run: bash scripts/tests/run_all.sh

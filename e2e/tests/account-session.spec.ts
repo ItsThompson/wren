@@ -71,7 +71,7 @@ test.describe('account and session journey', () => {
 
     await page.goto('/dashboard')
     await expect(page.getByText('Log in to see your roadmaps and everything you follow.')).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Log in' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Log in' }).first()).toBeVisible()
 
     await page.goto('/settings/connections')
     await expect(page.getByText('Log in to view and manage the agents connected to your account.')).toBeVisible()
