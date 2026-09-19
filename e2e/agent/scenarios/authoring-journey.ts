@@ -20,7 +20,6 @@ import {
   assertSubsectionTitle,
   buildAuthoringRoadmap,
   buildReplacementRoadmap,
-  collectNodeIds,
   resolveRoadmapIds,
   structureSnapshot,
 } from './authoring-fixture'
