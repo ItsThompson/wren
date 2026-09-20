@@ -1,7 +1,8 @@
 import { execFile as execFileCallback } from 'node:child_process'
 import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { describe, expect, it } from 'vitest'
 
@@ -371,6 +372,57 @@ describe('artifact sanitization', () => {
 
       await expect(sanitizeArtifactFiles([{ path: input, kind: 'attachment' }], output, createSensitiveValueRegistry())).rejects.toThrow('overlap')
       await expect(access(input)).resolves.toBeUndefined()
+    } finally {
+      await rm(work, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects an output nested under an input path before reading or deleting', async () => {
+    const work = await mkdtemp(join(tmpdir(), 'wren-artifact-overlap-test-'))
+    try {
+      const input = join(work, 'input')
+      const output = join(input, 'safe')
+      await mkdir(input)
+      await writeFile(join(input, 'marker.txt'), 'preserve')
+
+      await expect(sanitizeArtifactFiles([{ path: input, kind: 'attachment' }], output, createSensitiveValueRegistry())).rejects.toThrow('overlap')
+      await expect(access(join(input, 'marker.txt'))).resolves.toBeUndefined()
+    } finally {
+      await rm(work, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects equal input and output paths before deleting the output', async () => {
+    const work = await mkdtemp(join(tmpdir(), 'wren-artifact-overlap-test-'))
+    try {
+      const output = join(work, 'same')
+      await mkdir(output)
+      await writeFile(join(output, 'marker.txt'), 'preserve')
+
+      await expect(sanitizeArtifactFiles([{ path: output, kind: 'attachment' }], output, createSensitiveValueRegistry())).rejects.toThrow('overlap')
+      await expect(access(join(output, 'marker.txt'))).resolves.toBeUndefined()
+    } finally {
+      await rm(work, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects CLI input/output directory overlap before deleting either directory', async () => {
+    const work = await mkdtemp(join(tmpdir(), 'wren-artifact-cli-overlap-test-'))
+    try {
+      const input = join(work, 'input')
+      const output = join(input, 'safe')
+      await mkdir(output, { recursive: true })
+      await writeFile(join(input, 'report.json'), JSON.stringify({ runId: 'run-1' }))
+      await writeFile(join(output, 'marker.txt'), 'preserve')
+
+      await expect(execFile(process.execPath, [
+        '--experimental-strip-types',
+        join(dirname(fileURLToPath(import.meta.url)), 'artifact-sanitizer.ts'),
+      ], {
+        env: { ...process.env, ARTIFACT_INPUT_DIR: input, ARTIFACT_OUTPUT_DIR: output },
+      })).rejects.toMatchObject({ code: 1 })
+      await expect(access(join(input, 'report.json'))).resolves.toBeUndefined()
+      await expect(access(join(output, 'marker.txt'))).resolves.toBeUndefined()
     } finally {
       await rm(work, { recursive: true, force: true })
     }

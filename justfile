@@ -260,6 +260,15 @@ test-e2e:
     export E2E_SENSITIVE_VALUES_DIR="/tmp/wren-e2e-sensitive"
     rm -rf -- "$E2E_SENSITIVE_VALUES_DIR"
     mkdir -p "$E2E_SENSITIVE_VALUES_DIR"
+    cleanup_sensitive_values() {
+        local status=$?
+        trap - EXIT
+        if [ "$status" -eq 0 ]; then
+            rm -rf -- "$E2E_SENSITIVE_VALUES_DIR" || status=$?
+        fi
+        exit "$status"
+    }
+    trap cleanup_sensitive_values EXIT
     export NODE_EXTRA_CA_CERTS="{{e2e_ca}}"
     export RECORDER_CONTROL_TOKEN="$(cat {{e2e_token}})"
     cd e2e
@@ -275,6 +284,15 @@ test-e2e-system:
     export E2E_SENSITIVE_VALUES_DIR="/tmp/wren-e2e-sensitive"
     rm -rf -- "$E2E_SENSITIVE_VALUES_DIR"
     mkdir -p "$E2E_SENSITIVE_VALUES_DIR"
+    cleanup_sensitive_values() {
+        local status=$?
+        trap - EXIT
+        if [ "$status" -eq 0 ]; then
+            rm -rf -- "$E2E_SENSITIVE_VALUES_DIR" || status=$?
+        fi
+        exit "$status"
+    }
+    trap cleanup_sensitive_values EXIT
     export NODE_EXTRA_CA_CERTS="{{e2e_ca}}"
     export RECORDER_CONTROL_TOKEN="$(cat {{e2e_token}})"
     cd e2e
@@ -309,7 +327,8 @@ e2e-down:
     #!/usr/bin/env bash
     set -euo pipefail
     if [[ -r "{{e2e_token}}" ]]; then export RECORDER_CONTROL_TOKEN="$(cat "{{e2e_token}}")"; else export RECORDER_CONTROL_TOKEN=teardown-placeholder; fi
-    trap 'status=$?; trap - EXIT; scripts/e2e/cleanup-generated.sh || status=$?; exit "$status"' EXIT
+    sensitive_values_dir="/tmp/wren-e2e-sensitive"
+    trap 'status=$?; trap - EXIT; scripts/e2e/cleanup-generated.sh || status=$?; rm -rf -- "$sensitive_values_dir" || status=$?; exit "$status"' EXIT
     docker compose {{e2e_compose}} down -v --remove-orphans
 
 # Remove only the Wren-managed host entries and isolated CA/leaf material.

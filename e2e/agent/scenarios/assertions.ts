@@ -207,4 +207,3 @@ export function assertMetadata(output: EditRoadmapMetadataOutput, context: ToolJ
   }
   return Promise.resolve()
 }
-

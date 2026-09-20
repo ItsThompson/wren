@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, open, readFile, rename } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 export type SensitiveValueCategory =
@@ -70,6 +70,13 @@ function isSensitiveValueCategory(value: string): value is SensitiveValueCategor
   return SENSITIVE_VALUE_CATEGORIES.some((category) => category === value)
 }
 
+const SNAPSHOT_DIRECTORY_MODE = 0o700
+const SNAPSHOT_FILE_MODE = 0o600
+
+function isNotFoundError(error: unknown): boolean {
+  return error instanceof Error && 'code' in error && error.code === 'ENOENT'
+}
+
 function parseSensitiveValueSnapshot(serialized: string): Partial<Record<SensitiveValueCategory, string[]>> {
   const parsed: unknown = JSON.parse(serialized)
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('sensitive-value snapshot must be an object')
@@ -84,13 +91,18 @@ function parseSensitiveValueSnapshot(serialized: string): Partial<Record<Sensiti
 }
 
 export async function persistSensitiveValueSnapshot(registry: SensitiveValueRegistry, path: string): Promise<void> {
-  await mkdir(dirname(path), { recursive: true })
+  const directory = dirname(path)
+  await mkdir(directory, { recursive: true, mode: SNAPSHOT_DIRECTORY_MODE })
+  await chmod(directory, SNAPSHOT_DIRECTORY_MODE)
+
   let existing: Partial<Record<SensitiveValueCategory, string[]>> = {}
   try {
+    await chmod(path, SNAPSHOT_FILE_MODE)
     existing = parseSensitiveValueSnapshot(await readFile(path, 'utf8'))
   } catch (error: unknown) {
-    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error
+    if (!isNotFoundError(error)) throw error
   }
+
   const snapshot = registry.snapshot()
   for (const category of SENSITIVE_VALUE_CATEGORIES) {
     const values = snapshot[category]
@@ -98,8 +110,15 @@ export async function persistSensitiveValueSnapshot(registry: SensitiveValueRegi
     const merged = new Set([...(existing[category] ?? []), ...values])
     existing[category] = [...merged]
   }
+
   const temporary = `${path}.tmp-${process.pid}`
-  await writeFile(temporary, JSON.stringify(existing))
+  const temporaryFile = await open(temporary, 'w', SNAPSHOT_FILE_MODE)
+  try {
+    await temporaryFile.chmod(SNAPSHOT_FILE_MODE)
+    await temporaryFile.writeFile(JSON.stringify(existing))
+  } finally {
+    await temporaryFile.close()
+  }
   await rename(temporary, path)
 }
 

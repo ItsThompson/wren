@@ -318,4 +318,3 @@ export function projectProgressUpdate(result: McpCallToolResult): ProgressUpdate
     next: value(source, 'next', (item, field) => nextOutput(record(item, field), field)),
   }
 }
-

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -32,21 +32,28 @@ describe('InMemorySensitiveValueRegistry', () => {
     expect(snapshot.values()).toEqual(['first-token', 'second-token'])
   })
 
-  it('merges snapshots through an atomic job-local file', async () => {
+  it('merges snapshots atomically with restricted modes on existing paths', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'wren-sensitive-test-'))
     const path = join(directory, 'worker.json')
+    const temporary = `${path}.tmp-${process.pid}`
     try {
-      const first = new InMemorySensitiveValueRegistry()
-      first.register('username', 'first-user')
-      await persistSensitiveValueSnapshot(first, path)
-      const second = new InMemorySensitiveValueRegistry()
-      second.register('email', 'second@example.com')
-      await persistSensitiveValueSnapshot(second, path)
+      await chmod(directory, 0o755)
+      await writeFile(path, JSON.stringify({ username: ['first-user'] }))
+      await chmod(path, 0o644)
+      await writeFile(temporary, 'stale snapshot')
+      await chmod(temporary, 0o644)
 
+      const registry = new InMemorySensitiveValueRegistry()
+      registry.register('email', 'second@example.com')
+      await persistSensitiveValueSnapshot(registry, path)
+
+      expect((await stat(directory)).mode & 0o777).toBe(0o700)
+      expect((await stat(path)).mode & 0o777).toBe(0o600)
       expect(JSON.parse(await readFile(path, 'utf8'))).toEqual({
         username: ['first-user'],
         email: ['second@example.com'],
       })
+      await expect(stat(temporary)).rejects.toMatchObject({ code: 'ENOENT' })
     } finally {
       await rm(directory, { recursive: true, force: true })
     }
@@ -59,6 +66,7 @@ describe('InMemorySensitiveValueRegistry', () => {
       await writeFile(path, '{not-json')
       await expect(persistSensitiveValueSnapshot(new InMemorySensitiveValueRegistry(), path)).rejects.toThrow()
       expect(await readFile(path, 'utf8')).toBe('{not-json')
+      expect((await stat(path)).mode & 0o777).toBe(0o600)
     } finally {
       await rm(directory, { recursive: true, force: true })
     }

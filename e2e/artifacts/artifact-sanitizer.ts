@@ -1,11 +1,12 @@
-import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
-import { dirname, join, relative } from 'node:path'
+import { mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
+import { basename, dirname, join, relative } from 'node:path'
 
 import { SensitiveValueCategory } from './types.ts'
 import {
   classifyArtifactKind,
   createSensitiveValueRegistry,
   sanitizeArtifacts,
+  assertNoPathOverlap,
   type SensitiveValueRegistry,
 } from './sanitizer-core.ts'
 import type { ArtifactInput, DiagnosticArtifactKind } from './types.ts'
@@ -47,7 +48,7 @@ async function runSanitizerCli(): Promise<void> {
   const inputDir = process.env.ARTIFACT_INPUT_DIR
   const outputDir = process.env.ARTIFACT_OUTPUT_DIR
   if (!inputDir || !outputDir) throw new Error('artifact input and output directories are required')
-  await rm(outputDir, { recursive: true, force: true })
+  assertNoPathOverlap([inputDir], outputDir)
   const registry = createSensitiveValueRegistry()
   const valuesPath = process.env.SENSITIVE_VALUES_FILE
   if (valuesPath) registerSensitiveValues(registry, JSON.parse(await readFile(valuesPath, 'utf8')))
@@ -57,15 +58,27 @@ async function runSanitizerCli(): Promise<void> {
     return { path, kind: classifyArtifactKind(path, containerKind), bytes: await readFile(path) }
   }))
   const result = await sanitizeArtifacts(inputs, registry)
-  for (const artifact of result.approved) {
-    const target = join(outputDir, relative(inputDir, artifact.path))
-    await mkdir(dirname(target), { recursive: true })
-    await writeFile(target, artifact.bytes)
-  }
   if (!result.passed) {
+    await rm(outputDir, { recursive: true, force: true })
     process.stdout.write(JSON.stringify({ passed: false, approvedPaths: result.approvedPaths, withheldPaths: result.withheldPaths, unsafeCategories: result.unsafeCategories }) + '\n')
     process.exitCode = 1
     return
+  }
+
+  const outputParent = dirname(outputDir)
+  await mkdir(outputParent, { recursive: true })
+  const stagingDir = await mkdtemp(join(outputParent, `.${basename(outputDir)}-`))
+  try {
+    for (const artifact of result.approved) {
+      const target = join(stagingDir, relative(inputDir, artifact.path))
+      await mkdir(dirname(target), { recursive: true })
+      await writeFile(target, artifact.bytes)
+    }
+    await rm(outputDir, { recursive: true, force: true })
+    await rename(stagingDir, outputDir)
+  } catch (error) {
+    await rm(stagingDir, { recursive: true, force: true })
+    throw error
   }
   process.stdout.write(JSON.stringify({ passed: true, approvedPaths: result.approvedPaths, redactionCounts: result.redactionCounts }) + '\n')
 }

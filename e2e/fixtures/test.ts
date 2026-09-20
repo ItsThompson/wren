@@ -70,6 +70,14 @@ export const test = base.extend<WrenFixtures>({
     await use(apiContext)
   },
 
+  context: async ({ browser, contextOptions, contextOwner, recorderIdentity, sensitiveValueRegistry }, use) => {
+    const context = await browser.newContext(contextOptions)
+    await installRecorderIngestionIdentity(context, recorderIdentity.queryIdentity)
+    installSensitiveValueCapture(context, sensitiveValueRegistry)
+    ownClosable(contextOwner, context, 'context')
+    await use(context)
+  },
+
   browserContext: async ({ browser, contextOwner, recorderIdentity }, use) => {
     const browserContext = await browser.newContext({ baseURL: FRONTEND_BASE_URL })
     await installRecorderIngestionIdentity(browserContext, recorderIdentity.queryIdentity)
@@ -126,5 +134,22 @@ export const test = base.extend<WrenFixtures>({
     await use(createAgentFactory(attemptIdentity, contextOwner, sensitiveValueRegistry))
   },
 })
+
+function installSensitiveValueCapture(
+  context: Pick<BrowserContext, 'on'>,
+  sensitiveValues: SensitiveValueRegistry,
+): void {
+  context.on('request', (request) => {
+    const headers = request.headers()
+    const cookie = headers.cookie
+    const authorization = headers.authorization
+    if (cookie !== undefined) sensitiveValues.register('session-cookie', cookie)
+    if (authorization !== undefined) sensitiveValues.register('authorization-header', authorization)
+  })
+  context.on('response', (response) => {
+    const setCookie = response.headers()['set-cookie']
+    if (setCookie !== undefined) sensitiveValues.register('session-cookie', setCookie)
+  })
+}
 
 export { expect }

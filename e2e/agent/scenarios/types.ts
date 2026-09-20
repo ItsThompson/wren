@@ -309,4 +309,3 @@ export interface ToolCoverageDifference {
   readonly duplicateAdvertisedToolNames: readonly string[]
   readonly duplicateScenarioNames: readonly string[]
 }
-

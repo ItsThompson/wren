@@ -8,22 +8,17 @@ import { FRONTEND_BASE_URL } from './helpers/config'
  * preserves ordering within each file. `globalSetup` pre-flights stack health
  * before any test runs.
  */
-const configuredWorkers = process.env.E2E_WORKERS
-  ? Number.parseInt(process.env.E2E_WORKERS, 10)
-  : process.env.CI
-    ? 2
-    : 1
-const configuredRetries = process.env.E2E_RETRIES
-  ? Number.parseInt(process.env.E2E_RETRIES, 10)
-  : process.env.CI
-    ? 1
-    : 0
-if (!Number.isInteger(configuredWorkers) || configuredWorkers < 1) {
-  throw new Error('E2E_WORKERS must be a positive integer')
+export function parseE2EInteger(name: string, rawValue: string | undefined, fallback: number, minimum: number): number {
+  if (rawValue === undefined) return fallback
+  const requirement = minimum === 0 ? 'non-negative integer' : 'positive integer'
+  if (!/^\d+$/.test(rawValue)) throw new Error(`${name} must be a ${requirement}`)
+  const value = Number(rawValue)
+  if (!Number.isSafeInteger(value) || value < minimum) throw new Error(`${name} must be a ${requirement}`)
+  return value
 }
-if (!Number.isInteger(configuredRetries) || configuredRetries < 0) {
-  throw new Error('E2E_RETRIES must be a non-negative integer')
-}
+
+const configuredWorkers = parseE2EInteger('E2E_WORKERS', process.env.E2E_WORKERS, process.env.CI ? 2 : 1, 1)
+const configuredRetries = parseE2EInteger('E2E_RETRIES', process.env.E2E_RETRIES, process.env.CI ? 1 : 0, 0)
 
 export default defineConfig({
   testDir: './tests',

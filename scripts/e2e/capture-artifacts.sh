@@ -11,7 +11,7 @@ if [[ "${ARTIFACT_OUTPUT_DIR:-$SAFE_DIR}" != "$SAFE_DIR" ]]; then
   exit 1
 fi
 case "$SENSITIVE_VALUES_DIR" in
-  /tmp/wren-e2e-sensitive|/tmp/wren-e2e-sensitive.*) ;;
+  /tmp/wren-e2e-sensitive) ;;
   *) printf 'artifact capture: sensitive-value directory is outside the safe temporary root\n' >&2; exit 1 ;;
 esac
 trap 'rm -rf -- "$RAW_DIR" "$SENSITIVE_VALUES_DIR"' EXIT
@@ -60,10 +60,11 @@ else
 fi
 
 mkdir -p "$SENSITIVE_VALUES_DIR"
+chmod 700 "$SENSITIVE_VALUES_DIR"
 VALUES_FILE="$SENSITIVE_VALUES_DIR/merged-values.json"
 export VALUES_FILE SENSITIVE_VALUES_DIR ROOT_DIR
 node --input-type=module <<'NODE'
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 const values = {}
 const categoryAliases = new Map([
@@ -118,7 +119,8 @@ if (existsSync(process.env.SENSITIVE_VALUES_DIR)) {
     if (join(process.env.SENSITIVE_VALUES_DIR, name) !== process.env.VALUES_FILE) addSnapshot(name)
   }
 }
-writeFileSync(process.env.VALUES_FILE, JSON.stringify(values))
+writeFileSync(process.env.VALUES_FILE, JSON.stringify(values), { mode: 0o600 })
+chmodSync(process.env.VALUES_FILE, 0o600)
 NODE
 
 if ! ARTIFACT_INPUT_DIR="$RAW_DIR" ARTIFACT_OUTPUT_DIR="$SAFE_DIR" SENSITIVE_VALUES_FILE="$VALUES_FILE" \

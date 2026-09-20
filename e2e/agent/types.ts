@@ -88,4 +88,3 @@ export interface McpTransportLike {
 export interface McpTransportFactory {
   create(serverUrl: URL, provider: OAuthClientProvider): McpTransportLike
 }
-

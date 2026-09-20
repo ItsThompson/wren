@@ -1,7 +1,7 @@
 import { execFile as execFileCallback } from 'node:child_process'
 import { lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile, rename } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, dirname, extname, join, normalize, relative, resolve, sep } from 'node:path'
+import { basename, dirname, extname, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 
 import {
@@ -496,13 +496,26 @@ export async function sanitizeArtifacts(inputs: readonly ArtifactInput[], regist
   return { approved, approvedPaths: approved.map((artifact) => artifact.path), withheldPaths, redactionCounts, unsafeCategories: [...unsafeCategories], passed: withheldPaths.length === 0 }
 }
 
-export async function sanitizeArtifactFiles(inputs: readonly ArtifactFileManifestEntry[], outputDir: string, registry: SensitiveValueRegistry): Promise<ArtifactSafetyResult> {
-  const resolvedOutputDir = resolve(outputDir)
-  const overlapsOutput = inputs.some((input) => {
-    const resolvedInput = resolve(input.path)
-    return resolvedInput === resolvedOutputDir || resolvedInput.startsWith(`${resolvedOutputDir}${sep}`)
+function isWithinOrEqual(parent: string, candidate: string): boolean {
+  const pathFromParent = relative(parent, candidate)
+  return pathFromParent === '' || (
+    pathFromParent !== '..' &&
+    !pathFromParent.startsWith(`..${sep}`) &&
+    !isAbsolute(pathFromParent)
+  )
+}
+
+export function assertNoPathOverlap(inputPaths: readonly string[], outputPath: string): void {
+  const resolvedOutputPath = resolve(outputPath)
+  const overlapsOutput = inputPaths.some((inputPath) => {
+    const resolvedInputPath = resolve(inputPath)
+    return isWithinOrEqual(resolvedInputPath, resolvedOutputPath) || isWithinOrEqual(resolvedOutputPath, resolvedInputPath)
   })
   if (overlapsOutput) throw new Error('artifact input cannot overlap output directory')
+}
+
+export async function sanitizeArtifactFiles(inputs: readonly ArtifactFileManifestEntry[], outputDir: string, registry: SensitiveValueRegistry): Promise<ArtifactSafetyResult> {
+  assertNoPathOverlap(inputs.map((input) => input.path), outputDir)
   const artifacts = await Promise.all(inputs.map(async (input) => ({ ...input, bytes: await readFile(input.path) })))
   const result = await sanitizeArtifacts(artifacts, registry)
   await rm(outputDir, { recursive: true, force: true })
