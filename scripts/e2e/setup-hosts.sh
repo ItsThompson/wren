@@ -5,6 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=host-file-lib.sh
 source "$SCRIPT_DIR/host-file-lib.sh"
 
+E2E_HOSTS="$(python3 "$SCRIPT_DIR/contract-hosts.py" --all)"
+read -r -a E2E_HOST_ARRAY <<< "$E2E_HOSTS"
+
 HOSTS_FILE=${WREN_E2E_HOSTS_FILE:-/etc/hosts}
 MARKER_START="# BEGIN WREN E2E MANAGED HOSTS"
 MARKER_END="# END WREN E2E MANAGED HOSTS"
@@ -30,7 +33,7 @@ if grep -q -F "$MARKER_START" "$HOSTS_FILE" || grep -q -F "$MARKER_END" "$HOSTS_
   validate_managed_markers "$HOSTS_FILE" "$MARKER_START" "$MARKER_END"
 fi
 
-for host in app.wren.test api.wren.test mcp.wren.test; do
+for host in "${E2E_HOST_ARRAY[@]}"; do
   if grep -Ev "^[[:space:]]*#" "$HOSTS_FILE" | awk -v host="$host" '{ for (field = 2; field <= NF; field += 1) if ($field == host) found=1 } END { exit !found }'; then
     if ! grep -A3 -B1 -F "$MARKER_START" "$HOSTS_FILE" | grep -q "[[:space:]]$host\([[:space:]]\|$\)"; then
       printf 'hosts: %s already has an unrelated mapping; refusing to change it\n' "$host" >&2
@@ -57,14 +60,20 @@ awk -v start="$MARKER_START" -v end="$MARKER_END" '
 ' "$HOSTS_FILE" > "$tmp"
 cat >> "$tmp" <<EOF
 $MARKER_START
-127.0.0.1 app.wren.test api.wren.test mcp.wren.test
+127.0.0.1 $E2E_HOSTS
 $MARKER_END
 EOF
 
-if ! grep -q -F "$MARKER_START" "$tmp" || ! grep -q '127\.0\.0\.1 app\.wren\.test api\.wren\.test mcp\.wren\.test' "$tmp"; then
+if ! grep -q -F "$MARKER_START" "$tmp"; then
   printf 'hosts: generated file failed validation; original preserved at %s\n' "$backup" >&2
   exit 1
 fi
+for host in "${E2E_HOST_ARRAY[@]}"; do
+  if ! awk -v host="$host" '$1 == "127.0.0.1" { for (field = 2; field <= NF; field += 1) if ($field == host) found=1 } END { exit !found }' "$tmp"; then
+    printf 'hosts: generated file failed validation for %s; original preserved at %s\n' "$host" "$backup" >&2
+    exit 1
+  fi
+done
 chmod "$original_mode" "$tmp"
 mv "$tmp" "$HOSTS_FILE"
-printf 'hosts: configured app.wren.test, api.wren.test, and mcp.wren.test\n'
+printf 'hosts: configured %s\n' "$E2E_HOSTS"

@@ -18,6 +18,7 @@ interface WorkerSession {
   query: ReturnType<typeof vi.fn>
   dispose: ReturnType<typeof vi.fn>
   recorderClient: RecorderClient
+  newContext: ReturnType<typeof vi.fn>
 }
 
 async function createWorkerSession(parallelIndex: number): Promise<WorkerSession> {
@@ -43,9 +44,8 @@ async function createWorkerSession(parallelIndex: number): Promise<WorkerSession
     get: query,
     dispose,
   } as unknown as APIRequestContext
-  const request = {
-    newContext: vi.fn(async () => context),
-  }
+  const newContext = vi.fn(async () => context)
+  const request = { newContext }
   const recorderClient = await createRecorderClient(
     request,
     owner,
@@ -61,6 +61,7 @@ async function createWorkerSession(parallelIndex: number): Promise<WorkerSession
     query,
     dispose,
     recorderClient,
+    newContext,
   }
 }
 
@@ -69,6 +70,8 @@ describe('callback and recorder fixture ownership', () => {
     const sessions = await Promise.all([createWorkerSession(0), createWorkerSession(1)])
 
     expect(sessions[0].callbackUrl).not.toBe(sessions[1].callbackUrl)
+    expect(sessions[0].newContext).toHaveBeenCalledWith({ baseURL: 'https://app.wren.test' })
+    expect(sessions[1].newContext).toHaveBeenCalledWith({ baseURL: 'https://app.wren.test' })
     expect(sessions[0].callbackIdentity).not.toBe(sessions[1].callbackIdentity)
     expect(sessions[0].recorderIdentity).not.toBe(sessions[1].recorderIdentity)
 

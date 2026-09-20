@@ -36,7 +36,7 @@ function failureKind(value: unknown): BrowserFailureKind | null {
     : null
 }
 
-function eventFields(event: Record<string, unknown>): Omit<ParsedEnvelope, 'status'> {
+function eventFields(event: Record<string, unknown>): Omit<ParsedEnvelope, 'status' | 'queryIdentity'> {
   const tags = isObject(event.tags) ? event.tags : {}
   const contexts = isObject(event.contexts) ? event.contexts : {}
   const report = isObject(contexts.report) ? contexts.report : {}
@@ -60,7 +60,7 @@ function eventFields(event: Record<string, unknown>): Omit<ParsedEnvelope, 'stat
 }
 
 /** Parse the event item from a Sentry newline-delimited envelope. */
-export function parseSentryEnvelope(body: Uint8Array): ParsedEnvelope {
+export function parseSentryEnvelope(body: Uint8Array, queryIdentity: string | null = null): ParsedEnvelope {
   let text: string
   try {
     text = new TextDecoder('utf-8', { fatal: true }).decode(body)
@@ -87,6 +87,7 @@ export function parseSentryEnvelope(body: Uint8Array): ParsedEnvelope {
     if (itemType !== 'event') {
       return {
         status: 'unsupported',
+        queryIdentity,
         operation: null,
         failureKind: null,
         environment: null,
@@ -103,5 +104,5 @@ export function parseSentryEnvelope(body: Uint8Array): ParsedEnvelope {
   }
 
   if (firstEvent === null) throw new MalformedEnvelopeError()
-  return { status: 'valid', ...eventFields(firstEvent) }
+  return { status: 'valid', queryIdentity, ...eventFields(firstEvent) }
 }

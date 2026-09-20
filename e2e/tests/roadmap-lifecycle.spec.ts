@@ -1,16 +1,14 @@
 import { expect, test } from '../fixtures/test'
-
+import { OAuthScope } from '../agent/types'
+import { completeOnboarding, login } from '../browser/auth'
 import {
   archiveRoadmap,
-  callMcpTool,
-  createAgentAccessToken,
   createPublishableRoadmap,
   forkRoadmap,
   followRoadmap,
   getDashboard,
   getProfile,
   getRoadmap,
-  listMcpTools,
   publishRoadmap,
   setPublishedVisibility,
 } from '../helpers/api'
@@ -18,8 +16,9 @@ import {
 test.describe('roadmap lifecycle and discovery', () => {
   test('keeps the complete read and owner self-follow dashboard coherent', async ({
     accountFactory,
+    browserAccountFactory,
     roadmapIdentity,
-    oauthIdentity,
+    agentFactory,
   }) => {
     const authorAccount = await accountFactory.create('life')
     const authorUser = authorAccount
@@ -29,20 +28,25 @@ test.describe('roadmap lifecycle and discovery', () => {
     await followRoadmap(author, roadmapId)
 
     const roadmap = await getRoadmap(author, roadmapId)
-    const agentToken = await createAgentAccessToken(author, oauthIdentity)
-    const tools = await listMcpTools(author, agentToken)
-    const toolNames = tools.map((tool) => String(tool.name))
+    const browserAccount = await browserAccountFactory.create('life')
+    await login(browserAccount.page, authorAccount)
+    await completeOnboarding(browserAccount.page)
+    const session = await agentFactory.create(browserAccount.page, [OAuthScope.ROADMAPS_READ])
+    const tools = await session.listTools()
+    const toolNames = tools.map((tool) => tool.name)
     expect(toolNames).toEqual(expect.arrayContaining(['roadmap_list', 'roadmap_get']))
 
-    const discoveredDashboard = await callMcpTool(author, agentToken, 'roadmap_list', {})
-    const authoredCards = discoveredDashboard.structuredContent.authored as Record<string, unknown>[]
+    const discoveredDashboard = await session.callTool<{
+      structuredContent: { authored: Record<string, unknown>[] }
+    }>('roadmap_list', {})
+    const authoredCards = discoveredDashboard.structuredContent.authored
     expect(authoredCards).toHaveLength(1)
     const discoveredCard = authoredCards[0]
     if (!discoveredCard || typeof discoveredCard.id !== 'string') {
       throw new Error('roadmap_list did not return a roadmap ID')
     }
     expect(discoveredCard.id).toBe(roadmapId)
-    const mountedFullRead = await callMcpTool(author, agentToken, 'roadmap_get', {
+    const mountedFullRead = await session.callTool<{ structuredContent: Record<string, unknown> }>('roadmap_get', {
       roadmap_id: discoveredCard.id,
     })
     expect(mountedFullRead.structuredContent).toEqual(roadmap)

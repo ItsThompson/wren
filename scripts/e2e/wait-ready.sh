@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+read -r APP_HOST API_HOST MCP_HOST <<< "$(python3 "$SCRIPT_DIR/contract-hosts.py" app api mcp)"
 CA="${ROOT_DIR}/e2e/ingress/certificates/caroot/rootCA.pem"
-APP_URL="${FRONTEND_BASE_URL:-https://app.wren.test}"
-API_URL="${API_BASE_URL:-https://api.wren.test}"
-MCP_URL="${MCP_BASE_URL:-https://mcp.wren.test}"
+APP_URL="${FRONTEND_BASE_URL:-https://${APP_HOST}}"
+API_URL="${API_BASE_URL:-https://${API_HOST}}"
+MCP_URL="${MCP_BASE_URL:-https://${MCP_HOST}}"
 RECORDER_TOKEN="${RECORDER_CONTROL_TOKEN:-}"
 MAX_ATTEMPTS=${E2E_READY_ATTEMPTS:-60}
 INTERVAL_SECONDS=${E2E_READY_INTERVAL_SECONDS:-2}
@@ -15,13 +17,13 @@ if [[ ! -r "$CA" ]]; then
   exit 1
 fi
 
-canonical_urls="$(python3 - "$APP_URL" "$API_URL" "$MCP_URL" <<'PY'
+canonical_urls="$(python3 - "$APP_URL" "$API_URL" "$MCP_URL" "$APP_HOST" "$API_HOST" "$MCP_HOST" <<'PY'
 import sys
 from urllib.parse import urlsplit
 
-expected_hosts = ("app.wren.test", "api.wren.test", "mcp.wren.test")
+expected_hosts = tuple(sys.argv[4:])
 canonical_urls = []
-for raw_url, expected_host in zip(sys.argv[1:], expected_hosts):
+for raw_url, expected_host in zip(sys.argv[1:4], expected_hosts):
     try:
         parsed = urlsplit(raw_url)
         port = parsed.port
@@ -93,7 +95,7 @@ check_public_allowlist() {
 }
 check_mcp_health() {
   local container
-  container="$(docker compose -f docker-compose.yml -f e2e/docker-compose.e2e.yml ps -q mcp)"
+  container="$(docker compose --project-directory "$ROOT_DIR" -f "$ROOT_DIR/docker-compose.yml" -f "$ROOT_DIR/e2e/docker-compose.e2e.yml" ps -q mcp)"
   [[ -n "$container" && "$(docker inspect --format '{{.State.Health.Status}}' "$container")" == healthy ]]
 }
 

@@ -1,7 +1,9 @@
+import type { BrowserContext } from '@playwright/test'
 import { describe, expect, it, vi } from 'vitest'
 
 import {
   createRecorderQueryClient,
+  installRecorderIngestionIdentity,
   pollForExactlyOneEnvelope,
 } from './recorder-client'
 import type { EnvelopeRecord } from '../recorder/src/types'
@@ -9,6 +11,7 @@ import type { EnvelopeRecord } from '../recorder/src/types'
 const record: EnvelopeRecord = {
   sequence: 1,
   receivedAtIso: '2026-09-19T00:00:00.000Z',
+  queryIdentity: 'query-1',
   rawEnvelopeUtf8: 'raw-envelope',
   parseStatus: 'valid',
   operation: 'get_dashboard_me_dashboard_get',
@@ -24,6 +27,16 @@ function response(body: unknown, status = 200): Response {
 }
 
 describe('recorder query client', () => {
+  it('registers identity injection only for the recorder ingestion route', async () => {
+    const route = vi.fn()
+    await installRecorderIngestionIdentity(
+      { route } as unknown as Pick<BrowserContext, 'route'>,
+      'query-1',
+    )
+
+    expect(route).toHaveBeenCalledWith('**/_e2e/sentry/api/**', expect.any(Function))
+  })
+
   it('uses the app ingress and keeps the raw response outside Playwright request tracing', async () => {
     const fetcher = vi.fn(async (input: string, init?: RequestInit) => {
       expect(new URL(input).origin).toBe('https://app.wren.test')

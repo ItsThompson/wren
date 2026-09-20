@@ -1,6 +1,7 @@
 import type { APIRequest } from '@playwright/test'
 
-import { API_BASE_URL, RECORDER_CONTROL_TOKEN } from '../helpers/config'
+import { FRONTEND_BASE_URL, RECORDER_CONTROL_TOKEN } from '../helpers/config'
+import { createRecorderQueryIdentityHeaders } from '../helpers/recorder-client'
 import type { BrowserFailureKind, EnvelopeRecord } from '../recorder/src/types'
 import type { RecorderFixtureIdentity } from './attempt-identity'
 import type { AsyncResource, ContextOwner } from './context-owner'
@@ -19,7 +20,7 @@ export async function createRecorderClient(
   owner: ContextOwner,
   identity: RecorderFixtureIdentity,
 ): Promise<RecorderClient> {
-  const context = await request.newContext({ baseURL: API_BASE_URL })
+  const context = await request.newContext({ baseURL: FRONTEND_BASE_URL })
   const client: RecorderClient = {
     name: `recorder-client-${identity.queryIdentity}`,
     queryIdentity: identity.queryIdentity,
@@ -27,7 +28,7 @@ export async function createRecorderClient(
       const response = await context.get('/_e2e/recorder/envelopes', {
         headers: {
           'X-Recorder-Token': RECORDER_CONTROL_TOKEN,
-          'X-Recorder-Query-Identity': identity.queryIdentity,
+          ...createRecorderQueryIdentityHeaders(identity.queryIdentity),
         },
         params: { operation, failureKind, receivedAfterIso },
       })

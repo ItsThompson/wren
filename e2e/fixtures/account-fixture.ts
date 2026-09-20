@@ -8,6 +8,7 @@ import type {
 import { expect } from '@playwright/test'
 
 import { API_BASE_URL, FRONTEND_BASE_URL } from '../helpers/config'
+import { installRecorderIngestionIdentity } from '../helpers/recorder-client'
 import {
   createAccountIdentity,
   type AttemptAccountIdentity,
@@ -43,7 +44,8 @@ export function createBrowserAccountFactory(
   browser: Pick<Browser, 'newContext'>,
   owner: ContextOwner,
   attemptIdentity: TestAttemptIdentity,
-  sensitiveValues?: SensitiveValueRegistry,
+  sensitiveValues: SensitiveValueRegistry | undefined,
+  queryIdentity: string,
 ): BrowserAccountFactory {
   let accountIndex = 0
 
@@ -55,6 +57,7 @@ export function createBrowserAccountFactory(
       sensitiveValues?.register('email', accountIdentity.email)
       sensitiveValues?.register('password', accountIdentity.password)
       const context = await browser.newContext({ baseURL: FRONTEND_BASE_URL })
+      await installRecorderIngestionIdentity(context, queryIdentity)
       if (sensitiveValues !== undefined) {
         context.on('request', (request) => {
           const headers = request.headers()

@@ -6,6 +6,7 @@ import { EnvelopeStore, RecorderStorageLimitError, RecorderValidationError } fro
 import {
   BROWSER_FAILURE_KINDS,
   DEFAULT_RECORDER_LIMITS,
+  isValidRecorderQueryIdentity,
   type RecorderLimits,
 } from './types.ts'
 
@@ -84,6 +85,11 @@ async function readBody(request: IncomingMessage, maxBytes: number): Promise<Uin
   return Buffer.concat(chunks)
 }
 
+function recorderQueryIdentity(request: IncomingMessage): string | null {
+  const value = request.headers['x-recorder-query-identity']
+  return isValidRecorderQueryIdentity(value) ? value : null
+}
+
 function queryValue(url: URL, ...names: string[]): string | undefined {
   for (const name of names) {
     const value = url.searchParams.get(name)
@@ -113,10 +119,16 @@ function handleControlRequest(
     return
   }
   if (url.pathname === '/_e2e/recorder/envelopes') {
+    const queryIdentity = recorderQueryIdentity(request)
     const operation = queryValue(url, 'operation')
     const failureKind = queryValue(url, 'failureKind', 'failure_kind')
     const receivedAfterIso = queryValue(url, 'receivedAfterIso', 'received_after')
-    if (operation === undefined || failureKind === undefined || receivedAfterIso === undefined) {
+    if (
+      queryIdentity === null
+      || operation === undefined
+      || failureKind === undefined
+      || receivedAfterIso === undefined
+    ) {
       respondError(response, 400, 'invalid_query')
       return
     }
@@ -127,6 +139,7 @@ function handleControlRequest(
     }
     try {
       const records = store.query({
+        queryIdentity,
         operation,
         failureKind: parsedFailureKind,
         receivedAfterIso,
@@ -170,10 +183,17 @@ async function handleRequest(
     return
   }
 
+  const queryIdentity = recorderQueryIdentity(request)
+  if (queryIdentity === null) {
+    request.resume()
+    respondError(response, 400, 'invalid_query_identity')
+    return
+  }
+
   let body: Uint8Array
   try {
     body = await readBody(request, maxEnvelopeBytes)
-    const parsed = parseSentryEnvelope(body)
+    const parsed = parseSentryEnvelope(body, queryIdentity)
     store.append(body, parsed)
     respond(response, 200, { accepted: true })
   } catch (error) {

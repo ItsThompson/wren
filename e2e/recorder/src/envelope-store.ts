@@ -7,6 +7,7 @@ import {
   type ParsedEnvelope,
   type RecorderLimits,
   type SanitizedEnvelopeArtifact,
+  isValidRecorderQueryIdentity,
 } from './types.ts'
 
 export class RecorderValidationError extends Error {
@@ -40,6 +41,7 @@ function validateOperation(operation: string): void {
 }
 
 function validateQuery(query: EnvelopeQuery, maxQueryResults: number): Required<EnvelopeQuery> {
+  if (!isValidRecorderQueryIdentity(query.queryIdentity)) throw new RecorderValidationError()
   validateOperation(query.operation)
   if (!isFailureKind(query.failureKind)) throw new RecorderValidationError()
   parseTime(query.receivedAfterIso)
@@ -48,6 +50,7 @@ function validateQuery(query: EnvelopeQuery, maxQueryResults: number): Required<
     throw new RecorderValidationError()
   }
   return {
+    queryIdentity: query.queryIdentity,
     operation: query.operation,
     failureKind: query.failureKind,
     receivedAfterIso: query.receivedAfterIso,
@@ -77,9 +80,13 @@ export class EnvelopeStore {
 
     const receivedAt = this.now()
     if (Number.isNaN(receivedAt.getTime())) throw new Error('recorder clock is invalid')
+    if (!isValidRecorderQueryIdentity(parsed.queryIdentity)) {
+      throw new RecorderValidationError('missing recorder query identity')
+    }
     const record: EnvelopeRecord = {
       sequence: this.nextSequence,
       receivedAtIso: receivedAt.toISOString(),
+      queryIdentity: parsed.queryIdentity,
       rawEnvelopeUtf8: new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(body)),
       parseStatus: parsed.status,
       operation: parsed.operation,
@@ -104,6 +111,7 @@ export class EnvelopeStore {
       .filter(
         (record) =>
           record.parseStatus === 'valid' &&
+          record.queryIdentity === validated.queryIdentity &&
           record.operation === validated.operation &&
           record.failureKind === validated.failureKind &&
           Date.parse(record.receivedAtIso) >= receivedAfterTime,

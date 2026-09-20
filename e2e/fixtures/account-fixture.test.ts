@@ -61,12 +61,19 @@ describe('account fixture factory', () => {
     const close = vi.fn(async () => undefined)
     const page = {} as Page
     const newPage = vi.fn(async (): Promise<Page> => page)
+    const route = vi.fn(async () => undefined)
     const browser = {
-      newContext: vi.fn(async () => ({ close, newPage, on: vi.fn() })),
+      newContext: vi.fn(async () => ({ close, newPage, on: vi.fn(), route })),
     } as unknown as Pick<Browser, 'newContext'>
     const owner = new OwnedContextResources()
     const sensitiveValues = new InMemorySensitiveValueRegistry()
-    const factory = createBrowserAccountFactory(browser, owner, buildAttemptIdentity(), sensitiveValues)
+    const factory = createBrowserAccountFactory(
+      browser,
+      owner,
+      buildAttemptIdentity(),
+      sensitiveValues,
+      'e2e-test-recorder',
+    )
 
     const account = await factory.create('human')
 
@@ -75,6 +82,7 @@ describe('account fixture factory', () => {
     expect(sensitiveValues.snapshot().email).toEqual([account.email])
     expect(sensitiveValues.snapshot().password).toEqual([account.password])
     expect(browser.newContext).toHaveBeenCalledWith({ baseURL: 'https://app.wren.test' })
+    expect(route).toHaveBeenCalledWith('**/_e2e/sentry/api/**', expect.any(Function))
     expect(newPage).toHaveBeenCalledOnce()
     expect(account.page).toBe(page)
     await owner.closeAll()

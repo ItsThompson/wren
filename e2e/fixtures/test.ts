@@ -2,6 +2,7 @@ import { test as base, expect } from '@playwright/test'
 import type { APIRequestContext, BrowserContext } from '@playwright/test'
 
 import { API_BASE_URL, FRONTEND_BASE_URL, RECORDER_CONTROL_TOKEN } from '../helpers/config'
+import { installRecorderIngestionIdentity } from '../helpers/recorder-client'
 import {
   createAttemptIdentityFromTestInfo,
   createAttemptResourceIdentities,
@@ -69,8 +70,9 @@ export const test = base.extend<WrenFixtures>({
     await use(apiContext)
   },
 
-  browserContext: async ({ browser, contextOwner }, use) => {
+  browserContext: async ({ browser, contextOwner, recorderIdentity }, use) => {
     const browserContext = await browser.newContext({ baseURL: FRONTEND_BASE_URL })
+    await installRecorderIngestionIdentity(browserContext, recorderIdentity.queryIdentity)
     ownClosable(contextOwner, browserContext, 'browser-context')
     await use(browserContext)
   },
@@ -90,8 +92,14 @@ export const test = base.extend<WrenFixtures>({
     await use(createAccountFactory(playwright, contextOwner, attemptIdentity, sensitiveValueRegistry))
   },
 
-  browserAccountFactory: async ({ browser, contextOwner, attemptIdentity, sensitiveValueRegistry }, use) => {
-    await use(createBrowserAccountFactory(browser, contextOwner, attemptIdentity, sensitiveValueRegistry))
+  browserAccountFactory: async ({ browser, contextOwner, attemptIdentity, sensitiveValueRegistry, recorderIdentity }, use) => {
+    await use(createBrowserAccountFactory(
+      browser,
+      contextOwner,
+      attemptIdentity,
+      sensitiveValueRegistry,
+      recorderIdentity.queryIdentity,
+    ))
   },
 
   roadmapIdentity: async ({ resourceIdentities }, use) => {

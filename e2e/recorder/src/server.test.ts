@@ -56,13 +56,21 @@ describe('recorder HTTP boundary', () => {
     const ingested = await fetch(`${baseUrl}/_e2e/sentry/api/1/envelope/`, {
       method: 'POST',
       body: Buffer.from(body),
-      headers: { 'Content-Type': 'application/x-sentry-envelope' },
+      headers: {
+        'Content-Type': 'application/x-sentry-envelope',
+        'X-Recorder-Query-Identity': 'query-1',
+      },
     })
     expect(ingested.status).toBe(200)
 
     const query = await fetch(
       `${baseUrl}/_e2e/recorder/envelopes?operation=get_dashboard_me_dashboard_get&failureKind=upstream&receivedAfterIso=2026-09-18T23%3A59%3A59.999Z`,
-      { headers: { 'X-Recorder-Token': token } },
+      {
+        headers: {
+          'X-Recorder-Token': token,
+          'X-Recorder-Query-Identity': 'query-1',
+        },
+      },
     )
     expect(query.status).toBe(200)
     const payload = await jsonResponse(query)
@@ -70,6 +78,17 @@ describe('recorder HTTP boundary', () => {
     expect(records).toHaveLength(1)
     expect(records[0]).toMatchObject({ sequence: 1, operation: 'get_dashboard_me_dashboard_get' })
     expect(records[0]?.rawEnvelopeUtf8).toEqual(expect.stringContaining('event-1'))
+
+    const otherIdentityQuery = await fetch(
+      `${baseUrl}/_e2e/recorder/envelopes?operation=get_dashboard_me_dashboard_get&failureKind=upstream&receivedAfterIso=2026-09-18T23%3A59%3A59.999Z`,
+      {
+        headers: {
+          'X-Recorder-Token': token,
+          'X-Recorder-Query-Identity': 'query-2',
+        },
+      },
+    )
+    expect((await jsonResponse(otherIdentityQuery)).records).toEqual([])
 
     const artifacts = await fetch(`${baseUrl}/_e2e/recorder/artifacts`, {
       headers: { 'X-Recorder-Token': token },
@@ -93,21 +112,41 @@ describe('recorder HTTP boundary', () => {
     const malformed = await fetch(`${baseUrl}/_e2e/sentry/api/1/envelope/`, {
       method: 'POST',
       body: new TextEncoder().encode('{}'),
+      headers: { 'X-Recorder-Query-Identity': 'query-1' },
     })
     expect(malformed.status).toBe(400)
 
     const oversized = await fetch(`${baseUrl}/_e2e/sentry/api/1/envelope/`, {
       method: 'POST',
       body: Buffer.alloc(33),
+      headers: { 'X-Recorder-Query-Identity': 'query-1' },
     })
     expect(oversized.status).toBe(413)
     expect(store.exportArtifacts()).toEqual([])
   })
 
+  it('rejects recorder ingestion and queries without an attempt identity', async () => {
+    const baseUrl = await startServer()
+    const ingestion = await fetch(`${baseUrl}/_e2e/sentry/api/1/envelope/`, {
+      method: 'POST',
+      body: Buffer.from(makeEnvelope()),
+    })
+    expect(ingestion.status).toBe(400)
+
+    const query = await fetch(
+      `${baseUrl}/_e2e/recorder/envelopes?operation=x&failureKind=upstream&receivedAfterIso=2026-09-18T23%3A59%3A59.999Z`,
+      { headers: { 'X-Recorder-Token': token } },
+    )
+    expect(query.status).toBe(400)
+  })
+
   it('rejects invalid bounded queries and unknown ingestion paths', async () => {
     const baseUrl = await startServer()
     const invalidQuery = await fetch(`${baseUrl}/_e2e/recorder/envelopes?operation=x&failureKind=bad&receivedAfterIso=2026-09-18T23%3A59%3A59.999Z`, {
-      headers: { 'X-Recorder-Token': token },
+      headers: {
+        'X-Recorder-Token': token,
+        'X-Recorder-Query-Identity': 'query-1',
+      },
     })
     expect(invalidQuery.status).toBe(400)
 

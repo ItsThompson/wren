@@ -1,5 +1,31 @@
 import { FRONTEND_BASE_URL, RECORDER_CONTROL_TOKEN } from './config'
-import type { BrowserFailureKind, EnvelopeRecord } from '../recorder/src/types'
+import type { BrowserContext } from '@playwright/test'
+import {
+  isValidRecorderQueryIdentity,
+  RECORDER_QUERY_IDENTITY_HEADER,
+  type BrowserFailureKind,
+  type EnvelopeRecord,
+} from '../recorder/src/types'
+
+export function createRecorderQueryIdentityHeaders(queryIdentity: string): Record<string, string> {
+  if (!isValidRecorderQueryIdentity(queryIdentity)) throw new Error('invalid recorder query identity')
+  return { [RECORDER_QUERY_IDENTITY_HEADER]: queryIdentity }
+}
+
+export async function installRecorderIngestionIdentity(
+  context: Pick<BrowserContext, 'route'>,
+  queryIdentity: string,
+): Promise<void> {
+  const headers = createRecorderQueryIdentityHeaders(queryIdentity)
+  await context.route('**/_e2e/sentry/api/**', async (route) => {
+    const requestUrl = new URL(route.request().url())
+    if (requestUrl.origin !== FRONTEND_BASE_URL) {
+      await route.continue()
+      return
+    }
+    await route.continue({ headers: { ...route.request().headers(), ...headers } })
+  })
+}
 
 export interface RecorderQueryOptions {
   signal?: AbortSignal
@@ -36,7 +62,7 @@ export function createRecorderQueryClient(options: RecorderQueryClientOptions = 
       const response = await fetcher(url.toString(), {
         headers: {
           'X-Recorder-Token': controlToken,
-          'X-Recorder-Query-Identity': queryIdentity,
+          ...createRecorderQueryIdentityHeaders(queryIdentity),
         },
         signal: queryOptions?.signal,
       })
@@ -97,6 +123,7 @@ function isEnvelopeRecord(value: unknown): value is EnvelopeRecord {
   return (
     isPositiveSafeInteger(value.sequence) &&
     isIsoTimestamp(value.receivedAtIso) &&
+    isValidRecorderQueryIdentity(value.queryIdentity) &&
     typeof value.rawEnvelopeUtf8 === 'string' &&
     (value.parseStatus === 'valid' || value.parseStatus === 'unsupported') &&
     (value.operation === null || typeof value.operation === 'string') &&

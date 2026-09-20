@@ -7,7 +7,9 @@ cd "$root"
 uv run --package wren-contract-tests python scripts/ingress_contract.py --check
 python3 scripts/e2e/test_public_contracts.py >/dev/null
 uv run --package wren-contract-tests pytest scripts/e2e/test_ingress_parity.py >/dev/null
-bash -n scripts/e2e/capture-artifacts.sh
+bash -n scripts/e2e/capture-artifacts.sh scripts/e2e/setup-hosts.sh scripts/e2e/setup-certificates.sh scripts/e2e/wait-ready.sh
+[ "$(python3 scripts/e2e/contract-hosts.py --all)" = "app.wren.test api.wren.test mcp.wren.test" ]
+[ "$(python3 scripts/e2e/contract-hosts.py app api mcp)" = "app.wren.test api.wren.test mcp.wren.test" ]
 
 
 hosts="$(mktemp)"

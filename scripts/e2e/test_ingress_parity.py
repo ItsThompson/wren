@@ -59,6 +59,16 @@ class TestIngressContract:
         with pytest.raises(ValueError, match="catch-all route on api must be last"):
             validate_contract(nonterminal_catch_all)
 
+        noncanonical_path = self.contract.model_dump(mode="json")
+        noncanonical_path["hosts"][1]["routes"][0]["match"]["paths"] = ["/metrics/"]
+        with pytest.raises(ValueError, match="must not have a trailing slash"):
+            validate_contract(noncanonical_path)
+
+        root_prefix = self.contract.model_dump(mode="json")
+        root_prefix["hosts"][2]["routes"][0]["match"]["prefix"] = ["/"]
+        with pytest.raises(ValueError, match="prefixes must not include root"):
+            validate_contract(root_prefix)
+
         for service in (
             "https://frontend:80/path",
             "http://frontend; return 200;",
@@ -80,6 +90,46 @@ class TestIngressContract:
         invalid_app_hostname["hosts"][0]["e2e_hostname"] = "app.wren.test; return 200;"
         with pytest.raises(ValueError, match="invalid hostname"):
             validate_contract(invalid_app_hostname)
+
+    def test_nonterminal_route_overlaps_are_rejected(self) -> None:
+        overlapping_paths = self.contract.model_dump(mode="json")
+        overlapping_paths["hosts"][1]["routes"].insert(
+            1,
+            {
+                "id": "api-duplicate-block",
+                "match": {"kind": "paths", "paths": ["/metrics"], "trailing_slash": False},
+                "action": {"kind": "status", "status": 404},
+            },
+        )
+        with pytest.raises(ValueError, match="routes on api overlap"):
+            validate_contract(overlapping_paths)
+
+        overlapping_allowlist = self.contract.model_dump(mode="json")
+        overlapping_allowlist["hosts"][2]["routes"].insert(
+            0,
+            {
+                "id": "mcp-duplicate-public",
+                "match": {"kind": "allowlist", "exact": ["/mcp"], "prefix": []},
+                "action": {"kind": "proxy", "service": "http://mcp:9000"},
+            },
+        )
+        with pytest.raises(ValueError, match="routes on mcp overlap"):
+            validate_contract(overlapping_allowlist)
+
+    def test_ordered_nonterminal_routes_before_catch_all_are_valid(self) -> None:
+        validate_contract(self.contract)
+        assert [route.id for route in self.contract.hosts[1].routes] == [
+            "api-observability-block",
+            "api",
+        ]
+        assert [route.id for route in self.contract.hosts[2].routes] == [
+            "mcp-public",
+            "mcp-catch-all",
+        ]
+        assert [route.id for route in self.contract.hosts[3].routes] == [
+            "docs-health-block",
+            "docs",
+        ]
 
     def test_production_hosts_and_targets_are_generated(self) -> None:
         cloudflare = render_cloudflare(self.contract)
@@ -142,6 +192,31 @@ class TestIngressContract:
             route = resolve_route(self.contract, "mcp", path)
             assert route.id == "mcp-catch-all"
             self._assert_status(route.action, 404)
+
+        assert resolve_route(self.contract, "mcp", "/mcpx").id == "mcp-catch-all"
+        cloudflare = render_cloudflare(self.contract)
+        assert "mcp(/.*)?" in cloudflare
+        assert "mcpx" not in cloudflare
+
+    def test_root_path_and_trailing_slash_resolution_match_generated_regex(self) -> None:
+        root_contract = self.contract.model_dump(mode="json")
+        root_contract["hosts"][0]["routes"] = [
+            {
+                "id": "app-root-block",
+                "match": {"kind": "paths", "paths": ["/"], "trailing_slash": True},
+                "action": {"kind": "status", "status": 404},
+            },
+            {
+                "id": "app",
+                "match": {"kind": "all"},
+                "action": {"kind": "proxy", "service": "http://frontend:80"},
+            },
+        ]
+        typed = validate_contract(root_contract)
+        assert resolve_route(typed, "app", "/").id == "app-root-block"
+        assert resolve_route(typed, "app", "//").id == "app"
+        assert "location ~ ^/$ {" in render_nginx(typed)
+        assert "path: '^/$'" in render_cloudflare(typed)
 
     def test_e2e_adapter_rejects_nginx_injection_values(self) -> None:
         for header in (

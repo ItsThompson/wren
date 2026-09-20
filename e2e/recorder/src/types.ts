@@ -1,10 +1,21 @@
 export const BROWSER_FAILURE_KINDS = ['upstream', 'network'] as const
 export type BrowserFailureKind = (typeof BROWSER_FAILURE_KINDS)[number]
 
+export const RECORDER_QUERY_IDENTITY_HEADER = 'X-Recorder-Query-Identity'
+export const MAX_RECORDER_QUERY_IDENTITY_LENGTH = 120
+
+export function isValidRecorderQueryIdentity(value: unknown): value is string {
+  return typeof value === 'string'
+    && value.length > 0
+    && value.length <= MAX_RECORDER_QUERY_IDENTITY_LENGTH
+    && /^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(value)
+}
+
 export type EnvelopeParseStatus = 'valid' | 'unsupported'
 
 export interface ParsedEnvelope {
   status: EnvelopeParseStatus
+  queryIdentity: string | null
   operation: string | null
   failureKind: BrowserFailureKind | null
   environment: string | null
@@ -16,6 +27,7 @@ export interface ParsedEnvelope {
 export interface EnvelopeRecord {
   sequence: number
   receivedAtIso: string
+  queryIdentity: string
   rawEnvelopeUtf8: string
   parseStatus: EnvelopeParseStatus
   operation: string | null
@@ -27,6 +39,7 @@ export interface EnvelopeRecord {
 }
 
 export interface EnvelopeQuery {
+  queryIdentity: string
   operation: string
   failureKind: BrowserFailureKind
   receivedAfterIso: string

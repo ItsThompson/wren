@@ -40,16 +40,8 @@ def validate_contract(contract: object) -> IngressContract:
 def _match_path(match: object, path: str) -> bool:
     if isinstance(match, AllMatch):
         return True
-    if isinstance(match, PathsMatch):
-        candidates = {path}
-        if match.trailing_slash and path.endswith("/") and not path.endswith("//"):
-            candidates.add(path[:-1])
-        return any(candidate in match.paths for candidate in candidates)
-    if isinstance(match, AllowlistMatch):
-        if path in match.exact:
-            return True
-        return any(path == prefix or path.startswith(f"{prefix}/") for prefix in match.prefix)
-    raise ValueError(f"unknown match kind: {match!r}")
+    expression = _path_regex(match)
+    return expression is not None and re.fullmatch(expression, path) is not None
 
 
 def resolve_route(contract: object, host_id: str, path: str) -> Route:
@@ -76,6 +68,15 @@ def _path_regex(match: object) -> str | None:
     if isinstance(match, AllMatch):
         return None
     if isinstance(match, PathsMatch):
+        if "/" in match.paths:
+            alternatives = []
+            for path in match.paths:
+                canonical = path if path == "/" or not match.trailing_slash else path.rstrip("/")
+                suffix = "" if canonical == "/" else "/?" if match.trailing_slash else ""
+                alternatives.append(f"{_escaped_path(canonical)}{suffix}")
+            if alternatives == [""]:
+                return r"^/$"
+            return rf"^/(?:{'|'.join(alternatives)})$"
         paths = [_escaped_path(path) for path in match.paths]
         path_expression = paths[0] if len(paths) == 1 else f"({'|'.join(paths)})"
         suffix = "/?" if match.trailing_slash else ""
@@ -83,6 +84,10 @@ def _path_regex(match: object) -> str | None:
     if isinstance(match, AllowlistMatch):
         alternatives = [rf"{_escaped_path(path)}(/.*)?" for path in match.prefix]
         alternatives.extend(_escaped_path(path) for path in match.exact)
+        if alternatives == [""]:
+            return r"^/$"
+        if "" in alternatives:
+            return rf"^/(?:{'|'.join(alternatives)})$"
         return rf"^/({'|'.join(alternatives)})$"
     raise ValueError(f"unknown match: {match!r}")
 

@@ -16,6 +16,7 @@ function buildRecord(
   return {
     sequence: 1,
     receivedAtIso: '2026-01-01T00:00:00.000Z',
+    queryIdentity: 'query-1',
     rawEnvelopeUtf8: `${rawEnvelopeLines.join('\n')}\n`,
     parseStatus: 'valid',
     operation: 'operation',

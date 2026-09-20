@@ -6,9 +6,13 @@ import { makeEnvelope } from './test-fixtures.ts'
 
 const receivedAt = new Date('2026-09-19T00:00:00.000Z')
 
-function appendEnvelope(store: EnvelopeStore, options: Parameters<typeof makeEnvelope>[0] = {}): void {
+function appendEnvelope(
+  store: EnvelopeStore,
+  options: Parameters<typeof makeEnvelope>[0] = {},
+  queryIdentity = 'query-1',
+): void {
   const body = makeEnvelope(options)
-  store.append(body, parseSentryEnvelope(body))
+  store.append(body, parseSentryEnvelope(body, queryIdentity))
 }
 
 describe('EnvelopeStore', () => {
@@ -18,6 +22,7 @@ describe('EnvelopeStore', () => {
     appendEnvelope(store, { failureKind: 'network', status: null })
 
     const records = store.query({
+      queryIdentity: 'query-1',
       operation: 'get_dashboard_me_dashboard_get',
       failureKind: 'upstream',
       receivedAfterIso: receivedAt.toISOString(),
@@ -38,6 +43,22 @@ describe('EnvelopeStore', () => {
     )
   })
 
+  it('returns only records for the requested attempt identity', () => {
+    const store = new EnvelopeStore({}, () => receivedAt)
+    appendEnvelope(store, {}, 'query-1')
+    appendEnvelope(store, {}, 'query-2')
+
+    const records = store.query({
+      queryIdentity: 'query-2',
+      operation: 'get_dashboard_me_dashboard_get',
+      failureKind: 'upstream',
+      receivedAfterIso: receivedAt.toISOString(),
+    })
+
+    expect(records).toHaveLength(1)
+    expect(records[0]?.queryIdentity).toBe('query-2')
+  })
+
   it('bounds and validates control queries', () => {
     const store = new EnvelopeStore({ maxQueryResults: 2 }, () => receivedAt)
     appendEnvelope(store)
@@ -45,17 +66,20 @@ describe('EnvelopeStore', () => {
     appendEnvelope(store)
 
     expect(() => store.query({
+      queryIdentity: 'query-1',
       operation: '',
       failureKind: 'upstream',
       receivedAfterIso: '2026-09-18T23:59:59.999Z',
     })).toThrow(RecorderValidationError)
     expect(() => store.query({
+      queryIdentity: 'query-1',
       operation: 'get_dashboard_me_dashboard_get',
       failureKind: 'upstream',
       receivedAfterIso: 'not-a-time',
       limit: 3,
     })).toThrow(RecorderValidationError)
     expect(store.query({
+      queryIdentity: 'query-1',
       operation: 'get_dashboard_me_dashboard_get',
       failureKind: 'upstream',
       receivedAfterIso: receivedAt.toISOString(),
@@ -73,10 +97,10 @@ describe('EnvelopeStore', () => {
   it('exports only the safe allowlist and excludes incomplete records', () => {
     const store = new EnvelopeStore({}, () => receivedAt)
     const complete = makeEnvelope()
-    store.append(complete, parseSentryEnvelope(complete))
+    store.append(complete, parseSentryEnvelope(complete, 'query-1'))
     const incomplete = makeEnvelope({ operation: undefined })
     store.append(incomplete, {
-      ...parseSentryEnvelope(incomplete),
+      ...parseSentryEnvelope(incomplete, 'query-1'),
       service: null,
     })
 

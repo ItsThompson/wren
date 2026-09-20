@@ -11,8 +11,9 @@ function envelopeText(event: string): Uint8Array {
 
 describe('parseSentryEnvelope', () => {
   it('extracts bounded recovery metadata from an event item', () => {
-    expect(parseSentryEnvelope(makeEnvelope())).toEqual({
+    expect(parseSentryEnvelope(makeEnvelope(), 'query-1')).toEqual({
       status: 'valid',
+      queryIdentity: 'query-1',
       operation: 'get_dashboard_me_dashboard_get',
       failureKind: 'upstream',
       environment: 'production',
@@ -23,7 +24,8 @@ describe('parseSentryEnvelope', () => {
   })
 
   it('preserves null status for a network failure', () => {
-    expect(parseSentryEnvelope(makeEnvelope({ failureKind: 'network', status: null }))).toMatchObject({
+    expect(parseSentryEnvelope(makeEnvelope({ failureKind: 'network', status: null }), 'query-1')).toMatchObject({
+      queryIdentity: 'query-1',
       failureKind: 'network',
       responseStatus: null,
     })
@@ -33,8 +35,9 @@ describe('parseSentryEnvelope', () => {
     const body = new TextEncoder().encode(
       `${JSON.stringify({ event_id: 'event-1' })}\n${JSON.stringify({ type: 'attachment' })}\nraw\n`,
     )
-    expect(parseSentryEnvelope(body)).toEqual({
+    expect(parseSentryEnvelope(body, 'query-1')).toEqual({
       status: 'unsupported',
+      queryIdentity: 'query-1',
       operation: null,
       failureKind: null,
       environment: null,

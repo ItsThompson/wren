@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+E2E_HOSTS="$(python3 "$SCRIPT_DIR/contract-hosts.py" --all)"
+read -r -a E2E_HOST_ARRAY <<< "$E2E_HOSTS"
 CERT_DIR="${E2E_CERT_DIR:-${ROOT_DIR}/e2e/ingress/certificates}"
 CAROOT="${CERT_DIR}/caroot"
 LEAF="${CERT_DIR}/wren-e2e.pem"
@@ -36,7 +39,7 @@ CAROOT="$CAROOT" "$MKCERT_BIN" -install
 CAROOT="$CAROOT" "$MKCERT_BIN" \
   -cert-file "$LEAF" \
   -key-file "$KEY" \
-  app.wren.test api.wren.test mcp.wren.test
+  $E2E_HOSTS
 
 if [[ ! -r "$CA" || ! -r "$LEAF" || ! -r "$KEY" ]]; then
   printf 'tls: mkcert did not create the isolated CA and leaf files\n' >&2
@@ -47,7 +50,7 @@ if ! openssl x509 -in "$LEAF" -noout -checkend 86400 >/dev/null; then
   printf 'tls: generated leaf certificate is expired or expires within 24 hours\n' >&2
   exit 1
 fi
-for host in app.wren.test api.wren.test mcp.wren.test; do
+for host in "${E2E_HOST_ARRAY[@]}"; do
   if ! openssl verify -CAfile "$CA" -verify_hostname "$host" "$LEAF" >/dev/null 2>&1; then
     printf 'tls: certificate SAN validation failed for %s\n' "$host" >&2
     exit 1
@@ -56,5 +59,5 @@ done
 
 chmod 644 "$CA" "$LEAF"
 chmod 600 "$KEY"
-printf 'tls: isolated Wren CA and three-host certificate are ready\n'
+printf 'tls: isolated Wren CA and E2E host certificate are ready\n'
 printf 'tls: NODE_EXTRA_CA_CERTS=%s\n' "$CA"

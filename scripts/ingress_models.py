@@ -73,6 +73,26 @@ def _validate_path(value: object) -> str:
     return value
 
 
+def _path_variants(path: str, trailing_slash: bool) -> set[str]:
+    if not trailing_slash or path == "/":
+        return {path}
+    base = path.rstrip("/")
+    return {base, f"{base}/"}
+
+
+def _prefix_path(path: str) -> str:
+    if path == "/":
+        return path
+    return path.rstrip("/")
+
+
+def _path_matches_prefix(path: str, prefix: str) -> bool:
+    normalized_prefix = _prefix_path(prefix)
+    return normalized_prefix == "/" or path == normalized_prefix or path.startswith(
+        f"{normalized_prefix}/"
+    )
+
+
 def _validate_nginx_path(value: object) -> str:
     value = _validated_string(value, "Nginx path")
     if not value.startswith("/"):
@@ -182,9 +202,11 @@ class PathsMatch(IngressModel):
     trailing_slash: bool
 
     @model_validator(mode="after")
-    def require_unique_paths(self) -> PathsMatch:
+    def require_canonical_paths(self) -> PathsMatch:
         if len(set(self.paths)) != len(self.paths):
             raise ValueError("paths match entries must be unique")
+        if any(path != "/" and path.endswith("/") for path in self.paths):
+            raise ValueError("paths match entries must not have a trailing slash")
         return self
 
 
@@ -194,15 +216,60 @@ class AllowlistMatch(IngressModel):
     prefix: list[IngressPath]
 
     @model_validator(mode="after")
-    def require_paths(self) -> AllowlistMatch:
+    def require_canonical_paths(self) -> AllowlistMatch:
         if not self.exact and not self.prefix:
             raise ValueError("allowlist must define an exact or prefix path")
+        entries = [*self.exact, *self.prefix]
+        if any(path != "/" and path.endswith("/") for path in entries):
+            raise ValueError("allowlist entries must not have a trailing slash")
+        if "/" in self.prefix:
+            raise ValueError("allowlist prefixes must not include root")
         if len(set(self.exact)) != len(self.exact) or len(set(self.prefix)) != len(self.prefix):
             raise ValueError("allowlist entries must be unique")
         return self
 
 
 Match = Annotated[AllMatch | PathsMatch | AllowlistMatch, Field(discriminator="kind")]
+
+
+def _match_paths(match: PathsMatch) -> set[str]:
+    paths: set[str] = set()
+    for path in match.paths:
+        paths.update(_path_variants(path, match.trailing_slash))
+    return paths
+
+
+def _matches_overlap(left: Match, right: Match) -> bool:
+    if isinstance(left, AllMatch) or isinstance(right, AllMatch):
+        return True
+    if isinstance(left, PathsMatch) and isinstance(right, PathsMatch):
+        return bool(_match_paths(left) & _match_paths(right))
+    if isinstance(left, PathsMatch) and isinstance(right, AllowlistMatch):
+        return any(path in right.exact for path in _match_paths(left)) or any(
+            _path_matches_prefix(path, prefix)
+            for path in _match_paths(left)
+            for prefix in right.prefix
+        )
+    if isinstance(left, AllowlistMatch) and isinstance(right, PathsMatch):
+        return _matches_overlap(right, left)
+    if isinstance(left, AllowlistMatch) and isinstance(right, AllowlistMatch):
+        if set(left.exact) & set(right.exact):
+            return True
+        if any(
+            _path_matches_prefix(path, prefix) for path in left.exact for prefix in right.prefix
+        ):
+            return True
+        if any(
+            _path_matches_prefix(path, prefix) for path in right.exact for prefix in left.prefix
+        ):
+            return True
+        return any(
+            _path_matches_prefix(left_prefix, right_prefix)
+            or _path_matches_prefix(right_prefix, left_prefix)
+            for left_prefix in left.prefix
+            for right_prefix in right.prefix
+        )
+    raise ValueError(f"unknown match pair: {left!r}, {right!r}")
 
 
 class Route(IngressModel):
@@ -227,6 +294,15 @@ class Host(IngressModel):
         route_ids = [route.id for route in self.routes]
         if len(set(route_ids)) != len(route_ids):
             raise ValueError(f"route IDs on {self.id} must be unique")
+        nonterminal_routes = (
+            self.routes[:-1] if self.routes[-1].match.kind == "all" else self.routes
+        )
+        for index, route in enumerate(nonterminal_routes):
+            for other in nonterminal_routes[index + 1 :]:
+                if _matches_overlap(route.match, other.match):
+                    raise ValueError(
+                        f"routes on {self.id} overlap: {route.id} and {other.id}"
+                    )
         return self
 
 
