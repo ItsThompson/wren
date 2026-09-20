@@ -214,14 +214,26 @@ export async function runAuthoringJourney(
   const forkRead = await readRoadmapAsFork(context, fork.roadmap_id)
   if (forkRead.status !== 'draft' || forkRead.revision !== 1) throw new Error('fork must be a fresh draft')
 
-  const forkProgress: ProgressOutput = {
-    roadmap_id: fork.roadmap_id,
-    total_items: sourceProgress.total_items,
-    checked_items: 0,
-    percent: 0,
-    deadline: null,
-    sections: sourceProgress.sections.map((section) => ({ ...section, checked_items: 0, percent: 0 })),
-    checked_ids: [],
+  const forkProgress = await readProgressAsFork(context, fork.roadmap_id)
+  const sourceProgressAfterFork = await callScenario(context, 'progress_get', {
+    roadmap_id: create.roadmap_id,
+    detailed: true,
+  })
+  if (
+    forkProgress.roadmap_id !== fork.roadmap_id ||
+    forkProgress.total_items !== sourceProgress.total_items ||
+    forkProgress.checked_items !== 0 ||
+    forkProgress.percent !== 0 ||
+    forkProgress.sections.some((section) => section.checked_items !== 0 || section.percent !== 0) ||
+    JSON.stringify(forkProgress.checked_ids) !== JSON.stringify([])
+  ) {
+    throw new Error('fork progress must start empty and remain isolated from source progress')
+  }
+  if (
+    sourceProgressAfterFork.checked_items !== sourceProgress.checked_items ||
+    JSON.stringify(sourceProgressAfterFork.checked_ids) !== JSON.stringify(sourceProgress.checked_ids)
+  ) {
+    throw new Error('fork must not mutate source roadmap progress')
   }
 
   return {
@@ -249,6 +261,20 @@ async function readRoadmap(context: ToolJourneyContext, roadmapId: string): Prom
 }
 
 async function readRoadmapAsFork(context: ToolJourneyContext, roadmapId: string): Promise<RoadmapOutput> {
+  return withForkState(context, roadmapId, () => readRoadmap(context, roadmapId))
+}
+
+async function readProgressAsFork(context: ToolJourneyContext, roadmapId: string): Promise<ProgressOutput> {
+  return withForkState(context, roadmapId, () =>
+    callScenario(context, 'progress_get', { roadmap_id: roadmapId, detailed: true }),
+  )
+}
+
+async function withForkState<T>(
+  context: ToolJourneyContext,
+  roadmapId: string,
+  operation: () => Promise<T>,
+): Promise<T> {
   const sourceState = context.state
   context.state = {
     ...sourceState,
@@ -259,7 +285,7 @@ async function readRoadmapAsFork(context: ToolJourneyContext, roadmapId: string)
     itemIds: [],
   }
   try {
-    return await readRoadmap(context, roadmapId)
+    return await operation()
   } finally {
     context.state = sourceState
   }

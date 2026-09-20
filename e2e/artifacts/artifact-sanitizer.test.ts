@@ -151,6 +151,48 @@ describe('artifact sanitization', () => {
     expect(report).not.toContain('callback?')
   })
 
+  it('removes Playwright fill values while preserving unrelated report values', async () => {
+    const registry = new SensitiveValueRegistry()
+    registry.register(SensitiveValueCategory.PASSWORD, 'credential-value')
+    const result = await sanitizeArtifact({
+      path: 'trace/action.trace',
+      kind: 'trace',
+      bytes: jsonBytes({
+        type: 'action',
+        method: 'fill',
+        params: { selector: '#email', value: 'credential-value' },
+        details: { value: 'useful-report-value' },
+        __playwright_value_0: 'credential-value',
+      }),
+    }, registry)
+    const output = new TextDecoder().decode(result.bytes)
+
+    expect(output).toContain('useful-report-value')
+    expect(output).not.toContain('credential-value')
+    expect(output).not.toContain('__playwright_value_')
+    expect(() => registry.assertAbsent(output)).not.toThrow()
+  })
+
+  it('removes Playwright value fields from static report assets', async () => {
+    const registry = new SensitiveValueRegistry()
+    registry.register(SensitiveValueCategory.PASSWORD, 'credential-value')
+    registry.register(SensitiveValueCategory.PASSWORD, 'second-credential')
+    const result = await sanitizeArtifact({
+      path: 'report/app.js',
+      kind: 'report-static',
+      bytes: new TextEncoder().encode(
+        'const report = { value: "useful-report-value", __playwright_value_0: "credential-value" }; __playwright_value_1 = "second-credential";',
+      ),
+    }, registry)
+    const output = new TextDecoder().decode(result.bytes)
+
+    expect(output).toContain('useful-report-value')
+    expect(output).not.toContain('credential-value')
+    expect(output).not.toContain('second-credential')
+    expect(output).not.toContain('__playwright_value_')
+    expect(() => registry.assertAbsent(output)).not.toThrow()
+  })
+
   it('retains safe HTML and binary assets from a standard report', async () => {
     const registry = new SensitiveValueRegistry()
     const html = await sanitizeArtifact({

@@ -110,6 +110,7 @@ dependency_closure('ingress', focused)
 assert focused == expected, focused
 for service in ('frontend', 'backend', 'mcp', 'postgres', 'recorder'):
     assert not services[service].get('ports'), service
+assert services['ingress']['ports'][0]['host_ip'] == '127.0.0.1'
 assert services['ingress']['ports'][0]['published'] == '443'
 assert services['backend']['environment']['ENVIRONMENT'] == 'production'
 assert services['mcp']['environment']['ENVIRONMENT'] == 'production'

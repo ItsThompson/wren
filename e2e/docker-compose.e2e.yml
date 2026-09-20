@@ -69,7 +69,7 @@ services:
       recorder:
         condition: service_started
     ports:
-      - "443:443"
+      - "127.0.0.1:443:443"
     volumes:
       - ./e2e/ingress/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./e2e/ingress/certificates:/etc/nginx/certs:ro

@@ -258,12 +258,20 @@ describe('authoring journey', () => {
     expect(result.metadataRead.title).toBe('Attempt roadmap Published')
     expect(result.sourceProgress.checked_items).toBe(1)
     expect(result.sourceProgress.checked_ids).toEqual(['item-4'])
+    expect(result.forkProgress.roadmap_id).toBe('roadmap-2')
+    expect(result.forkProgress.total_items).toBe(result.sourceProgress.total_items)
     expect(result.forkProgress.checked_items).toBe(0)
+    expect(result.forkProgress.checked_ids).toEqual([])
+    expect(calls.filter((call) => call.name === 'progress_get').map((call) => call.arguments_)).toEqual([
+      { roadmap_id: 'roadmap-1', detailed: true },
+      { roadmap_id: 'roadmap-2', detailed: true },
+      { roadmap_id: 'roadmap-1', detailed: true },
+    ])
     expect(calls.map((call) => call.name)).toEqual([
       'create_roadmap_draft', 'roadmap_get', 'patch_roadmap_draft', 'roadmap_get',
       'replace_roadmap_draft', 'roadmap_get', 'validate_roadmap_draft', 'publish_roadmap',
       'roadmap_get', 'edit_roadmap_metadata', 'roadmap_get', 'progress_update', 'progress_get',
-      'fork_roadmap', 'roadmap_get',
+      'fork_roadmap', 'roadmap_get', 'progress_get', 'progress_get',
     ])
     expect(calls[2].arguments_).toMatchObject({
       roadmap_id: 'roadmap-1',

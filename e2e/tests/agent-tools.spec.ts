@@ -45,9 +45,13 @@ test.describe('official MCP tool journeys', () => {
     expect(result.sourceProgress.checked_items).toBe(1)
     expect(result.sourceProgress.checked_ids).toHaveLength(1)
     expect(result.fork.roadmap_id).not.toBe(result.create.roadmap_id)
+    expect(result.fork.source_roadmap_id).toBe(result.create.roadmap_id)
     expect(result.forkRead.status).toBe('draft')
+    expect(result.forkProgress.roadmap_id).toBe(result.fork.roadmap_id)
+    expect(result.forkProgress.total_items).toBe(result.sourceProgress.total_items)
     expect(result.forkProgress.checked_items).toBe(0)
     expect(result.forkProgress.checked_ids).toEqual([])
+    expect(result.forkProgress.checked_ids).not.toContain(result.sourceProgress.checked_ids?.[0])
   })
 
   test('completes the published roadmap study and discovery journey', async ({

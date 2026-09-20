@@ -257,6 +257,9 @@ e2e-up:
 test-e2e:
     #!/usr/bin/env bash
     set -euo pipefail
+    export E2E_SENSITIVE_VALUES_DIR="/tmp/wren-e2e-sensitive"
+    rm -rf -- "$E2E_SENSITIVE_VALUES_DIR"
+    mkdir -p "$E2E_SENSITIVE_VALUES_DIR"
     export NODE_EXTRA_CA_CERTS="{{e2e_ca}}"
     export RECORDER_CONTROL_TOKEN="$(cat {{e2e_token}})"
     cd e2e
@@ -269,6 +272,9 @@ test-e2e:
 test-e2e-system:
     #!/usr/bin/env bash
     set -euo pipefail
+    export E2E_SENSITIVE_VALUES_DIR="/tmp/wren-e2e-sensitive"
+    rm -rf -- "$E2E_SENSITIVE_VALUES_DIR"
+    mkdir -p "$E2E_SENSITIVE_VALUES_DIR"
     export NODE_EXTRA_CA_CERTS="{{e2e_ca}}"
     export RECORDER_CONTROL_TOKEN="$(cat {{e2e_token}})"
     cd e2e
@@ -278,6 +284,7 @@ test-e2e-system:
 e2e-capture-artifacts:
     #!/usr/bin/env bash
     set -euo pipefail
+    export E2E_SENSITIVE_VALUES_DIR="/tmp/wren-e2e-sensitive"
     export NODE_EXTRA_CA_CERTS="{{e2e_ca}}"
     if [ -r "{{e2e_token}}" ]; then export RECORDER_CONTROL_TOKEN="$(cat {{e2e_token}})"; fi
     scripts/e2e/capture-artifacts.sh

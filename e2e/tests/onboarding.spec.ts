@@ -17,8 +17,9 @@ test.describe('onboarding (register -> wizard -> dashboard, no redirect loop)', 
   test('a new account is guided through the wizard and completes onto the dashboard', async ({
     page,
     attemptIdentity,
+    sensitiveValueRegistry,
   }) => {
-    await registerNewUser(page, uniqueUser('onb', attemptIdentity))
+    await registerNewUser(page, uniqueUser('onb', attemptIdentity), sensitiveValueRegistry)
     await expectRedirectedToOnboarding(page)
 
     // the wizard is full-screen and chrome-free (no AppShell top bar),
@@ -67,8 +68,9 @@ test.describe('onboarding (register -> wizard -> dashboard, no redirect loop)', 
   test('skipping every step still completes onboarding and lands on the dashboard', async ({
     page,
     attemptIdentity,
+    sensitiveValueRegistry,
   }) => {
-    await registerNewUser(page, uniqueUser('skip', attemptIdentity))
+    await registerNewUser(page, uniqueUser('skip', attemptIdentity), sensitiveValueRegistry)
     await expectRedirectedToOnboarding(page)
     await expect(page.getByText('Welcome to Wren')).toBeVisible()
 
@@ -99,8 +101,9 @@ test.describe('onboarding (register -> wizard -> dashboard, no redirect loop)', 
   test('an onboarded user visiting /onboarding is redirected to the dashboard', async ({
     page,
     attemptIdentity,
+    sensitiveValueRegistry,
   }) => {
-    await registerNewUser(page, uniqueUser('bounce', attemptIdentity))
+    await registerNewUser(page, uniqueUser('bounce', attemptIdentity), sensitiveValueRegistry)
     await expectRedirectedToOnboarding(page)
     await page.getByRole('button', { name: 'Skip' }).click()
     await expect(page).toHaveURL(/\/dashboard$/)
@@ -115,8 +118,9 @@ test.describe('onboarding (register -> wizard -> dashboard, no redirect loop)', 
   test('an un-onboarded user on /authorize sees consent, not onboarding', async ({
     page,
     attemptIdentity,
+    sensitiveValueRegistry,
   }) => {
-    await registerNewUser(page, uniqueUser('consent', attemptIdentity))
+    await registerNewUser(page, uniqueUser('consent', attemptIdentity), sensitiveValueRegistry)
 
     // /authorize is mounted OUTSIDE the OnboardingGate, so an
     // un-onboarded user is never bounced to /onboarding. Without a live

@@ -22,6 +22,8 @@ const SENSITIVE_FIELD = /(authorization|headers?|cookie|cookies|query|string|que
 const SENSITIVE_TEXT = /(bearer\s+[^\s"']+|-----begin [^-]+private key-----|https?:\/\/[^\s"'<>?]+\?[^\s"'<>]+|[?&][A-Za-z0-9_-]+=[^\s&"'<>]+)/i
 const CALLBACK_FIELD = /(callback|redirect|authorization.*url|consent)/i
 const CALLBACK_URL = /https?:\/\/[^\s"'<>]*(?:callback|redirect|authorize|consent)[^\s"'<>]*/i
+const PLAYWRIGHT_VALUE_FIELD = /^__playwright_value_/i
+const PLAYWRIGHT_ACTION_METHOD = /^(fill|type|pressSequentially|selectOption|setInputFiles|check|uncheck|clear)$/i
 const STATIC_REPORT_EXTENSIONS = new Set(['.html', '.htm', '.css', '.js', '.mjs', '.svg', '.ico', '.woff', '.woff2', '.map'])
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp'])
 const CATEGORY_BY_FIELD: readonly [RegExp, SensitiveValueCategory][] = [
@@ -119,17 +121,46 @@ function sanitizeString(value: string, registry: SensitiveValueRegistry): string
   return redacted.replace(/https?:\/\/[^\s"'<>]+/gi, sanitizeUrl)
 }
 
-function sanitizeStructuredValue(value: unknown, registry: SensitiveValueRegistry): unknown {
-  if (Array.isArray(value)) return value.map((item) => sanitizeStructuredValue(item, registry))
+interface StructuredSanitizationContext {
+  playwrightActionParams?: boolean
+}
+
+function isPlaywrightAction(value: object): boolean {
+  const method = 'method' in value && typeof value.method === 'string'
+    ? value.method
+    : 'apiName' in value && typeof value.apiName === 'string'
+      ? value.apiName.split('.').at(-1)
+      : undefined
+  return method !== undefined && PLAYWRIGHT_ACTION_METHOD.test(method)
+}
+
+function sanitizeStructuredValue(
+  value: unknown,
+  registry: SensitiveValueRegistry,
+  context: StructuredSanitizationContext = {},
+): unknown {
+  if (Array.isArray(value)) return value.map((item) => sanitizeStructuredValue(item, registry, context))
   if (typeof value === 'string') return sanitizeString(value, registry)
   if (value === null || typeof value !== 'object') return value
+
+  const action = isPlaywrightAction(value)
   const sanitized: Record<string, unknown> = {}
   for (const [childField, fieldValue] of Object.entries(value)) {
     const normalizedField = childField.replace(/[^a-z]/gi, '')
+    if (PLAYWRIGHT_VALUE_FIELD.test(childField)) continue
+    if ((action || context.playwrightActionParams) && childField === 'value') continue
     if (SENSITIVE_FIELD.test(normalizedField) || CALLBACK_FIELD.test(normalizedField)) continue
-    sanitized[childField] = sanitizeStructuredValue(fieldValue, registry)
+    const childContext = action && ['params', 'action', 'actionParams'].includes(childField)
+      ? { playwrightActionParams: true }
+      : context
+    sanitized[childField] = sanitizeStructuredValue(fieldValue, registry, childContext)
   }
   return sanitized
+}
+
+function sanitizePlaywrightStaticFields(text: string): string {
+  const fieldPattern = /(^|[,{;.\s])(?:["']?__playwright_value_[\w$-]+["']?)\s*[:=]\s*(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^,}\]\n]+)\s*,?/gim
+  return text.replace(fieldPattern, '$1')
 }
 
 function hasUnsafeDynamicStaticExpression(text: string): boolean {
@@ -248,7 +279,7 @@ function parseStructuredText(text: string, kind: DiagnosticArtifactKind, registr
   } catch {
     if (kind === 'report-static') {
       if (hasUnsafeDynamicStaticExpression(text)) throw new UnsafeArtifactError([SensitiveValueCategory.INTERNAL_API_TOKEN])
-      const sanitizedText = sanitizeString(text, registry)
+      const sanitizedText = sanitizeString(sanitizePlaywrightStaticFields(text), registry)
       return { text: sanitizedText, counts }
     }
     if (kind === 'trace' || kind === 'report') {
@@ -270,7 +301,9 @@ function finalScan(bytes: Uint8Array, registry: SensitiveValueRegistry): Sensiti
   const categories = registry.categoriesFound(bytes)
   let text: string
   try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes) } catch { return categories }
-  if (SENSITIVE_TEXT.test(text) || CALLBACK_URL.test(text)) categories.push(SensitiveValueCategory.INTERNAL_API_TOKEN)
+  if (SENSITIVE_TEXT.test(text) || CALLBACK_URL.test(text) || /__playwright_value_/i.test(text)) {
+    categories.push(SensitiveValueCategory.INTERNAL_API_TOKEN)
+  }
   for (const match of text.matchAll(/["']([^"']+)["']\s*:/g)) {
     const field = match[1] ?? ''
     if (SENSITIVE_FIELD.test(field.replace(/[^a-z]/gi, '')) || CALLBACK_FIELD.test(field)) categories.push(categoryForField(field))
