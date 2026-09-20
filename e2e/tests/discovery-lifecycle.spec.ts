@@ -9,7 +9,7 @@ import {
   publishRoadmap,
   setRoadmapVisibility,
 } from '../browser/roadmap'
-import { createPublishableRoadmap } from '../helpers/api'
+import { createPublishableRoadmap, followRoadmap } from '../helpers/api'
 
 test.describe('public discovery and learner tracking', () => {
   test('shows only public owner content and starts following through the browser', async ({
@@ -122,6 +122,8 @@ test.describe('public discovery and learner tracking', () => {
     await setRoadmapVisibility(ownerBrowser.page, 'public')
     await ownerBrowser.page.reload()
     await expect(ownerBrowser.page.getByText('Public access', { exact: true })).toBeVisible()
+    await followRoadmap(owner.apiContext, sourceRoadmapId)
+    await followRoadmap(learner.apiContext, sourceRoadmapId)
     await ownerBrowser.page.goto(`/user/${owner.username}`)
     await expect(ownerBrowser.page.getByRole('link', { name: editedMetadata.title })).toBeVisible()
     await learnerBrowser.page.goto(`/user/${owner.username}`)
