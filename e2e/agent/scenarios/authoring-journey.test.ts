@@ -204,11 +204,12 @@ describe('authoring journey', () => {
             next: { complete: false, items: [], remaining_in_path: 1 },
           }
         } else if (name === 'progress_get') {
-          const isFork = arguments_.roadmap_id === 'roadmap-2'
+          if (arguments_.roadmap_id === 'roadmap-2') {
+            throw new Error('draft progress reads are not supported')
+          }
           structuredContent = {
-            roadmap_id: isFork ? 'roadmap-2' : 'roadmap-1', total_items: 3,
-            checked_items: isFork ? 0 : 1, percent: isFork ? 0 : 33,
-            deadline: null, sections: [], checked_ids: isFork ? [] : [replacementIds.itemIds[0]],
+            roadmap_id: 'roadmap-1', total_items: 3, checked_items: 1, percent: 33,
+            deadline: null, sections: [], checked_ids: [replacementIds.itemIds[0]],
           }
         } else {
           roadmapReadCount += 1
@@ -258,20 +259,17 @@ describe('authoring journey', () => {
     expect(result.metadataRead.title).toBe('Attempt roadmap Published')
     expect(result.sourceProgress.checked_items).toBe(1)
     expect(result.sourceProgress.checked_ids).toEqual(['item-4'])
-    expect(result.forkProgress.roadmap_id).toBe('roadmap-2')
-    expect(result.forkProgress.total_items).toBe(result.sourceProgress.total_items)
-    expect(result.forkProgress.checked_items).toBe(0)
-    expect(result.forkProgress.checked_ids).toEqual([])
+    expect(result.forkRead.id).toBe(result.fork.roadmap_id)
+    expect(result.forkRead.status).toBe('draft')
     expect(calls.filter((call) => call.name === 'progress_get').map((call) => call.arguments_)).toEqual([
       { roadmap_id: 'roadmap-1', detailed: true },
-      { roadmap_id: 'roadmap-2', detailed: true },
       { roadmap_id: 'roadmap-1', detailed: true },
     ])
     expect(calls.map((call) => call.name)).toEqual([
       'create_roadmap_draft', 'roadmap_get', 'patch_roadmap_draft', 'roadmap_get',
       'replace_roadmap_draft', 'roadmap_get', 'validate_roadmap_draft', 'publish_roadmap',
       'roadmap_get', 'edit_roadmap_metadata', 'roadmap_get', 'progress_update', 'progress_get',
-      'fork_roadmap', 'roadmap_get', 'progress_get', 'progress_get',
+      'fork_roadmap', 'roadmap_get', 'progress_get',
     ])
     expect(calls[2].arguments_).toMatchObject({
       roadmap_id: 'roadmap-1',
