@@ -40,8 +40,10 @@ function notFound(instance: string) {
 
 export const handlers = [
   // --- auth (external-only) ---
-  // The mock harness starts anonymous: refresh has no session to resume. Login
-  // and register return the demo user so the authed shell can be exercised.
+  // The mock harness starts anonymous: the access session and refresh token have
+  // no session to resume. Login and register return the demo user so the authed
+  // shell can be exercised.
+  http.get('*/auth/session', () => new HttpResponse(null, { status: 401 })),
   http.post('*/auth/refresh', () => new HttpResponse(null, { status: 401 })),
 
   http.post('*/auth/register', async () => {

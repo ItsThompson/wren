@@ -10,7 +10,7 @@ import { useAuth } from '@/auth'
 import { buildAuthUser, buildAuthValue } from './auth-harness'
 import { createHookWrapper } from './createHookWrapper'
 
-const server = setupServer()
+const server = setupServer(http.get('*/auth/session', () => new HttpResponse(null, { status: 401 })))
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())

@@ -187,6 +187,26 @@ async def test_logout_with_an_invalid_token_is_a_noop() -> None:
     assert repo.commits == 0
 
 
+async def test_current_user_resolves_without_minting_or_revoking_a_session() -> None:
+    service, repo = _service()
+    session = await service.register("ada", "ada@example.com", _PASSWORD)
+
+    user = await service.current_user(session.user.id)
+
+    assert user == session.user
+    assert repo.commits == 1
+    assert await repo.is_session_revoked(session.tokens.sid) is False
+
+
+async def test_current_user_for_a_missing_user_is_unauthorized() -> None:
+    service, repo = _service()
+
+    with pytest.raises(Unauthorized):
+        await service.current_user("ghost-user")
+
+    assert repo.commits == 0
+
+
 async def test_refresh_rotates_and_revokes_the_old_session() -> None:
     service, repo = _service()
     session = await service.register("ada", "ada@example.com", _PASSWORD)

@@ -319,7 +319,31 @@ def test_bad_credentials_are_a_generic_401(
     assert response.json()["detail"] == "Invalid email or password."
 
 
-# --- refresh / logout / revocation ------------------------------------------
+# --- session / refresh / logout / revocation -------------------------------
+
+
+def test_session_returns_the_current_user_without_rotating_tokens(
+    make_settings: MakeSettings,
+) -> None:
+    client, _ = _build_client(make_settings)
+    _register(client)
+    refresh_before = client.cookies.get(REFRESH_COOKIE_NAME)
+    assert refresh_before is not None
+
+    response = client.get("/auth/session")
+
+    assert response.status_code == 200
+    assert response.json()["username"] == "ada"
+    assert client.cookies.get(REFRESH_COOKIE_NAME) == refresh_before
+    assert "set-cookie" not in response.headers
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_session_without_a_valid_access_cookie_is_401(make_settings: MakeSettings) -> None:
+    client, _ = _build_client(make_settings)
+    response = client.get("/auth/session")
+    assert response.status_code == 401
+    assert response.headers["cache-control"] == "no-store"
 
 
 def test_refresh_rotates_the_session_and_keeps_the_user(make_settings: MakeSettings) -> None:

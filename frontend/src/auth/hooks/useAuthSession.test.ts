@@ -11,7 +11,10 @@ import { useAuthSession } from './useAuthSession'
 
 const BASE = 'https://api.test'
 
-const server = setupServer()
+const server = setupServer(
+  http.get('*/auth/session', () => new HttpResponse(null, { status: 401 })),
+  http.post('*/auth/refresh', () => new HttpResponse(null, { status: 401 })),
+)
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
@@ -39,13 +42,116 @@ function renderSession() {
   return renderHook(() => useAuthSession(client))
 }
 
-describe('useAuthSession resume-on-mount', () => {
-  it('resolves to authenticated with the user when a session resumes (200)', async () => {
-    server.use(http.post('*/auth/refresh', () => HttpResponse.json(mockAuthUser)))
+describe('useAuthSession bootstrap', () => {
+  it('resolves to authenticated from a valid access session without refreshing', async () => {
+    let refreshCalls = 0
+    server.use(
+      http.get('*/auth/session', () => HttpResponse.json(mockAuthUser)),
+      http.post('*/auth/refresh', () => {
+        refreshCalls += 1
+        return HttpResponse.json(mockAuthUser)
+      }),
+    )
     const { result } = renderSession()
 
     await waitFor(() => expect(result.current.status).toBe('authenticated'))
     expect(result.current.user).toEqual(mockAuthUser)
+    expect(refreshCalls).toBe(0)
+  })
+
+  it('refreshes an expired access session before resolving authenticated', async () => {
+    let refreshCalls = 0
+    server.use(
+      http.get('*/auth/session', () => new HttpResponse(null, { status: 401 })),
+      http.post('*/auth/refresh', () => {
+        refreshCalls += 1
+        return HttpResponse.json(mockAuthUser)
+      }),
+    )
+    const { result } = renderSession()
+
+    await waitFor(() => expect(result.current.status).toBe('authenticated'))
+    expect(result.current.user).toEqual(mockAuthUser)
+    expect(refreshCalls).toBe(1)
+  })
+
+  it('does not let a delayed bootstrap overwrite a successful login', async () => {
+    let releaseSessionProbe!: () => void
+    let refreshCalls = 0
+    let sessionProbeReleased = false
+    const sessionProbe = new Promise<void>((resolve) => {
+      releaseSessionProbe = () => {
+        sessionProbeReleased = true
+        resolve()
+      }
+    })
+    server.use(
+      http.get('*/auth/session', async () => {
+        await sessionProbe
+        return new HttpResponse(null, { status: 401 })
+      }),
+      http.post('*/auth/login', () => HttpResponse.json(mockAuthUser)),
+      http.post('*/auth/refresh', () => {
+        refreshCalls += 1
+        return new HttpResponse(null, { status: 401 })
+      }),
+    )
+    const { result } = renderSession()
+
+    await act(async () => {
+      const outcome = await result.current.login({ email: 'ada@example.com', password: 'Str0ngPass' })
+      expect(outcome).toEqual({ ok: true })
+    })
+    expect(result.current.status).toBe('authenticated')
+
+    await act(async () => {
+      releaseSessionProbe()
+      await waitFor(() => expect(sessionProbeReleased).toBe(true))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(result.current.status).toBe('authenticated')
+    expect(result.current.user).toEqual(mockAuthUser)
+    expect(refreshCalls).toBe(0)
+  })
+
+  it('serializes login behind an in-flight bootstrap refresh', async () => {
+    const loginUser = { ...mockAuthUser, username: 'logged-in-user' }
+    let releaseRefresh!: () => void
+    let resolveRefreshStarted!: () => void
+    let loginCalls = 0
+    const refreshGate = new Promise<void>((resolve) => {
+      releaseRefresh = resolve
+    })
+    const refreshStarted = new Promise<void>((resolve) => {
+      resolveRefreshStarted = resolve
+    })
+    server.use(
+      http.get('*/auth/session', () => new HttpResponse(null, { status: 401 })),
+      http.post('*/auth/refresh', async () => {
+        resolveRefreshStarted()
+        await refreshGate
+        return HttpResponse.json(mockAuthUser)
+      }),
+      http.post('*/auth/login', () => {
+        loginCalls += 1
+        return HttpResponse.json(loginUser)
+      }),
+    )
+    const { result } = renderSession()
+    await refreshStarted
+
+    await act(async () => {
+      const login = result.current.login({ email: 'ada@example.com', password: 'Str0ngPass' })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(loginCalls).toBe(0)
+      releaseRefresh()
+      expect(await login).toEqual({ ok: true })
+    })
+
+    expect(loginCalls).toBe(1)
+    expect(result.current.status).toBe('authenticated')
+    expect(result.current.user).toEqual(loginUser)
   })
 
   it('resolves to anonymous when no session can be resumed (401)', async () => {

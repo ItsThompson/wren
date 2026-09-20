@@ -217,10 +217,12 @@ def _problem_from_request_validation(
 
 
 def _render(problem: ProblemDetail) -> Response:
+    headers = {"Cache-Control": "no-store"} if problem.status == 401 else None
     return Response(
         content=problem.model_dump_json(exclude_none=True),
         status_code=problem.status,
         media_type=PROBLEM_JSON_MEDIA_TYPE,
+        headers=headers,
     )
 
 

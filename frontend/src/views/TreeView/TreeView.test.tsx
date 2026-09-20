@@ -109,8 +109,9 @@ function buildProgress(checkedIds: string[] = []): ProgressSnapshot {
 }
 
 const server = setupServer(
-  // useRealAuth mounts the real AuthProvider, which resumes via POST /auth/refresh
-  // on mount; resolve it to anonymous (the tree read is unconditional either way).
+  // useRealAuth mounts the real AuthProvider; resolve the access session and
+  // refresh token to anonymous (the tree read is unconditional either way).
+  http.get('*/auth/session', () => new HttpResponse(null, { status: 401 })),
   http.post('*/auth/refresh', () => new HttpResponse(null, { status: 401 })),
   http.get('*/roadmaps/:id/progress', () => HttpResponse.json(buildProgress([]))),
   http.get('*/roadmaps/:id', () => HttpResponse.json(buildRoadmap())),

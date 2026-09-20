@@ -79,6 +79,9 @@ function buildDraft(overrides: Partial<Roadmap> = {}): Roadmap {
 }
 
 const server = setupServer(
+  // AuthProvider bootstraps from the access session before falling back to the
+  // refresh token. The default is anonymous; specific tests override it.
+  http.get('*/auth/session', () => new HttpResponse(null, { status: 401 })),
   // Default "nothing next" so published-view tests that don't exercise the next
   // highlight don't trip `onUnhandledRequest: 'error'`; specific tests override
   // this via `server.use` (runtime handlers take precedence over initial ones).

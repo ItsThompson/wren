@@ -1,6 +1,6 @@
 /** Minimal shapes of the external-app JSON the e2e specs and seeding helpers read back. */
 
-/** The authenticated session view returned by `/auth/refresh` (and register/login). */
+/** The authenticated session view returned by `/auth/session`, register, and login. */
 export interface AuthenticatedUser {
   has_completed_onboarding: boolean
 }

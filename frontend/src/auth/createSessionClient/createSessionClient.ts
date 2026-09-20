@@ -1,8 +1,7 @@
-import type { Client, Middleware } from 'openapi-fetch'
+import type { Middleware } from 'openapi-fetch'
 
-import { createApiClient } from '@/api/client'
+import { createApiClient, type SessionClient } from '@/api/client'
 import { createApiReportingMiddleware } from '@/observability/sentry'
-import type { paths } from '@/api/schema'
 
 const AUTH_PREFIX = '/auth/'
 const BODY_METHODS = new Set(['POST', 'PUT', 'PATCH'])
@@ -14,15 +13,24 @@ const BODY_METHODS = new Set(['POST', 'PUT', 'PATCH'])
  * the reporting controller's retry-rejection hook, so a rejected raw retry is
  * reported exactly once and the same error object propagates unchanged.
  */
-export function createSessionClient(baseUrl: string): Client<paths> {
+export function createSessionClient(baseUrl: string): SessionClient {
   const reporting = createApiReportingMiddleware()
   const replayableRequests = new WeakMap<Request, Request>()
-  let client: Client<paths>
+  let client: SessionClient
   let refreshing: Promise<boolean> | null = null
+  let authOperationQueue = Promise.resolve()
+
+  const runAuthOperation = <T>(operation: () => Promise<T>): Promise<T> => {
+    const previous = authOperationQueue
+    let release!: () => void
+    authOperationQueue = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    return previous.then(operation).finally(release)
+  }
 
   const refreshOnce = (): Promise<boolean> => {
-    refreshing ??= client
-      .POST('/auth/refresh')
+    refreshing ??= runAuthOperation(() => client.POST('/auth/refresh'))
       .then(({ response }) => response.ok)
       .finally(() => {
         refreshing = null
@@ -57,6 +65,7 @@ export function createSessionClient(baseUrl: string): Client<paths> {
     credentials: 'include',
     reporting,
     middleware: sessionRefreshMiddleware,
-  })
+  }) as SessionClient
+  client.runAuthOperation = runAuthOperation
   return client
 }

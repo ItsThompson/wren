@@ -31,7 +31,7 @@ function buildClient(overrides: Partial<ConnectedClient> = {}): ConnectedClient 
   }
 }
 
-const server = setupServer()
+const server = setupServer(http.get('*/auth/session', () => new HttpResponse(null, { status: 401 })))
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())

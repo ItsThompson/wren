@@ -26,4 +26,6 @@ export function createApiClient(baseUrl: string, clientOptions: ApiClientOptions
 }
 
 export type ApiClient = Client<paths>
-export type SessionClient = Client<paths>
+export type SessionClient = Client<paths> & {
+  runAuthOperation<T>(operation: () => Promise<T>): Promise<T>
+}

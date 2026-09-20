@@ -80,19 +80,18 @@ test.describe('onboarding (register -> wizard -> dashboard, no redirect loop)', 
     await expect(page).toHaveURL(/\/dashboard$/)
     await expect(page.getByRole('heading', { name: /your dashboard/i })).toBeVisible()
 
-    // A reload stays on the dashboard, and the session resume the SPA runs on
-    // load returns the persisted flag as true: proof the skip path completed
-    // onboarding on the backend, not just in client state. Observing the SPA's
-    // own resume avoids consuming the rotating refresh token from the test.
-    const [resume] = await Promise.all([
+    // A reload stays on the dashboard, and the session introspection the SPA
+    // runs on load returns the persisted flag as true: proof the skip path
+    // completed onboarding on the backend, not just in client state.
+    const [session] = await Promise.all([
       page.waitForResponse(
         (response) =>
-          response.url().includes('/auth/refresh') && response.request().method() === 'POST',
+          response.url().includes('/auth/session') && response.request().method() === 'GET',
       ),
       page.reload(),
     ])
-    expect(resume.status()).toBe(200)
-    const resumed = (await resume.json()) as AuthenticatedUser
+    expect(session.status()).toBe(200)
+    const resumed = (await session.json()) as AuthenticatedUser
     expect(resumed.has_completed_onboarding).toBe(true)
     await expect(page).toHaveURL(/\/dashboard$/)
     await expect(page.getByRole('heading', { name: /your dashboard/i })).toBeVisible()
