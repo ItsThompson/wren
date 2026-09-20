@@ -4,9 +4,9 @@ trap 'status=$?; printf "e2e topology harness failed at line %s (status %s)\n" "
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$root"
-python3 scripts/ingress_contract.py --check
+uv run --package wren-contract-tests python scripts/ingress_contract.py --check
 python3 scripts/e2e/test_public_contracts.py >/dev/null
-python3 scripts/e2e/test_ingress_parity.py >/dev/null
+uv run --package wren-contract-tests pytest scripts/e2e/test_ingress_parity.py >/dev/null
 bash -n scripts/e2e/capture-artifacts.sh
 
 

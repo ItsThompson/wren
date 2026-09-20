@@ -225,8 +225,9 @@ validate_deploy_identity() {
 
 assert_generated_ingress_current() {
   log "==> Preflight: assert generated ingress output is current"
-  python3 "${REPO_ROOT}/scripts/ingress_contract.py" --check \
-    || die "generated ingress output is stale; run python3 scripts/ingress_contract.py --write"
+  uv run --directory "${REPO_ROOT}" --no-sync --package wren-contract-tests \
+    python scripts/ingress_contract.py --check \
+    || die "generated ingress output is stale; run just generate-ingress"
 }
 
 assert_secret_env_present() {

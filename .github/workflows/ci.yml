@@ -210,8 +210,14 @@ jobs:
         with:
           node-version: 22
 
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       - name: Install script-test dependencies
-        run: sudo apt-get update && sudo apt-get install -y just
+        run: |
+          sudo apt-get update && sudo apt-get install -y just
+          uv sync --all-packages --frozen
 
       - name: Script test harnesses (scripts/tests/*_test.sh)
         run: bash scripts/tests/run_all.sh
@@ -302,6 +308,13 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: e2e/package-lock.json
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Sync workspace for ingress generation
+        run: uv sync --all-packages --frozen
 
       - name: Prepare trusted E2E environment
         run: just setup-e2e

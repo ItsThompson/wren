@@ -1,156 +1,193 @@
-"""Render and validate generated ingress adapter output."""
+"""Render validated ingress models through the checked-in templates."""
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
-try:
-    from ingress_contract import (
-        CLOUDFLARE_PATH,
-        NGINX_PATH,
-        _path_regex,
-        load_contract,
-        render_cloudflare,
-        validate_contract,
-    )
-except ModuleNotFoundError:
-    from .ingress_contract import (
-        CLOUDFLARE_PATH,
-        NGINX_PATH,
-        _path_regex,
-        load_contract,
-        render_cloudflare,
-        validate_contract,
-    )
+if TYPE_CHECKING:
+    from pathlib import Path
+
+import yaml
+from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
+
+from scripts.ingress_contract import (
+    CLOUDFLARE_PATH,
+    NGINX_PATH,
+    ROOT,
+    _path_regex,
+    load_contract,
+    validate_contract,
+)
+from scripts.ingress_models import (
+    Action,
+    AllMatch,
+    AllowlistMatch,
+    Host,
+    IngressContract,
+    PathsMatch,
+    ProxyAction,
+    Route,
+)
+
+TEMPLATE_PATH = ROOT / "deployments/ingress/templates"
+_ENVIRONMENT = Environment(
+    loader=FileSystemLoader(TEMPLATE_PATH),
+    undefined=StrictUndefined,
+    autoescape=select_autoescape(
+        enabled_extensions=("html", "xml"), default_for_string=False, default=False
+    ),
+    keep_trailing_newline=True,
+)
 
 
-def _proxy_lines(upstream: str, headers: list[str] | None = None) -> list[str]:
-    lines = [
-        f"            proxy_pass http://{upstream};",
-        "            proxy_set_header Host $host;",
-        "            proxy_set_header X-Forwarded-Host $host;",
-        "            proxy_set_header X-Forwarded-For $remote_addr;",
-        "            proxy_set_header X-Forwarded-Proto https;",
-    ]
-    lines.extend(f"            proxy_set_header {header};" for header in headers or [])
-    return lines
+@dataclass(frozen=True)
+class NginxLocation:
+    directive: str
+    action: Action
+    upstream: str | None = None
+    headers: tuple[str, ...] = ()
 
 
-def _nginx_location(match: dict[str, Any], action: dict[str, Any], upstream: str) -> list[str]:
-    if match["kind"] == "all":
-        locations = ["location / {"]
-    elif match["kind"] == "paths":
-        locations = [f"location ~ {_path_regex(match)} {{"]
-    elif match["kind"] == "allowlist":
-        locations = [f"location = {path} {{" for path in match["exact"]]
-        for prefix in match["prefix"]:
+@dataclass(frozen=True)
+class NginxHost:
+    hostname: str
+    locations: tuple[NginxLocation, ...]
+
+
+def _service_host(service: str) -> str:
+    hostname = urlsplit(service).hostname
+    if hostname is None:
+        raise ValueError(f"service URL has no hostname: {service!r}")
+    return hostname
+
+
+def _service_address(service: str) -> str:
+    parsed = urlsplit(service)
+    return f"{_service_host(service)}:{parsed.port or 80}"
+
+
+def _route_locations(route: Route) -> list[str]:
+    match = route.match
+    if isinstance(match, AllMatch):
+        return ["location / {"]
+    if isinstance(match, PathsMatch):
+        return [f"location ~ {_path_regex(match)} {{"]
+    if isinstance(match, AllowlistMatch):
+        locations = [f"location = {path} {{" for path in match.exact]
+        for prefix in match.prefix:
             locations.extend([f"location = {prefix} {{", f"location ^~ {prefix}/ {{"])
-    else:
-        raise ValueError(f"unknown match kind: {match['kind']}")
-
-    lines: list[str] = []
-    for location in locations:
-        lines.append(f"        {location}")
-        if action["kind"] == "status":
-            lines.append(f"            return {action['status']};")
-        else:
-            lines.extend(_proxy_lines(upstream))
-        lines.append("        }")
-        lines.append("")
-    return lines
+        return locations
+    raise ValueError(f"unknown route match: {match!r}")
 
 
-def render_nginx(contract: dict[str, Any]) -> str:
-    validate_contract(contract)
-    adapter = contract["e2e_adapter"]
-    app_host = next((host for host in contract["hosts"] if host["id"] == "app"), None)
-    if app_host is None or not app_host["e2e_hostname"]:
-        raise ValueError("E2E rendering requires the app hostname")
-    e2e_hosts = [host for host in contract["hosts"] if host["e2e_hostname"]]
-    if app_host not in e2e_hosts:
-        raise ValueError("E2E rendering could not select the app host")
-    recorder_upstream = urlsplit(adapter["recorder_service"]).hostname or ""
-    recorder_port = urlsplit(adapter["recorder_service"]).port or 80
-    services = {f"{recorder_upstream}:{recorder_port}"}
+def _nginx_locations(route: Route) -> tuple[NginxLocation, ...]:
+    upstream = None
+    if isinstance(route.action, ProxyAction):
+        upstream = _service_host(route.action.service)
+    return tuple(
+        NginxLocation(directive=directive, action=route.action, upstream=upstream)
+        for directive in _route_locations(route)
+    )
+
+
+def _host_locations(
+    host: Host,
+    recorder_service: str,
+    recorder_headers: dict[str, tuple[str, ...]],
+) -> tuple[NginxLocation, ...]:
+    locations: list[NginxLocation] = []
+    if host.id == "app":
+        recorder_upstream = _service_host(recorder_service)
+        for path, headers in recorder_headers.items():
+            locations.append(
+                NginxLocation(
+                    directive=f"location = {path} {{",
+                    action=ProxyAction(kind="proxy", service=recorder_service),
+                    upstream=recorder_upstream,
+                    headers=headers,
+                )
+            )
+    for route in host.routes:
+        locations.extend(_nginx_locations(route))
+    return tuple(locations)
+
+
+def _nginx_context(contract: IngressContract) -> dict[str, Any]:
+    adapter = contract.e2e_adapter
+    e2e_hosts = [host for host in contract.hosts if host.e2e_hostname is not None]
+    recorder_headers = {route.path: tuple(route.headers) for route in adapter.recorder_routes}
+    upstreams = {_service_address(adapter.recorder_service)}
     for host in e2e_hosts:
-        for route in host["routes"]:
-            action = route["action"]
-            if action["kind"] == "proxy":
-                parsed = urlsplit(action["service"])
-                services.add(f"{parsed.hostname}:{parsed.port or 80}")
+        for route in host.routes:
+            if isinstance(route.action, ProxyAction):
+                upstreams.add(_service_address(route.action.service))
+    return {
+        "upstreams": tuple(
+            {"name": address.rsplit(":", 1)[0], "address": address} for address in sorted(upstreams)
+        ),
+        "certificate": adapter.tls.certificate,
+        "key": adapter.tls.key,
+        "hosts": tuple(
+            NginxHost(
+                hostname=host.e2e_hostname or "",
+                locations=_host_locations(host, adapter.recorder_service, recorder_headers),
+            )
+            for host in e2e_hosts
+        ),
+    }
 
-    lines = [
-        "# GENERATED FILE: python3 scripts/ingress_contract.py --write",
-        "# Source: deployments/ingress/contract.json",
-        "events {}",
-        "",
-        "http {",
-        "    client_max_body_size 1m;",
-        "",
-    ]
-    for service in sorted(services):
-        name, port = service.split(":", 1)
-        lines.append(f"    upstream {name} {{ server {service}; }}")
-    lines.extend(
-        [
-            "",
-            "    server {",
-            "        listen 443 ssl default_server;",
-            "        server_name _;",
-            "",
-        ]
+
+def render_nginx(contract: object) -> str:
+    typed_contract = validate_contract(contract)
+    return _ENVIRONMENT.get_template("nginx.conf.j2").render(**_nginx_context(typed_contract))
+
+
+def render_cloudflare(contract: object) -> str:
+    typed_contract = validate_contract(contract)
+    routes: list[dict[str, str | None]] = []
+    for host in typed_contract.hosts:
+        for route in host.routes:
+            path = _path_regex(route.match)
+            service = (
+                route.action.service
+                if isinstance(route.action, ProxyAction)
+                else f"http_status:{route.action.status}"
+            )
+            routes.append(
+                {
+                    "hostname": f"${{{host.cloudflare_variable}}}",
+                    "path": path,
+                    "service": service,
+                }
+            )
+    catch_all = typed_contract.catch_all
+    catch_all_service = (
+        catch_all.service
+        if isinstance(catch_all, ProxyAction)
+        else f"http_status:{catch_all.status}"
     )
-    lines.extend(
-        [
-            f"        ssl_certificate {adapter['tls']['certificate']};",
-            f"        ssl_certificate_key {adapter['tls']['key']};",
-            "        return 444;",
-            "    }",
-            "",
-        ]
+    rendered = _ENVIRONMENT.get_template("cloudflare.yml.j2").render(
+        tunnel="${CF_TUNNEL_ID}",
+        routes=tuple(routes),
+        catch_all=catch_all_service,
     )
-
-    for host in e2e_hosts:
-        lines.extend(
-            [
-                "    server {",
-                "        listen 443 ssl;",
-                f"        server_name {host['e2e_hostname']};",
-                "",
-                f"        ssl_certificate {adapter['tls']['certificate']};",
-                f"        ssl_certificate_key {adapter['tls']['key']};",
-                "",
-            ]
-        )
-        if host["id"] == "app":
-            for recorder_route in adapter["recorder_routes"]:
-                lines.append(f"        location = {recorder_route['path']} {{")
-                lines.extend(_proxy_lines(recorder_upstream, recorder_route["headers"]))
-                lines.append("        }")
-                lines.append("")
-        for route in host["routes"]:
-            action = route["action"]
-            upstream = ""
-            if action["kind"] == "proxy":
-                upstream = urlsplit(action["service"]).hostname or ""
-            lines.extend(_nginx_location(route["match"], action, upstream))
-        lines.append("    }")
-        lines.append("")
-    lines.extend(["}", ""])
-    return "\n".join(lines)
+    parsed = yaml.safe_load(rendered)
+    if not isinstance(parsed, dict) or not isinstance(parsed.get("ingress"), list):
+        raise ValueError("Cloudflare template did not produce an ingress YAML document")
+    return rendered
 
 
-def generated_outputs_are_current(contract: dict[str, Any] | None = None) -> bool:
-    contract = contract or load_contract()
-    return (
-        CLOUDFLARE_PATH.read_text(encoding="utf-8") == render_cloudflare(contract)
-        and NGINX_PATH.read_text(encoding="utf-8") == render_nginx(contract)
+def generated_outputs_are_current(contract: IngressContract | None = None) -> bool:
+    typed_contract = contract or load_contract()
+    return all(
+        path.exists() and path.read_text(encoding="utf-8") == content
+        for path, content in output_contents(typed_contract)
     )
 
 
-def output_contents(contract: dict[str, Any]) -> tuple[tuple[Path, str], ...]:
+def output_contents(contract: IngressContract) -> tuple[tuple[Path, str], ...]:
     return (
         (CLOUDFLARE_PATH, render_cloudflare(contract)),
         (NGINX_PATH, render_nginx(contract)),

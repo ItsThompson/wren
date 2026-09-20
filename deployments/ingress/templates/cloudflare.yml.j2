@@ -1,0 +1,10 @@
+# GENERATED FILE: python3 scripts/ingress_contract.py --write
+# Source: deployments/ingress/contract.json
+tunnel: {{ tunnel }}
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+{% for route in routes %}  - hostname: {{ route.hostname }}
+{% if route.path is not none %}    path: '{{ route.path }}'
+{% endif %}    service: {{ route.service }}
+{% endfor %}  - service: {{ catch_all }}
