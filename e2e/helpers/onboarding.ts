@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test'
 
+import type { SensitiveValueRegistry } from '../fixtures/sensitive-value-registry'
 import type { TestUser } from './users'
 
 /**
@@ -17,7 +18,14 @@ import type { TestUser } from './users'
  * Dashboard link renders only when signed in) is the settle signal that the
  * session cookie is live in the browser context.
  */
-export async function registerNewUser(page: Page, user: TestUser): Promise<void> {
+export async function registerNewUser(
+  page: Page,
+  user: TestUser,
+  sensitiveValueRegistry: SensitiveValueRegistry,
+): Promise<void> {
+  sensitiveValueRegistry.register('username', user.username)
+  sensitiveValueRegistry.register('email', user.email)
+  sensitiveValueRegistry.register('password', user.password)
   await page.goto('/auth?mode=register')
   await page.getByLabel('Username').fill(user.username)
   await page.getByLabel('Email').fill(user.email)

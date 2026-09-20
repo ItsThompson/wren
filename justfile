@@ -176,17 +176,27 @@ codegen-mcp:
 
 # --- Deploy / ops -----------------------------------------------------------
 
+# Render the ingress contract into the production Cloudflare and E2E Nginx files.
+generate-ingress:
+    uv run --no-sync --package wren-contract-tests python scripts/ingress_contract.py --write
+
+# Fail when either checked-in ingress output does not match the contract.
+check-ingress:
+    uv run --no-sync --package wren-contract-tests python scripts/ingress_contract.py --check
+
 # Deploy the whole stack to a VPS over a Docker Context; DEPLOY_SHA optional
 # (defaults to the checkout HEAD). Register the context and export the
 # config/secret env first (see docs/runbooks/bring-up.md Phase E). Match
 # DEPLOY_SHA to the CD-built image tags: DEPLOY_SHA=$(git rev-parse HEAD) just deploy 203.0.113.10
 deploy ip user='deploy':
+    uv run --no-sync --package wren-contract-tests python scripts/ingress_contract.py --check
     ./scripts/deploy.sh {{ip}} {{user}}
 
 # Print the deploy plan (every docker --context compose line + the ssh lines)
 # without touching a server. The preflight runs, so the required config/secret
 # env vars must be set (even dummy values) to reach the plan.
 deploy-plan ip user='deploy':
+    uv run --no-sync --package wren-contract-tests python scripts/ingress_contract.py --check
     DRY_RUN=1 ./scripts/deploy.sh {{ip}} {{user}}
 
 # Run the deploy-script test harness (pure helpers, dry-run plan, rollback).
@@ -195,6 +205,7 @@ test-deploy:
 
 # Preview the rendered Cloudflare tunnel ingress config from the local .env.
 render-tunnel:
+    uv run --no-sync --package wren-contract-tests python scripts/ingress_contract.py --check
     set -a; . ./.env; set +a; \
     envsubst '$CF_TUNNEL_ID $CF_APP_HOSTNAME $CF_API_HOSTNAME $CF_MCP_HOSTNAME $CF_DOCS_HOSTNAME' \
       < deployments/cloudflare/config.yml
@@ -207,32 +218,120 @@ render-alertmanager:
     envsubst '$DISCORD_WEBHOOK_URL' \
       < deployments/alertmanager/alertmanager.yml
 
-# --- E2E (Playwright, full stack) -------------------------------------------
+# --- E2E (Playwright, production-mode HTTPS stack) --------------------------
 
-# Every e2e compose invocation layers the e2e overlay (published frontend +
-# backend ports, relaxed cookies) on the base stack. Test-only: a real deploy
-# never uses this overlay (deploy.sh composes base + docker-compose.tunnel.yml).
 e2e_compose := "-f docker-compose.yml -f e2e/docker-compose.e2e.yml"
+e2e_root := justfile_directory()
+e2e_ca := e2e_root + "/e2e/ingress/certificates/caroot/rootCA.pem"
+e2e_token := e2e_root + "/e2e/keys/recorder-control-token"
 
-# Install the Playwright runner + the chromium browser (run once).
+# Install dependencies, prepare isolated hosts and trust, and generate test-only
+# OAuth material. The production stack never uses these generated files.
 setup-e2e:
-    cd e2e && npm ci && npx playwright install --with-deps chromium
+    #!/usr/bin/env bash
+    set -euo pipefail
+    uv run --no-sync --package wren-contract-tests python scripts/ingress_contract.py --check
+    if [[ "$(uname -s)" == "Linux" ]]; then (cd e2e && npm ci && npx playwright install --with-deps chromium); else (cd e2e && npm ci && npx playwright install chromium); fi
+    if [ -w /etc/hosts ]; then scripts/e2e/setup-hosts.sh; else sudo scripts/e2e/setup-hosts.sh; fi
+    scripts/e2e/setup-certificates.sh
+    scripts/e2e/setup-oauth-key.sh
 
-# Build + boot the e2e stack (published ports) and run pre-traffic migrations.
-# Both `up` and the migration `run` materialize the environment-sourced
-# Prometheus config, so export the vars for the whole recipe.
+# Migrate the disposable database before starting the focused ingress graph.
+# Only ingress publishes host port 443; all application services stay private.
 e2e-up:
     #!/usr/bin/env bash
     set -euo pipefail
+    uv run --no-sync --package wren-contract-tests python scripts/ingress_contract.py --check
     export WREN_PROMETHEUS_CONFIG="$(cat deployments/prometheus/prometheus.yml)"
     export WREN_PROMETHEUS_ALERTS="$(cat deployments/prometheus/alerts.yml)"
-    docker compose {{e2e_compose}} up -d --build
-    docker compose {{e2e_compose}} run --rm backend alembic upgrade head
+    scripts/e2e/setup-oauth-key.sh
+    export RECORDER_CONTROL_TOKEN="$(cat {{e2e_token}})"
+    export NODE_EXTRA_CA_CERTS="{{e2e_ca}}"
+    docker compose {{e2e_compose}} build frontend backend mcp recorder ingress
+    docker compose {{e2e_compose}} up -d --wait postgres
+    docker compose {{e2e_compose}} run --rm --no-deps backend alembic upgrade head
+    docker compose {{e2e_compose}} up -d ingress
+    FRONTEND_BASE_URL=https://app.wren.test API_BASE_URL=https://api.wren.test MCP_BASE_URL=https://mcp.wren.test scripts/e2e/wait-ready.sh
 
-# Run the Playwright spine + smoke against the running e2e stack.
+# Run E2E static checks and the Playwright suite through trusted HTTPS.
 test-e2e:
-    cd e2e && npx playwright test
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export E2E_SENSITIVE_VALUES_DIR="/tmp/wren-e2e-sensitive"
+    rm -rf -- "$E2E_SENSITIVE_VALUES_DIR"
+    mkdir -p "$E2E_SENSITIVE_VALUES_DIR"
+    cleanup_sensitive_values() {
+        local status=$?
+        trap - EXIT
+        if [ "$status" -eq 0 ]; then
+            rm -rf -- "$E2E_SENSITIVE_VALUES_DIR" || status=$?
+        fi
+        exit "$status"
+    }
+    trap cleanup_sensitive_values EXIT
+    export NODE_EXTRA_CA_CERTS="{{e2e_ca}}"
+    export RECORDER_CONTROL_TOKEN="$(cat {{e2e_token}})"
+    cd e2e
+    npm run typecheck
+    npm run lint
+    npm run test:unit
+    npx playwright test
 
-# Tear down the e2e stack and drop its named volumes.
+# Run only the Playwright suite against an already-running E2E stack.
+test-e2e-system:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export E2E_SENSITIVE_VALUES_DIR="/tmp/wren-e2e-sensitive"
+    rm -rf -- "$E2E_SENSITIVE_VALUES_DIR"
+    mkdir -p "$E2E_SENSITIVE_VALUES_DIR"
+    cleanup_sensitive_values() {
+        local status=$?
+        trap - EXIT
+        if [ "$status" -eq 0 ]; then
+            rm -rf -- "$E2E_SENSITIVE_VALUES_DIR" || status=$?
+        fi
+        exit "$status"
+    }
+    trap cleanup_sensitive_values EXIT
+    export NODE_EXTRA_CA_CERTS="{{e2e_ca}}"
+    export RECORDER_CONTROL_TOKEN="$(cat {{e2e_token}})"
+    cd e2e
+    npx playwright test
+
+# Capture and sanitize diagnostics while the E2E stack and recorder remain available.
+e2e-capture-artifacts:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export E2E_SENSITIVE_VALUES_DIR="/tmp/wren-e2e-sensitive"
+    export NODE_EXTRA_CA_CERTS="{{e2e_ca}}"
+    if [ -r "{{e2e_token}}" ]; then export RECORDER_CONTROL_TOKEN="$(cat {{e2e_token}})"; fi
+    scripts/e2e/capture-artifacts.sh
+
+# Show the six E2E service logs without exposing direct service ports.
+e2e-logs:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    docker compose {{e2e_compose}} logs --no-color ingress frontend backend mcp postgres recorder
+
+e2e-typecheck:
+    cd e2e && npm run typecheck
+
+e2e-lint:
+    cd e2e && npm run lint
+
+test-e2e-unit:
+    cd e2e && npm run test:unit
+
+# Tear down containers, networks, volumes, and generated OAuth material.
 e2e-down:
-    docker compose {{e2e_compose}} down -v
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ -r "{{e2e_token}}" ]]; then export RECORDER_CONTROL_TOKEN="$(cat "{{e2e_token}}")"; else export RECORDER_CONTROL_TOKEN=teardown-placeholder; fi
+    sensitive_values_dir="/tmp/wren-e2e-sensitive"
+    trap 'status=$?; trap - EXIT; scripts/e2e/cleanup-generated.sh || status=$?; rm -rf -- "$sensitive_values_dir" || status=$?; exit "$status"' EXIT
+    docker compose {{e2e_compose}} down -v --remove-orphans
+
+# Remove only the Wren-managed host entries and isolated CA/leaf material.
+reset-e2e-trust:
+    if [ -w /etc/hosts ]; then scripts/e2e/reset-hosts.sh; else sudo scripts/e2e/reset-hosts.sh; fi
+    scripts/e2e/reset-certificates.sh

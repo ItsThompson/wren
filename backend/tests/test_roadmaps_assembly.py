@@ -299,9 +299,6 @@ def test_fork_mints_the_new_roadmap_id_and_resets_lifecycle() -> None:
 def test_fork_copies_all_content_verbatim() -> None:
     source = _source_roadmap()
     fork = assemble_fork(source, "grokking-dsa-9x2b", owner="forker", now=_LATER)
-    # Presentation + structure copied: title, description, subject_tags, section
-    # and subsection maps + order, and every child ID verbatim (uniqueness scope
-    # is a single roadmap, so the IDs carry safely into the fork's namespace).
     assert fork.title == source.title
     assert fork.description == source.description
     assert fork.subject_tags == source.subject_tags
@@ -309,7 +306,6 @@ def test_fork_copies_all_content_verbatim() -> None:
     assert fork.suggested_path == source.suggested_path
     fork_sub = fork.sections["sec_foundations"].subsections
     assert set(fork_sub) == {"sub_arrays", "sub_hashing"}
-    # References carry over intact (same IDs, so no re-mint/remap needed).
     assert fork_sub["sub_hashing"].prereq_ids == ["sub_arrays"]
 
 

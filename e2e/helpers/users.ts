@@ -1,23 +1,22 @@
+import { randomBytes } from 'node:crypto'
+
+import type { TestAttemptIdentity } from '../fixtures/attempt-identity'
+import { createAccountIdentity } from '../fixtures/attempt-identity'
+
 export interface TestUser {
   username: string
   email: string
   password: string
 }
 
-let sequence = 0
-
-/**
- * A fresh, unique user per call so the suite's per-test users never collide.
- * The handle is lowercase alphanumeric to satisfy username validation; the
- * email derives from it so it is unique too.
- */
-export function uniqueUser(role = 'user'): TestUser {
-  sequence += 1
-  const token = `${Date.now().toString(36)}${sequence}${Math.random().toString(36).slice(2, 8)}`
-  const handle = `e2e${role}${token}`.toLowerCase().replace(/[^a-z0-9]/g, '')
+/** Create a standalone test user when a fixture identity is not available. */
+export function uniqueUser(role = 'user', identity?: TestAttemptIdentity): TestUser {
+  if (identity !== undefined) return createAccountIdentity(identity, role, 0)
+  const handle = `e2e${role}${randomBytes(8).toString('hex')}`.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const username = handle.slice(0, 32)
   return {
-    username: handle,
-    email: `${handle}@example.com`,
+    username,
+    email: `${username}@example.com`,
     password: 'Str0ngPass1',
   }
 }

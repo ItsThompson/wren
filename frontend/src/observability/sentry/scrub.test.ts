@@ -15,7 +15,7 @@ describe('scrubSentryEvent', () => {
             type: 'Error',
             value: 'secret exception',
             mechanism: { type: 'generic', handled: false },
-            stacktrace: { frames: [{ filename: 'app.ts', vars: { secret: 'value' } }] },
+            stacktrace: { frames: [{ filename: 'https://app.wren.test/assets/app.js', abs_path: '/assets/app.js', vars: { secret: 'value' } }] },
           },
         ],
       },
@@ -28,6 +28,8 @@ describe('scrubSentryEvent', () => {
     expect(event.exception?.values?.[0].value).toBe('[Redacted exception]')
     expect(event.exception?.values?.[0].mechanism).toBeUndefined()
     expect(event.exception?.values?.[0].stacktrace?.frames?.[0].vars).toBeUndefined()
+    expect(event.exception?.values?.[0].stacktrace?.frames?.[0].filename).toBeUndefined()
+    expect(event.exception?.values?.[0].stacktrace?.frames?.[0].abs_path).toBeUndefined()
   })
 
   it('keeps only allowlisted bounded tags', () => {

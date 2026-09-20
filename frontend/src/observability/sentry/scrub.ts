@@ -69,7 +69,11 @@ export function scrubSentryEvent<T extends Event>(event: T): T {
   for (const value of event.exception?.values ?? []) {
     value.value = '[Redacted exception]'
     delete value.mechanism
-    for (const frame of value.stacktrace?.frames ?? []) delete frame.vars
+    for (const frame of value.stacktrace?.frames ?? []) {
+      delete frame.vars
+      delete frame.filename
+      delete frame.abs_path
+    }
   }
   return event
 }

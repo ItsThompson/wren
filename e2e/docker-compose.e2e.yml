@@ -1,15 +1,7 @@
 # =============================================================================
-# E2E overlay — layered ON TOP of docker-compose.yml for the CI
-# `e2e` job and local `just e2e-up` / `just test-e2e`.
-#
-# The base stack is expose-only (the tunnel is the only ingress in prod), so a
-# host-run Playwright cannot reach it. This overlay publishes the frontend,
-# external backend, and MCP transport ports to the host, and relaxes cookies + wires in-network
-# URLs so the containerized stack boots healthy and self-contained for tests.
-#
-# Test-only: a real deploy never uses this file (deploy.sh composes the base
-# file plus docker-compose.tunnel.yml). The distinct project name keeps its
-# volumes/networks separate from `just up` (wren) and `just up-dev` (wren-dev).
+# Production-mode HTTPS topology for Playwright and the official MCP client.
+# This overlay is test-only. Production deployment continues to use the base
+# file plus docker-compose.tunnel.yml.
 # =============================================================================
 name: wren-e2e
 
@@ -17,29 +9,79 @@ services:
   frontend:
     build:
       args:
-        # The browser reaches the API at the published HOST port, so bake the
-        # host origin (not the in-network `backend` service name) into the SPA.
-        VITE_API_BASE_URL: http://localhost:8000
-    ports:
-      - "5173:80"
+        VITE_API_BASE_URL: https://api.wren.test
+        VITE_MCP_BASE_URL: https://mcp.wren.test
+        VITE_SENTRY_DSN: https://e2epublickey@app.wren.test/_e2e/sentry/1
+        VITE_SENTRY_RELEASE: ${WREN_E2E_RELEASE:-e2e-local}
 
   backend:
     environment:
-      ENVIRONMENT: development            # relaxed cookies: Secure off, host-only
-      SESSION_JWT_SECRET: e2e-session-secret-not-for-production
-      INTERNAL_API_TOKEN: e2e-internal-token
-      CORS_ORIGIN: http://localhost:5173  # allow the SPA origin's credentialed XHRs
-      PUBLIC_BASE_URL: http://backend:8000  # in-network AS origin (OAuth/JWKS)
-      APP_PUBLIC_URL: http://localhost:5173
-      MCP_PUBLIC_URL: http://localhost:9000
-    ports:
-      - "8000:8000"
+      ENVIRONMENT: production
+      SESSION_JWT_SECRET: ${E2E_SESSION_JWT_SECRET:-wren-e2e-session-secret-at-least-32-bytes}
+      INTERNAL_API_TOKEN: ${E2E_INTERNAL_API_TOKEN:-wren-e2e-internal-token}
+      CORS_ORIGIN: https://app.wren.test
+      PUBLIC_BASE_URL: https://api.wren.test
+      APP_PUBLIC_URL: https://app.wren.test
+      MCP_PUBLIC_URL: https://mcp.wren.test
+      COOKIE_DOMAIN: .wren.test
+      TRUSTED_PROXIES: ${E2E_APP_NET_SUBNET:-10.90.0.0/24}
+      OAUTH_PRIVATE_KEY_PATH: /run/secrets/oauth_private_key
+      OAUTH_KEY_ID: wren-e2e
+      OAUTH_ACCESS_TTL_SECONDS: 2
+      OAUTH_REFRESH_TTL_SECONDS: 600
+      SENTRY_DSN_BACKEND: ""
+      SENTRY_RELEASE: ${WREN_E2E_RELEASE:-e2e-local}
+    volumes:
+      - ./e2e/keys/oauth-private.pem:/run/secrets/oauth_private_key:ro
 
   mcp:
-    ports:
-      - "9000:9000"
     environment:
-      ENVIRONMENT: development
-      INTERNAL_API_TOKEN: e2e-internal-token
-      PUBLIC_BASE_URL: http://backend:8000  # reach the AS JWKS in-network
-      MCP_PUBLIC_URL: http://localhost:9000
+      ENVIRONMENT: production
+      INTERNAL_API_TOKEN: ${E2E_INTERNAL_API_TOKEN:-wren-e2e-internal-token}
+      PUBLIC_BASE_URL: https://api.wren.test
+      MCP_PUBLIC_URL: https://mcp.wren.test
+      MCP_TRUSTED_PROXIES: ${E2E_APP_NET_SUBNET:-10.90.0.0/24}
+      SSL_CERT_FILE: /etc/wren-e2e/rootCA.pem
+      SENTRY_DSN_MCP: ""
+      SENTRY_RELEASE: ${WREN_E2E_RELEASE:-e2e-local}
+    volumes:
+      - ./e2e/ingress/certificates/caroot/rootCA.pem:/etc/wren-e2e/rootCA.pem:ro
+
+  recorder:
+    build:
+      context: ./e2e/recorder
+    environment:
+      RECORDER_CONTROL_TOKEN: ${RECORDER_CONTROL_TOKEN:?run scripts/e2e/setup-oauth-key.sh first}
+    expose:
+      - "8080"
+    networks:
+      - app-net
+
+  ingress:
+    image: nginx:1.27-alpine
+    depends_on:
+      frontend:
+        condition: service_started
+      backend:
+        condition: service_started
+      mcp:
+        condition: service_started
+      recorder:
+        condition: service_started
+    ports:
+      - "127.0.0.1:443:443"
+    volumes:
+      - ./e2e/ingress/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./e2e/ingress/certificates:/etc/nginx/certs:ro
+    networks:
+      app-net:
+        aliases:
+          - api.wren.test
+          - app.wren.test
+          - mcp.wren.test
+
+networks:
+  app-net:
+    ipam:
+      config:
+        - subnet: ${E2E_APP_NET_SUBNET:-10.90.0.0/24}

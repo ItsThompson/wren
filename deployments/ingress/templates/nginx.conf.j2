@@ -1,0 +1,40 @@
+# GENERATED FILE: python3 scripts/ingress_contract.py --write
+# Source: deployments/ingress/contract.json
+events {}
+
+http {
+    client_max_body_size 1m;
+
+{% for upstream in upstreams %}    upstream {{ upstream.name }} { server {{ upstream.address }}; }
+{% endfor %}
+    server {
+        listen 443 ssl default_server;
+        server_name _;
+
+        ssl_certificate {{ certificate }};
+        ssl_certificate_key {{ key }};
+        return 444;
+    }
+
+{% for host in hosts %}    server {
+        listen 443 ssl;
+        server_name {{ host.hostname }};
+
+        ssl_certificate {{ certificate }};
+        ssl_certificate_key {{ key }};
+
+{% for location in host.locations %}        {{ location.directive }}
+{% if location.action.kind == 'status' %}            return {{ location.action.status }};
+        }
+
+{% else %}            proxy_pass http://{{ location.upstream }};
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-For $remote_addr;
+            proxy_set_header X-Forwarded-Proto https;
+{% for header in location.headers %}            proxy_set_header {{ header }};
+{% endfor %}        }
+
+{% endif %}{% endfor %}    }
+
+{% endfor %}}

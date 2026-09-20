@@ -119,25 +119,7 @@ def assemble_draft(
 
 
 def assemble_fork(source: Roadmap, new_roadmap_id: str, owner: str, *, now: datetime) -> Roadmap:
-    """Copy ``source`` content into a brand-new public-on-publish draft.
-
-    A fork is a faithful content copy under a freshly-minted, globally-unique
-    ``new_roadmap_id`` (never derived from the source ID), owned by the forking
-    ``owner`` and reset to a ``draft`` at ``revision`` 1 with fresh timestamps.
-    All content is copied: sections, subsections, resources, checklist items,
-    ``prereq_ids``, ``suggested_path``, track tags, ``subject_tags``, ``title``,
-    and ``description``.
-
-    Child slug IDs are copied verbatim: their uniqueness scope is a single roadmap,
-    so they carry safely into the fork's own namespace and every internal reference
-    (``prereq_ids`` / ``suggested_path``) stays valid without a re-mint or a remap.
-    The only minted value is the new roadmap ID. ``published_visibility`` resets to
-    public, never inheriting the source's sharing state, and no progress is carried
-    over: the service creates no progress record for a fork.
-
-    Pure: ``model_copy(deep=True)`` gives the fork independent nested maps, so the
-    persisted source is never mutated.
-    """
+    """Copy ``source`` content into a brand-new public-on-publish draft."""
     return source.model_copy(
         deep=True,
         update={
