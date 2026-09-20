@@ -78,12 +78,13 @@ RouteRegistry = Mapping[RouteKey, AccessLevel]
 # that mounts them (accounts, roadmaps, OAuth). The coverage test fails
 # safe (deny) the moment a mounted product route is missing an entry.
 #
-# The /auth endpoints are PUBLIC: they establish or tear down a session rather
-# than resolving one via require_user, so they gate no caller identity. They are
-# mounted on the external app only (no internal-app auth surface).
+# The session-establishing /auth endpoints are PUBLIC. The session lookup
+# resolves the existing access cookie and therefore requires an external session.
+# They are mounted on the external app only (no internal-app auth surface).
 EXTERNAL_ROUTE_ACCESS: RouteRegistry = {
     RouteKey(method="POST", path="/auth/register"): AccessLevel.PUBLIC,
     RouteKey(method="POST", path="/auth/login"): AccessLevel.PUBLIC,
+    RouteKey(method="GET", path="/auth/session"): AccessLevel.EXTERNAL_COOKIE,
     RouteKey(method="POST", path="/auth/refresh"): AccessLevel.PUBLIC,
     RouteKey(method="POST", path="/auth/logout"): AccessLevel.PUBLIC,
     # Roadmap authoring resolves the human session via require_user. The full

@@ -48,7 +48,7 @@ const decisionOk = () =>
     return HttpResponse.json({ redirect_uri: body.approve ? APPROVE_REDIRECT : DENY_REDIRECT })
   })
 
-const server = setupServer()
+const server = setupServer(http.get('*/auth/session', () => new HttpResponse(null, { status: 401 })))
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())

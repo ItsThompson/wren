@@ -34,7 +34,7 @@ export interface HookWrapperOptions {
   authValue?: AuthContextValue
   /**
    * Mount the real `<AuthProvider>` (which consumes the shared session client)
-   * so a mocked `POST /auth/refresh` drives `resume()` and the `enabled` gate.
+   * so mocked session bootstrap responses drive the `enabled` gate.
    * Wins over `authValue` when both are passed.
    */
   useRealAuth?: boolean
@@ -53,7 +53,7 @@ export interface HookWrapperOptions {
  * `ApiClientProvider` so `useSessionClient()` resolves.
  *
  * Auth resolution:
- * - `useRealAuth: true` → real `<AuthProvider>` (resume via mocked `/auth/refresh`)
+ * - `useRealAuth: true` → real `<AuthProvider>` (bootstrap via mocked auth endpoints)
  * - `authValue` provided → `<AuthContext.Provider value={authValue}>` (controlled)
  * - neither → a default anonymous controlled value (`buildAuthValue()`)
  */

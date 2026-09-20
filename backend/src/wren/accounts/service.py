@@ -1,4 +1,4 @@
-"""AccountService: registration, login/logout, session refresh, and profile.
+"""AccountService: registration, login/logout, session lookup/refresh, and profile.
 
 The single source of truth for account business rules. It
 receives a repository and collaborators, resolves identity from credentials or
@@ -123,6 +123,13 @@ class AccountService:
             raise Unauthorized(_INVALID_CREDENTIALS)
         _log.info("user_logged_in", user_id=user.id)
         return self._start_session(user)
+
+    async def current_user(self, user_id: str) -> AuthenticatedUser:
+        """Resolve the authenticated user's current view without changing its session."""
+        user = await self._repo.get_by_id(user_id)
+        if user is None:
+            raise Unauthorized("Session expired or revoked; log in again.")
+        return _to_authenticated(user)
 
     async def refresh(self, refresh_token: str) -> Session:
         """Rotate a valid refresh token into a fresh session; revoke the old id."""

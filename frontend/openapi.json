@@ -87,6 +87,27 @@
         }
       }
     },
+    "/auth/session": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Session",
+        "operationId": "session_auth_session_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthenticatedUser"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/refresh": {
       "post": {
         "tags": [

@@ -1,4 +1,4 @@
-"""External REST adapter for accounts: /auth/register, /login, /refresh, /logout.
+"""External REST adapter for accounts: /auth/register, /login, /session, /refresh, /logout.
 
 Thin handlers: each maps one request to one
 :class:`AccountService` call, writes or clears the session cookies, and returns
@@ -21,7 +21,7 @@ from wren.accounts.config import AUTH_PATH, REFRESH_COOKIE_NAME, CookieConfig
 from wren.accounts.schemas import AuthenticatedUser, LoginRequest, RegisterRequest
 from wren.accounts.service import AccountService
 from wren.core.errors import Unauthorized
-from wren.core.identity import SESSION_COOKIE_NAME
+from wren.core.identity import SESSION_COOKIE_NAME, require_user
 
 if TYPE_CHECKING:
     from wren.accounts.tokens import TokenPair
@@ -55,6 +55,15 @@ def create_accounts_router(
         session = await service.login(body.email, body.password)
         _write_session_cookies(response, session.tokens, cookie_config)
         return session.user
+
+    @router.get("/session")
+    async def session(
+        response: Response,
+        user_id: str = Depends(require_user),
+        service: AccountService = Depends(service_provider),
+    ) -> AuthenticatedUser:
+        response.headers["Cache-Control"] = "no-store"
+        return await service.current_user(user_id)
 
     @router.post("/refresh")
     async def refresh(
