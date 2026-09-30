@@ -53,6 +53,12 @@
     -webkit-text-size-adjust: 100%;
   }
 
+  @media (pointer: fine) {
+    html {
+      overscroll-behavior: none;
+    }
+  }
+
   body {
     margin: 0;
     min-height: 100vh;
