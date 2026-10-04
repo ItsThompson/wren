@@ -39,7 +39,7 @@ def test_guidance_asks_for_the_learners_target_level() -> None:
 
 def test_guidance_covers_study_and_assesses_more_than_recall() -> None:
     content = read_skill_markdown()
-    assert "name: wren-roadmaps" in content
+    assert content.startswith("---\nname: wren\n")
     assert "## Studying a roadmap" in content
     assert "prerequisites are the hard constraint" in content
     assert "Read the primary source" in content

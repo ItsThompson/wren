@@ -1,9 +1,9 @@
 ---
-name: wren-roadmaps
-description: Create, edit, publish, and study personalized Wren learning roadmaps via the connected MCP tools. Activate for roadmap authoring or study sessions. You own learner modelling, prerequisite discovery, resource selection, ZPD sequencing, and assessment at the learner's chosen Bloom level. Wren stores roadmaps, validates structure, renders content, and tracks progress.
+name: wren
+description: Use Wren's MCP tools to create, edit, publish, and study personalized learning roadmaps and track progress. Load for any Wren roadmap or learning-progress request. Covers learner goals, ZPD sequencing, Bloom-level assessment, resources, and tool workflows.
 ---
 
-# Wren Roadmaps
+# Wren
 
 Wren is a store for personalized **learning roadmaps**. You (the user's agent) are connected to it over MCP. This guide covers both authoring and studying a roadmap. Sequence learning by the learner's **Zone of Proximal Development (ZPD)**: each step is challenging but reachable given what they already know.
 
