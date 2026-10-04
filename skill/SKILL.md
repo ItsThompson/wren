@@ -1,24 +1,16 @@
 ---
 name: wren-roadmaps
-description: >
-  Create, edit, publish, and study personalized Wren learning roadmaps via the
-  connected MCP tools. Activate for roadmap authoring or study sessions. You own
-  learner modelling, prerequisite discovery, resource selection, ZPD sequencing,
-  and assessment at the learner's chosen Bloom level. Wren stores roadmaps,
-  validates structure, renders content, and tracks progress.
+description: Create, edit, publish, and study personalized Wren learning roadmaps via the connected MCP tools. Activate for roadmap authoring or study sessions. You own learner modelling, prerequisite discovery, resource selection, ZPD sequencing, and assessment at the learner's chosen Bloom level. Wren stores roadmaps, validates structure, renders content, and tracks progress.
 ---
 
 # Wren Roadmaps
 
-Wren is a store for personalized **learning roadmaps**. You (the user's agent)
-are connected to it over MCP. This guide covers both authoring and studying a
-roadmap. Sequence learning by the learner's **Zone of Proximal Development (ZPD)**:
-each step is challenging but reachable given what they already know.
+Wren is a store for personalized **learning roadmaps**. You (the user's agent) are connected to it over MCP. This guide covers both authoring and studying a roadmap. Sequence learning by the learner's **Zone of Proximal Development (ZPD)**: each step is challenging but reachable given what they already know.
 
-## The load-bearing idea: you are the brain, not the app
+## The app is a tool, not the decision-maker
 
-Wren does five things and no more: it **stores** roadmaps, **validates their
-structure**, **renders** them, **tracks progress**, and **hosts these tools**.
+Wren does five key things: it **stores** roadmaps, **validates their structure**, **renders** them, **tracks progress**, and **hosts these tools**.
+
 Everything that makes a roadmap good is your job, done before you write anything:
 
 - **Model the learner.** Ask what they already know, what level of understanding they want to achieve, and how much time they have. Do not assume a blank slate or a mastery goal.
@@ -26,11 +18,7 @@ Everything that makes a roadmap good is your job, done before you write anything
 - **Gather resources.** Find a concrete article/video/course/doc for each node.
 - **Sequence by ZPD.** Order the work so each step builds on the last.
 
-Wren never computes ZPD, never reasons about pedagogy, and never reorders your
-work. The `suggested_path` you author **is** your sequencing intent, frozen at
-publish time. If the roadmap is not well-sequenced, that is on you, not the tool.
-Keep roadmaps light and iterate with the user: a first draft is a starting point,
-not a final artifact.
+Wren never computes ZPD, never reasons about pedagogy, and never reorders your work. The `suggested_path` you author **is** your sequencing intent, frozen at publish time. If the roadmap is not well-sequenced, that is on you, not the tool.
 
 ## Set the learning target with Bloom's taxonomy
 
@@ -54,23 +42,14 @@ A roadmap is a small tree with one graph inside it:
 
 Two cross-cutting structures:
 
-- **Prerequisite edges** between subsections form a **DAG** (directed, acyclic).
-  An edge means "learn X before Y".
-- **`suggested_path`** is an ordered list of every subsection ID. It expresses
-  your ZPD sequencing and must be a valid topological order of the DAG.
+- **Prerequisite edges** between subsections form a **DAG** (directed, acyclic). An edge means "learn X before Y".
+- **`suggested_path`** is an ordered list of every subsection ID. It expresses your ZPD sequencing and must be a valid topological order of the DAG.
 
 ### Address everything by ID, never by array index
 
-Every node has a **server-minted slug ID** (e.g. `sub_python-basics`). All edits
-target these IDs. There is no array-index addressing anywhere: you never say
-"the third subsection". When you create or import content, attach a `proposed_id`
-to any node you intend to reference later; the server preserves it (or returns a
-`proposed_id -> minted_id` remap if it had to de-dupe), so you always have a
-stable handle. Ordering is expressed with `before_id` / `after_id`, never by
-resending an array.
+Every node has a **server-minted slug ID** (e.g. `sub_python-basics`). All edits target these IDs. There is no array-index addressing anywhere: you never say "the third subsection". When you create or import content, attach a `proposed_id` to any node you intend to reference later; the server preserves it (or returns a `proposed_id -> minted_id` remap if it had to de-dupe), so you always have a stable handle. Ordering is expressed with `before_id` / `after_id`, never by resending an array.
 
-Slug IDs are stable and diverge from titles: renaming a subsection does **not**
-change its ID. Keep addressing by ID.
+Slug IDs are stable and diverge from titles: renaming a subsection does **not** change its ID. Keep addressing by ID.
 
 ## The tools
 
@@ -84,48 +63,31 @@ change its ID. Keep addressing by ID.
 | `fork_roadmap(source_roadmap_id)` | New draft seeded from any roadmap you can read, with fresh IDs and progress. The only way to change published structure |
 | `edit_roadmap_metadata(roadmap_id, ...)` | Presentation-only edit (`title`, `description`, `subject_tags`); allowed even on published roadmaps |
 
-**`patch` is the primary path; `replace` is not.** Reach for `replace` only when
-you genuinely have a whole new document to import. For everyday editing (rename a
-subsection, add a resource, insert an item, add a prerequisite edge, reorder),
-use `patch`.
+**`patch` is the primary path; `replace` is not.** Reach for `replace` only when you genuinely have a whole new document to import. For everyday editing (rename a subsection, add a resource, insert an item, add a prerequisite edge, reorder), use `patch`.
 
 ## Authoring workflow
 
 1. **Ask for the learner's target level** and current knowledge, then design the roadmap off-app: sections, subsections and prerequisite edges, checklist items at the appropriate Bloom level, a resource per subsection, and the ZPD `suggested_path`.
-2. **`create_roadmap_draft`** with the full first draft. Put a `proposed_id` on
-   every subsection you will reference in edges or in `suggested_path`.
-3. **Iterate with `patch_roadmap_draft`.** Pass the current `revision`; batch
-   related edits into one atomic call. Order operations so the graph stays valid
-   at every step (see the transient-cycle rule below).
-4. **`validate_roadmap_draft`** and fix every violation. Validation returns the
-   complete list at once, each naming the offending IDs.
+2. **`create_roadmap_draft`** with the full first draft. Put a `proposed_id` on every subsection you will reference in edges or in `suggested_path`.
+3. **Iterate with `patch_roadmap_draft`.** Pass the current `revision`; batch related edits into one atomic call. Order operations so the graph stays valid at every step (see the transient-cycle rule below).
+4. **`validate_roadmap_draft`** and fix every violation. Validation returns the complete list at once, each naming the offending IDs.
 5. **Confirm with the user**, then **`publish_roadmap`**.
 
 ### Ordering operations and the transient-cycle rule
 
-Edges are added with `add_edge(from_id, to_id)`: this records that `from_id` is a
-prerequisite of `to_id` (learn `from_id` first).
+Edges are added with `add_edge(from_id, to_id)`: this records that `from_id` is a prerequisite of `to_id` (learn `from_id` first).
 
-A `patch` batch is applied **atomically** (all-or-nothing), and every operation
-that adds a prerequisite edge (`add_edge`, or an `add_subsection` carrying
-`prereq_ids`) is checked for acyclicity **after each edge-affecting operation**,
-not just at the end of the batch. So a batch that would create a cycle *midway*
-is rejected even when the final graph would be acyclic.
-**Order your `add_edge` operations so the DAG stays acyclic at each step.** Add
-edges in dependency order (prerequisites first) and never introduce an edge whose
-reverse you plan to remove later in the same batch. The error names the cycle so
-you can reorder and retry.
+A `patch` batch is applied **atomically** (all-or-nothing), and every operation that adds a prerequisite edge (`add_edge`, or an `add_subsection` carrying `prereq_ids`) is checked for acyclicity **after each edge-affecting operation**, not just at the end of the batch. So a batch that would create a cycle *midway* is rejected even when the final graph would be acyclic.
+
+**Order your `add_edge` operations so the DAG stays acyclic at each step.** Add edges in dependency order (prerequisites first) and never introduce an edge whose reverse you plan to remove later in the same batch. The error names the cycle so you can reorder and retry.
 
 ### Optimistic concurrency
 
-Content writes carry the draft's `revision`. If it is stale (someone else edited
-in between) the tool returns a re-read error: fetch the current state, rebase your
-change, and retry with the fresh `revision`. Never guess a revision number.
+Content writes carry the draft's `revision`. If it is stale (someone else edited in between) the tool returns a re-read error: fetch the current state, rebase your change, and retry with the fresh `revision`. Never guess a revision number.
 
 ## The structural validation contract (V1-V8)
 
-`publish` hard-blocks on any of these; `validate` reports all of them at once.
-Author to satisfy them from the start:
+`publish` hard-blocks on any of these; `validate` reports all of them at once. Author to satisfy them from the start:
 
 | Rule | Requirement |
 |------|-------------|
@@ -138,21 +100,15 @@ Author to satisfy them from the start:
 | **V7** | Every **subsection has ≥ 1 resource** |
 | **V8** | **Non-empty titles** on the roadmap and every section, subsection, and checklist item |
 
-V3 and V4 together are why `suggested_path` is load-bearing: it is both the
-complete list of nodes and their learning order. Keep it in sync as you add or
-remove subsections (`set_suggested_path` in a patch).
+V3 and V4 together are why `suggested_path` is load-bearing: it is both the complete list of nodes and their learning order. Keep it in sync as you add or remove subsections (`set_suggested_path` in a patch).
 
 ## Publishing is one-way: confirm first
 
-Publishing freezes the roadmap's structure so followers can track progress
-against it. **Published (and archived) content is immutable.** After publish you
-can only edit presentation metadata (`title`, `description`, `subject_tags`); to
-change structure you must `fork_roadmap` into a new draft and publish that.
+Publishing freezes the roadmap's structure so followers can track progress against it. **Published (and archived) content is immutable.** After publish you can only edit presentation metadata (`title`, `description`, `subject_tags`); to change structure you must `fork_roadmap` into a new draft and publish that.
 
 Because it cannot be undone:
 
-1. **Share a preview** with the user (walk them through the sections and the
-   suggested path; the study-time read tools help you narrate it).
+1. **Share a preview** with the user (walk them through the sections and the suggested path; the study-time read tools help you narrate it).
 2. **Gather feedback** and apply it with `patch`.
 3. **Get explicit confirmation** that they want to publish.
 4. Only then call **`publish_roadmap`**.
@@ -182,8 +138,7 @@ create_roadmap_draft({
 })
 ```
 
-Then iterate. For example, extend the roadmap with a new subsection, wire its
-prerequisite, and keep `suggested_path` in sync, in one atomic patch:
+Then iterate. For example, extend the roadmap with a new subsection, wire its prerequisite, and keep `suggested_path` in sync, in one atomic patch:
 
 ```
 patch_roadmap_draft(roadmap_id, revision, [
@@ -196,8 +151,7 @@ patch_roadmap_draft(roadmap_id, revision, [
 ])
 ```
 
-The `add_edge` names `sub_hashing` before `sub_collisions`, so the DAG stays
-acyclic as the batch applies. Validate, confirm with the user, then publish.
+The `add_edge` names `sub_hashing` before `sub_collisions`, so the DAG stays acyclic as the batch applies. Validate, confirm with the user, then publish.
 
 ## Studying a roadmap
 

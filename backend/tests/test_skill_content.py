@@ -64,7 +64,7 @@ def test_read_skill_markdown_returns_the_guidance_content() -> None:
     content = read_skill_markdown()
     # Load-bearing thesis + the concepts every roadmap author must honor.
     assert "Zone of Proximal Development" in content
-    assert "you are the brain, not the app" in content
+    assert "The app is a tool, not the decision-maker" in content
     # The three write paths are named and their roles distinguished.
     assert "create_roadmap_draft" in content
     assert "patch_roadmap_draft" in content
