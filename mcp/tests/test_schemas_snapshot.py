@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -31,6 +32,7 @@ if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
 
 _SNAPSHOT = Path(__file__).parent / "snapshots" / "tools_schema.json"
+_SKILL = Path(__file__).resolve().parents[2] / "skill" / "SKILL.md"
 
 
 def _settings() -> RsSettings:
@@ -84,6 +86,16 @@ async def test_tool_schemas_match_the_frozen_snapshot() -> None:
         "MCP tool contract drifted. If intentional, regenerate with "
         "WREN_UPDATE_SNAPSHOTS=1 and review the diff."
     )
+
+
+async def test_skill_tool_table_matches_registered_tools() -> None:
+    content = _SKILL.read_text(encoding="utf-8")
+    tool_section = content.partition("## The tools\n")[2].partition("\n## Authoring workflow")[0]
+    listed = re.findall(r"^\| `([^(`]+)\([^`]*\)` \|", tool_section, flags=re.MULTILINE)
+    registered = {tool["name"] for tool in await _contract()}
+
+    assert len(listed) == len(set(listed)), "SKILL.md lists a tool more than once"
+    assert set(listed) == registered
 
 
 # --------------------------------------------------------------------------- #

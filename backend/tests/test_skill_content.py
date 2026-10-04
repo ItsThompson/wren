@@ -54,24 +54,6 @@ def test_guidance_covers_study_and_assesses_more_than_recall() -> None:
     assert "reassess later" in content
 
 
-def test_guidance_lists_study_and_progress_tools() -> None:
-    content = read_skill_markdown()
-    tool_names = (
-        "roadmap_list",
-        "roadmap_get_profile",
-        "roadmap_get",
-        "roadmap_get_overview",
-        "roadmap_get_next",
-        "roadmap_get_node",
-        "roadmap_get_section",
-        "roadmap_search",
-        "progress_get",
-        "progress_update",
-    )
-    for name in tool_names:
-        assert f"| `{name}(" in content
-
-
 def test_media_type_is_utf8_markdown() -> None:
     # The guidance carries non-ASCII (the >= glyph in the validation contract), so
     # the charset is load-bearing, not decorative.
