@@ -29,6 +29,31 @@ def test_bundled_skill_matches_the_canonical_repo_root_copy() -> None:
     )
 
 
+def test_guidance_asks_for_the_learners_target_level() -> None:
+    content = read_skill_markdown()
+    assert "Bloom's taxonomy" in content
+    assert "Ask the learner what level of understanding they want to achieve" in content
+    assert "remember, understand, apply, analyze, evaluate, create" in content
+    assert "checklist items" in content
+
+
+def test_guidance_covers_study_and_assesses_more_than_recall() -> None:
+    content = read_skill_markdown()
+    assert "name: wren-roadmaps" in content
+    assert "## Studying a roadmap" in content
+    assert "prerequisites are the hard constraint" in content
+    assert "Read the primary source" in content
+    assert "focus points" in content
+    assert "study the resources before you explain" in content
+    assert "Assess each checklist item at the level its outcome requires" in content
+    assert "Recall alone does not demonstrate" in content
+    assert "Allow notes and tools" in content
+    assert "verbatim copy" in content
+    assert "Mark an item complete only after" in content
+    assert "progress_update" in content
+    assert "reassess later" in content
+
+
 def test_media_type_is_utf8_markdown() -> None:
     # The guidance carries non-ASCII (the >= glyph in the validation contract), so
     # the charset is load-bearing, not decorative.

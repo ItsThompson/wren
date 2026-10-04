@@ -1,20 +1,19 @@
 ---
-name: wren-roadmap-authoring
+name: wren-roadmaps
 description: >
-  Author genuinely ZPD-ordered, well-structured learning roadmaps in Wren via
-  the connected MCP tools. Activate whenever a user asks you to create, edit, or
-  publish a learning roadmap on Wren. You own the teaching: modelling what the
-  learner already knows, discovering prerequisites, gathering resources, and
-  sequencing by Zone of Proximal Development. Wren stores, validates structure,
-  renders, and tracks progress: it does not do the pedagogy.
+  Create, edit, publish, and study personalized Wren learning roadmaps via the
+  connected MCP tools. Activate for roadmap authoring or study sessions. You own
+  learner modelling, prerequisite discovery, resource selection, ZPD sequencing,
+  and assessment at the learner's chosen Bloom level. Wren stores roadmaps,
+  validates structure, renders content, and tracks progress.
 ---
 
-# Authoring roadmaps in Wren
+# Wren Roadmaps
 
 Wren is a store for personalized **learning roadmaps**. You (the user's agent)
-are connected to it over MCP. This guide steers you to produce a roadmap that is
-genuinely sequenced by the learner's **Zone of Proximal Development (ZPD)**: each
-step is challenging but reachable given what they already know.
+are connected to it over MCP. This guide covers both authoring and studying a
+roadmap. Sequence learning by the learner's **Zone of Proximal Development (ZPD)**:
+each step is challenging but reachable given what they already know.
 
 ## The load-bearing idea: you are the brain, not the app
 
@@ -22,8 +21,7 @@ Wren does five things and no more: it **stores** roadmaps, **validates their
 structure**, **renders** them, **tracks progress**, and **hosts these tools**.
 Everything that makes a roadmap good is your job, done before you write anything:
 
-- **Model the learner.** Ask (or infer from context) what they already know, what
-  they're aiming at, and how much time they have. Do not assume a blank slate.
+- **Model the learner.** Ask what they already know, what level of understanding they want to achieve, and how much time they have. Do not assume a blank slate or a mastery goal.
 - **Discover prerequisites.** Decide which concepts must precede which.
 - **Gather resources.** Find a concrete article/video/course/doc for each node.
 - **Sequence by ZPD.** Order the work so each step builds on the last.
@@ -33,6 +31,14 @@ work. The `suggested_path` you author **is** your sequencing intent, frozen at
 publish time. If the roadmap is not well-sequenced, that is on you, not the tool.
 Keep roadmaps light and iterate with the user: a first draft is a starting point,
 not a final artifact.
+
+## Set the learning target with Bloom's taxonomy
+
+Ask the learner what level of understanding they want to achieve before designing a roadmap. Use plain language rather than asking them to pick a taxonomy label: "Do you want to recognize and explain the ideas, use them in practice, compare and judge approaches, or build something new?" If their goal already answers this, confirm the target rather than asking again. If it remains unclear, ask instead of assuming.
+
+Use the revised Bloom's taxonomy as a guide to the kind of work the learner should be able to do: **remember, understand, apply, analyze, evaluate, create**. These are types of learning outcomes, not a requirement to put every subsection through all six levels. A learner who wants to apply a topic may need to remember and explain its basics first; a learner seeking an overview does not need projects that demand evaluation or creation.
+
+Match the roadmap's depth, resources, and checklist items to the chosen target. Write observable outcomes (for example, "explain why X works" or "apply X to solve Y") rather than vague items such as "understand X". Include lower-level prerequisites where needed, but stop when the learner can demonstrate the requested level. Use ZPD to decide the order of reachable steps; use the target level to decide how far those steps go.
 
 ## The model
 
@@ -85,9 +91,7 @@ use `patch`.
 
 ## Authoring workflow
 
-1. **Model the learner** and design the roadmap off-app: the sections, the
-   subsections and their prerequisite edges, the checklist items, a resource per
-   subsection, and the ZPD `suggested_path`.
+1. **Ask for the learner's target level** and current knowledge, then design the roadmap off-app: sections, subsections and prerequisite edges, checklist items at the appropriate Bloom level, a resource per subsection, and the ZPD `suggested_path`.
 2. **`create_roadmap_draft`** with the full first draft. Put a `proposed_id` on
    every subsection you will reference in edges or in `suggested_path`.
 3. **Iterate with `patch_roadmap_draft`.** Pass the current `revision`; batch
@@ -167,7 +171,7 @@ create_roadmap_draft({
     subsections: [
       { proposed_id: "sub_arrays", title: "Arrays",
         resources: [{ title: "Arrays 101", url: "https://...", type: "article" }],
-        checklist_items: [{ text: "Understand contiguous storage" }] },
+        checklist_items: [{ text: "Explain how contiguous storage supports indexed access" }] },
       { proposed_id: "sub_hashing", title: "Hashing",
         prereq_ids: ["sub_arrays"],
         resources: [{ title: "Hash functions", url: "https://...", type: "video" }],
@@ -194,3 +198,14 @@ patch_roadmap_draft(roadmap_id, revision, [
 
 The `add_edge` names `sub_hashing` before `sub_collisions`, so the DAG stays
 acyclic as the batch applies. Validate, confirm with the user, then publish.
+
+## Studying a roadmap
+
+Start with the roadmap overview and next eligible items, then open the chosen subsection. The suggested path is the default order; prerequisites are the hard constraint. Follow the learner's preference when prerequisites allow it.
+
+Study one subsection at a time:
+
+1. Read the primary source yourself before teaching so explanations match its facts and notation. Use a PDF-to-text skill for PDFs. If the source is unavailable, say so rather than inventing its contents.
+2. Assign the subsection's resources with focus points that name what the learner should extract. Let the learner study the resources before you explain or assess.
+3. Assess each checklist item at the level its outcome requires within the learner's chosen goal: recall a fact, explain an idea in their own words, apply it to a new case, analyze a comparison, evaluate a choice with reasons, or create an artifact. Recall alone does not demonstrate application, analysis, evaluation, or creation. Allow notes and tools when the real task calls for them, but require independent work rather than a verbatim copy of the tutor's answer.
+4. Mark an item complete only after the learner demonstrates its outcome. Set its progress explicitly with `progress_update`. If the learner misses it, teach the specific gap and reassess later with a fresh prompt; mark it complete once they succeed.
