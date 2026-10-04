@@ -53,6 +53,8 @@ Slug IDs are stable and diverge from titles: renaming a subsection does **not** 
 
 ## The tools
 
+### Authoring and publication
+
 | Tool | Use it for |
 |------|-----------|
 | `create_roadmap_draft(roadmap)` | **Initial authoring / import.** The one legitimate full-document write. Returns the `roadmap_id`, `revision`, and any `proposed_id -> minted_id` remap |
@@ -64,6 +66,21 @@ Slug IDs are stable and diverge from titles: renaming a subsection does **not** 
 | `edit_roadmap_metadata(roadmap_id, ...)` | Presentation-only edit (`title`, `description`, `subject_tags`); allowed even on published roadmaps |
 
 **`patch` is the primary path; `replace` is not.** Reach for `replace` only when you genuinely have a whole new document to import. For everyday editing (rename a subsection, add a resource, insert an item, add a prerequisite edge, reorder), use `patch`.
+
+### Study and progress
+
+| Tool | Use it for |
+|------|-----------|
+| `roadmap_list()` | Find your authored and followed roadmaps when the ID is unknown |
+| `roadmap_get_profile(handle)` | Find published public roadmaps from a profile handle |
+| `roadmap_get(roadmap_id)` | Retrieve the full roadmap when inspection or export needs every detail |
+| `roadmap_get_overview(roadmap_id, format?)` | See sections and completion counts; detailed format includes the suggested path |
+| `roadmap_get_next(roadmap_id, format?)` | Find unchecked items whose prerequisites are complete, in suggested-path order |
+| `roadmap_get_node(roadmap_id, subsection_id, format?)` | Study one subsection with its resources, prerequisites, and checklist items |
+| `roadmap_get_section(roadmap_id, section_id, cursor?, include?)` | Browse a section in pages; pass back the returned cursor to continue |
+| `roadmap_search(roadmap_id, query, tags?)` | Search subsections and checklist items by keyword or track tag |
+| `progress_get(roadmap_id, detailed?)` | See completion totals; detailed mode also returns completed item IDs |
+| `progress_update(roadmap_id, item_ids, state)` | Set items complete or incomplete; returns updated progress and the next suggestion |
 
 ## Authoring workflow
 
