@@ -21,7 +21,7 @@ name: wren
 services:
   cloudflared:
     # Pinned third-party image; review quarterly and check release notes.
-    image: cloudflare/cloudflared:2026.7.1
+    image: cloudflare/cloudflared:2026.10.5
     profiles: [tunnels]
     command: tunnel --config /etc/cloudflared/config.yml run
     # Ingress config (non-secret) and named-tunnel credentials (secret) are both
