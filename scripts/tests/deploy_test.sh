@@ -68,7 +68,7 @@ test_filter_first_party_images() {
   out="$(printf '%s\n' \
     'ghcr.io/wren-platform/wren/backend:latest' \
     'postgres:17-alpine' \
-    'cloudflare/cloudflared:2026.7.1' \
+    'cloudflare/cloudflared:2026.10.5' \
     'ghcr.io/acme/wren/mcp:sha-abc' \
     'ghcr.io/wren-platform/wren/frontend:latest' | filter_first_party_images)"
   contains "${out}" "ghcr.io/acme/wren/mcp" || return 1
