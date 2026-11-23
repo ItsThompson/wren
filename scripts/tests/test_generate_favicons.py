@@ -29,7 +29,7 @@ class GenerateFaviconsTest(unittest.TestCase):
         background = (*bytes.fromhex(colors["background"][1:]), 255)
         primary = (*bytes.fromhex(colors["primary"][1:]), 255)
         source = ElementTree.parse(  # noqa: S314  # Trusted repository artwork.
-            ROOT / "shared/branding/off-center.svg"
+            ROOT / "shared/branding/icon.svg"
         )
         original_path = source.find(f".//{SVG_NAMESPACE}path").get("d")
 
@@ -116,7 +116,7 @@ class GenerateFaviconsTest(unittest.TestCase):
             existing = output / "favicon.ico"
             existing.write_bytes(b"existing icon")
             oversized_source = Path(directory) / "oversized.svg"
-            artwork = (ROOT / "shared/branding/off-center.svg").read_text()
+            artwork = (ROOT / "shared/branding/icon.svg").read_text()
             oversized_source.write_text(
                 artwork.replace('viewBox="0 0 96 96"', 'viewBox="0 0 192 192"')
             )

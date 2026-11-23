@@ -32,7 +32,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Generate Wren favicons from the shared brand and theme."
     )
-    parser.add_argument("--source", type=Path, default=ROOT / "shared/branding/off-center.svg")
+    parser.add_argument("--source", type=Path, default=ROOT / "shared/branding/icon.svg")
     parser.add_argument(
         "--output-dir",
         type=Path,
