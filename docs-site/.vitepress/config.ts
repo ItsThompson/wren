@@ -10,6 +10,12 @@ export default defineConfig({
     "Wren documentation: connect an agent and follow learning roadmaps.",
   base: "/",
   srcDir: "docs",
+  head: [
+    ["link", { rel: "icon", href: "/favicon.ico", sizes: "16x16 32x32 48x48" }],
+    ["link", { rel: "icon", href: "/favicon.svg", type: "image/svg+xml", sizes: "any" }],
+    ["link", { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" }],
+    ["link", { rel: "manifest", href: "/site.webmanifest" }],
+  ],
 
   // Light-only, matching the app; dark mode is deferred.
   // Removes the appearance toggle from the navbar entirely.
